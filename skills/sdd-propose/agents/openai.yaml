@@ -1,0 +1,4 @@
+interface:
+  display_name: "SDD Propose"
+  short_description: "Draft or replan SDD changes"
+  default_prompt: "Use $sdd-propose to turn this change idea or mid-change discovery into proposal, design, and task artifacts."

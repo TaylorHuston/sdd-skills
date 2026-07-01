@@ -1,0 +1,4 @@
+interface:
+  display_name: "SDD Explore"
+  short_description: "Explore SDD changes before proposing"
+  default_prompt: "Use $sdd-explore to think through this product or technical change before proposing it."

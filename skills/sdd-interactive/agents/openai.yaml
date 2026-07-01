@@ -1,0 +1,4 @@
+interface:
+  display_name: "SDD Interactive"
+  short_description: "Track small changes with UI handoffs"
+  default_prompt: "Use $sdd-interactive to run a tracked interactive SDD change session with manual UI confirmation steps."

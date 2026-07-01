@@ -1,0 +1,194 @@
+---
+class:
+aliases:
+tags:
+created: 2026-06-13
+modified: 2026-06-29
+archived:
+cssclasses:
+---
+# Story-Driven Development
+
+Story-Driven Development is our workflow for helping solo developers and small teams use LLMs on larger codebases without losing track of what the application actually does.
+
+The durable source of truth is not an implementation plan. It is the current product behavior: Epics, embedded Stories, Requirements, Scenarios, and the evidence that maps those behaviors to code and tests.
+
+The goals are:
+
+1. Make it clear what users can and cannot currently do.
+2. Give future developers and agents a reliable map from behavior to implementation files and verification evidence.
+3. Keep change work scoped, reviewable, and recoverable across sessions.
+4. Preserve enough process structure to avoid drift without turning every change into heavyweight waterfall planning.
+
+## Core Terms
+
+- **Product Brief/PRD**: Private product context, usually stored under `06 Projects/<app>/prd.md`. It describes product purpose, audience, scope, principles, market context when useful, and open product questions. It guides SDD work but is not an implementation checklist.
+- **Epic**: The durable capability file. It lives at `docs/epics/<key>-<###>-epic-name>/epic.md` and contains the capability narrative, embedded Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, and known gaps.
+- **Story**: A durable user-path contract embedded inside an Epic. Stories should usually use "As a <actor>, I want to <action/path>, so that <user-facing value/outcome>." A Story should describe a meaningful user action or outcome, not a tiny UI requirement.
+- **Requirement**: A concrete behavior expectation under a Story. Prefer `SHALL` wording.
+- **Scenario**: A BDD-style example under a Requirement. Prefer `WHEN` / `THEN` wording, including important failure modes.
+- **Implemented By**: A developer starting index for the important files, modules, routes, components, APIs, migrations, or support files that implement or materially support the Story.
+- **Verified By**: A behavior evidence index. It should name concrete tests, assertions, browser/manual scenarios, review artifacts, or other proof tied to the Requirement or Scenario.
+- **Verification Gaps**: Known missing, deferred, or accepted gaps. Empty or stale gaps are misleading and should be cleaned up.
+- **Change**: A dated folder under `docs/changes/yyyy-mm-dd-change-name/` containing `proposal.md`, `design.md`, and `tasks.md`. The change may create a new Epic, update an existing Epic, or both.
+
+## Artifact Authority
+
+When artifacts disagree, reconcile them instead of allowing parallel truths.
+
+Use this authority order:
+
+1. Running implementation and tests reveal what the application actually does.
+2. Epic files are the durable written source of truth for capabilities, embedded Stories, Requirements, Scenarios, implementation evidence, verification evidence, and known gaps.
+3. Active change folders are working records for proposed or in-progress changes.
+4. Product Briefs/PRDs guide product intent, audience, scope, principles, and open product questions.
+5. Reviews, release notes, changelogs, and exploration notes are evidence and transition records.
+6. READMEs and general docs are supporting documentation and must not contradict active Epic truth.
+
+Generated Story indexes, such as `docs/epics/index.md` or `docs/epics/story-index.json`, are optional project-local validation or navigation artifacts. They are not canonical. If a project intentionally maintains them, keep them generated and current; do not hand-maintain them.
+
+Legacy standalone Story files under `docs/stories/`, old Story implementation records, non-Story Task records, and `.llm/plans` or `.llm/reviews` artifacts are migration inputs only unless the user explicitly asks for legacy compatibility.
+
+## Epic And Story Shape
+
+Epics are capability-sized. A useful Epic might cover browsing a catalog, adding items to a cart, purchasing, creating an order, and notifying fulfillment.
+
+Stories are user-path-sized. A useful Story might be: "As a shopper, I want to browse, search, and filter the catalog, so that I can find items I want to buy."
+
+Avoid Stories that are just UI details, such as "As a user, I want to click the plus icon." That detail may belong in a Requirement or Scenario if it matters, but it is rarely a Story by itself.
+
+Stories are not immutable. They may be renamed, reordered, split, merged, moved between Epics, or revised as the product understanding improves. Preserve durable Story IDs when useful, but renumber deliberately when cleanup or migration requires it. Story IDs must be unique across active Epics unless a migration note explicitly documents the temporary duplicate and blocks new work from relying on it.
+
+Requirements and Scenarios should be concrete enough to drive BDD/TDD:
+
+```text
+Requirement R1: The catalog SHALL support filtering by item category.
+
+Scenario R1-S1:
+WHEN a shopper selects a category filter
+THEN the catalog shows only items in that category.
+```
+
+Capture important failure modes as Scenarios when they affect user-visible behavior, data integrity, permissions, payment flow, destructive actions, or recovery.
+
+## Change Workflow
+
+Use dated change folders for proposed and active work:
+
+```text
+docs/changes/yyyy-mm-dd-change-name/
+  proposal.md
+  design.md
+  tasks.md
+  review.md        # only when review finds deficiencies
+```
+
+`proposal.md` defines the problem, goal, scope, non-goals, affected Epics, and expected user/product outcome.
+
+`design.md` is the high-level technical approach. It should explain the chosen approach, important alternatives considered, risks, dependencies, migration or data implications, and how the Epic/Story/Requirement truth will change. It should not become a step-by-step implementation plan.
+
+`tasks.md` is the adaptive implementation ledger. It records `Resume Here`, task progress, implementation evidence, verification evidence, manual UI confirmation status, changelog impact, review status, branch/PR/merge state, deferred gaps, and closeout readiness.
+
+Changes may be small or large. Small fixes still deserve enough tracking to keep Epic truth accurate. Large changes should remain adaptable rather than pretending every implementation phase is knowable up front.
+
+When implementation or manual feedback discovers a new or meaningfully changed Requirement, Scenario, constraint, or Epic ownership question that needs planning before more code changes, use `/sdd-propose --replan` against the active change. That mode updates `proposal.md`, `design.md`, and `tasks.md`, records the planning update, and then hands back to a fresh `/sdd-apply`.
+
+## Implementation And Review
+
+Implementation should usually follow a BDD/TDD loop around each Requirement or Scenario:
+
+1. Write or identify the failing or characterizing test when practical.
+2. Implement the smallest slice that satisfies the Requirement or Scenario.
+3. Run the focused verification.
+4. Update `tasks.md` and affected Epic truth.
+5. Commit the slice when commits are authorized and the app branch policy allows it.
+
+Use subagents for isolated implementation slices, specialist guidance, and fresh-context review when the work is non-trivial. The orchestrating agent remains responsible for validating subagent claims, reconciling artifacts, and deciding whether to stop.
+
+Manual UI confirmation is part of the workflow for browser-visible or otherwise user-facing changes. The agent should walk the user through what to manually confirm, record the status in `tasks.md`, and classify feedback as implementation bug, requirement change, follow-up, or accepted gap.
+
+`/sdd-review` is the local PR-style gate after implementation. It independently checks proposal/design/tasks, Epic truth, Requirements, Scenarios, tests, manual confirmation, code quality, security, docs, changelog impact, branch policy, and closeout consistency. If it finds deficiencies, it creates or updates `review.md`.
+
+`/sdd-release` is for promotion to `main` or another production branch. It runs release checks, updates `CHANGELOG.md` following Keep a Changelog, pushes the release branch when authorized, and opens the production PR. It does not merge, deploy, tag, or publish without explicit authorization.
+
+## Branching
+
+Each application repo owns its branch policy in its local `AGENTS.md`. Read it before creating branches, choosing merge targets, opening PRs, running reviews, or planning implementation.
+
+When no project-local policy exists, prefer:
+
+- `main` as production.
+- `develop` as integration.
+- short-lived branches from `develop`.
+- local `/sdd-review` before routine integration.
+- remote PRs for `main` promotion through `/sdd-release`.
+
+Bias toward an Epic or change working branch when Stories depend on each other. This avoids breaking prerequisite chains across separate branches.
+
+## Definition Of Done For A Story
+
+A Story is ready for handoff only when:
+
+- It describes the current user path and observable outcome.
+- Requirements and Scenarios match implemented behavior or clearly identify known gaps.
+- `Implemented By` points to the important files a developer should inspect first.
+- `Verified By` contains concrete evidence tied to Requirements or Scenarios.
+- `Verification Gaps` contains only real remaining gaps.
+- Production-path and mock-boundary risks have proof or explicit gaps.
+- Manual UI confirmation is complete, not applicable, pending user, or recorded as an accepted gap.
+- The active change's `tasks.md` does not contradict Epic truth, review state, changelog state, PR/merge state, folder state, or accepted deferred gaps.
+
+## Definition Of Done For An Epic
+
+An Epic is healthy only when:
+
+- Its outcome and current scope match what the embedded Stories actually provide.
+- Stories are in a logical order and remain appropriately scoped.
+- Story IDs are unique across active Epics unless a documented migration is resolving a duplicate.
+- Requirements and Scenarios are concrete enough to guide implementation and verification.
+- `Implemented By`, `Verified By`, and `Verification Gaps` are current.
+- Related active or closed changes do not contradict Epic truth.
+- Any maintained generated indexes are current and do not point to missing evidence.
+- Deferred scope and open decisions remain accurate.
+
+## Anti-Patterns
+
+Avoid:
+
+- Creating a new Story to avoid fixing a stale existing Story.
+- Treating `proposal.md`, `design.md`, or `tasks.md` as more authoritative than implementation reality or Epic truth.
+- Turning Stories into tiny UI control requirements.
+- Hiding product scope expansion inside technical design or implementation tasks.
+- Recording only generic command logs in `Verified By`.
+- Treating fake-backed tests as full production-path proof when the real boundary is risky.
+- Hand-maintaining generated indexes.
+- Closing, merging, or promoting a change while Epic truth, tasks, review status, changelog state, PR/merge state, or manual confirmation status remains contradictory.
+
+## Skill Workflow
+
+Use the skills to apply this doctrine consistently:
+
+| Skill | Purpose |
+|---|---|
+| `/sdd-prd` | Create or revise the private Product Brief/PRD that guides product scope, audience, principles, market context, monetization, and open product questions. |
+| `/sdd-explore` | Think through product ideas, technical options, codebase findings, or requirement questions before deciding whether to create a change. |
+| `/sdd-propose` | Create or update a dated change folder with `proposal.md`, `design.md`, and `tasks.md`; use `/sdd-propose --replan` for mid-change discoveries that need planning before `/sdd-apply` resumes. |
+| `/sdd-interactive` | Create and apply a lightweight tracked change in one working session for small concrete changes that do not need a full upfront proposal pass. |
+| `/sdd-apply` | Implement or continue an active change using Requirement/Scenario-driven slices, subagent delegation when useful, verification, artifact reconciliation, and manual UI confirmation. |
+| `/sdd-review` | Run the local PR-style integration gate after implementation or before closing a change. |
+| `/sdd-epic-verify` | Audit an Epic end to end against current implementation, tests, evidence, change lifecycle state, and Story/Requirement/Scenario quality. |
+| `/sdd-space-status` | Produce a read-only status overview across PRDs, Epics, changes, reviews, risks, and suggested next actions. |
+| `/sdd-orphan-audit` | Find likely orphaned code/tests and SDD traceability gaps conservatively. |
+| `/sdd-release` | Prepare a production-branch release PR, including release checks and changelog updates. |
+
+Do not create separate compatibility-wrapper skills for older command names. Canonical new work should use the current `/sdd-*` skill names directly.
+
+## Skill Enforcement Boundary
+
+This document defines the durable doctrine for Story-Driven Development. Skills operationalize the doctrine for specific workflows.
+
+If this document and a skill disagree, update the skill or this document so they align rather than treating the disagreement as acceptable drift.
+
+Do not duplicate full canonical templates here. Templates belong in the relevant skill assets.
+
+Every SDD skill must end with a self-improvement closeout. After the normal result, the agent should ask itself "How well did this work, and what could have been improved?" and tell the user the concise conclusion. If there is a concrete skill, process, template, or doctrine improvement to consider, name it explicitly; otherwise say no specific process improvement was found.

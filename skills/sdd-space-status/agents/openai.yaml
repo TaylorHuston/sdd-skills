@@ -1,0 +1,4 @@
+interface:
+  display_name: "SDD Space Status"
+  short_description: "Summarize SDD workflow status across a project"
+  default_prompt: "Use $sdd-space-status to summarize current SDD Epics, changes, risks, and next steps for this project."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "SDD Apply"
+  short_description: "Apply SDD changes with UI handoffs"
+  default_prompt: "Use $sdd-apply to apply the active SDD change with specialist-guided slices and manual UI confirmation steps."

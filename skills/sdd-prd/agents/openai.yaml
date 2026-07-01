@@ -1,0 +1,4 @@
+interface:
+  display_name: "SDD PRD"
+  short_description: "Create SDD product briefs through interview"
+  default_prompt: "Use $sdd-prd to define or refresh the product brief before proposing SDD changes."

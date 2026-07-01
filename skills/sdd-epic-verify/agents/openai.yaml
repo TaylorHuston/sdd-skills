@@ -1,0 +1,4 @@
+interface:
+  display_name: "SDD Epic Verify"
+  short_description: "Audit Epic drift against implementation"
+  default_prompt: "Use $sdd-epic-verify to audit whether this Epic still matches the current implementation."

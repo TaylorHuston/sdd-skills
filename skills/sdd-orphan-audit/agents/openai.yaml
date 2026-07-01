@@ -1,0 +1,4 @@
+interface:
+  display_name: "SDD Orphan Audit"
+  short_description: "Find SDD traceability orphan candidates"
+  default_prompt: "Use $sdd-orphan-audit to find orphaned code, tests, and stale SDD traceability evidence."

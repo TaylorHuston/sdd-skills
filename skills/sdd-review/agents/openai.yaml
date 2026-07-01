@@ -1,0 +1,4 @@
+interface:
+  display_name: "SDD Review"
+  short_description: "Review SDD changes for integration"
+  default_prompt: "Use $sdd-review to verify the active SDD change with manual UI confirmation and local integration readiness."

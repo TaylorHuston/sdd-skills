@@ -1,0 +1,4 @@
+interface:
+  display_name: "SDD Release"
+  short_description: "Prepare main release PRs"
+  default_prompt: "Use $sdd-release to run release checks, update the changelog, and open a main PR for remote CI and review."
