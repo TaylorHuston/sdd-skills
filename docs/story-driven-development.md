@@ -1,11 +1,6 @@
 ---
-class:
-aliases:
-tags:
 created: 2026-06-13
 modified: 2026-06-30
-archived:
-cssclasses:
 ---
 # Story-Driven Development
 
