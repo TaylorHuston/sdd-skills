@@ -89,7 +89,7 @@ Update `tasks.md` after Discovery with current state, branch/ref, expected dirty
 
 Stop before code edits if the change artifacts are missing, contradictory, too ambiguous for the next slice, or require a product/scope decision. If the issue is a small artifact repair and the user has asked to apply the change, patch the artifact and continue.
 
-If implementation reveals meaningful product drift from `06 Projects/<project>/prd.md`, stop or record the drift and recommend `/sdd-prd` unless the user has explicitly authorized updating product direction in the same run.
+If implementation reveals meaningful product drift from project planning docs or a PRD/Product Brief, stop or record the drift and recommend `/sdd-prd` unless the user has explicitly authorized updating product direction in the same run.
 
 ## Manual Feedback Loop
 

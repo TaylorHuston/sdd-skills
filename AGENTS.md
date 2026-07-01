@@ -1,10 +1,15 @@
+---
+modified: 2026-06-30
+---
 # AGENTS.md
 
 Guidance for assistants working in this repository.
 
 ## Purpose
 
-This repository packages reusable Codex skills for Story-Driven Development.
+This repository packages reusable skills for Story-Driven Development.
+
+The packaged skills follow the `.agents/` skill-folder convention and should be usable by tools that respect that structure.
 
 ## Resources
 

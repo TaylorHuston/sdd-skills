@@ -1,6 +1,6 @@
 ---
 name: sdd-explore
-description: Enter SDD explore mode as a thinking partner for product ideas, technical options, codebase investigation, and requirement clarification before or during a SDD change. Use when the user invokes /sdd-explore, wants to think through a vague idea, compare approaches, inspect existing changes, investigate relevant code or Epic specs, or decide whether to run sdd-propose. Do not implement code; optionally write a dated exploration summary under 06 Projects/project/exploration when the user wants the conclusions remembered.
+description: Enter SDD explore mode as a thinking partner for product ideas, technical options, codebase investigation, and requirement clarification before or during a SDD change. Use when the user invokes /sdd-explore, wants to think through a vague idea, compare approaches, inspect existing changes, investigate relevant code or Epic specs, or decide whether to run sdd-propose. Do not implement code; optionally write a dated exploration summary under the project's private planning docs when the user wants the conclusions remembered.
 ---
 
 # SDD Explore
@@ -30,7 +30,7 @@ Read or inspect only what is relevant:
 - legacy changes under `changes/` only when pre-migration decisions may matter
 - Epic specs under `docs/epics/*/epic.md`
 - code paths only when the question depends on current implementation reality
-- `06 Projects/<project>/exploration/` when prior exploration summaries are likely relevant
+- project private planning docs or `exploration/` notes when prior exploration summaries are likely relevant
 
 If the project is unclear and the answer would affect where a summary is written, ask the user which project owns the exploration.
 
@@ -45,7 +45,7 @@ Use this routing:
 | Product motivation, scope, or affected Epic actions | `docs/changes/yyyy-mm-dd-change-name/proposal.md` |
 | Technical approach, alternatives, risks, constraints, or verification strategy | `docs/changes/yyyy-mm-dd-change-name/design.md` |
 | Work item, blocker, resume state, implementation note, or verification result | `docs/changes/yyyy-mm-dd-change-name/tasks.md` |
-| Durable exploratory conclusion that should not become a change yet | `06 Projects/<project>/exploration/yyyy-mm-dd-<slug>.md` |
+| Durable exploratory conclusion that should not become a change yet | `<planning-root>/<project>/exploration/yyyy-mm-dd-<slug>.md` |
 
 If no change exists and the idea has crystallized enough to formalize, offer to run `sdd-propose`.
 
@@ -56,7 +56,7 @@ Write a summary only when the user asks to save, capture, summarize, remember, o
 Default location:
 
 ```text
-06 Projects/<project>/exploration/yyyy-mm-dd-<slug>.md
+<planning-root>/<project>/exploration/yyyy-mm-dd-<slug>.md
 ```
 
 Use the local shell date for `yyyy-mm-dd`. Keep the slug short and based on the topic. Create the `exploration/` directory if needed. If a same-day file already exists for the topic, update it when clearly continuing the same exploration; otherwise use a more specific slug.
@@ -104,7 +104,7 @@ If the exploration later becomes a SDD change, leave the summary as source conte
 - Do not create `proposal.md`, `design.md`, or `tasks.md` unless the user asks to propose or capture into an existing change.
 - Do not create a mandatory discussion record.
 - Do not pressure the user to formalize; offer and move on.
-- Keep summaries private under `06 Projects/`, not in public app docs.
+- Keep summaries in private planning docs, not in public app docs.
 
 ## Ending
 

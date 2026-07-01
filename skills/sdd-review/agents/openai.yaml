@@ -1,4 +1,4 @@
 interface:
   display_name: "SDD Review"
   short_description: "Review SDD changes for integration"
-  default_prompt: "Use $sdd-review to verify the active SDD change with manual UI confirmation and local integration readiness."
+  default_prompt: "Use $sdd-review to run a deep local PR-style review of the active SDD change against its target branch, including SDD truth, security, manual UI confirmation, and integration readiness."

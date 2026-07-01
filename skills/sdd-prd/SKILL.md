@@ -23,7 +23,7 @@ Use this boundary:
 
 | Artifact | Owns |
 |---|---|
-| `06 Projects/<app>/prd.md` | product purpose, audience, scope, principles, product-level capability areas, market/monetization, open product questions |
+| `<planning-root>/<app>/prd.md` | product purpose, audience, scope, principles, product-level capability areas, market/monetization, open product questions |
 | `docs/changes/yyyy-mm-dd-change-name/proposal.md` | why this specific change exists and what Epic actions it proposes |
 | `docs/changes/yyyy-mm-dd-change-name/design.md` | high-level technical approach plus proposed Epic/Story/Requirement/Scenario changes |
 | `docs/changes/yyyy-mm-dd-change-name/tasks.md` | implementation ledger, resume state, verification ledger, and closeout state |

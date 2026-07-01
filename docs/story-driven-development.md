@@ -3,28 +3,31 @@ class:
 aliases:
 tags:
 created: 2026-06-13
-modified: 2026-06-29
+modified: 2026-06-30
 archived:
 cssclasses:
 ---
 # Story-Driven Development
 
-Story-Driven Development is our workflow for helping solo developers and small teams use LLMs on larger codebases without losing track of what the application actually does.
+Story-Driven Development is our workflow for helping solo developers and small teams use LLMs on larger codebases without losing track of what the application actually does or where that behavior lives in the codebase.
 
-The durable source of truth is not an implementation plan. It is the current product behavior: Epics, embedded Stories, Requirements, Scenarios, and the evidence that maps those behaviors to code and tests.
+The north star is an evidence-backed map from product behavior to implementation. Running behavior and tests reveal reality; Epic/Story truth is the durable written map. SDD's job is to keep those aligned so future work starts from the right behavior, the right files, and the right verification evidence instead of rediscovering the system from scratch.
+
+The durable source of truth is not an implementation plan, external report, chat transcript, Confluence-style page, or game of telephone. It is the current product behavior recorded in Epics, embedded Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, and known gaps. If a behavior is not represented in an Epic/Story, it is not accepted as durable implemented product truth until the Epic/Story map is updated.
 
 The goals are:
 
 1. Make it clear what users can and cannot currently do.
 2. Give future developers and agents a reliable map from behavior to implementation files and verification evidence.
-3. Keep change work scoped, reviewable, and recoverable across sessions.
-4. Preserve enough process structure to avoid drift without turning every change into heavyweight waterfall planning.
+3. Make "what is actually implemented?" answerable from Epic/Story truth without hunting through stale reports or relying on memory.
+4. Keep change work scoped, reviewable, and recoverable across sessions.
+5. Preserve enough process structure to avoid drift without turning every change into heavyweight waterfall planning.
 
 ## Core Terms
 
-- **Product Brief/PRD**: Private product context, usually stored under `06 Projects/<app>/prd.md`. It describes product purpose, audience, scope, principles, market context when useful, and open product questions. It guides SDD work but is not an implementation checklist.
+- **Product Brief/PRD**: Private product context, usually stored in project planning docs outside the public app surface. It describes product purpose, audience, scope, principles, market context when useful, and open product questions. It guides SDD work but is not an implementation checklist.
 - **Epic**: The durable capability file. It lives at `docs/epics/<key>-<###>-epic-name>/epic.md` and contains the capability narrative, embedded Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, and known gaps.
-- **Story**: A durable user-path contract embedded inside an Epic. Stories should usually use "As a <actor>, I want to <action/path>, so that <user-facing value/outcome>." A Story should describe a meaningful user action or outcome, not a tiny UI requirement.
+- **Story**: A durable user-path contract embedded inside an Epic. Stories should usually use `"As a <actor>, I want to <action/path>, so that <user-facing value/outcome>."` A Story should describe a meaningful user action or outcome, not a tiny UI requirement.
 - **Requirement**: A concrete behavior expectation under a Story. Prefer `SHALL` wording.
 - **Scenario**: A BDD-style example under a Requirement. Prefer `WHEN` / `THEN` wording, including important failure modes.
 - **Implemented By**: A developer starting index for the important files, modules, routes, components, APIs, migrations, or support files that implement or materially support the Story.
@@ -39,11 +42,13 @@ When artifacts disagree, reconcile them instead of allowing parallel truths.
 Use this authority order:
 
 1. Running implementation and tests reveal what the application actually does.
-2. Epic files are the durable written source of truth for capabilities, embedded Stories, Requirements, Scenarios, implementation evidence, verification evidence, and known gaps.
+2. Epic files are the durable written map for accepted implemented capabilities, embedded Stories, Requirements, Scenarios, implementation evidence, verification evidence, and known gaps.
 3. Active change folders are working records for proposed or in-progress changes.
 4. Product Briefs/PRDs guide product intent, audience, scope, principles, and open product questions.
 5. Reviews, release notes, changelogs, and exploration notes are evidence and transition records.
 6. READMEs and general docs are supporting documentation and must not contradict active Epic truth.
+
+There should be no separate durable answer to "what is implemented?" outside Epic/Story truth. If code exists but no Epic/Story records the behavior, treat it as undocumented drift. Either add it to the appropriate Epic/Story with `Implemented By` and `Verified By` evidence, explicitly record it as a gap or orphan, or remove it through a tracked change.
 
 Generated Story indexes, such as `docs/epics/index.md` or `docs/epics/story-index.json`, are optional project-local validation or navigation artifacts. They are not canonical. If a project intentionally maintains them, keep them generated and current; do not hand-maintain them.
 
@@ -91,6 +96,8 @@ docs/changes/yyyy-mm-dd-change-name/
 
 Changes may be small or large. Small fixes still deserve enough tracking to keep Epic truth accurate. Large changes should remain adaptable rather than pretending every implementation phase is knowable up front.
 
+Planning artifacts are documentation. Creating or revising PRDs, SDD change folders, proposal/design/tasks files, Epic drafts, review records, and similar planning notes does not by itself require a feature branch. Those artifacts may be created on the current documentation branch when project policy allows it. The implementation branch requirement begins when work changes application code, tests, schemas, configuration, generated app artifacts, or runtime behavior.
+
 When implementation or manual feedback discovers a new or meaningfully changed Requirement, Scenario, constraint, or Epic ownership question that needs planning before more code changes, use `/sdd-propose --replan` against the active change. That mode updates `proposal.md`, `design.md`, and `tasks.md`, records the planning update, and then hands back to a fresh `/sdd-apply`.
 
 ## Implementation And Review
@@ -120,6 +127,8 @@ When no project-local policy exists, prefer:
 - `main` as production.
 - `develop` as integration.
 - short-lived branches from `develop`.
+- planning and documentation-only edits on the current documentation or integration branch when project policy allows it.
+- `change/*`, `fix/*`, or `misc/*` branches before application code, tests, schemas, configuration, generated app artifacts, or runtime behavior change.
 - local `/sdd-review` before routine integration.
 - remote PRs for `main` promotion through `/sdd-release`.
 
@@ -146,7 +155,7 @@ An Epic is healthy only when:
 - Stories are in a logical order and remain appropriately scoped.
 - Story IDs are unique across active Epics unless a documented migration is resolving a duplicate.
 - Requirements and Scenarios are concrete enough to guide implementation and verification.
-- `Implemented By`, `Verified By`, and `Verification Gaps` are current.
+- `Implemented By`, `Verified By`, and `Verification Gaps` are current enough that a future developer can start investigation from the Epic instead of rediscovering the relevant code.
 - Related active or closed changes do not contradict Epic truth.
 - Any maintained generated indexes are current and do not point to missing evidence.
 - Deferred scope and open decisions remain accurate.
@@ -156,6 +165,7 @@ An Epic is healthy only when:
 Avoid:
 
 - Creating a new Story to avoid fixing a stale existing Story.
+- Allowing implemented behavior to live only in code, chat, a stale report, or a private memory instead of the relevant Epic/Story.
 - Treating `proposal.md`, `design.md`, or `tasks.md` as more authoritative than implementation reality or Epic truth.
 - Turning Stories into tiny UI control requirements.
 - Hiding product scope expansion inside technical design or implementation tasks.

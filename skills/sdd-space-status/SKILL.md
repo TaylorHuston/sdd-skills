@@ -32,7 +32,7 @@ Start from any of these:
 Expected artifact locations:
 
 ```text
-<vault-root>/06 Projects/<project>/prd.md
+<planning-root>/<project>/prd.md
 <app-root>/docs/epics/<key>-<###>-epic-name>/epic.md
 <app-root>/docs/epics/<key>-<###>-epic-name>/reviews/*.md
 <app-root>/docs/changes/<yyyy-mm-dd-change-name>/{proposal.md,design.md,tasks.md,review.md}

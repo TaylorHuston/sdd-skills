@@ -44,7 +44,7 @@ Use:
 3. Load only the context needed to propose accurately.
    - Read project guidance such as `AGENTS.md`, `README.md`, and product/PRD context when present.
    - Read root `CHANGELOG.md` when it exists and the change may be user-facing, release-relevant, security-relevant, migration-relevant, operationally notable, or public documentation-worthy.
-   - Read `06 Projects/<project>/prd.md` when available; if product direction is missing or stale and the change depends on it, recommend `/sdd-prd` without blocking small experiments.
+   - Read project planning docs or PRD/Product Brief files when available; if product direction is missing or stale and the change depends on it, recommend `/sdd-prd` without blocking small experiments.
    - Inspect existing active changes under `docs/changes/` and closed changes under `docs/changes/closed/` only enough to avoid duplicate or conflicting scope.
    - In `--replan`, read the active change's `proposal.md`, `design.md`, `tasks.md`, any `review.md`, relevant implementation ledger entries, manual feedback, recent failing/passing checks, and enough current code or tests to understand the discovery.
    - Inspect legacy `changes/` only enough to avoid duplicate scope or continue a pre-migration change; do not create new SDD changes there.
@@ -155,7 +155,7 @@ In `--replan`:
 - Avoid vague Scenario text such as "WHEN this Story's user-visible workflow is exercised". Rewrite it into a real condition/action and observable result.
 - Treat root `CHANGELOG.md` as public release communication, not SDD workflow truth. Use Keep a Changelog 1.1.0 conventions: `Unreleased` first, newest releases first, ISO dates for releases, and grouped entry types `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security`.
 - Do not put private vault context, SDD implementation ledger details, raw Requirement/Scenario lists, internal task IDs, secrets, or speculative roadmap promises in `CHANGELOG.md`.
-- Flag conflicts with `06 Projects/<project>/prd.md` as product drift; do not update PRD direction from this skill unless the user explicitly asks.
+- Flag conflicts with project planning docs or PRD/Product Brief files as product drift; do not update PRD direction from this skill unless the user explicitly asks.
 - Put high-level technical approach, alternatives, constraints, transition contracts, and verification strategy in `design.md`, not in separate approach artifacts by default.
 - Put implementation progress, resume state, task status, verification results, and closeout state in `tasks.md`, not in separate implementation stubs or ledgers by default.
 - Put review outcome, review record path or clean-review note, manual confirmation status, changelog status, PR/merge state, and accepted deferred gaps in `tasks.md` so closeout can be validated without a special mode.

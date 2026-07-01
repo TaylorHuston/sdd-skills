@@ -1,17 +1,19 @@
 ---
 name: sdd-review
-description: Review a SDD change as the local integration gate after /sdd-apply or before closing, creating a docs/changes/yyyy-mm-dd-change-name/review.md file when deficiencies are found, verifying proposal.md, design.md, tasks.md, Epic truth, unique Story IDs, Requirements, Scenarios, tests, manual confirmation status, code quality, security, documentation, changelog, branch policy, source-vs-target merge readiness, and closeout consistency. Use when the user invokes /sdd-review, asks to verify a SDD change, run a local PR-style review, prepare integration readiness, address review findings, close or finish a change, create a non-production PR, or merge a SDD change into an integration branch. Use /sdd-release instead for main/production promotion, release PRs, full release checks, changelog finalization, or remote CI / AI-assisted review for production acceptance.
+description: Review a SDD change as the local integration gate after /sdd-apply or before closing, creating a docs/changes/yyyy-mm-dd-change-name/review.md file when deficiencies are found, verifying proposal.md, design.md, tasks.md, Epic truth, unique Story IDs, Requirements, Scenarios, tests, manual confirmation status, code quality, security, documentation, changelog, branch policy, source-vs-target merge readiness, and closeout consistency. Use when the user invokes /sdd-review, asks to verify a SDD change, run a local PR-style review, prepare integration readiness, address review findings, close or finish a change, create a non-production PR, merge a SDD change into an integration branch, or merge-and-close a ready change according to the app's merge policy. Use /sdd-release instead for main/production promotion, release PRs, full release checks, changelog finalization, or remote CI / AI-assisted review for production acceptance.
 ---
 
 # SDD Review
 
 Review a SDD change like a local pull request. This is the final independent gate after `/sdd-apply`: confirm the implemented change satisfies its artifacts, the durable Epic is current, verification is strong enough, and the source branch is ready for local integration, PR, or merge according to the app's branch policy.
 
+Default behavior is deep review. A clean `/sdd-review` means the source branch is ready to integrate into the selected target branch, not merely that the active change folder looks plausible. The primary review surface is the source-vs-target diff plus the SDD artifacts that claim to explain it. Use cheaper or narrower modes only when the user asks for them explicitly.
+
 Use `/sdd-release` instead when the task is preparing a release PR to `main`, running full release checks, finalizing `CHANGELOG.md`, or cutting a release.
 
 For the default solo-developer workflow, use `/sdd-review` to prepare routine changes for the project integration branch. Remote PRs are optional for routine integration unless project-local policy or the user explicitly requires one; production-branch promotion belongs to `/sdd-release`.
 
-Do not treat this as more implementation planning. In default mode, fix narrow, clearly safe deficiencies as they are found, commit those fixes after affected verification passes, report what was fixed and committed, and stop. The user may rerun `/sdd-review` manually for a fresh-context pass until it reports clean. If the review finds deficiencies that are unsafe to fix automatically, write or update `review.md` in the active change folder so the findings can be addressed in a later `/sdd-apply` or targeted review pass.
+Do not treat this as more implementation planning. In default mode, run the full PR-style review, use fresh-context delegated review passes when available and useful, fix narrow clearly safe deficiencies as they are found, commit those fixes after affected verification passes, report what was fixed and committed, and stop. The user may rerun `/sdd-review` manually for a fresh-context pass until it reports clean. If the review finds deficiencies that are unsafe to fix automatically, write or update `review.md` in the active change folder so the findings can be addressed in a later `/sdd-apply` or targeted review pass.
 
 Always validate closeout readiness as part of review. If the user asks to finish, close, merge-and-close, or otherwise complete the change, perform the closeout mutation only after review passes, branch/PR/merge/acceptance state is clear, and the change-local artifacts agree with reality.
 
@@ -21,7 +23,12 @@ Start from an explicit change folder, change name, source branch, target branch,
 
 Supported modes:
 
-- Default: review, fix narrow clearly safe in-scope findings once, rerun affected checks, commit only the safe-fix diff, report what was fixed and committed, and stop with the current verdict. Do not create a PR, merge, push, or close the change.
+- Default: run the deep PR-style review against the selected target branch, use delegated fresh-context review passes when available and materially useful, fix narrow clearly safe in-scope findings once, rerun affected checks, commit only the safe-fix diff, report what was fixed and committed, and stop with the current verdict. Do not create a PR, merge, push, or close the change.
+- `--deep`: explicit alias for default behavior.
+- `--fast`: run a lightweight review on the main thread only. Still check source-vs-target diff, required SDD artifacts, branch policy, dirty state, security, and verification evidence, but skip delegated review passes and broad optional checks unless a risk is obvious.
+- `--artifact-only`: review SDD artifacts, Epic truth, lifecycle state, manual confirmation status, changelog status, and PRD alignment when applicable. Do not review application code beyond what is necessary to confirm artifact claims. Do not return `ready` for integration from this mode; use `artifact-ready`, `changes-requested`, or `blocked`.
+- `--diff-only`: review the source-vs-target code/config/test/docs diff, branch readiness, security, and verification evidence. Do not reconcile full Epic or PRD truth beyond obvious contradictions. Do not return full SDD closeout readiness from this mode.
+- `--no-delegate`: use the main thread only. Use when subagent tooling is unavailable, the change is tiny, or delegation would add more noise than useful independent review.
 - `--check`: review only and do not edit any files, including `review.md`.
 - `--no-fix`: review only, write or update `review.md` when deficiencies exist, and report the verdict.
 - `--fix`: same safe-fix behavior as default, kept as an explicit alias for callers that want to signal remediation intent. Do not broaden scope.
@@ -29,7 +36,8 @@ Supported modes:
 - `--max-iterations N`: cap `--until-ready`; default to `3`.
 - `--pr`: when all gates pass, create a non-production pull request following the app's branch policy. If the target is the production branch, use `/sdd-release` instead.
 - `--merge`: when all gates pass, merge to the non-production integration branch following the app's branch policy. If the target is the production branch, use `/sdd-release` instead.
-PR creation, merge, push, rebase, branch deletion, deployment, destructive data changes, credentials, production actions, and moving a change folder to `docs/changes/closed/` require explicit user authorization through the request or active workflow context. A request to create a PR or merge into the production branch is a release request and should route to `/sdd-release` unless the user explicitly states otherwise. A local commit containing only safe review fixes is part of default review remediation and does not require separate authorization. If branch policy is unclear, stop before PR, merge, or closeout.
+- `--merge-and-close`: when all gates pass, complete the policy-defined non-production merge path and close the change. Treat this as explicit authorization for both the non-production merge/integration action and the closeout mutation, but not for push, rebase, branch deletion, deployment, production action, or remote PR merge unless the request or app policy explicitly covers that action.
+PR creation, merge, merge-and-close, push, rebase, branch deletion, deployment, destructive data changes, credentials, production actions, and moving a change folder to `docs/changes/closed/` require explicit user authorization through the request or active workflow context. A request to create a PR or merge into the production branch is a release request and should route to `/sdd-release` unless the user explicitly states otherwise. A local commit containing only safe review fixes is part of default review remediation and does not require separate authorization. If branch or merge policy is unclear, stop before PR, merge, or closeout.
 
 ## Select The Change And Branches
 
@@ -41,11 +49,53 @@ Use explicit inputs first. Otherwise:
 4. Auto-select only when exactly one active change exists.
 5. Ask the user when selection is ambiguous.
 
-Resolve source and target branches from explicit input, then project-local `AGENTS.md` branch policy. Use the current branch as source only when that matches the policy. Do not assume `main`, `develop`, branch prefixes, or merge direction from another app.
+Resolve source and target branches from explicit input, then project-local `AGENTS.md` branch and merge policy. Use the current branch as source only when that matches the policy. Do not assume `main`, `develop`, branch prefixes, merge strategy, closeout branch, or merge direction from another app.
 
 If the requested PR or merge target is the production branch, stop and route to `/sdd-release` unless project-local policy defines a different non-release production-branch workflow and the user explicitly confirms it.
 
-Always announce the selected change, source branch, target branch, and whether PR/merge actions are authorized.
+Always announce the selected change, source branch, target branch, and whether PR, merge, and closeout actions are authorized.
+
+## Build The Review Bundle
+
+Before deciding any verdict, build a review bundle for the selected source and target. Prefer explicit refs from the user or app policy; otherwise infer conservatively and stop if the target is ambiguous.
+
+Capture:
+
+- app root and workflow root
+- selected change folder
+- source branch or ref
+- target branch or ref
+- merge base
+- source-only commits
+- target-only commits, when useful for behind-state risk
+- changed file list from `target...source`
+- source-vs-target diff stat
+- source-vs-target diff
+- working tree dirty state, separated into app/source repo, workflow artifact repo, and unrelated repos
+- untracked files relevant to the app/source repo
+- conflict check result without performing a merge
+- branch policy and whether the current source/target pair satisfies it
+- active `review.md`, `tasks.md` review state, manual confirmation state, changelog state, PR/merge state, and closeout state
+
+Use commands like these when the repo supports them, adjusting refs to the app policy:
+
+```bash
+git status --short
+git branch --show-current
+git merge-base TARGET SOURCE
+git log --oneline TARGET..SOURCE
+git log --oneline SOURCE..TARGET
+git diff --name-status TARGET...SOURCE
+git diff --stat TARGET...SOURCE
+git diff TARGET...SOURCE
+git merge-tree --write-tree TARGET SOURCE
+```
+
+Prefer `git merge-tree --write-tree TARGET SOURCE` for conflict checks. Treat exit code `0` plus a printed tree object as clean, and a non-zero exit as a conflict or mergeability failure that needs inspection. Avoid piping human-readable merge output through broad `rg "CONFLICT|<<<<<<<|changed in both"` checks as the primary signal; those searches can self-match review artifacts or command text and create false positives.
+
+Treat `TARGET...SOURCE` as the primary PR-style review diff. Use the working tree diff only to understand uncommitted review fixes, local artifact edits, generated files, or blockers. Do not allow unrelated dirty files outside the source repo to obscure the source-vs-target review.
+
+Record the bundle summary in `review.md` when findings exist, or in `tasks.md` when the review is clean and no `review.md` is required.
 
 ## Required Context
 
@@ -59,7 +109,8 @@ Before reviewing, read:
 - relevant target Epic files under `docs/epics/*/epic.md`
 - enough of every active `docs/epics/*/epic.md` to detect duplicate Story IDs across the app
 - vault, workspace, and app `AGENTS.md`, especially app branch policy
-- `06 Projects/<project>/prd.md` when product scope changed, the change claims product direction, or PRD drift was flagged
+- project planning docs or PRD/Product Brief files when product scope changed, the change claims product direction, or PRD drift was flagged
+- project visual/style guidance, design-system notes, or app visual identity docs when the change affects app UI, layout, styling, component density, interaction polish, or visual identity
 - project README, test docs, security docs, deployment docs, and current-state docs when affected
 - source-vs-target diff and changed file list
 - code, tests, generated files, docs, and configuration touched by the change
@@ -69,6 +120,45 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
 For app review readiness, uncommitted files outside the app/source repo do not block review, PR, or merge readiness unless they are explicitly part of the requested app change, target repo, or branch operation. Report related root-vault or workflow-artifact dirty state clearly, but do not classify it as blocking merely because it is uncommitted. App/source repo dirty state still blocks readiness when it is part of the change and not committed or explicitly deferred.
 
 If the selected change is in legacy `changes/`, keep using that explicit path for the current run unless the user asks to migrate it. Do not create a second active copy silently.
+
+## Delegated Review Model
+
+Default to an orchestrator-and-reviewers model when subagent tooling is available and the change is not trivial. The main agent remains responsible for the final verdict, git safety, branch policy, artifact mutation, safe fixes, and validating delegated claims.
+
+Use delegated fresh-context passes for:
+
+- artifact truth and lifecycle consistency
+- source-vs-target code review
+- verification and Requirement/Scenario coverage
+- security review
+- UI/UX and visual identity review when the diff affects user-visible UI
+- documentation, changelog, and PRD alignment
+- branch, conflict, and integration readiness
+
+Use the main thread only when:
+
+- `--no-delegate`, `--fast`, `--artifact-only`, or `--diff-only` narrows the task
+- the change is tiny enough that subagents would add process noise
+- the review surface is too ambiguous to delegate safely
+- subagent tooling is unavailable
+- the user needs to answer a question before a reviewer can be scoped
+
+Parallelize read-only delegated review passes when their scopes do not overlap. Do not delegate lifecycle decisions, commits, PR creation, merges, closeout moves, branch operations, or final verdicts.
+
+Use `assets/subagent-pr-review-prompt.md` for delegated passes when structured prompts help. Each delegated review prompt must include:
+
+- app root and workflow root
+- change folder and artifact paths
+- source branch/ref, target branch/ref, and merge base
+- changed files and any narrowed file scope
+- assigned review pass
+- relevant Story, Requirement, and Scenario IDs when known
+- branch policy summary
+- specialist guidance to load, if any
+- explicit instruction not to edit, commit, push, merge, close, or update lifecycle state
+- required report shape
+
+Treat subagent output as evidence, not final truth. Validate important claims by inspecting the referenced files, checking the source-vs-target diff, rerunning focused commands when practical, and rejecting vague findings without concrete impact.
 
 ## Review Gates
 
@@ -112,7 +202,10 @@ Run all gates that apply. Use `pass`, `findings`, `blocked`, or `not applicable`
    - If the change has no manually observable UI or app behavior, confirm `tasks.md` records why manual UI confirmation is not applicable.
    - Do not require the user to have completed manual confirmation unless the project branch policy, change artifacts, or user request makes human acceptance a readiness gate.
 6. Local PR Code Review Gate
-   - Review the source-vs-target diff for correctness, regressions, maintainability, accidental scope, error/loading/empty states, and consistency with project patterns.
+   - Review the source-vs-target diff as the primary code review surface.
+   - Check source-only commits for accidental scope, confusing commit shape, omitted artifacts, and review risk.
+   - Review correctness, regressions, maintainability, accidental scope, error/loading/empty states, and consistency with project patterns.
+   - For UI-facing changes, check consistency with project visual/style guidance and app visual identity docs when present. Treat unexplained drift from those documents as a review finding when it would make the app less coherent or less usable.
    - Findings need file/line references when practical, user or maintenance impact, and concrete remediation.
 7. Security Review Gate
    - Perform a formal security pass every time, scaled to risk.
@@ -127,16 +220,22 @@ Run all gates that apply. Use `pass`, `findings`, `blocked`, or `not applicable`
    - Confirm entries are public-safe and human-facing, not SDD workflow logs, raw Requirement/Scenario lists, internal task IDs, private vault context, secrets, or speculative roadmap promises.
    - If no changelog entry is needed, confirm `tasks.md` or the review report records the reason.
 10. Branch And Merge Readiness Gate
-   - Confirm branch policy, source branch, target branch, dirty state, commit shape, and unrelated changes.
+   - Confirm branch policy, merge policy, source branch, target branch, dirty state, commit shape, and unrelated changes.
+   - Distinguish documentation-only/planning changes from implementation changes. SDD planning artifacts, PRDs, Epic docs, README-style docs, changelog notes, and review records may live on documentation or integration branches when project policy allows it. Do not fail branch readiness merely because planning/docs were created on an integration or production branch.
+   - For implementation changes, require the project branch policy unless the user explicitly waived it. Implementation changes include application code, tests, schemas, configuration, generated app artifacts, or runtime behavior.
    - Confirm whether the target is an integration branch or production branch.
    - Confirm remote PRs are optional for routine integration unless project-local policy requires them.
    - Check source-vs-target merge conflicts without performing the merge.
+   - Confirm the source branch contains all intended implementation, test, artifact, docs, changelog, and generated-file changes relative to target.
+   - Confirm target-only changes do not invalidate the source branch's assumptions.
    - Confirm all related app and workflow changes are committed or explicitly documented as blockers before PR/merge.
+   - Prefer the exit code from `git merge-tree --write-tree TARGET SOURCE` for mergeability. Use human-readable merge output only for diagnosing a non-zero result, not as the first-pass source of truth.
+   - For `--merge-and-close`, confirm whether app policy expects the closeout commit on the source branch before integration, on the target branch after integration, or in a PR; if policy is silent, prefer closing on the target branch after a successful non-production merge so `tasks.md` can record the actual merge result.
 11. PRD Alignment Gate
-   - When product scope changed or a PRD drift concern exists, confirm the implemented change still fits `06 Projects/<project>/prd.md`.
+   - When product scope changed or a PRD drift concern exists, confirm the implemented change still fits the project planning docs or PRD/Product Brief.
    - If product intent changed, require a `/sdd-prd` update or explicit user acceptance before ready verdict.
 
-Do not use verdict `ready` unless the code review and security review gates are complete and have no blocking findings.
+Do not use verdict `ready` unless the review bundle, code review, security review, branch/merge readiness, and required SDD artifact gates are complete and have no blocking findings. Narrow modes may report narrower outcomes, but they must not imply full integration readiness.
 
 ## Review Findings
 
@@ -172,6 +271,7 @@ changes-requested | blocked | ready
 | Tests and verification | TBD | TBD |
 | Manual UI confirmation | TBD | TBD |
 | Code review | TBD | TBD |
+| Visual / UX consistency | TBD | TBD |
 | Security review | TBD | TBD |
 | Documentation | TBD | TBD |
 | Changelog | TBD | TBD |
@@ -195,6 +295,31 @@ changes-requested | blocked | ready
 ## Verification Evidence
 
 - COMMAND_OR_SCENARIO: result and what it proves.
+
+## Review Bundle
+
+- Source branch/ref:
+- Target branch/ref:
+- Merge base:
+- Source-only commits:
+- Target-only commits:
+- Changed files:
+- Diff stat:
+- Conflict check:
+- Dirty state:
+- Branch policy:
+
+## Delegated Review Passes
+
+| Pass | Reviewer | Result | Notes |
+|---|---|---|---|
+| Artifact truth | TBD | TBD | TBD |
+| Code diff | TBD | TBD | TBD |
+| Verification coverage | TBD | TBD | TBD |
+| Security | TBD | TBD | TBD |
+| UI / visual identity | TBD | TBD | TBD |
+| Docs / changelog / PRD | TBD | TBD | TBD |
+| Integration readiness | TBD | TBD | TBD |
 
 ## PR / Merge Readiness
 
@@ -244,9 +369,18 @@ When all gates pass:
 - If the target is the production branch, do not create the PR or merge from `/sdd-review`; report that the change is locally ready and hand off to `/sdd-release`.
 - If `--pr` is authorized, create a PR following app branch policy. Include the change path, summary, Requirements/Scenarios covered, verification evidence, security review result, and remaining non-blocking risks.
 - If `--merge` is authorized, merge following app branch policy. Recheck target branch, conflict state, dirty state, and required checks immediately before merging.
-- If neither `--pr` nor `--merge` is authorized, report that the change is ready for the project's normal integration path. Note that `/sdd-release` should be used later for promotion to `main`.
+- If `--merge-and-close` is authorized, merge and close following app policy. Recheck target branch, conflict state, dirty state, required checks, and closeout state immediately before merging or closing. If app policy requires a PR, push, rebase, remote PR merge, or another action not explicitly authorized, stop before that action and report the remaining policy step.
+- If neither `--pr`, `--merge`, nor `--merge-and-close` is authorized, report that the change is ready for the project's normal integration path. Note that `/sdd-release` should be used later for promotion to `main`.
 
 Do not push unless explicitly authorized or required by an explicitly requested PR workflow. Do not close the change folder until PR/merge/acceptance state is clear and the user has explicitly asked to close, finish, merge-and-close, or otherwise complete the change.
+
+When merge-and-closing:
+
+1. Follow the app's local `AGENTS.md` merge policy for target branch, merge strategy, PR requirements, and whether direct integration-branch commits are allowed.
+2. Perform the non-production merge/integration step before closeout unless project policy explicitly says to close on the source branch first.
+3. After the merge/integration step succeeds, update the closeout record with the actual PR/merge status, target branch, date, commit or PR reference when available, review outcome, manual confirmation status, changelog status, and remaining accepted risks.
+4. Move the change folder to `docs/changes/closed/` and commit the closeout mutation in the repo and branch required by app policy.
+5. Verify the target branch has the closed change path, no active duplicate path, and no contradictory references to the old active path.
 
 When closing:
 
@@ -261,7 +395,7 @@ Stop and report when:
 
 - change or branch selection is ambiguous.
 - required artifacts are missing or contradictory.
-- branch policy is missing or violated.
+- branch policy is missing or violated for implementation changes, or unclear for a requested PR/merge/closeout.
 - unrelated app/source-repo dirty files block safe review, fixes, PR, or merge.
 - required checks fail without a safe in-scope fix.
 - security review finds unresolved risk.
@@ -273,7 +407,7 @@ Stop and report when:
 - required public changelog entry is missing, misleading, private, or not Keep a Changelog-shaped.
 - PRD/product-direction drift is unresolved when the change depends on it.
 - PR/merge targets the production branch; route to `/sdd-release` instead.
-- PR/merge would require push, rebase, destructive action, production credentials, deployment, target-branch changes, or human approval not already granted.
+- PR/merge/closeout would require push, rebase, destructive action, production credentials, deployment, target-branch changes beyond an explicitly authorized `--merge-and-close` closeout commit, or human approval not already granted.
 - findings need product, architecture, data, auth, or scope judgment from the user.
 
 ## Final Response
@@ -297,7 +431,7 @@ Include:
 - changelog result
 - PRD alignment result when checked
 - branch and merge readiness result
-- PR or merge action taken, offered, or blocked
+- PR, merge, or closeout action taken, offered, or blocked
 - remaining risks and next action
 
 ## Final Self-Improvement Action

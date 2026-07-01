@@ -44,7 +44,7 @@ Before auditing, read:
 - target `docs/epics/<key>-<###>-epic-name>/epic.md`
 - relevant `docs/changes/**/proposal.md`, `design.md`, `tasks.md`, and `review.md` when they mention the Epic or its Story IDs
 - enough of every active `docs/epics/*/epic.md` to detect duplicate Story IDs across the app
-- `06 Projects/<project>/prd.md` when product direction exists or drift is suspected
+- project planning docs or PRD/Product Brief files when product direction exists or drift is suspected
 - README, testing docs, architecture docs, ADRs, data-model docs, current-state docs, and root `CHANGELOG.md` when they claim behavior owned by the Epic
 - source files, tests, configs, generated artifacts, and runtime surfaces listed in Story `Implemented By` and `Verified By`
 
