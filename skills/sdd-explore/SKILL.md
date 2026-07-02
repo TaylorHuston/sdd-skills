@@ -1,6 +1,6 @@
 ---
 name: sdd-explore
-description: Enter SDD explore mode as a thinking partner for product ideas, technical options, codebase investigation, and requirement clarification before or during a SDD change. Use when the user invokes /sdd-explore, wants to think through a vague idea, compare approaches, inspect existing changes, investigate relevant code or Epic specs, or decide whether to run sdd-propose. Do not implement code; optionally write a dated exploration summary under the project's private planning docs when the user wants the conclusions remembered.
+description: Enter SDD explore mode as a thinking partner for product ideas, technical options, codebase investigation, architecture decisions, and requirement clarification before or during a SDD change. Use when the user invokes /sdd-explore, wants to think through a vague idea, compare approaches, inspect existing changes, investigate relevant code or Epic specs, decide whether to run sdd-propose, or decide whether an ADR is warranted. Do not implement code; optionally write a dated exploration summary under the project's private planning docs or draft an ADR when the user wants durable conclusions remembered.
 ---
 
 # SDD Explore
@@ -44,10 +44,21 @@ Use this routing:
 |---|---|
 | Product motivation, scope, or affected Epic actions | `docs/changes/yyyy-mm-dd-change-name/proposal.md` |
 | Technical approach, alternatives, risks, constraints, or verification strategy | `docs/changes/yyyy-mm-dd-change-name/design.md` |
+| Durable architecture, data, dependency, integration, deployment, security, storage, or cross-cutting project decision | `docs/adrs/yyyy-mm-dd-<decision-title>.md` |
 | Work item, blocker, resume state, implementation note, or verification result | `docs/changes/yyyy-mm-dd-change-name/tasks.md` |
 | Durable exploratory conclusion that should not become a change yet | `<planning-root>/<project>/exploration/yyyy-mm-dd-<slug>.md` |
 
 If no change exists and the idea has crystallized enough to formalize, offer to run `sdd-propose`.
+
+If the discussion reaches a durable architecture decision, offer to draft an ADR. Do not auto-create one. Use the project's ADR location when guidance exists; otherwise default to:
+
+```text
+<project-root>/docs/adrs/yyyy-mm-dd-<decision-title>.md
+```
+
+Use `/sdd-adr` to draft the ADR when the user wants to capture it. The ADR should cover context, decision, options considered, consequences, validation, and reconsideration signals. Keep status `Proposed` unless the user explicitly accepts the decision or project guidance defines another status workflow.
+
+Use an ADR when the decision should constrain future implementation or review. Do not suggest an ADR for ordinary implementation details, minor UI layout choices, reversible tactical choices, or decisions already covered by project guidance.
 
 ## Exploration Summaries
 
@@ -102,6 +113,7 @@ If the exploration later becomes a SDD change, leave the summary as source conte
 - Do not implement application code.
 - Do not edit Epic specs unless the user explicitly asks to apply a change.
 - Do not create `proposal.md`, `design.md`, or `tasks.md` unless the user asks to propose or capture into an existing change.
+- Do not create an ADR unless the user asks to capture or draft the architecture decision.
 - Do not create a mandatory discussion record.
 - Do not pressure the user to formalize; offer and move on.
 - Keep summaries in private planning docs, not in public app docs.
@@ -113,6 +125,6 @@ When the discussion reaches a useful pause, optionally summarize:
 - what we figured out
 - remaining uncertainty
 - whether this is ready for `sdd-propose`
-- whether anything should be captured in a change artifact or exploration summary
+- whether anything should be captured in a change artifact, ADR, or exploration summary
 
 End final responses with a concise self-improvement conclusion: ask "How well did this work, and what could have been improved?" and name one process improvement if evident.

@@ -1,6 +1,6 @@
 ---
 created: 2026-06-13
-modified: 2026-06-30
+modified: 2026-07-01
 ---
 # Story-Driven Development
 
@@ -22,11 +22,11 @@ The goals are:
 
 - **Product Brief/PRD**: Private product context, usually stored in project planning docs outside the public app surface. It describes product purpose, audience, scope, principles, market context when useful, and open product questions. It guides SDD work but is not an implementation checklist.
 - **Epic**: The durable capability file. It lives at `docs/epics/<key>-<###>-epic-name>/epic.md` and contains the capability narrative, embedded Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, and known gaps.
-- **Story**: A durable user-path contract embedded inside an Epic. Stories should usually use `"As a <actor>, I want to <action/path>, so that <user-facing value/outcome>."` A Story should describe a meaningful user action or outcome, not a tiny UI requirement.
+- **Story**: A durable user-path contract embedded inside an Epic. New Epics should use Epic-scoped Story labels such as `S1`, `S2`, and full references such as `EPIC-ID/S1`; legacy app-wide Story IDs may remain when existing tests, reports, or history depend on them. Stories should usually use `"As a <actor>, I want to <action/path>, so that <user-facing value/outcome>."` A Story should describe a meaningful user action or outcome, not a tiny UI requirement.
 - **Requirement**: A concrete behavior expectation under a Story. Prefer `SHALL` wording.
 - **Scenario**: A BDD-style example under a Requirement. Prefer `WHEN` / `THEN` wording, including important failure modes.
 - **Implemented By**: A developer starting index for the important files, modules, routes, components, APIs, migrations, or support files that implement or materially support the Story.
-- **Verified By**: A behavior evidence index. It should name concrete tests, assertions, browser/manual scenarios, review artifacts, or other proof tied to the Requirement or Scenario.
+- **Verified By**: A behavior evidence index. It should name concrete tests, assertions, browser/manual scenarios, review artifacts, or other proof tied to the Requirement or Scenario. It is not a chronological command log.
 - **Verification Gaps**: Known missing, deferred, or accepted gaps. Empty or stale gaps are misleading and should be cleaned up.
 - **Change**: A dated folder under `docs/changes/yyyy-mm-dd-change-name/` containing `proposal.md`, `design.md`, and `tasks.md`. The change may create a new Epic, update an existing Epic, or both.
 
@@ -57,7 +57,9 @@ Stories are user-path-sized. A useful Story might be: "As a shopper, I want to b
 
 Avoid Stories that are just UI details, such as "As a user, I want to click the plus icon." That detail may belong in a Requirement or Scenario if it matters, but it is rarely a Story by itself.
 
-Stories are not immutable. They may be renamed, reordered, split, merged, moved between Epics, or revised as the product understanding improves. Preserve durable Story IDs when useful, but renumber deliberately when cleanup or migration requires it. Story IDs must be unique across active Epics unless a migration note explicitly documents the temporary duplicate and blocks new work from relying on it.
+Stories are not immutable. They may be renamed, reordered, split, merged, moved between Epics, or revised as the product understanding improves. For new or normalized Epics, use Epic-scoped Story labels such as `S1`, `S2`, and `S3`; labels must be unique within the Epic, and full references such as `EPIC-ID/S1/R2-S3` are unique because they include the Epic ID. Candidate Stories should not receive a Story label until promoted into the embedded Story set.
+
+Historical app-wide Story IDs such as `DASH-008` or `SQ-003` can remain when existing tests, review reports, generated indexes, or commits depend on them. Do not create UUID-like Story handles for new embedded Stories. If a Story moves between Epics and outside references exist, record a short migration note from the old full reference to the new one instead of pretending the move was invisible.
 
 Requirements and Scenarios should be concrete enough to drive BDD/TDD:
 
@@ -148,7 +150,7 @@ An Epic is healthy only when:
 
 - Its outcome and current scope match what the embedded Stories actually provide.
 - Stories are in a logical order and remain appropriately scoped.
-- Story IDs are unique across active Epics unless a documented migration is resolving a duplicate.
+- Story labels are unique within each Epic, and full Story references remain traceable. Historical app-wide Story IDs remain unique across active Epics unless a documented migration is resolving a duplicate.
 - Requirements and Scenarios are concrete enough to guide implementation and verification.
 - `Implemented By`, `Verified By`, and `Verification Gaps` are current enough that a future developer can start investigation from the Epic instead of rediscovering the relevant code.
 - Related active or closed changes do not contradict Epic truth.
@@ -177,14 +179,16 @@ Use the skills to apply this doctrine consistently:
 |---|---|
 | `/sdd-prd` | Create or revise the private Product Brief/PRD that guides product scope, audience, principles, market context, monetization, and open product questions. |
 | `/sdd-explore` | Think through product ideas, technical options, codebase findings, or requirement questions before deciding whether to create a change. |
+| `/sdd-adr` | Create, update, or assess ADRs for durable technical decisions that future SDD work should respect. |
 | `/sdd-propose` | Create or update a dated change folder with `proposal.md`, `design.md`, and `tasks.md`; use `/sdd-propose --replan` for mid-change discoveries that need planning before `/sdd-apply` resumes. |
 | `/sdd-interactive` | Create and apply a lightweight tracked change in one working session for small concrete changes that do not need a full upfront proposal pass. |
 | `/sdd-apply` | Implement or continue an active change using Requirement/Scenario-driven slices, subagent delegation when useful, verification, artifact reconciliation, and manual UI confirmation. |
 | `/sdd-review` | Run the local PR-style integration gate after implementation or before closing a change. |
 | `/sdd-epic-verify` | Audit an Epic end to end against current implementation, tests, evidence, change lifecycle state, and Story/Requirement/Scenario quality. |
-| `/sdd-space-status` | Produce a read-only status overview across PRDs, Epics, changes, reviews, risks, and suggested next actions. |
+| `/sdd-space-status` | Produce a read-only re-entry brief for returning to an app after time away. |
 | `/sdd-orphan-audit` | Find likely orphaned code/tests and SDD traceability gaps conservatively. |
 | `/sdd-release` | Prepare a production-branch release PR, including release checks and changelog updates. |
+| `/sdd-pr` | Steward an existing or non-production SDD-backed PR through comments, checks, accepted fixes, and final merge handoff. |
 
 Do not create separate compatibility-wrapper skills for older command names. Canonical new work should use the current `/sdd-*` skill names directly.
 

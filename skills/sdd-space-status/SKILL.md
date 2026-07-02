@@ -1,38 +1,33 @@
 ---
 name: sdd-space-status
-description: Produce a read-only SDD workflow status overview for an application project or space. Use when the user invokes /sdd-space-status or /space-status in the SDD workflow; asks for current SDD status, gaps, risks, Epic and Story coverage, duplicate Story IDs, active or closed change state, closeout consistency, review readiness, implementation drift, verification gaps, changelog impact, or suggested next steps across a project. Reads PRDs/Product Briefs, docs/epics directories, embedded Stories, docs/changes, SDD review and Epic verification reports, CHANGELOG.md, and related docs without changing them unless follow-up edits are explicitly requested.
+description: Produce a read-only re-entry brief for an SDD application project or space. Use when the user invokes /sdd-space-status or /space-status, says it has been a while since working on an app, asks where work left off, asks what the app is, asks what is active, blocked, stale, or recently closed, asks which files to read first, or asks for the likely next SDD action. Reads project guidance, README/docs, Product Briefs/PRDs, Epics, active and recent changes, review reports, Epic verification reports, CHANGELOG.md, git context, and related docs without changing them.
 ---
 
 # SDD Space Status
 
-Summarize the current SDD workflow state of an application project from its durable artifacts.
+Produce a read-only re-entry brief for an app or space after time away.
 
-Default to read-only reporting. Do not create, edit, move, close, split, merge, implement, verify, replan, or reconcile artifacts unless the user explicitly asks for follow-up changes.
+Orient the user quickly: what the app is, what work was active, where durable SDD truth lives, what looks stale or blocked enough to care about, and what to do next.
 
-## Purpose
+This is not an audit gate. Do not edit, close, move, merge, implement, test, verify, replan, or reconcile artifacts. Do not claim full review readiness, release readiness, or Epic alignment unless a dedicated review/verification artifact already supports that claim. Route to `/sdd-review`, `/sdd-epic-verify`, `/sdd-release`, or another focused skill when confidence would require deeper work.
 
-`/sdd-space-status` answers:
-
-- What product outcomes are represented by the current PRD/Product Brief and Epics?
-- Which Epics and embedded Stories exist, what state are they in, and what user paths do they cover?
-- Which active or closed SDD changes exist under `docs/changes/`, and do they still match Epic truth?
-- What implementation, verification, traceability, Story ownership, changelog, lifecycle, or artifact drift should be addressed next?
-- What is the most useful next SDD action?
-
-Keep the SDD north star in mind: Epics are durable capability truth, Stories are embedded capability slices with stable IDs, Requirements and Scenarios describe observable behavior, `docs/changes/*` records proposed and applied work, and review/verification artifacts challenge or confirm truth.
+Keep the SDD north star in mind: Epics are the durable capability map; embedded Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, and known gaps should explain what is actually implemented and where to start in the code. `/sdd-space-status` helps the user find that map again, not rebuild the whole map in one pass.
 
 ## Inputs
 
 Start from any of these:
 
 - app root, project path, project slug, space name, or current working directory
-- PRD/Product Brief, Epic directory, `epic.md`, change folder, `proposal.md`, `design.md`, `tasks.md`, `review.md`, Epic verification report, changelog, Story ID, or Epic ID
+- PRD/Product Brief, `docs/epics/`, `epic.md`, `docs/changes/`, `proposal.md`, `design.md`, `tasks.md`, `review.md`, Epic verification report, changelog, Story reference, branch name, or app README
 - no explicit target, when the current directory clearly identifies the project
 
-Expected artifact locations:
+Common landmarks:
 
 ```text
 <planning-root>/<project>/prd.md
+<app-root>/AGENTS.md
+<app-root>/README.md
+<app-root>/docs/README.md
 <app-root>/docs/epics/<key>-<###>-epic-name>/epic.md
 <app-root>/docs/epics/<key>-<###>-epic-name>/reviews/*.md
 <app-root>/docs/changes/<yyyy-mm-dd-change-name>/{proposal.md,design.md,tasks.md,review.md}
@@ -40,150 +35,130 @@ Expected artifact locations:
 <app-root>/CHANGELOG.md
 ```
 
-Treat old `docs/stories/`, `.llm/plans/`, `.llm/reviews/`, and legacy root `changes/` as migration or legacy inputs only. Report them when relevant, but do not recommend new writes there unless the user explicitly asks for legacy compatibility.
+Treat old `docs/stories/`, `.llm/plans/`, `.llm/reviews/`, and legacy root `changes/` as migration inputs only. Mention them if they explain where work left off, but do not recommend new writes there unless project guidance explicitly requires legacy compatibility.
 
-Treat generated Story indexes such as `docs/epics/index.md` and `docs/epics/story-index.json` as optional project-local validation artifacts. If project scripts intentionally maintain them, report whether they are current and useful. Do not treat their existence as legacy drift by itself.
+Generated Story indexes such as `docs/epics/index.md` and `docs/epics/story-index.json` are optional navigation or validation artifacts. Use them for orientation when present, but do not treat them as canonical truth.
 
-## Workflow
+## Re-Entry Depth
+
+Read enough to orient and route. Prefer current, active, and recent artifacts over exhaustive scans.
 
 1. Locate the project.
-   - Prefer the nearest directory with `docs/epics/`, `docs/changes/`, `package.json`, `.git/`, or framework config.
-   - If invoked from the vault root, infer the project from the user's target or from unambiguous artifact paths.
-   - Read relevant workspace and project guidance such as `AGENTS.md`, app-local `AGENTS.md`, `README.md`, and branch policy.
-   - Establish and report the app root, app repo git root, display name, PRD path if present, and SDD artifact roots.
-   - Treat mismatches between discovered paths, folder names, display names, Epic IDs, Story IDs, and change names as drift findings.
-2. Inventory product and durable truth.
-   - Read PRD/Product Brief context when present and relevant to product direction.
-   - List Epic directories under `docs/epics/` and read each relevant `epic.md`.
-   - Parse embedded Stories, Story IDs, statuses when declared, Requirements, Scenarios, `Implemented By`, `Verified By`, and `Verification Gaps`.
-   - Check Story ID uniqueness across active Epic files.
-   - Note missing expected directories as status facts, not errors.
-3. Inventory changes and reviews.
-   - List active changes under `docs/changes/`, excluding `docs/changes/closed/`.
-   - List closed changes under `docs/changes/closed/` only enough to understand recent completion state and avoid duplicate recommendations.
-   - Classify each change by `proposal.md`, `design.md`, `tasks.md`, `review.md`, task checkboxes, Resume Here, blockers, review verdict, manual confirmation status, changelog state, PR/merge state, closeout fields, folder location, and modified time.
-   - List Epic verification reports under `docs/epics/*/reviews/` and classify them by result and recency.
-   - Read root `CHANGELOG.md` when it exists and active or recent changes appear release-relevant.
-4. Check artifact health.
-   - Confirm Stories are embedded in Epic `epic.md` files; flag new standalone Story files as legacy drift unless the project intentionally has not migrated.
-   - Flag duplicate Story IDs across active Epics as blocking traceability drift unless an explicit migration note says the duplicate is being resolved.
-   - Confirm new or modified Stories have stable Story IDs, local `R#` Requirements, local `R#-S#` Scenarios, `Implemented By`, `Verified By`, and `Verification Gaps`.
-   - Flag generic Scenarios, stale `AC-#`/`TAC-#` references, missing code maps, missing verification evidence, and broad evidence that does not prove production paths.
-   - Flag Story ownership drift: Stories that belong in a different Epic, MVP/container Epics that should be decomposed, duplicated Stories, and Story order that no longer follows dependency or completion sequence.
-   - Flag active changes whose design/tasks no longer match Epic truth or implementation reality.
-   - Flag closed changes whose `Resume Here`, checklist, review record, manual confirmation status, changelog status, PR/merge state, deferred gaps, or folder location contradict that closed state.
-5. Summarize product and Epics.
-   - Report PRD/Product Brief health only when it affects current scope, open product questions, or Epic/story alignment.
-   - Report each Epic's health, outcome, embedded Story count, important open decisions, verification posture, and suggested move.
-   - Do not copy every Requirement or Scenario into the Epic summary; reference the Epic or Story instead.
-6. Summarize Stories.
-   - Report status, current user path, implementation evidence, verification evidence, gaps, and suggested move.
-   - Separate active/in-scope Stories from deferred, moved, archived, or potential Stories when the Epic distinguishes them.
-   - Flag Stories that are too granular, overloaded, duplicated, missing traceability, missing verification, stale relative to implementation, or not tied to a meaningful user path.
-7. Summarize SDD changes.
-   - Classify active changes as `ready`, `active`, `blocked`, `needs review`, `review findings`, `ready to close`, `stale`, or `unknown`.
-   - Classify closed changes as historical evidence; do not recommend editing closed changes unless they are misleading enough to create drift.
-   - Treat a closed change with contradictory closeout fields as `closed-with-drift`, not clean history.
-   - Prefer evidence from `tasks.md` Resume Here, implementation ledger, verification ledger, review verdicts, Epic verification reports, changelog entries, and modification dates over guesses.
-8. Identify risks and gaps.
-   - Highlight misleading Epic/Story truth, duplicate Story IDs, missing or stale `Implemented By`, missing `Verified By`, open `Verification Gaps`, generic Scenarios, stale `AC-#`/`TAC-#` references, stale change artifacts, stale reviews, missing changelog entries, contradictory closed-change state, lifecycle mistakes, and Product/Epic/Story drift.
-   - Call out places where `/sdd-review` is the right next gate for an active change.
-   - Call out places where `/sdd-release` is the right next gate because reviewed work is ready for full release checks, changelog finalization, and a PR to `main`.
-   - Call out places where `/sdd-epic-verify` is the right next review because Epic outcome, Story ownership, Story order, Story scope quality, completion criteria, or implementation drift is uncertain.
-   - Call out places where `/sdd-propose`, `/sdd-apply`, `/sdd-prd`, `/sdd-explore`, `/diagnose`, or `/improve-codebase-architecture` is a better next move than more status work.
-9. Suggest next steps.
-   - Prioritize next steps by what best preserves Epic/Story truth and code/test evidence.
-   - Prefer finishing or reconciling in-progress changes before starting new ones.
-   - Prefer verification and traceability closure when behavior appears implemented but unverified.
-   - Prefer Product/PRD refresh when product purpose, audience, or scope is stale.
+   - Prefer the nearest directory with `docs/epics/`, `docs/changes/`, `package.json`, `.git/`, framework config, or app-local `AGENTS.md`.
+   - If invoked from the vault root, infer the app from the user's target or an unambiguous artifact path.
+   - Report the app root, git root, display name, active branch, dirty/clean context, PRD/Product Brief path if present, and main SDD roots.
+2. Read local guidance and onboarding docs.
+   - Read app-local `AGENTS.md`, `README.md`, `docs/README.md`, and any obvious project guidance that explains branch policy, app purpose, docs inventory, or local workflow.
+   - Read workspace SDD doctrine when present and needed to interpret artifact authority or workflow routing.
+3. Reconstruct product intent.
+   - Read the Product Brief/PRD when present.
+   - Read enough README/docs context to answer what the app is, who it is for, and what shape the product currently has.
+4. Reconstruct durable SDD truth.
+   - Read Epic indexes when present, then relevant `docs/epics/*/epic.md` files.
+   - Prefer summary-level understanding: outcomes, current scope, embedded Story list, important open decisions, obvious verification gaps, and the files a developer would inspect first.
+   - Do not exhaustively inspect every Requirement and Scenario unless the current work depends on them.
+5. Reconstruct where work left off.
+   - Read active `docs/changes/*` folders first, especially `tasks.md` Resume Here, task checkboxes, implementation evidence, verification evidence, review status, manual confirmation status, branch/PR/merge state, and closeout notes.
+   - Read recent closed changes only enough to avoid recommending already-finished work and to understand recent direction.
+   - Read `review.md` and recent Epic verification reports when they affect active work or explain why a change is blocked.
+   - Read `CHANGELOG.md` only when active/recent work appears release-relevant.
+6. Notice obvious stale or risky context.
+   - Mention contradictions that are visible from the artifacts you already read.
+   - Do not perform a full drift investigation. If the answer depends on implementation reality, route to `/sdd-review`, `/sdd-epic-verify`, `/sdd-orphan-audit`, `/diagnose`, or `/improve-codebase-architecture`.
 
-## Status Heuristics
+## What To Notice
 
-Use these labels unless the project has a local convention:
+Look for re-entry signals:
 
-- Product health: `aligned`, `needs decisions`, `stale`, `missing`, `unknown`
-- Epic health: `on track`, `needs decisions`, `needs stories`, `needs verification`, `needs decomposition`, `blocked`, `complete`, `unknown`
-- Story health: `ready`, `needs implementation`, `in progress`, `implemented-needs-verification`, `verified`, `needs update`, `misplaced`, `blocked`, `deferred`
-- Change health: `ready`, `active`, `blocked`, `needs review`, `review findings`, `ready to close`, `closed`, `closed-with-drift`, `stale`, `unknown`
-- Changelog health: `current`, `missing`, `needs update`, `not needed`, `unchecked`
+- What the app is and which product goal currently matters.
+- The active change, active branch, and most useful `Resume Here` instruction.
+- Whether work looks `active`, `blocked`, `needs review`, `ready to close`, `recently closed`, or `unknown`.
+- Review findings, Epic verification findings, manual confirmation status, and accepted gaps that shape the next move.
+- Epics or Stories that are central to current work.
+- Supporting docs that are likely useful or stale enough to mention.
+- Missing local guidance, unclear product direction, or missing SDD artifacts when that blocks orientation.
+- Obvious contradictions such as an active folder that claims work is complete, a closed change that still says pending, or a Story whose evidence clearly does not match the change notes.
 
-Be explicit when a label is inferred rather than declared in artifacts.
+Use these labels unless the project declares its own:
+
+- Current work: `active`, `blocked`, `needs review`, `ready to close`, `recently closed`, `unknown`
+- Epic/Story posture: `clear enough`, `needs verify`, `stale-looking`, `missing`, `unknown`
+- Product direction: `clear`, `needs decisions`, `stale-looking`, `missing`, `unknown`
+- Supporting docs: `current-looking`, `possibly stale`, `missing if required`, `unchecked`
+
+Be explicit when a label is inferred rather than declared.
 
 ## Output Shape
 
-Use this structure:
+Use this structure, trimming sections that are not useful for the project:
 
 ```text
 Space: <project-or-space>
 App root: /absolute/path
-App repo git root: /absolute/path
-Display name: Product Name
-PRD/Product Brief: /absolute/path or none found
-SDD artifacts: /absolute/path/docs
-Changelog health: current / missing / needs update / not needed / unchecked
+Git root: /absolute/path
+Branch / state: <branch>, <clean/dirty summary>
+Product Brief / PRD: /absolute/path or none found
+Main SDD files: /absolute/path/docs/epics, /absolute/path/docs/changes
 
-Summary:
+What This App Is:
 - ...
 
-Product / Epics:
-| Artifact | Health | Scope / Stories | Open Decisions | Suggested Move |
-|---|---|---:|---|---|
-| ... | ... | ... | ... | ... |
+Where We Left Off:
+- ...
 
-Stories:
-| Story | Epic | Health | Implementation / Evidence | Verification | Suggested Move |
-|---|---|---|---|---|---|
-| ... | ... | ... | ... | ... | ... |
+Active Work:
+| Change / Branch | State | Resume Point | Why It Matters |
+|---|---|---|---|
+| ... | ... | ... | ... |
 
-SDD Changes:
-| Change | State | Scope | Evidence / Concern | Suggested Move |
-|---|---|---|---|---|
-| ... | ... | ... | ... | ... |
+Important Epics / Stories:
+| Artifact | Posture | Why Read It First |
+|---|---|---|
+| ... | ... | ... |
 
-Risks / Gaps:
+Recent Changes:
+- ...
+
+Known Gaps / Risks:
 - [P1] ...
 - [P2] ...
 
-Suggested Next Steps:
+Likely Next Move:
 1. ...
 2. ...
 3. ...
 
-Useful Commands:
+Useful Files / Commands:
 - ...
 ```
 
-Keep the report concise. Prefer the top 3-5 next steps over an exhaustive backlog. Include absolute file links when referring to local files in user-facing output.
+Keep the report concise. Prefer the top 3 next moves over an exhaustive backlog. Include absolute file links when referring to local files in user-facing output.
 
-## Priority Guidance
+## Routing
 
-Rank suggested next steps in this order when multiple options compete:
+If the likely next action is clear, name the skill that should own it:
 
-1. Fix misleading Epic or Story truth, especially duplicate Story IDs.
-2. Close verification gaps for implemented user paths.
-3. Unblock active changes.
-4. Fix contradictory closed-change state when closed artifacts no longer agree with review, manual confirmation, changelog, PR/merge, deferred-gap, or folder-location truth.
-5. Run `/sdd-review` for completed implementation that has not had an independent gate.
-6. Run `/sdd-epic-verify` when Epic ownership, Story order, Story quality, or implementation drift is uncertain.
-7. Create or revise a SDD change with `/sdd-propose` when a concrete product/code change is needed.
-8. Refresh Product/PRD direction with `/sdd-prd` when product purpose or scope is stale.
-9. Start new implementation work with `/sdd-apply`.
-
-## Follow-Up Mode
-
-If the user asks to act on a recommendation:
-
-- Use `/sdd-prd` for Product Brief/PRD creation or revision.
-- Use `/sdd-propose` for new changes, Epic updates, Story moves, Story rewrites, technical approach, and task ledger creation.
-- Use `/sdd-apply` for applying or continuing a proposed change.
-- Use `/sdd-review` for local PR-style review, review findings, PR readiness, or merge readiness.
-- Use `/sdd-release` for full release checks, changelog finalization, and PR creation to `main`.
-- Use `/sdd-epic-verify` for objective Epic and linked-Story drift review.
-- Use `/sdd-explore` for exploratory thinking that may optionally produce a durable exploration note.
+- Use `/sdd-prd` when product purpose, audience, scope, or open questions need conversation before more planning.
+- Use `/sdd-explore` when the right product or technical path is unclear.
+- Use `/sdd-propose` for a new tracked change, Epic/Story update, replan, ADR-worthy design decision, or implementation plan.
+- Use `/sdd-apply` when an active change has a clear next implementation slice.
+- Use `/sdd-review` when implementation appears done or needs the local PR-style gate.
+- Use `/sdd-release` when reviewed work is ready for production-branch release preparation.
+- Use `/sdd-epic-verify` when Epic truth, Story ownership, Story order, requirement quality, or implementation drift needs a dedicated audit.
+- Use `/sdd-orphan-audit` when implemented behavior may not be captured by any Epic/Story.
 - Use `/diagnose` for an active bug, regression, flaky behavior, or performance issue before implementation work.
 - Use `/improve-codebase-architecture` for broad architecture discovery outside a single SDD change.
 
-Do not bundle unrelated follow-up actions into the status report unless the user asks for a cleanup pass.
+Do not bundle unrelated follow-up actions into the status report. The status report should make the next move obvious, not perform the next move.
+
+## Guardrails
+
+- Stay read-only unless the user explicitly asks for follow-up edits.
+- Do not deep-audit Epics, tests, implementation, or docs inventory.
+- Do not treat missing docs as findings unless local guidance requires them or their absence blocks orientation.
+- Do not treat broad status uncertainty as a defect. Say what was not checked and route to the appropriate deeper skill.
+- Do not over-rank low-confidence risks. If a concern is only a hunch, label it as a hunch.
+- Do not let the report become a template-compliance review. Mention only drift that affects re-entry or the likely next action.
 
 ## Final Self-Improvement Action
 

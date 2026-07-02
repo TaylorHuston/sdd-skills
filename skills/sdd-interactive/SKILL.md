@@ -51,7 +51,7 @@ Use existing artifacts when the session continues an active change. Keep `tasks.
    - Record it in `tasks.md` before or immediately after acting.
    - Classify it as `cosmetic`, `defect`, `verification gap`, `artifact drift`, `requirement refinement`, `small in-scope behavior`, `scope expansion`, or `product drift`.
    - For `cosmetic` changes, make the smallest safe edit, verify the affected surface, and record why no Epic truth changed.
-   - For `defect` changes, add or update a focused failing-first test/check when practical, fix the defect, verify, and update Story evidence.
+   - For `defect` changes, add or update a focused failing-first test/check when practical, fix the defect, verify, and update scenario-mapped Story evidence.
    - For `verification gap`, produce the missing proof before claiming completion.
    - For `artifact drift`, reconcile `proposal.md`, `design.md`, `tasks.md`, Epic truth, docs, or changelog before continuing.
    - For `requirement refinement`, update `design.md` and the target Epic Requirement/Scenario before or alongside implementation.
@@ -70,6 +70,7 @@ Use existing artifacts when the session continues an active change. Keep `tasks.
    - Validate important subagent claims before updating durable truth or committing.
 8. Reconcile durable truth.
    - Update affected Epic `Implemented By`, `Verified By`, and `Verification Gaps` when implementation or verification reality changes.
+   - Keep Epic `Verified By` as a scenario-mapped evidence index. Record chronological command output in `tasks.md` instead; broad gates are supporting evidence unless mapped to named behavior.
    - Keep Story IDs stable. Preserve local Requirement and Scenario IDs when editing existing truth; add new IDs only for genuinely new behavior.
    - Keep Story IDs unique across active Epics in the app. Stop on duplicates unless the session is explicitly resolving the duplicate.
    - Update `CHANGELOG.md` under `Unreleased` using Keep a Changelog categories when the change is public/release relevant.
@@ -85,7 +86,7 @@ Use existing artifacts when the session continues an active change. Keep `tasks.
 
 ## Artifact Shape
 
-Use this minimum structure when creating new artifacts.
+Use this minimum structure when creating new artifacts. Treat these as trimmed subsets of the `/sdd-propose` proposal, design, and tasks templates, not as an independent template family. If a lightweight session needs fields beyond this shape, either add only the needed `/sdd-propose` template section or promote the work to `/sdd-propose`.
 
 `proposal.md`:
 

@@ -1,11 +1,45 @@
 ---
-modified: 2026-06-30
+modified: 2026-07-01
 ---
 # Changelog
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once versioned releases begin.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.3.0] - 2026-07-01
+
+### Added
+
+- Added `/sdd-adr` for durable architecture decision records and `/sdd-pr` for SDD-backed pull request stewardship.
+- Added canonical template examples under `docs/templates/` for easy browsing.
+- Added canonical Epic and ADR templates for packaged SDD workflows.
+- Added stronger Epic verification checks for doctrine adherence, template adherence, missing Stories, missing Requirements, and missing Scenarios.
+
+### Changed
+
+- Updated SDD doctrine and skills to use Epic-scoped Story labels such as `S1` instead of requiring globally unique Story IDs for new embedded Stories.
+- Tightened Epic evidence guidance so `Verified By` is a scenario-mapped evidence index, while chronological command history stays in change ledgers.
+- Made `/sdd-propose` a more thorough planning action with technical option comparison, client/API boundary planning, and ADR routing for durable decisions.
+- Updated `/sdd-explore`, `/sdd-release`, and `/sdd-pr` routing around ADR capture and PR stewardship.
+- Refocused `/sdd-space-status` into a read-only app re-entry brief.
+- Softened `/sdd-release` so full E2E is required by project policy or release risk, not merely by default.
+- Clarified `/sdd-interactive` artifacts as lightweight subsets of `/sdd-propose` templates.
+- Tightened package `AGENTS.md`, README, and doctrine guidance for public, portable use.
 
 ## [0.2.1] - 2026-06-30
 

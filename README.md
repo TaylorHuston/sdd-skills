@@ -1,5 +1,5 @@
 ---
-modified: 2026-06-30
+modified: 2026-07-01
 ---
 # SDD Skills
 
@@ -29,10 +29,12 @@ Support workflow:
 
 | Skill | Purpose |
 |---|---|
-| `/sdd-explore` | Think through ideas or investigate context before proposing a change. |
+| `/sdd-adr` | Create, update, or assess ADRs for durable SDD architecture decisions. |
+| `/sdd-explore` | Think through ideas, compare approaches, investigate context, and offer ADR capture when durable architecture decisions emerge. |
 | `/sdd-interactive` | Track and implement small concrete changes in one working session. |
 | `/sdd-epic-verify` | Audit an Epic against current implementation and evidence. |
-| `/sdd-space-status` | Summarize current SDD status across a project. |
+| `/sdd-pr` | Open or steward SDD-backed pull requests, process review comments/checks, and stop before merge for user approval. |
+| `/sdd-space-status` | Produce a read-only re-entry brief when returning to an app after time away. |
 | `/sdd-orphan-audit` | Find likely orphaned code, tests, and stale traceability evidence. |
 
 ## Artifact Model
@@ -53,13 +55,17 @@ docs/
     closed/
 ```
 
-Epics are the durable behavior-to-code map. Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, and `Verification Gaps` live inside each Epic's `epic.md`. If implemented behavior is not represented in an Epic/Story, treat it as undocumented drift until the map is updated or the code is removed through a tracked change.
+Epics are the durable behavior-to-code map. Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, and `Verification Gaps` live inside each Epic's `epic.md`. `Verified By` is a scenario-mapped evidence index, not a chronological command log; broad gates such as lint, typecheck, build, or full CI are supporting evidence unless tied to a named Requirement or Scenario. If implemented behavior is not represented in an Epic/Story, treat it as undocumented drift until the map is updated or the code is removed through a tracked change.
 
 Change folders are working records. `proposal.md` defines scope, `design.md` defines the technical approach, and `tasks.md` is the adaptive implementation ledger and resume surface.
+
+For non-trivial changes, `design.md` should compare viable technical options before selecting an approach. When a change creates a durable architecture, data, dependency, integration, deployment, security, storage, or cross-cutting project decision, record it as an ADR under `docs/adrs/` unless project-local guidance uses a different ADR location.
 
 Product Briefs/PRDs and app visual/style guidance are project planning artifacts. Store them wherever the project keeps private planning docs, and reference them from SDD skills when product scope, UI identity, or release-readiness depends on them.
 
 Generated indexes are optional. If a project maintains `docs/epics/index.md` or `docs/epics/story-index.json`, treat them as generated navigation or validation artifacts, not canonical truth.
+
+Canonical template examples are browsable in [docs/templates/](docs/templates/). These mirror the skill-local template assets used to create PRDs, Epics, changes, ADRs, review reports, audit reports, changelogs, and release PR notes.
 
 ## Current Development Shape
 
@@ -103,12 +109,12 @@ Start by using project-local guidance before changing the packaged skills. A goo
 Common adaptation points:
 
 - Planning docs: `/sdd-prd`, `/sdd-propose`, `/sdd-review`, and `/sdd-release` may need updated language if Product Briefs, PRDs, visual identity docs, or design notes live outside the app repo.
-- SDD artifact paths: most skills assume `docs/epics/` and `docs/changes/`. Alter `/sdd-propose`, `/sdd-apply`, `/sdd-review`, `/sdd-epic-verify`, `/sdd-space-status`, and `/sdd-orphan-audit` if your canonical paths differ.
-- Branch and merge policy: `/sdd-review` and `/sdd-release` are intentionally conservative. Update them or your app `AGENTS.md` for trunk-based development, no-PR workflows, required PR workflows, nonstandard production branches, or release trains.
+- SDD artifact paths: most skills assume `docs/epics/`, `docs/changes/`, and `docs/adrs/`. Alter `/sdd-propose`, `/sdd-apply`, `/sdd-review`, `/sdd-adr`, `/sdd-epic-verify`, `/sdd-space-status`, and `/sdd-orphan-audit` if your canonical paths differ.
+- Branch and merge policy: `/sdd-review`, `/sdd-pr`, and `/sdd-release` are intentionally conservative. Update them or your app `AGENTS.md` for trunk-based development, no-PR workflows, required PR workflows, nonstandard production branches, or release trains.
 - Verification commands: `/sdd-apply`, `/sdd-review`, and `/sdd-release` should be aligned with your real test, lint, typecheck, security, build, migration, and manual acceptance gates.
 - Changelog and release records: `/sdd-review` and `/sdd-release` assume a Keep a Changelog-style `CHANGELOG.md`. Adjust if you use generated release notes, changesets, GitHub releases only, or another release record.
 - UI and design guidance: `/sdd-review` looks for project visual/style guidance when UI changes are involved. Point it at your design system docs, brand guide, component guidelines, or remove that gate if the project does not need one.
-- Status and audit heuristics: `/sdd-space-status` and `/sdd-orphan-audit` depend heavily on naming conventions, generated indexes, and traceability expectations. Tune them after you see the first few reports against your codebase.
+- Re-entry and audit heuristics: `/sdd-space-status` depends on naming conventions and recent workflow artifacts for orientation, while `/sdd-orphan-audit` depends on traceability evidence. Tune them after you see the first few reports against your codebase.
 
 ## Installation
 
@@ -154,6 +160,7 @@ The skills work best when each application repo has:
 - `docs/epics/` for durable capability truth
 - `docs/changes/` for active and closed changes
 - private planning docs for PRD/Product Brief and visual/style guidance when product or UI decisions need durable context
+- `docs/adrs/` or another project-local ADR location when durable architecture decisions need their own record
 
 The skills prefer project-local guidance over package defaults.
 

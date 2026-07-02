@@ -17,6 +17,8 @@ Use `references/specialist-routing.md` during specialist checkpoints. Keep techn
 
 Use `assets/changelog-template.md` when a release-relevant change needs a root `CHANGELOG.md` and the application does not have one yet.
 
+Use `assets/epic-template.md` when creating a new Epic or normalizing an Epic file shape.
+
 ## Inputs And Modes
 
 Start from an explicit change folder, change name, or active change inferred from the conversation.
@@ -56,7 +58,7 @@ Before editing, read:
 - root `CHANGELOG.md` when `proposal.md` says changelog impact is required or TBD, or when implementation proves the change is user-facing, release-relevant, security-relevant, migration-relevant, operationally notable, or public documentation-worthy
 - relevant `AGENTS.md`, README, PRD/Product Brief, and project-local branch policy
 - target Epic files under `docs/epics/*/epic.md`
-- enough of every active `docs/epics/*/epic.md` to detect duplicate Story IDs across the app
+- enough of every active `docs/epics/*/epic.md` to detect duplicate Story labels within an Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs
 - code, tests, docs, and generated artifacts named by `design.md`, `tasks.md`, or current implementation reality
 - routes, commands, seed data, test accounts, browser setup, screenshots, or local dev URLs needed to give the user a useful manual UI confirmation walkthrough when the change is user-facing
 
@@ -75,8 +77,11 @@ Check that:
 - each targeted Epic path follows `docs/epics/key-###-epic-name/epic.md`.
 - Stories stay embedded in Epic `epic.md` files; do not create `docs/stories/`.
 - Epics and Stories are durable but revisable truth; proposed Story moves, splits, merges, renames, and reorders are explicit Epic changes, not accidental implementation cleanup.
-- each Story has a stable Story ID, local Requirement IDs, local Scenario IDs, `Implemented By`, `Verified By`, and `Verification Gaps`.
-- Story IDs are unique across active app Epics unless a temporary migration duplicate is explicitly documented as blocking further implementation.
+- each Story has a stable Epic-scoped label or documented legacy Story ID, local Requirement IDs, local Scenario IDs, `Implemented By`, `Verified By`, and `Verification Gaps`.
+- implemented Stories use `Verified By` as a scenario-mapped evidence index, not as a chronological command log.
+- `Verified By` evidence distinguishes focused automated tests, broad supporting gates, deterministic E2E, live-provider playtests, manual UI confirmation, and debug/log inspection instead of collapsing them into one vague "verified" bucket.
+- `S#` Story labels are unique within each Epic, full Story references are traceable, and legacy app-wide Story IDs remain unique unless a temporary migration duplicate is explicitly documented as blocking further implementation.
+- later Stories or Requirements do not silently supersede earlier Epic truth. If this change revises an earlier boundary, update the older Story wording, `Verified By`, and `Verification Gaps` or record an explicit supersession note.
 - Requirements and Scenarios describe observable behavior unless a technical detail is itself user-visible.
 - Scenarios are concrete enough to drive tests or manual checks. Do not proceed with generic Scenarios such as "WHEN this Story's workflow is exercised"; patch the artifact or stop for scope clarification.
 - the technical approach is sufficient for the next implementation slice.
@@ -118,9 +123,9 @@ Before acting on feedback:
    - For `scope expansion`, stop unless the user explicitly accepts expanding this change. If accepted and the expansion needs planning, route to `/sdd-propose --replan`; otherwise update `proposal.md`, `design.md`, Epic truth, and `tasks.md`. If not accepted, recommend `/sdd-propose` for a follow-up change.
    - For `product drift`, stop or recommend `/sdd-prd` unless the user explicitly authorizes product-direction updates in the same run.
 
-When feedback changes a Requirement or Scenario, preserve the stable Story ID and local Requirement/Scenario ID when the behavior is an edit to existing truth. Add a new `R#` or `R#-S#` only when it is a genuinely new behavior rule or scenario. Do not silently renumber completed Requirements or Scenarios just to keep labels tidy.
+When feedback changes a Requirement or Scenario, preserve the stable Story label/reference and local Requirement/Scenario ID when the behavior is an edit to existing truth. Add a new `R#` or `R#-S#` only when it is a genuinely new behavior rule or scenario. Do not silently renumber completed Requirements or Scenarios just to keep labels tidy.
 
-When feedback or implementation reveals that a Story belongs in a different Epic, treat it as Epic ownership change. Preserve the Story ID unless the user explicitly accepts renumbering, update both source and destination Epic truth, and record the move in `tasks.md`; if the move was not in the proposal, stop or require explicit scope acceptance before applying it.
+When feedback or implementation reveals that a Story belongs in a different Epic, treat it as Epic ownership change. Record the old full Story reference and the new full Story reference, update both source and destination Epic truth, and record the move in `tasks.md`; if the move was not in the proposal, stop or require explicit scope acceptance before applying it.
 
 Manual feedback is not `/sdd-review` by default. Create or update `review.md` only when the feedback is explicitly a review finding or comes from `/sdd-review`; otherwise keep the active record in `tasks.md` and the durable truth in `design.md` plus the Epic. When the feedback becomes planning-level discovery, let `/sdd-propose --replan` revise the planning artifacts before implementation resumes.
 
@@ -162,7 +167,7 @@ Parallelize read-only discovery and review subagents when their scopes do not ov
 
 Before each delegated phase or review pass, run a specialist checkpoint:
 
-1. Inspect the selected Story ID, Requirement ID, Scenario ID(s), touched files, package/config files, project guidance, and risk surface.
+1. Inspect the selected Story label/reference, Requirement ID, Scenario ID(s), touched files, package/config files, project guidance, and risk surface.
 2. Read `references/specialist-routing.md` when technology, platform, security, UX, architecture, migration, or verification guidance may materially affect the slice.
 3. Select only specialist skills or subagent roles that can materially affect implementation, testing, security, migration, UX, performance, backend behavior, or architecture.
 4. Prefer router skills when the exact specialist skill is unclear.
@@ -175,7 +180,7 @@ Every delegated implementation prompt must include:
 
 - app root and workflow/vault root
 - change folder and `proposal.md`, `design.md`, `tasks.md` paths
-- target Epic path and the exact Story ID, Requirement ID, and Scenario ID scope
+- target Epic path and the exact Story label/reference, Requirement ID, and Scenario ID scope
 - relevant technical approach, constraints, and stop conditions
 - named specialist guidance to load
 - the reason each specialist skill or guidance item applies to this slice
@@ -203,12 +208,13 @@ Implement one coherent behavior or capability slice at a time.
 1. Apply Epic artifact work first when needed.
    - Create or update `docs/epics/key-###-epic-name/epic.md`.
    - Keep Stories embedded in the Epic.
+   - Use `assets/epic-template.md` for new or normalized Epic files unless project-local guidance intentionally keeps a legacy shape.
    - Preserve room for future supporting artifacts beside `epic.md`, but do not create extra folders unless needed.
 2. Select the next pending Requirement or Scenario from `tasks.md` and `design.md`.
    - Prefer Requirement-shaped phases.
    - Split by Scenario when a Requirement is too large, has distinct failure modes, or crosses separate technical surfaces.
    - Use file-shaped work only as an enabling phase tied to the next Requirement.
-   - Use the stable labels in reports and commits: `STORY-ID R1`, `STORY-ID R1-S1`, and so on.
+   - Use the stable labels in reports and commits: `EPIC-ID/S1 R1`, `EPIC-ID/S1/R1-S1`, or the documented legacy Story ID form.
    - If the next slice came from manual feedback, confirm `tasks.md`, `design.md`, and the target Epic reflect the feedback classification before editing code.
 3. Delegate the selected Requirement or Scenario when it is non-trivial and delegation is available.
    - Scope the subagent with `assets/subagent-requirement-prompt.md`.
@@ -225,13 +231,17 @@ Implement one coherent behavior or capability slice at a time.
    - Keep implementation aligned with `design.md`, but update the artifacts when implementation reality proves the design stale.
    - Do not silently expand product scope or user-visible behavior.
 6. Run focused verification.
-   - Name the Story ID, Requirement ID, Scenario ID, behavior, assertion, route, browser path, command, or manual check being proved.
+   - Name the Story label/reference, Requirement ID, Scenario ID, behavior, assertion, route, browser path, command, or manual check being proved.
+   - Record chronological command results in `tasks.md` under the Verification Ledger.
+   - Label the evidence type where it matters: focused automated test, broad supporting gate, deterministic E2E, live-provider playtest, manual UI confirmation, or debug/log inspection.
    - Treat broad commands as supporting evidence unless they map to named behavior.
    - Leave the repo green before committing; do not commit a merely expected failing-test state unless the user explicitly asks for a checkpoint.
 7. Reconcile the Epic Story entry.
    - Update Story-level `Implemented By` with important current files and their roles.
-   - Update Story-level `Verified By` with concrete evidence.
+   - Update Story-level `Verified By` as a scenario-mapped evidence index. Each entry should name the concrete test, check, manual scenario, browser path, or review artifact and the Story/Requirement/Scenario IDs it proves.
+   - Do not append chronological verification logs to `Verified By`; broad gates such as lint, typecheck, build, codegen, or full CI can appear only as supporting evidence.
    - Keep `Verification Gaps` limited to real gaps, deferrals, or weaker-than-required evidence.
+   - Search affected Epic Stories for older wording that this slice supersedes. Reconcile stale Requirements, Scenarios, `Implemented By`, `Verified By`, `Verification Gaps`, and notes before claiming the current Story is done.
 8. Update the manual UI confirmation checklist.
    - When the slice changes browser-visible UI, user flows, interaction behavior, empty/error/loading states, permissions, data entry, navigation, or other manually observable app behavior, add or refresh a `Manual UI Confirmation` section in `tasks.md`.
    - Walk the user through the exact app URL or route, required local server state, seed/test data or account, steps to perform, expected observations, known acceptable rough edges, and what feedback would count as a defect, requirement refinement, verification gap, artifact drift, scope expansion, or product drift.
@@ -252,10 +262,16 @@ Implement one coherent behavior or capability slice at a time.
    - Add verification ledger entries.
    - Add or refresh manual UI confirmation steps and status.
    - Keep closeout fields consistent with reality: review record, manual confirmation status, changelog status, PR/merge state, deferred gaps, and folder location.
+   - Record any superseded Story/Requirement/Scenario wording and the artifact reconciliation performed.
+   - Keep old proposal/design status text from contradicting completed work. If design sections still say `Not implemented yet`, `Not verified yet`, or implementation is pending after implementation has landed, update or clearly mark that text as historical before closeout.
    - Record subagents used, specialist skills loaded, blockers, departures, and commit hashes or commit candidates.
+   - Before the implementation commit exists, record the relevant ledger rows as `commit pending`, `uncommitted`, or a clear commit candidate rather than inventing a hash.
 11. Commit locally when authorized, the slice is verified, and changes are commit-shaped.
    - Do not stage unrelated dirty files.
    - Keep app/source commits separate from vault/workflow commits unless they are the same repo.
+   - After a commit succeeds, immediately update `tasks.md` so `Resume Here`, the implementation ledger, verification ledger, closeout state, and PR/merge state reference the real commit hash.
+   - If that post-commit ledger update changes `tasks.md`, make a small ledger-only follow-up commit. This keeps cold-resume state accurate instead of leaving `tasks.md` with stale `uncommitted` or `commit pending` entries.
+   - In `--no-commit` mode, do not make either commit; keep `tasks.md` on commit candidates and say that hashes remain pending.
 
 Continue until all safe tasks are done, a stop condition is hit, or `--step` completes one slice.
 
@@ -265,10 +281,12 @@ Before reporting the change as implemented or ready for closeout, run final revi
 
 - Proposal Scope: implemented work matches the proposed change or recorded approved departures.
 - Design Fidelity: technical approach, alternatives, constraints, decisions, and risks remain accurate.
-- Epic Truth: Epic Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, and `Verification Gaps` match reality.
-- ID Traceability: new or modified Stories keep stable Story IDs; Requirements use local `R#` IDs; Scenarios use local `R#-S#` IDs; verification evidence does not rely on stale `AC-#` labels unless they are explicitly marked as legacy references.
-- Story ID Uniqueness: no duplicate Story IDs exist across active `docs/epics/**/epic.md` files unless an explicit migration note blocks relying on the duplicate.
+- Epic Truth: Epic Stories, Requirements, Scenarios, `Implemented By`, scenario-mapped `Verified By`, and `Verification Gaps` match reality.
+- Supersession Reconciliation: later work has not left earlier Stories, Requirements, Scenarios, `Verified By`, or `Verification Gaps` with stale assumptions.
+- Story Reference Traceability: new or modified Stories keep stable Epic-scoped labels or documented legacy Story IDs; Requirements use local `R#` IDs; Scenarios use local `R#-S#` IDs; verification evidence does not rely on stale `AC-#` labels unless they are explicitly marked as legacy references.
+- Story Reference Uniqueness: no duplicate `S#` labels exist within a single Epic, no duplicate full Story references exist, and no duplicate legacy app-wide Story IDs exist unless an explicit migration note blocks relying on the duplicate.
 - Test And Coverage: user-visible behavior has concrete proof, and risky fake/mock/helper boundaries have production-path proof or explicit gaps.
+- Evidence Typing: deterministic E2E, live-provider playtests, manual UI confirmation, broad gates, and debug/log inspection are recorded as distinct evidence types.
 - Manual UI Confirmation: for browser-visible or otherwise user-facing app changes, `tasks.md` includes a clear walkthrough the user can execute, with expected results and how feedback should be classified.
 - Code Quality: changed code is scoped, maintainable, and avoids speculative rewrites.
 - Security And Data Safety: auth, permissions, persistence, migrations, secrets, and destructive paths are handled or explicitly out of scope.
@@ -276,6 +294,7 @@ Before reporting the change as implemented or ready for closeout, run final revi
 - Changelog: root `CHANGELOG.md` is updated when the implemented change is release-relevant, or `tasks.md` records why no public entry is needed.
 - Merge Readiness: branch, dirty state, commits or commit candidates, remaining gaps, and later review needs are clear.
 - Closeout Readiness: `tasks.md` has no contradictory Resume Here, checklist, review record, manual confirmation status, changelog status, PR/merge state, deferred-gap, or folder-location claims.
+- Closed-Artifact Readiness: related proposal/design/tasks/review files do not still claim implemented work is unimplemented, unverified, pending, or accepted under obsolete status vocabulary.
 
 Use fresh-context delegated reviewers by default for substantial changes and whenever practical for normal implementation. Delegate at least coverage, code, security, and docs/artifact review when the changed surface is non-trivial. This is implementation self-review and does not replace `/sdd-review` as the local PR gate. The orchestrator remains responsible for final judgment and verification of important claims.
 
@@ -287,14 +306,16 @@ A change is implementation-complete only when:
 
 - all required tasks are complete or explicitly deferred with a reason.
 - targeted Epic files exist and match the implemented behavior.
-- new or modified Stories, Requirements, and Scenarios follow the stable ID convention.
-- Story-level `Implemented By`, `Verified By`, and `Verification Gaps` are current.
+- new or modified Stories, Requirements, and Scenarios follow the stable label/reference convention.
+- Story-level `Implemented By`, scenario-mapped `Verified By`, and `Verification Gaps` are current.
+- superseded or revised earlier Story truth has been reconciled, not merely contradicted by a later Story.
 - meaningful verification has passed or gaps are explicit.
 - manual UI confirmation steps are recorded for user-facing app changes, or `tasks.md` explains why no manual confirmation applies.
 - final review has no unresolved safe fixes.
 - `tasks.md` has an accurate final `Resume Here`, implementation ledger, verification ledger, blockers/open questions, and closeout state.
 - `tasks.md` records the review outcome as a `review.md` path, a clean review recorded in `tasks.md`, or an explicit user-approved review waiver before closeout.
 - `tasks.md` records manual UI confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
+- related proposal/design/tasks/review artifacts do not contain stale implementation-pending language or contradictory manual confirmation status unless clearly marked historical.
 - root `CHANGELOG.md` is current when required, using Keep a Changelog categories under `Unreleased`.
 - commits or commit candidates are recorded.
 
@@ -305,6 +326,8 @@ Do not move the change to `docs/changes/closed/` unless the user explicitly asks
 When closing:
 
 1. Ensure `tasks.md` closeout reflects review outcome, review record, manual confirmation status, changelog status, PR/merge state, remaining accepted risks, and no contradictory checklist or Resume Here state.
+   - Confirm manual confirmation status uses only `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
+   - Confirm related active and closed artifacts no longer contradict the accepted Epic state, including stale `Not implemented yet`, `Not verified yet`, old boundary wording, or obsolete manual status vocabulary.
 2. Move `docs/changes/yyyy-mm-dd-change-name/` to `docs/changes/closed/yyyy-mm-dd-change-name/`.
    - If the selected change is in legacy `changes/`, ask whether to migrate it into `docs/changes/closed/` during closeout rather than preserving the legacy root-level location.
 3. Update the moved `tasks.md` closeout section.
@@ -321,7 +344,8 @@ Stop and report when:
 - branch policy is missing or violated.
 - unrelated dirty files block safe edits.
 - verification fails without a safe in-scope fix.
-- duplicate Story IDs exist across active Epics without an explicit migration/blocking note.
+- duplicate Story labels inside one Epic, duplicate full Story references, or duplicate legacy app-wide Story IDs exist without an explicit migration/blocking note.
+- a later Story or implementation slice supersedes earlier Epic truth that has not been reconciled.
 - risky production-path behavior is only covered by mocks/helpers and no explicit gap is acceptable.
 - subagent output is unsafe, unsupported, stale, or too broad to integrate.
 - required credentials, live services, migrations, production data, destructive actions, push, merge, rebase, deploy, or branch deletion need approval.

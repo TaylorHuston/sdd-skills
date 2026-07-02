@@ -264,7 +264,7 @@ def print_markdown(report: dict, limit: int) -> None:
         print("- None found.")
     for label, values in (
         ("Implemented By points to missing paths", report["missing_implemented_refs"]),
-        ("Verified By points to missing paths", report["missing_verified_refs"]),
+        ("Verified By path references point to missing paths", report["missing_verified_refs"]),
     ):
         if values:
             print(f"\n### {label}")
@@ -277,7 +277,7 @@ def print_markdown(report: dict, limit: int) -> None:
     if not tests and not sources:
         print("- None found.")
     if tests:
-        print("\n### Tests without Verified By ownership")
+        print("\n### Tests without Verified By path references")
         for path in limited(tests, limit):
             print(f"- `{path}`")
         if limit and len(tests) > limit:

@@ -49,7 +49,7 @@ Check git status before writing a report. Preserve unrelated dirty files. Do not
 2. Run the universal traceability script.
    - Use `scripts/sdd_orphan_audit.py <app-root> --format markdown` for a human summary.
    - Use `--format json` when the result will be post-processed.
-   - The script parses `docs/epics/*/epic.md`, extracts `Implemented By` and `Verified By` pasdd-like references, compares them to `git ls-files` or filesystem fallback inventory, and identifies candidate test files.
+   - The script parses `docs/epics/*/epic.md`, extracts `Implemented By` and `Verified By` path-like references, compares them to `git ls-files` or filesystem fallback inventory, and identifies candidate test files. Human review must still decide whether `Verified By` ownership is scenario-mapped or merely a broad command reference.
 3. Review the script output.
    - Read only suspicious files or artifacts needed to classify findings.
    - Do not read every source file by default.
@@ -61,7 +61,7 @@ Check git status before writing a report. Preserve unrelated dirty files. Do not
    - Record analyzer command, version when easy, exit code, and limitations.
 5. Classify findings.
    - `missing-reference`: Epic evidence points to a file/test that does not exist.
-   - `traceability-gap`: a real file/test appears relevant but no Epic owns it in `Implemented By` or `Verified By`.
+   - `traceability-gap`: a real file/test appears relevant but no Epic owns it in `Implemented By` or scenario-mapped `Verified By`.
    - `likely-orphan`: SDD evidence is absent and a stack analyzer or repo-native inventory suggests the item is unused.
    - `stale-test`: a test exists but appears to verify removed, renamed, or unowned behavior.
    - `stale-code`: code exists but appears unused or disconnected from current routes/build/runtime.
@@ -101,7 +101,7 @@ Include:
 - commands run
 - Epic evidence coverage summary
 - missing Epic references
-- tests without `Verified By` ownership
+- tests without scenario-mapped `Verified By` ownership
 - source files without `Implemented By` ownership
 - stack analyzer findings, if any
 - confidence-classified candidates

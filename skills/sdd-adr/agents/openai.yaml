@@ -1,0 +1,4 @@
+interface:
+  display_name: "SDD ADR"
+  short_description: "Create and update SDD ADRs"
+  default_prompt: "Use $sdd-adr to draft or update an architecture decision record for an SDD project."

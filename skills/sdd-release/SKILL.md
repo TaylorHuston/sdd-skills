@@ -1,6 +1,6 @@
 ---
 name: sdd-release
-description: Prepare a SDD application release PR to main or another production branch. Use when the user invokes /sdd-release, asks to release, push or promote to main, cut a release, prepare a production-branch PR, run full release checks, run the full e2e suite before release, bump or finalize CHANGELOG.md following Keep a Changelog, open a release pull request, or use remote CI / AI-assisted review for main promotion. Runs branch-policy and dirty-state preflight, verifies SDD review/readiness and closeout consistency, runs full e2e and other required release checks, updates CHANGELOG.md only after checks pass, commits release metadata, pushes the release branch when authorized by the PR request, and opens a PR to main/production. Does not merge, deploy, tag, or publish without explicit authorization.
+description: Prepare a SDD application release PR to main or another production branch. Use when the user invokes /sdd-release, asks to release, push or promote to main, cut a release, prepare a production-branch PR, run full release checks, run the full e2e suite before release, bump or finalize CHANGELOG.md following Keep a Changelog, open a release pull request, or use remote CI / AI-assisted review for main promotion. Runs branch-policy and dirty-state preflight, verifies SDD review/readiness and closeout consistency, defers to project-local CI/CD or testing docs for required release gates when they exist, updates CHANGELOG.md only after checks pass, commits release metadata, pushes the release branch when authorized by the PR request, and opens a PR to main/production. Does not merge, deploy, tag, or publish without explicit authorization.
 ---
 
 # SDD Release
@@ -11,9 +11,11 @@ This is the release gate after implementation and local review. It is stricter t
 
 Use this as the default remote PR workflow for production-branch promotion. Routine SDD changes may be reviewed and merged locally into the project integration branch; `/sdd-release` is where hosted CI, review-thread history, and remote AI-assisted review become the default path.
 
+After `/sdd-release` opens a PR, use `/sdd-pr` for ongoing PR stewardship: checking review comments, status checks, review threads, remote AI-assisted feedback, narrow accepted fixes, replies, and final merge-readiness handoff. `/sdd-release` prepares the release PR; `/sdd-pr` tends that PR until the user approves merge.
+
 ## Modes
 
-- Default: run release preflight, run full release checks including full e2e, update `CHANGELOG.md`, commit release metadata, push the release branch when needed, and open a PR to `main`.
+- Default: run release preflight, run the project-defined release gate, update `CHANGELOG.md`, commit release metadata, push the release branch when needed, and open a PR to `main`.
 - `--check`: run preflight and release checks only. Do not edit, commit, push, or open a PR.
 - `--no-pr`: run release checks and update release artifacts, but stop before pushing or opening a PR.
 - `--no-commit`: keep `CHANGELOG.md` and related release artifacts unstaged; report a commit candidate.
@@ -28,13 +30,14 @@ Before release work, read:
 
 - project-local `AGENTS.md`, especially branch policy and release rules
 - parent/workspace `AGENTS.md` when the app lives under or beside the vault
-- `developer-guide.md` from the vault root when available
+- workspace developer guide when available
 - root `README.md`, package scripts, test docs, deployment docs, and CI docs when present
 - remote review configuration such as `.coderabbit.yaml`, GitHub branch protection, or project docs when present
 - root `CHANGELOG.md`
 - active and recently completed `docs/changes/**/{proposal.md,design.md,tasks.md,review.md}` relevant to the release
 - `docs/epics/*/epic.md` when release notes, changelog entries, or readiness depend on Epic truth
 - project PRD/Product Brief when product scope changed or release contents are ambiguous
+- project visual/style guidance or app visual identity docs when a release includes prominent UI, layout, branding, or app-identity changes and those docs affect release risk or communication
 
 Check git status in every repo that may change. Preserve unrelated dirty files. Do not stage unrelated changes.
 
@@ -55,17 +58,23 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
    - Stop on duplicate Story IDs across active Epics unless the release is explicitly carrying the cleanup and it has already passed `/sdd-review`.
    - Confirm root `CHANGELOG.md` exists or create it from `assets/changelog-template.md` only when the project does not have one and the user wants release notes.
    - Confirm secrets, env files, generated caches, build artifacts, and local-only files will not be staged.
-3. Run full release checks before changelog bump.
-   - Run the full e2e test suite first when the project exposes a clear e2e command.
-   - Also run required release checks from project docs or package scripts, such as lint, typecheck, unit tests, integration tests, build, codegen check, migration dry-run/check, formatting check, or docs validation.
-   - Prefer project-defined aggregate commands such as `test`, `test:e2e`, `e2e`, `ci`, `check`, `lint`, `typecheck`, and `build`; do not invent destructive commands.
-   - If no e2e command exists, stop or explicitly record why the release cannot satisfy the normal gate.
+3. Resolve and run release checks before changelog bump.
+   - First defer to project-local release guidance when it exists, in this order: project-local `AGENTS.md`, `docs/ci-cd.md`, `docs/testing.md`, `docs/deployment.md`, workflow files under `.github/workflows/`, then package scripts.
+   - Treat the project-local documented required release gate as authoritative when it clearly names required commands or explicitly marks browser, provider-backed, deployment, or e2e checks as optional, risk-triggered, or not required yet.
+   - Run the full e2e test suite first only when project-local docs or scripts expose it as required for release, or when release risk makes browser/provider-backed verification materially necessary.
+   - Also run required or best-available release checks from project docs or package scripts, such as lint, typecheck, unit tests, integration tests, build, codegen check, migration dry-run/check, formatting check, docs validation, or risk-triggered e2e.
+   - Prefer project-defined aggregate commands such as `ci:required`, `ci`, `check`, `test`, `test:e2e`, `e2e`, `lint`, `typecheck`, and `build`; do not invent destructive commands.
+   - If no project-local release guidance exists, derive the strongest available local release gate from package scripts, workflow files, README/testing docs, and the changed risk surface. Do not require e2e solely because the project exposes an e2e command.
+   - If no project-local release guidance exists and no meaningful local release gate can be identified, stop or explicitly record why release confidence cannot be established.
+   - If project-local release guidance exists and says e2e or browser/provider checks are optional or not yet part of the required gate, do not stop solely because no e2e command exists; report the skipped optional gate and its documented reason.
    - If any required release check fails, stop before changelog edits unless the failure is caused by stale release metadata and the project policy permits fixing it first.
 4. Prepare the changelog.
    - Follow Keep a Changelog 1.1.0.
    - Keep `Unreleased` first.
-   - Move release-ready `Unreleased` entries into a new version/date heading only when the project uses versioned releases or the user provides the release version.
-   - If no release version is known, keep entries under `Unreleased` and add a release PR note rather than inventing a semantic version.
+   - Determine the release version before editing. Use an explicit user-provided version first. Otherwise, when the app has a package or manifest version such as `package.json.version`, use that current project version for the release heading. For a first release, `0.1.0` is valid when the package already declares `0.1.0`.
+   - Move release-ready `Unreleased` entries into a new version/date heading when a release version is known from the user or project metadata.
+   - For a first changelog release, add a short release-context sentence and usually place initial capabilities under `Added` rather than `Changed`, because there is no earlier released baseline being changed.
+   - If no release version can be inferred from project metadata and the user did not provide one, stop and ask instead of leaving release-ready entries under `Unreleased` or inventing a semantic version.
    - Use the local shell date in ISO format for dated release headings.
    - Keep categories to `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security`.
    - Ensure entries are public-safe: no private vault context, SDD ledger details, raw Requirement/Scenario lists, secrets, internal-only task IDs, or speculative roadmap promises.
@@ -84,6 +93,7 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
    - Include release scope, changelog summary, SDD reviews checked, commands run, full e2e result, security/data notes, manual acceptance notes, and known risks.
    - Treat the remote PR as the handoff to hosted CI and remote AI-assisted review when configured. Add required labels, reviewers, or context only when project docs or the user's request calls for them.
    - Record remote AI-assisted review as `triggered`, `not configured`, `unavailable`, or `not checked`; do not block PR creation solely because an optional remote review has not completed.
+   - End new PR creation with a handoff to `/sdd-pr` for later review-thread and status-check stewardship after CI, bots, or humans have had time to respond.
    - Do not merge the PR unless the user explicitly asked for release merge and branch policy allows it.
 8. Update SDD artifacts when appropriate.
    - If release readiness changes active `tasks.md` closeout state, update it only when the release clearly owns that change and the update is safe.
@@ -92,7 +102,7 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
 
 ## Recommended Gates
 
-In addition to full e2e, prefer these gates when the app exposes them:
+Use the app's documented release gate first. In addition, prefer these gates when the app exposes them and project-local policy does not mark them optional for the current release:
 
 - lint
 - typecheck
@@ -107,7 +117,7 @@ In addition to full e2e, prefer these gates when the app exposes them:
 - CI status check after PR creation when available
 - remote AI-assisted code review status after PR creation when configured
 
-Scale to the app. A small static app may only have build plus e2e. A multi-app system should use the app's full documented release gate.
+Scale to the app. A small static app may only have build. A local MVP may intentionally keep browser or provider-backed checks optional until they are stable and cheap. A multi-app system should use the app's full documented release gate.
 
 ## Changelog Rules
 
@@ -115,7 +125,7 @@ Treat `CHANGELOG.md` as public release communication.
 
 - Use Keep a Changelog 1.1.0 conventions.
 - Do not create release versions from guesses.
-- If the project has `package.json` versioning and the user wants a version bump, ask for the release type or infer only from an explicit project convention.
+- If the project has `package.json` versioning, use the current `package.json.version` as the changelog release heading. Only bump the package version itself when the user explicitly asks for a version bump or the project-local release process requires it.
 - If there are no public-facing changes, record that in the release PR rather than fabricating changelog content.
 - If `Unreleased` is empty but SDD changes were released, inspect the relevant changes and Epics before adding entries.
 
@@ -126,7 +136,8 @@ Stop and report when:
 - branch policy is missing, unclear, or conflicts with the requested release route.
 - source or target branch selection is ambiguous.
 - unrelated dirty files would be staged or affect release checks.
-- full e2e does not exist, cannot run, or fails.
+- project-local release guidance requires full e2e and it does not exist, cannot run, or fails.
+- no project-local release guidance exists and no meaningful local release gate can be identified or satisfied.
 - required release checks fail.
 - `/sdd-review` readiness is missing for release-blocking SDD changes.
 - release-relevant SDD closeout state is contradictory or duplicate Story IDs make Epic traceability unreliable.
@@ -149,6 +160,7 @@ Include:
 - release commit hash or commit candidate
 - SDD review/readiness status
 - remote CI and AI-assisted review status when known
+- whether `/sdd-pr` should be rerun later to steward the opened PR
 - remaining risks or approvals needed
 - exact next action
 

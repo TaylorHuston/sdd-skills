@@ -1,6 +1,6 @@
 ---
 name: sdd-review
-description: Review a SDD change as the local integration gate after /sdd-apply or before closing, creating a docs/changes/yyyy-mm-dd-change-name/review.md file when deficiencies are found, verifying proposal.md, design.md, tasks.md, Epic truth, unique Story IDs, Requirements, Scenarios, tests, manual confirmation status, code quality, security, documentation, changelog, branch policy, source-vs-target merge readiness, and closeout consistency. Use when the user invokes /sdd-review, asks to verify a SDD change, run a local PR-style review, prepare integration readiness, address review findings, close or finish a change, create a non-production PR, merge a SDD change into an integration branch, or merge-and-close a ready change according to the app's merge policy. Use /sdd-release instead for main/production promotion, release PRs, full release checks, changelog finalization, or remote CI / AI-assisted review for production acceptance.
+description: Review a SDD change as the local integration gate after /sdd-apply or before closing, creating a docs/changes/yyyy-mm-dd-change-name/review.md file when deficiencies are found, verifying proposal.md, design.md, tasks.md, Epic truth, Epic template adherence, Story labels/references, Requirements, Scenarios, tests, manual confirmation status, code quality, security, documentation, changelog, branch policy, source-vs-target merge readiness, and closeout consistency. Use when the user invokes /sdd-review, asks to verify a SDD change, run a local PR-style review, prepare integration readiness, address review findings, close or finish a change, create a non-production PR, merge a SDD change into an integration branch, or merge-and-close a ready change according to the app's merge policy. Use /sdd-release instead for main/production promotion, release PRs, full release checks, changelog finalization, or remote CI / AI-assisted review for production acceptance.
 ---
 
 # SDD Review
@@ -107,7 +107,7 @@ Before reviewing, read:
 - existing `docs/changes/yyyy-mm-dd-change-name/review.md`, if present
 - root `CHANGELOG.md` when `proposal.md` says changelog impact is required or TBD, `tasks.md` references changelog work, or the implemented change is user-facing, release-relevant, security-relevant, migration-relevant, operationally notable, or public documentation-worthy
 - relevant target Epic files under `docs/epics/*/epic.md`
-- enough of every active `docs/epics/*/epic.md` to detect duplicate Story IDs across the app
+- enough of every active `docs/epics/*/epic.md` to detect duplicate Story labels inside an Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs
 - vault, workspace, and app `AGENTS.md`, especially app branch policy
 - project planning docs or PRD/Product Brief files when product scope changed, the change claims product direction, or PRD drift was flagged
 - project visual/style guidance, design-system notes, or app visual identity docs when the change affects app UI, layout, styling, component density, interaction polish, or visual identity
@@ -168,19 +168,22 @@ Run all gates that apply. Use `pass`, `findings`, `blocked`, or `not applicable`
    - `proposal.md`, `design.md`, and `tasks.md` agree on scope.
    - `tasks.md` checkboxes, Resume Here, implementation ledger, verification ledger, blockers, and closeout state match repo reality.
    - Any departures from the proposal or design are recorded and justified.
+   - When implementation is complete or closeout is requested, `proposal.md`, `design.md`, `tasks.md`, and `review.md` do not still claim accepted work is `Not implemented yet`, `Not verified yet`, implementation pending, verification pending, or using obsolete manual confirmation status vocabulary unless the text is explicitly historical and non-authoritative.
    - Closed changes, or changes the user has asked to close, have no contradictory lifecycle state: `Resume Here`, checklist, review state, manual confirmation status, changelog status, PR/merge state, deferred gaps, and folder location all agree.
    - No required closeout checkbox remains unchecked unless it is explicitly recorded as an accepted deferred gap with an owner decision.
    - `tasks.md` records the review outcome as either a `review.md` path, a clean review recorded in `tasks.md`, or an explicit user-approved review waiver.
 2. Epic Truth Gate
    - Target Epic directories and `epic.md` files exist.
-   - Each Story has a stable Story ID, current Requirements, Scenarios, `Implemented By`, `Verified By`, and `Verification Gaps`.
-   - Story IDs are unique across active `docs/epics/**/epic.md` files in the app unless a temporary migration duplicate is explicitly documented and blocked from further implementation.
-   - When duplicate Story IDs are found during default or `--fix` review, clean them up automatically if the intended owner is obvious, the fix is a mechanical renumber inside the active change's target Epic or recently added Story set, and all affected references are local to the app docs/change artifacts. Record the renumbering in `tasks.md` or `review.md`.
+   - New or normalized Epic files follow the canonical Epic template shape: frontmatter, Product Context, Outcome, Current Scope, Deferred Scope, Candidate Stories, Story Index, Stories, Cross-Story Concerns, Open Decisions, Completion Criteria, and Notes.
+   - Each Story has a stable Epic-scoped label or documented legacy Story ID, current Requirements, Scenarios, `Implemented By`, `Verified By`, and `Verification Gaps`.
+   - `S#` Story labels are unique within each Epic, full Story references are traceable, and legacy app-wide Story IDs remain unique across active `docs/epics/**/epic.md` files unless a temporary migration duplicate is explicitly documented and blocked from further implementation.
+   - When duplicate Story labels or conflicting legacy Story IDs are found during default or `--fix` review, clean them up automatically if the intended owner is obvious, the fix is a mechanical relabel inside the active change's target Epic or recently added Story set, and all affected references are local to the app docs/change artifacts. Record the relabeling in `tasks.md` or `review.md`.
    - Any Story rename, reorder, split, merge, or move between Epics is intentional, documented in the change artifacts, and reconciled in every affected Epic.
-   - Story IDs are preserved across Epic moves unless deliberate renumbering is documented.
+   - Story moves record the old full Story reference and new full Story reference unless the Story uses a documented legacy app-wide ID that remains intentionally preserved.
    - Requirements and Scenarios match implemented user-visible behavior and known failure modes.
+   - Later Stories or implementation slices have not silently superseded earlier Story truth. If a boundary changed, the older Requirement/Scenario wording, `Verified By`, `Verification Gaps`, and notes are reconciled or explicitly marked superseded.
    - `Implemented By` is a useful code map, not a full dependency list.
-   - `Verified By` names concrete evidence, not only broad commands.
+   - `Verified By` is a scenario-mapped evidence index, not a chronological command log. Broad gates such as lint, typecheck, build, codegen, or full CI are supporting evidence unless mapped to named Story/Requirement/Scenario behavior.
 3. Requirement And Scenario Gate
    - New or modified Requirements use local `R#` IDs inside their Story.
    - New or modified Scenarios use local `R#-S#` IDs under their Requirement.
@@ -188,9 +191,12 @@ Run all gates that apply. Use `pass`, `findings`, `blocked`, or `not applicable`
    - Every in-scope Requirement is implemented or explicitly deferred.
    - Every Scenario, including failure, empty, permission, validation, and recovery paths, is implemented or explicitly listed as a gap.
    - Evidence proves the production path where risk warrants it, not only helper or mock behavior.
+   - Evidence type is explicit where it matters: focused automated tests, broad supporting gates, deterministic E2E, live-provider playtests, manual UI confirmation, and debug/log inspection are not treated as interchangeable.
 4. Test And Verification Gate
    - Run focused tests/checks tied to Requirements and Scenarios.
-   - Confirm verification evidence maps to Story ID plus Requirement/Scenario IDs when possible.
+   - Confirm verification evidence maps to Story label/reference plus Requirement/Scenario IDs, or records a clear reason why a specific evidence item cannot be mapped.
+   - Confirm chronological command logs stay in `tasks.md` Verification Ledger instead of replacing Epic `Verified By` evidence.
+   - Confirm `tasks.md` records chronological commands while Epic `Verified By` records only durable scenario-mapped evidence and evidence type.
    - Treat stale `AC-#` or `TAC-#` references as findings unless they are explicitly preserved as legacy acceptance references and mapped to current Requirement/Scenario IDs.
    - Run broader lint, typecheck, build, codegen, migration, browser, or integration checks when changed files warrant them.
    - Record skipped checks with the reason, fallback evidence, and whether the skip blocks readiness.
@@ -267,7 +273,7 @@ changes-requested | blocked | ready
 | Change artifacts | TBD | TBD |
 | Epic truth | TBD | TBD |
 | Requirements and Scenarios | TBD | TBD |
-| ID traceability | TBD | TBD |
+| Story reference traceability | TBD | TBD |
 | Tests and verification | TBD | TBD |
 | Manual UI confirmation | TBD | TBD |
 | Code review | TBD | TBD |
@@ -294,7 +300,9 @@ changes-requested | blocked | ready
 
 ## Verification Evidence
 
-- COMMAND_OR_SCENARIO: result and what it proves.
+| Command / Scenario | Evidence Type | Requirement / Scenario | Result | What It Proves |
+|---|---|---|---|---|
+| TBD | focused automated test / broad supporting gate / deterministic E2E / live-provider playtest / manual UI confirmation / debug-log inspection | EPIC-ID/S1 R1/R1-S1 | TBD | TBD |
 
 ## Review Bundle
 
@@ -347,7 +355,7 @@ Default mode may fix findings once. With default mode or `--fix`, only fix findi
 - small enough to verify in the same review pass
 - not product decisions, architecture rewrites, data migrations, destructive actions, secrets, branch operations, or broad refactors
 
-Safe automatic fixes include stale generated indexes, stale task ledger checkboxes, missing verification ledger entries for checks already run, small Epic evidence/date corrections, changelog category placement, formatting/lint fixes with obvious local intent, mechanical duplicate Story ID renumbering when ownership and references are obvious, and similarly mechanical artifact drift.
+Safe automatic fixes include stale generated indexes, stale task ledger checkboxes, missing verification ledger entries for checks already run, small Epic evidence/date corrections, changelog category placement, formatting/lint fixes with obvious local intent, mechanical duplicate Story label/reference cleanup when ownership and references are obvious, and similarly mechanical artifact drift.
 
 After every fix:
 
@@ -399,11 +407,13 @@ Stop and report when:
 - unrelated app/source-repo dirty files block safe review, fixes, PR, or merge.
 - required checks fail without a safe in-scope fix.
 - security review finds unresolved risk.
-- Epic truth or Requirement/Scenario evidence is stale or incomplete.
-- duplicate Story IDs exist across active Epics without an explicit migration/blocking note and cannot be safely renumbered mechanically during the review pass.
-- new or modified Stories lack stable Story IDs, local Requirement IDs, local Scenario IDs, or concrete non-generic Scenarios.
+- Epic truth or Requirement/Scenario evidence is stale, incomplete, or unmapped.
+- later implementation or Stories superseded earlier Epic truth without reconciling the earlier Story wording, evidence, or gaps.
+- duplicate Story labels inside one Epic, duplicate full Story references, or duplicate legacy app-wide Story IDs exist without an explicit migration/blocking note and cannot be safely corrected mechanically during the review pass.
+- new or modified Stories lack stable Epic-scoped labels or documented legacy Story IDs, local Requirement IDs, local Scenario IDs, or concrete non-generic Scenarios.
 - user-facing app changes lack a useful manual UI confirmation walkthrough, or the walkthrough is stale relative to the implementation.
 - manual confirmation status, review record, changelog state, PR/merge state, or closeout state is contradictory.
+- closed or closing change artifacts still contain stale implementation-pending or verification-pending language that contradicts accepted Epic truth.
 - required public changelog entry is missing, misleading, private, or not Keep a Changelog-shaped.
 - PRD/product-direction drift is unresolved when the change depends on it.
 - PR/merge targets the production branch; route to `/sdd-release` instead.
@@ -421,7 +431,7 @@ Include:
 - blocking and required findings, ordered by severity
 - whether `review.md` was created or updated
 - Requirement/Scenario coverage result
-- ID traceability result
+- Story reference traceability result
 - Epic truth result
 - test and verification commands/results
 - manual UI confirmation walkthrough status and any steps the user should perform

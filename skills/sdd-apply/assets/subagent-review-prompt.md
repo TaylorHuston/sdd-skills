@@ -39,8 +39,8 @@ Do not independently load broad unrelated technology skills. If the named specia
 
 Apply the assigned `REVIEW_PASS`:
 
-- `artifact-truth`: check proposal, design, tasks, Epic Story IDs, Requirement IDs, Scenario IDs, Implemented By, Verified By, Verification Gaps, review record, manual confirmation status, changelog status, PR/merge state, and closeout state agree with reality.
-- `coverage`: check Story ID plus Requirement/Scenario coverage, negative paths, browser or production-path proof, mock/fake boundaries, regression risk, flaky risk, and verification gaps.
+- `artifact-truth`: check proposal, design, tasks, Epic Story labels/references, Requirement IDs, Scenario IDs, Implemented By, scenario-mapped Verified By, Verification Gaps, review record, manual confirmation status, changelog status, PR/merge state, and closeout state agree with reality. Flag `Verified By` sections that are only command logs or unmapped broad gates, and flag proposal/design/tasks text that still says completed work is not implemented, not verified, or pending.
+- `coverage`: check Story label/reference plus Requirement/Scenario coverage, negative paths, browser or production-path proof, mock/fake boundaries, regression risk, flaky risk, scenario-mapped verification evidence, evidence type separation, and verification gaps. Evidence type separation means deterministic E2E, live-provider playtests, manual UI confirmation, broad gates, and debug/log inspection are not treated as interchangeable.
 - `manual-ui-confirmation`: check that browser-visible or otherwise user-facing app changes have a concise `tasks.md` walkthrough the user can execute, including route, setup, actions, expected results, feedback classification, and status of `not applicable`, `pending user`, `user confirmed`, or `accepted gap`. If no manual confirmation applies, check that the reason is recorded.
 - `code`: check correctness, maintainability, regressions, accidental scope expansion, brittle tests, architecture fit, and documentation impact.
 - `security`: check auth/authz, tenant or permission isolation, data exposure, input/output handling, secrets, dependencies, deployment/config, migrations, and destructive flows.
@@ -63,8 +63,9 @@ Return:
 - review pass and outcome: `pass`, `findings`, `gaps`, `needed`, or `blocked`
 - blocking findings first, each with severity, file/line, impact, and required change
 - Requirements, Scenarios, or risks reviewed
-- ID traceability reviewed, including stale `AC-#` or `TAC-#` references if present
-- duplicate Story ID or closeout contradiction findings, if present
+- Story reference traceability reviewed, including stale `AC-#` or `TAC-#` references if present
+- duplicate Story label/reference or closeout contradiction findings, if present
+- superseded Story/Requirement/Scenario wording that still reads as current truth, if present
 - production-path and mock/fake boundaries reviewed
 - evidence inspected
 - manual UI confirmation walkthrough status, including missing or stale steps
@@ -73,5 +74,6 @@ Return:
 - documentation, Epic, design, or tasks updates needed
 - whether `tasks.md` Resume Here is accurate enough for cold-start recovery
 - whether `tasks.md` closeout state is internally consistent
+- whether related proposal/design/tasks/review artifacts use the same manual confirmation status vocabulary and no longer contain stale implementation-pending text
 - recommended remediation slices, if fixes are safe and in scope
 - residual risks and blockers

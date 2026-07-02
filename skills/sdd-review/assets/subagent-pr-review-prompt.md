@@ -43,9 +43,9 @@ Do not broaden into unrelated repo history, unrelated dirty files, production re
 
 Apply only the assigned `REVIEW_PASS`:
 
-- `artifact-truth`: check proposal, design, tasks, Epic truth, Story IDs, Requirement IDs, Scenario IDs, `Implemented By`, `Verified By`, `Verification Gaps`, review state, manual confirmation status, changelog state, PR/merge state, and closeout state.
+- `artifact-truth`: check proposal, design, tasks, Epic truth, Epic template adherence, Story labels/references, Requirement IDs, Scenario IDs, `Implemented By`, scenario-mapped `Verified By`, `Verification Gaps`, review state, manual confirmation status, changelog state, PR/merge state, and closeout state. Flag `Verified By` sections that are only command logs or unmapped broad gates. Flag completed or closing changes whose proposal/design/tasks/review artifacts still say work is not implemented, not verified, pending, or use obsolete manual confirmation status vocabulary.
 - `code-diff`: review `TARGET_REF...SOURCE_REF` for correctness, regressions, maintainability, accidental scope, error/loading/empty states, generated-file drift, and consistency with project patterns.
-- `verification-coverage`: check whether tests, browser checks, manual checks, mocks/fakes, and verification ledgers prove the changed Requirements and Scenarios well enough for the risk.
+- `verification-coverage`: check whether tests, browser checks, manual checks, mocks/fakes, verification ledgers, and Epic `Verified By` entries prove the changed Requirements and Scenarios well enough for the risk. Distinguish focused automated tests, broad supporting gates, deterministic E2E, live-provider playtests, manual UI confirmation, and debug/log inspection instead of treating them as interchangeable.
 - `security`: inspect auth/authz, permissions, data exposure, input/output handling, secrets, dependencies, deployment/config, persistence, migrations, destructive flows, and public attack surface.
 - `ui-ux-visual`: check browser-visible UI for usability, layout resilience, accessibility basics, interaction polish, density, app visual identity, and shared visual-style consistency.
 - `docs-changelog-prd`: check README/docs/current-state docs, changelog, PRD alignment, public/private boundary, and whether docs now contradict Epic truth or implementation.
@@ -83,6 +83,7 @@ Return:
 - source-vs-target surfaces inspected
 - artifact files inspected
 - Requirements, Scenarios, or risks reviewed
+- superseded Story/Requirement/Scenario wording or evidence drift reviewed
 - verification commands or scenarios run, if any
 - specialist guidance loaded, skipped, unavailable, or newly recommended
 - assumptions and blind spots

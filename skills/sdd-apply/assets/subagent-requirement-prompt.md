@@ -41,7 +41,10 @@ Do not independently load broad unrelated technology skills. If the named specia
 - Do not edit secrets, local env files, build output, or dependency caches.
 - Keep changes scoped to the assigned Requirement or Scenario.
 - Preserve the assigned Story, Requirement, and Scenario IDs in tests, verification notes, and requested artifact updates when useful.
-- Do not introduce, rename, or renumber Stories. If the assigned Story ID appears duplicated or wrong, report it as traceability drift instead of choosing a new ID.
+- When reporting Epic `Verified By` updates, use scenario-mapped evidence entries. Chronological command history belongs in `tasks.md`.
+- Label evidence type where useful: focused automated test, broad supporting gate, deterministic E2E, live-provider playtest, manual UI confirmation, or debug/log inspection.
+- Do not introduce, rename, or renumber Stories. If the assigned Story label/reference appears duplicated or wrong, report it as traceability drift instead of choosing a new label.
+- If the assigned work supersedes earlier Story, Requirement, Scenario, `Verified By`, or `Verification Gaps` wording, report the needed reconciliation instead of leaving the older truth contradictory.
 - Treat Requirements and Scenarios as observable behavior unless the orchestrator says a technical detail is user-visible.
 - Keep technical implementation guarantees in `design.md`, `tasks.md`, ADRs, or current-state docs; do not turn them into user-visible Requirements.
 - Stay within the selected specialist role.
@@ -73,6 +76,8 @@ COMMANDS
 
 If a command cannot run, report the reason and next best evidence.
 
+Treat broad commands as supporting gates unless you can name the Story, Requirement, Scenario, behavior, or assertion they prove.
+
 Identify any fake, mock, fixture, injected client, stubbed platform service, generated sample, or helper-only test used. For each one, report the production-path proof or the gap the orchestrator must carry forward.
 
 For browser-visible or otherwise user-facing app behavior, propose concise manual UI confirmation steps for the user: app URL or route, required setup or test data, exact actions, expected observations, and feedback that would change Requirements, Scenarios, or implementation. If no manual confirmation applies, say why.
@@ -87,9 +92,11 @@ Return:
 - specialist guidance loaded, skipped, unavailable, or newly recommended, including why it mattered
 - BDD/TDD evidence, including failing-first result or skip reason
 - verification commands and results
+- evidence type for important verification
 - mock/fake boundaries relied on, plus production-path proof or gaps
 - suggested manual UI confirmation steps for the user, or why none apply
-- Epic Story `Implemented By`, `Verified By`, `Verification Gaps`, or Notes updates needed
+- Epic Story `Implemented By`, scenario-mapped `Verified By`, `Verification Gaps`, or Notes updates needed
+- superseded Story/Requirement/Scenario wording or evidence that needs reconciliation
 - `tasks.md` checklist, implementation ledger, verification ledger, and `Resume Here` updates needed
 - review record, manual confirmation status, changelog status, PR/merge state, or closeout updates needed
 - durable documentation updates needed
