@@ -24,7 +24,7 @@ mode: default
 |---|---|---|
 | SDD doctrine adherence | TBD | TBD |
 | Epic coherence | TBD | TBD |
-| Epic template adherence | TBD | TBD |
+| Epic template adherence | TBD | Include `scripts/epic_template_check.py` result. |
 | Story shape | TBD | TBD |
 | Story requirement completeness | TBD | TBD |
 | Story reference traceability | TBD | TBD |
@@ -73,6 +73,7 @@ mode: default
 
 | Command / Scenario | Result | Proves | Notes |
 |---|---|---|---|
+| `scripts/epic_template_check.py <epic.md>` | TBD | Canonical Epic section spine, Story metadata, `Implemented By`, and `Verified By` shape. | Required template-shape gate. |
 | TBD | TBD | TBD | TBD |
 
 ## Delegated Audits

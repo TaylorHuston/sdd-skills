@@ -1,5 +1,5 @@
 ---
-modified: 2026-07-01
+modified: 2026-07-02
 ---
 # Changelog
 
@@ -12,6 +12,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 ### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.4.0] - 2026-07-02
+
+### Added
+
+- Added `scripts/epic_template_check.py` to `/sdd-epic-verify` for repeatable Epic template-shape checks.
+
+### Changed
+
+- Updated `/sdd-epic-verify` reports to include the Epic template checker as a required template-adherence gate.
+- Tightened `/sdd-propose` so proposal work requires explicit planning interview, Story/Requirement challenge, scope-decision capture, and scenario-mapped verification planning before artifacts are finalized.
+- Updated `/sdd-apply` promotion guidance for package-neutral workflow roots, user confirmation vocabulary, default-layout adaptation, explicit delegation authorization, risk-shaped evidence, and category-first specialist routing.
 
 ### Deprecated
 

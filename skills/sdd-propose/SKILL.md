@@ -66,17 +66,24 @@ Use:
    - Create `docs/changes/<yyyy-mm-dd-change-name>/` when it does not exist.
    - If any target artifact already exists, read the existing artifacts and continue only when the user's intent is clearly to revise the change. Otherwise ask whether to revise it or create a differently named change.
    - If a matching legacy `changes/<yyyy-mm-dd-change-name>/` exists, ask whether to continue that legacy change, migrate it to `docs/changes/`, or create a differently named change. Do not silently create duplicate active truth.
-5. Interview for the proposal and design boundary.
+5. Interview and refine the proposal/design boundary.
    - First summarize the proposed scope boundary from the user's request, PRD/Product Brief, existing Epics, existing changes, and current implementation reality.
    - Ask the user all questions needed to properly design the proposal, Epic actions, Stories, Requirements, Scenarios, technical options, current and plausible future clients, API/frontend/backend boundaries, constraints, verification strategy, ADR needs, and task ledger.
+   - Do not treat context synthesis as a substitute for interviewing. If Story boundaries, Requirement wording, Scenario coverage, client/API boundaries, data/auth/security constraints, ADR decisions, or verification strategy are materially unsettled by durable project docs, ask before drafting final artifacts.
+   - Present the candidate Story/Requirement decomposition before finalizing it when the change affects user-visible behavior, durable Epic truth, public contracts, data, auth/security, or more than one plausible technical path.
+   - Challenge each proposed Story before accepting it: it should describe a real user or system capability, belong in the named Epic, avoid UI-task fragmentation, and have Requirements/Scenarios that are observable enough to verify.
+   - Challenge each Requirement and Scenario before accepting it: Requirements should be concrete `The system SHALL ...` behavior rules, and Scenarios should cover the relevant happy path, empty state, failure mode, permission/validation case, recovery path, integration boundary, or security-sensitive condition.
+   - Challenge the verification plan before accepting it: `Verified By` should be able to become a scenario-mapped evidence index, not a command history or broad gate with no Requirement/Scenario mapping.
    - Keep questions inside the proposed change scope.
    - Do not ask questions that would materially expand product scope, user-visible behavior, Epic ownership, data model, auth/security model, public API, deployment behavior, or external-service state.
    - If a scope-expanding question seems relevant, name it as out of scope or future work instead of pulling it into the current proposal.
    - Do not treat user interest in a broader idea as permission to expand the current change unless the user explicitly says to expand this proposal's scope.
    - For MVP work, bias toward the smallest proof loop that satisfies the stated MVP question; record adjacent product ambitions as deferred scope.
    - Ask whether the scoped change should produce a public changelog entry only when that is not obvious from the proposal context.
-   - Prefer one high-leverage question at a time when the answer materially affects the design. Do not ask questions already answered by project docs, existing Epics, existing changes, implementation, tests, or PRD context.
-   - Stop interviewing when remaining uncertainty can be recorded as an open question without weakening the proposal.
+   - Prefer one high-leverage question at a time when the answer materially affects the design. Batch only tightly related naming or yes/no details when waiting would not improve the proposal. Do not ask questions already answered by project docs, existing Epics, existing changes, implementation, tests, or PRD context.
+   - If the user declines to answer or asks to proceed, record the unresolved decision as an assumption, open question, candidate Story, or deferred scope instead of silently promoting it into accepted Requirements.
+   - Stop interviewing only when remaining uncertainty can be recorded as an open question without weakening the proposal.
+   - A proposal is too weak to finalize when it contains generic Stories, generic Scenarios, unmapped verification, or silent assumptions about product scope, Epic ownership, API/client boundaries, data, auth/security, or durable architecture decisions.
    - In `--replan`, focus the interview only on the discovered requirement, why the current plan is insufficient, whether it belongs in the current change, and what must be true before `/sdd-apply` resumes.
 6. Draft `proposal.md`.
    - Explain why the change exists and what it changes.
@@ -87,6 +94,8 @@ Use:
    - Capture open questions and impact without making low-confidence implementation claims.
 7. Draft `design.md`.
    - Describe the target Epic changes and high-level technical approach in enough detail for review before implementation.
+   - Start from the refined Story/Requirement decomposition produced by the interview. Do not invent final Stories, Requirements, or Scenarios solely from implementation guesses when material user or product choices remain open.
+   - Record the planning interview results: scope decisions, user decisions, assumptions, deferred scope, Story/Requirement refinements, Scenario gaps considered, and any open questions that would block implementation.
    - For non-trivial changes, explore multiple viable technical paths before choosing one. Usually compare 2-3 options; use one option only when the decision is obvious and record why.
    - Compare options on user impact, implementation complexity, reversibility, client surfaces, API/contract shape, frontend/backend boundary, data/schema implications, auth/security implications, testability, operational risk, migration/rollout needs, and fit with project conventions.
    - Select one approach, explain why it is the best fit, and name what would cause the team to reconsider.
@@ -134,9 +143,12 @@ Use:
    - Re-read them before final response.
    - Check that `proposal.md` names intended Epic actions.
    - Check that `proposal.md` records changelog impact.
+   - Check that `proposal.md` and `design.md` record the interview results: confirmed scope decisions, deferred scope, assumptions, unresolved questions, and any user decisions that shaped the Story/Requirement decomposition.
    - Check that `design.md` gives each Story a stable Epic-scoped label or documented legacy Story ID, local Requirement IDs, local Scenario IDs, `Implemented By`, `Verified By`, and `Verification Gaps`, plus right-sized technical options, selected approach, constraints, and ADR decisions or ADR non-applicability.
+   - Check that each Story has been challenged for user-path fit and Epic ownership, each Requirement is an observable behavior rule, each Scenario names a real trigger/state/result, and the verification strategy can map evidence to Story/Requirement/Scenario IDs.
    - Check that `design.md` records any existing Epic truth that may be superseded and the intended reconciliation.
    - Check that `tasks.md` can replace a separate implementation stub or ledger for this change and includes review record, manual confirmation status, changelog status, PR/merge state, ADR status, accepted deferred gaps, superseded-truth reconciliation, stale proposal/design cleanup, and closeout fields.
+   - Stop and ask a follow-up question instead of finalizing when a blocking ambiguity would make Stories, Requirements, Scenarios, or verification misleading.
    - In `--replan`, check that `Resume Here` points to the next `/sdd-apply` run and no stale checklist or blocker claims contradict the revised plan.
 
 ## Replan Mode

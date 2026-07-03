@@ -27,6 +27,8 @@ Default output is a report under the Epic directory:
 
 Use `assets/epic-verify-report-template.md` for the report and `assets/epic-template.md` as the canonical Epic shape reference. Create `reviews/` only when writing a report.
 
+Use `scripts/epic_template_check.py` for the repeatable Epic template-shape scan. Run it against the selected Epic during every audit, and run it against the app root when the user asks for a workspace/app-wide template assessment.
+
 The report is the durable audit record. Findings are addressed through the workflow named in the report:
 
 - `artifact-only`: after reporting, ask the user whether to apply the listed safe artifact fixes in the same thread.
@@ -43,6 +45,7 @@ Before auditing, read:
 - canonical SDD doctrine named by workspace or project guidance, or the packaged `docs/story-driven-development.md` when available
 - `developer-guide.md` from the vault root when available
 - this skill's `assets/epic-template.md`, to check the target Epic against the canonical template shape
+- this skill's `scripts/epic_template_check.py`, to run the repeatable template-shape scan
 - target `docs/epics/<key>-<###>-epic-name>/epic.md`
 - relevant `docs/changes/**/proposal.md`, `design.md`, `tasks.md`, and `review.md` when they mention the Epic, its Story labels, full Story references, or legacy Story IDs
 - enough of every active `docs/epics/*/epic.md` to detect duplicate Story labels inside an Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs
@@ -60,6 +63,8 @@ Check git status in every repo that may be inspected or touched. Preserve unrela
 2. Parse the Epic.
    - Identify Epic ID, current status, Story labels or documented legacy Story IDs, Story titles, Requirements, Scenarios, `Implemented By`, `Verified By`, and `Verification Gaps`.
    - Compare the Epic to the canonical template shape: frontmatter, Product Context, Outcome, Current Scope, Deferred Scope, Candidate Stories, Story Index, Stories, Cross-Story Concerns, Open Decisions, Completion Criteria, and Notes.
+   - Run `scripts/epic_template_check.py <epic.md>` and treat failures as `template-drift` findings. For app-wide template assessments, run `scripts/epic_template_check.py <app-root>` and summarize every Epic with findings.
+   - The template-shape scan must check top-level section spine, required frontmatter keys, promoted Story metadata lines, Story subsection presence, canonical `Implemented By` table header, canonical `Verified By` table header, and legacy/migration Story label warnings.
    - Summarize the intended Epic behavior from outcome, current scope, completion criteria, PRD/product docs, public docs, and known runtime surfaces.
    - Confirm Story labels or documented legacy Story IDs are stable, Requirements use local `R#`, and Scenarios use local `R#-S#`.
    - Confirm `S#` Story labels are unique within each Epic, full Story references are traceable, and legacy app-wide Story IDs remain unique unless a temporary migration duplicate is explicitly documented as blocking further implementation.
@@ -97,6 +102,8 @@ Check git status in every repo that may be inspected or touched. Preserve unrela
    - `lifecycle-drift`: related change folders, review records, manual confirmation status, changelog state, PR/merge state, deferred gaps, or closed-folder state contradict each other. This includes completed or closed artifacts that still say work is `Not implemented yet`, `Not verified yet`, pending implementation/verification, or use obsolete manual confirmation status vocabulary.
    - `superseded-truth-drift`: later Stories, Requirements, Scenarios, implementation, or docs changed a boundary but earlier Epic truth still reads as current.
 8. Write or print the report.
+   - Include the `scripts/epic_template_check.py` command and result in `Tests And Checks`.
+   - Summarize template-shape findings in the Epic template adherence gate and `Template drift` line.
 9. In `--propose-fixes`, create a scoped SDD change for findings that require implementation or risky decisions after the report exists.
 10. After every non-`--check` run, ask the user whether to apply any safe artifact fixes identified by the audit. Do not apply those fixes until the user explicitly agrees.
 11. End with the final self-improvement action.
@@ -116,6 +123,7 @@ Use `pass`, `findings`, `blocked`, or `not applicable`.
    - The Story set is complete enough to fulfill the Epic's stated behavior, product/docs claims, and observable runtime surface. Missing Stories are findings.
    - Story ownership still makes sense for this Epic; MVP/container Epics may need Stories moved into more focused Epics as the product matures.
 3. Epic Template Adherence
+   - The Epic passes `scripts/epic_template_check.py` or every failure is reported as `template-drift`.
    - Frontmatter includes the canonical Epic metadata fields when available: `id`, `status`, `created`, `modified`, `last_verified`, and `stories`.
    - The Epic uses the canonical section spine: Product Context, Outcome, Current Scope, Deferred Scope, Candidate Stories, Story Index, Stories, Cross-Story Concerns, Open Decisions, Completion Criteria, and Notes.
    - Candidate Stories remain unlabeled until promoted. Labels are assigned only inside the accepted `Stories` section.

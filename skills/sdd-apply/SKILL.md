@@ -1,23 +1,40 @@
 ---
 name: sdd-apply
-description: Apply or continue a SDD change from an active docs/changes/yyyy-mm-dd-change-name folder with one main orchestrating agent coordinating subagents in isolated contexts for non-trivial Requirement-driven BDD/TDD implementation, focused discovery, specialist-guided implementation, verification, fresh-context review slices, and manual UI confirmation walkthroughs for the user. Reads proposal.md, design.md, and tasks.md, updates Epic directories and application code, keeps tasks.md as the resume and implementation ledger, reconciles Story-level Implemented By, Verified By, Verification Gaps, manual confirmation status, changelog status, and closeout readiness, validates subagent claims before commits, runs final review, and stops for ambiguity or unsafe changes. Use when the user invokes /sdd-apply, asks to apply, implement, continue, review-only, delegate implementation, use specialist technology guidance, walk through UI confirmation, or close a SDD change.
+description: Apply or continue a SDD change from an active docs/changes/yyyy-mm-dd-change-name folder with one main orchestrating agent coordinating subagents in isolated contexts for non-trivial Requirement-driven BDD/TDD implementation, focused discovery, specialist-guided implementation, verification, implementation self-check slices, and manual UI confirmation walkthroughs for the user. Reads proposal.md, design.md, and tasks.md, updates Epic directories and application code, keeps tasks.md as the resume and implementation ledger, reconciles Story-level Implemented By, Verified By, Verification Gaps, manual confirmation status, changelog status, and closeout readiness, validates subagent claims before commits, runs implementation self-check, and stops for ambiguity or unsafe changes. Use when the user invokes /sdd-apply, asks to apply, implement, continue, review-only, delegate implementation, use specialist technology guidance, walk through UI confirmation, or close a SDD change.
 ---
 
 # SDD Apply
 
 Apply a SDD change from its change folder. This is the implementation-side companion to `/sdd-propose`: `proposal.md` defines scope, `design.md` defines the high-level technical approach and Epic changes, and `tasks.md` is the adaptive implementation ledger and cold-resume surface.
 
+Non-negotiable invariant: Epic/Story truth must stay aligned with implementation reality as the work proceeds. If implementation changes behavior, reveals stale Story wording, changes Requirement or Scenario meaning, moves Epic ownership, or changes verification confidence, update the affected Epic/Story truth in the same run or stop before claiming implementation progress.
+
+Branch invariant: before changing application code, tests, schemas, configuration, generated project artifacts, or runtime behavior, read and follow the implementation repo's local `AGENTS.md` and branch/merge policy. If project-local policy is absent, fall back to documented project or workspace guidance. Do not begin code or runtime edits on a branch that violates policy; stop or ask before creating or switching branches unless the user already authorized it.
+
 Do not create a separate implementation record, Story approach report, Epic approach report, or CLI state. Fold those responsibilities into the existing change artifacts.
 
 Use `/sdd-interactive` instead when no suitable change folder exists yet and the user wants a lightweight tracked working session that creates the change artifacts and immediately applies small edits.
 
-Default to an orchestrator-and-subagents model. The main agent owns change selection, artifact truth, branch/git safety, phase selection, subagent scoping, validation of child claims, `tasks.md`, Epic reconciliation, commits, stop conditions, and user-facing decisions. Delegate non-trivial implementation, discovery, verification, and review slices to subagents when the tooling is available and safe.
+Default to an orchestrator-and-subagents model. The main agent owns change selection, artifact truth, branch/git safety, phase selection, subagent scoping, validation of child claims, `tasks.md`, Epic reconciliation, commits, stop conditions, and user-facing decisions. Delegate non-trivial implementation, discovery, verification, and implementation self-check slices to subagents when the tooling is available and safe.
+
+Delegation authorization: invoking `/sdd-apply`, naming `sdd-apply`, or asking to apply/continue an active SDD change is explicit permission to use bounded SDD subagents under this skill's delegation model. If the local tool policy requires an explicit user request before spawning subagents, this skill invocation satisfies that requirement for non-trivial Discovery, implementation, verification, and self-check slices that remain inside the selected change. Do not ask for separate subagent permission unless the user passed `--no-delegate`, the requested delegation would exceed the selected change, the tool requires a more specific approval than normal spawning, or a stop condition applies.
 
 Use `references/specialist-routing.md` during specialist checkpoints. Keep technology guidance canonical in the specialist skills; do not copy stack-specific rules into this skill except for routing criteria.
 
 Use `assets/changelog-template.md` when a release-relevant change needs a root `CHANGELOG.md` and the application does not have one yet.
 
 Use `assets/epic-template.md` when creating a new Epic or normalizing an Epic file shape.
+
+## Default Layout And Adaptation
+
+Default SDD layout:
+
+- active changes: `docs/changes/<yyyy-mm-dd-change-name>/`
+- closed changes: `docs/changes/closed/<yyyy-mm-dd-change-name>/`
+- Epics: `docs/epics/<key>-<###>-<epic-name>/epic.md`
+- project changelog: root `CHANGELOG.md` unless project-local guidance says otherwise
+
+Project-local guidance may adapt paths, branch policy, changelog location, test commands, and supporting docs inventory. It must not weaken the SDD invariants around durable Epic/Story truth, Requirement/Scenario traceability, or scenario-mapped evidence.
 
 ## Inputs And Modes
 
@@ -28,11 +45,11 @@ Supported modes:
 - Default: implement all safe remaining tasks, update artifacts as reality changes, make local commits when authorized, and stop only for defined stop conditions.
 - `--step`: run Discovery or one coherent slice, report, and ask before continuing.
 - `--no-commit`: keep changes commit-shaped and record commit candidates instead of committing.
-- `--review-only`: skip new implementation slices and run final review against current implementation and artifacts.
-- `--no-delegate`: use the main thread only. Use when subagent tooling is unavailable, the slice is tiny, or isolation would create more risk than value.
+- `--review-only`: skip new implementation slices and run the implementation self-check against current implementation and artifacts. This mode does not replace `/sdd-review`.
+- `--no-delegate`: use the main thread only. This opt-out overrides the skill's default delegation authorization. Also skip delegation when subagent tooling is unavailable, the slice is tiny, or isolation would create more risk than value.
 - `--max-review-iterations N`: cap hands-off remediation attempts; default to `3`.
 
-Default and explicit full mode authorize local commits for completed, verified slices. They do not authorize push, merge, deploy, rebase, destructive data changes, deleting branches, touching credentials, or marking user acceptance complete.
+Default and explicit full mode authorize local commits for completed, verified slices only when the current user request and project branch policy allow them. They do not authorize push, merge, deploy, rebase, destructive data changes, deleting branches, touching credentials, or marking user acceptance complete.
 
 Closeout is not a special correctness mode. Always maintain closeout readiness as normal workflow truth. Move a change to `docs/changes/closed/` only when the user asks to close, finish, merge-and-close, or otherwise complete it, and only after implementation completion plus a completed `/sdd-review` or an explicit user override that review is not needed.
 
@@ -56,7 +73,8 @@ Before editing, read:
 - `docs/changes/yyyy-mm-dd-change-name/design.md`
 - `docs/changes/yyyy-mm-dd-change-name/tasks.md`
 - root `CHANGELOG.md` when `proposal.md` says changelog impact is required or TBD, or when implementation proves the change is user-facing, release-relevant, security-relevant, migration-relevant, operationally notable, or public documentation-worthy
-- relevant `AGENTS.md`, README, PRD/Product Brief, and project-local branch policy
+- relevant `AGENTS.md`, README, PRD/Product Brief, and project-local branch/merge policy; if no project-local policy exists, use documented project or workspace guidance as fallback
+- existing or locally required project docs under `docs/` when the change may affect their truth value, such as architecture, testing, deployment, style, data/API contracts, operations, or current-state docs
 - target Epic files under `docs/epics/*/epic.md`
 - enough of every active `docs/epics/*/epic.md` to detect duplicate Story labels within an Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs
 - code, tests, docs, and generated artifacts named by `design.md`, `tasks.md`, or current implementation reality
@@ -64,7 +82,7 @@ Before editing, read:
 
 If the selected change is in legacy `changes/`, keep using that explicit path for the current run unless the user asks to migrate it. Do not create a second active copy silently.
 
-Check git status in every repo that may change. Preserve unrelated dirty files. If the change touches an app repo under or beside the vault, read that repo's local guidance before editing.
+Check git status in every repo that may change. Preserve unrelated dirty files. Before code or runtime edits, confirm the current branch satisfies the project-local policy or documented fallback policy. If the change touches an implementation repo associated with the workflow root, read that repo's local guidance before editing.
 
 ## Discovery
 
@@ -77,6 +95,7 @@ Check that:
 - each targeted Epic path follows `docs/epics/key-###-epic-name/epic.md`.
 - Stories stay embedded in Epic `epic.md` files; do not create `docs/stories/`.
 - Epics and Stories are durable but revisable truth; proposed Story moves, splits, merges, renames, and reorders are explicit Epic changes, not accidental implementation cleanup.
+- Epic/Story truth is non-negotiable. Do not continue implementation if affected Epic truth is stale, contradictory, or no longer mapped to the behavior being changed unless the current run is actively reconciling it.
 - each Story has a stable Epic-scoped label or documented legacy Story ID, local Requirement IDs, local Scenario IDs, `Implemented By`, `Verified By`, and `Verification Gaps`.
 - implemented Stories use `Verified By` as a scenario-mapped evidence index, not as a chronological command log.
 - `Verified By` evidence distinguishes focused automated tests, broad supporting gates, deterministic E2E, live-provider playtests, manual UI confirmation, and debug/log inspection instead of collapsing them into one vague "verified" bucket.
@@ -86,7 +105,7 @@ Check that:
 - Scenarios are concrete enough to drive tests or manual checks. Do not proceed with generic Scenarios such as "WHEN this Story's workflow is exercised"; patch the artifact or stop for scope clarification.
 - the technical approach is sufficient for the next implementation slice.
 - `tasks.md` has a usable `Resume Here`, Requirement/Scenario checklist, implementation ledger, verification ledger, blockers/open questions, and closeout area.
-- the current branch and dirty state allow safe edits.
+- the current branch satisfies project-local policy or documented fallback policy, and dirty state allows safe edits.
 - stale or already-implemented behavior cannot satisfy the new Requirements by accident.
 - tests and verification plans can prove the production path, not only helper or mock behavior.
 
@@ -147,6 +166,8 @@ Do not let enabling phases become vague infrastructure work. Tie them to the nex
 
 Use subagents heavily, but keep the main agent as orchestrator.
 
+The user's invocation of this skill is the standing delegation authorization for the selected SDD change. Record skipped delegation only when the main thread intentionally keeps work local because `--no-delegate` is active, tooling is unavailable, the slice is tiny, isolation would add risk, or another explicit stop condition applies. Do not cite a generic lack of subagent permission as the reason for skipping delegation during `/sdd-apply`.
+
 Prefer delegation for:
 
 - codebase discovery over a broad or unfamiliar surface
@@ -169,16 +190,28 @@ Before each delegated phase or review pass, run a specialist checkpoint:
 
 1. Inspect the selected Story label/reference, Requirement ID, Scenario ID(s), touched files, package/config files, project guidance, and risk surface.
 2. Read `references/specialist-routing.md` when technology, platform, security, UX, architecture, migration, or verification guidance may materially affect the slice.
-3. Select only specialist skills or subagent roles that can materially affect implementation, testing, security, migration, UX, performance, backend behavior, or architecture.
-4. Prefer router skills when the exact specialist skill is unclear.
+3. Select only project-local guidance, framework/platform docs, specialist skills, or subagent roles that can materially affect implementation, testing, security, migration, UX, performance, backend behavior, or architecture.
+4. Prefer project-local guidance first, then framework/platform docs or available specialist/router skills when the exact specialist is unclear.
 5. Record subagents used, specialist guidance loaded, skipped guidance, unavailable guidance, and concrete consequences in `tasks.md`.
 6. Treat new migration, security, product-risk, deployment, external-service, or data-risk requirements as stop conditions unless the user already authorized them.
+
+For every non-trivial implementation, verification, or self-check slice, maintain a `Specialist Checkpoint` section in `tasks.md`. If the section is missing, add it before code edits or delegated work. Use this table shape:
+
+```md
+## Specialist Checkpoint
+
+| Date | Slice | Touched Surface / Risk | Specialist Guidance Selected | Loaded / Delegated? | Consequence |
+|---|---|---|---|---|---|
+| YYYY-MM-DD | EPIC/S#/R# or slice name | UI / backend / data / security / deployment / test risk | `project docs`, `framework docs`, `skill-name`, or `not applicable` | loaded / delegated / skipped / unavailable | What changed in implementation, verification, or stop conditions |
+```
+
+Blocking rule: do not begin code edits for a non-trivial slice until this table records the specialist decision, unless the run is actively repairing missing SDD artifacts. A tiny slice may record `not applicable` with a concrete reason, such as `copy-only docs edit`, `single selector rename`, or `no technology-specific risk`.
 
 Do not load every matching skill, copy specialist skill bodies into this skill, or spawn broad generic agents. Each subagent gets one bounded job.
 
 Every delegated implementation prompt must include:
 
-- app root and workflow/vault root
+- implementation root and workflow root
 - change folder and `proposal.md`, `design.md`, `tasks.md` paths
 - target Epic path and the exact Story label/reference, Requirement ID, and Scenario ID scope
 - relevant technical approach, constraints, and stop conditions
@@ -224,11 +257,17 @@ Implement one coherent behavior or capability slice at a time.
 4. Follow BDD/TDD for the selected Requirement or Scenario when practical.
    - Translate Scenarios into concrete tests, browser checks, command checks, or manual scenarios.
    - Preserve Requirement and Scenario IDs in test names, verification notes, or `tasks.md` entries when that improves traceability.
+   - Shape tests around the changed risk, not only the happy path. When relevant, include deterministic negative and edge cases for resettable state, external state refresh, overlapping async writes, debounced or autosaved edits, parser/extractor validation, permission/configuration failure, and portable path/environment assumptions.
+   - For resettable or seedable data, verify every mutable field that the change can edit is restored or intentionally preserved.
+   - For editable UI or command surfaces backed by canonical state, verify identity, focus/draft preservation, and synchronization from external canonical updates when those behaviors can regress.
+   - For extraction, parsing, inference, or validation boundaries, include at least one adversarial negative case where the output mentions the target concept but does not satisfy the condition.
    - Write or update focused tests/checks first.
    - Confirm the new or changed test fails for the expected reason when practical.
    - If a failing-first check is not practical, record why in `tasks.md`.
 5. Make scoped code, test, doc, or Epic changes.
    - Keep implementation aligned with `design.md`, but update the artifacts when implementation reality proves the design stale.
+   - Treat Epic/Story reconciliation as part of implementation, not documentation cleanup after the fact.
+   - Update existing or locally required project docs under `docs/` when the change makes them stale. Do not create a broad standard doc inventory unless project-local guidance or the change itself requires it.
    - Do not silently expand product scope or user-visible behavior.
 6. Run focused verification.
    - Name the Story label/reference, Requirement ID, Scenario ID, behavior, assertion, route, browser path, command, or manual check being proved.
@@ -255,18 +294,24 @@ Implement one coherent behavior or capability slice at a time.
    - Create root `CHANGELOG.md` from `assets/changelog-template.md` if the file is missing and the change requires a public changelog entry.
    - Keep entries public-safe and human-facing. Do not mention private vault context, SDD implementation ledgers, raw Requirement/Scenario lists, internal task IDs, secrets, or speculative roadmap promises.
    - If no changelog entry is needed, record the reason in `tasks.md`.
-10. Update `tasks.md`.
+10. Reconcile affected project docs under `docs/`.
+   - Treat project docs as supporting documentation, not canonical Epic/Story truth.
+   - Update docs whose truth value changed, including architecture, testing, deployment, style, data/API contracts, operations, README, or current-state docs.
+   - If a relevant doc is missing, create it only when project-local guidance requires it or when the change needs a new durable support document.
+   - If no project docs need updates, record the reason in `tasks.md`.
+11. Update `tasks.md`.
    - Refresh `Resume Here`.
    - Mark completed Requirement and Scenario checklist items.
+   - Add or refresh the `Specialist Checkpoint` table for the current slice before marking implementation complete.
    - Add a short implementation ledger entry.
    - Add verification ledger entries.
    - Add or refresh manual UI confirmation steps and status.
    - Keep closeout fields consistent with reality: review record, manual confirmation status, changelog status, PR/merge state, deferred gaps, and folder location.
    - Record any superseded Story/Requirement/Scenario wording and the artifact reconciliation performed.
    - Keep old proposal/design status text from contradicting completed work. If design sections still say `Not implemented yet`, `Not verified yet`, or implementation is pending after implementation has landed, update or clearly mark that text as historical before closeout.
-   - Record subagents used, specialist skills loaded, blockers, departures, and commit hashes or commit candidates.
+   - Record subagents used, specialist skills loaded, skipped, unavailable, or delegated; blockers; departures; and commit hashes or commit candidates.
    - Before the implementation commit exists, record the relevant ledger rows as `commit pending`, `uncommitted`, or a clear commit candidate rather than inventing a hash.
-11. Commit locally when authorized, the slice is verified, and changes are commit-shaped.
+12. Commit locally when authorized, the slice is verified, and changes are commit-shaped.
    - Do not stage unrelated dirty files.
    - Keep app/source commits separate from vault/workflow commits unless they are the same repo.
    - After a commit succeeds, immediately update `tasks.md` so `Resume Here`, the implementation ledger, verification ledger, closeout state, and PR/merge state reference the real commit hash.
@@ -275,9 +320,9 @@ Implement one coherent behavior or capability slice at a time.
 
 Continue until all safe tasks are done, a stop condition is hit, or `--step` completes one slice.
 
-## Verification And Final Review
+## Verification And Implementation Self-Check
 
-Before reporting the change as implemented or ready for closeout, run final review. Cover:
+Before reporting the change as implemented or ready for `/sdd-review`, run an implementation self-check. This is the apply-side sanity check that the implementation slice is complete, reconciled, and ready for independent review; it is not the local PR-style `/sdd-review` gate. Cover:
 
 - Proposal Scope: implemented work matches the proposed change or recorded approved departures.
 - Design Fidelity: technical approach, alternatives, constraints, decisions, and risks remain accurate.
@@ -286,17 +331,18 @@ Before reporting the change as implemented or ready for closeout, run final revi
 - Story Reference Traceability: new or modified Stories keep stable Epic-scoped labels or documented legacy Story IDs; Requirements use local `R#` IDs; Scenarios use local `R#-S#` IDs; verification evidence does not rely on stale `AC-#` labels unless they are explicitly marked as legacy references.
 - Story Reference Uniqueness: no duplicate `S#` labels exist within a single Epic, no duplicate full Story references exist, and no duplicate legacy app-wide Story IDs exist unless an explicit migration note blocks relying on the duplicate.
 - Test And Coverage: user-visible behavior has concrete proof, and risky fake/mock/helper boundaries have production-path proof or explicit gaps.
+- Risk-Shaped Evidence: deterministic edge cases introduced by the implementation are proved or explicitly carried as gaps. Do not treat an artifact claim such as "reset works", "stable identity", "autosave flushes", "validation rejects bad output", or "remote configuration fails clearly" as verified unless a test, browser/manual check, or source inspection directly supports that exact property.
 - Evidence Typing: deterministic E2E, live-provider playtests, manual UI confirmation, broad gates, and debug/log inspection are recorded as distinct evidence types.
 - Manual UI Confirmation: for browser-visible or otherwise user-facing app changes, `tasks.md` includes a clear walkthrough the user can execute, with expected results and how feedback should be classified.
 - Code Quality: changed code is scoped, maintainable, and avoids speculative rewrites.
 - Security And Data Safety: auth, permissions, persistence, migrations, secrets, and destructive paths are handled or explicitly out of scope.
-- Docs And Artifacts: README/current-state docs, generated indexes, and change artifacts are reconciled when affected.
+- Docs And Artifacts: affected project docs under `docs/`, README/current-state docs, generated indexes, and change artifacts are reconciled when affected, without inventing a fixed docs inventory.
 - Changelog: root `CHANGELOG.md` is updated when the implemented change is release-relevant, or `tasks.md` records why no public entry is needed.
-- Merge Readiness: branch, dirty state, commits or commit candidates, remaining gaps, and later review needs are clear.
+- Review Handoff Readiness: branch, dirty state, commits or commit candidates, remaining gaps, and later `/sdd-review` needs are clear.
 - Closeout Readiness: `tasks.md` has no contradictory Resume Here, checklist, review record, manual confirmation status, changelog status, PR/merge state, deferred-gap, or folder-location claims.
 - Closed-Artifact Readiness: related proposal/design/tasks/review files do not still claim implemented work is unimplemented, unverified, pending, or accepted under obsolete status vocabulary.
 
-Use fresh-context delegated reviewers by default for substantial changes and whenever practical for normal implementation. Delegate at least coverage, code, security, and docs/artifact review when the changed surface is non-trivial. This is implementation self-review and does not replace `/sdd-review` as the local PR gate. The orchestrator remains responsible for final judgment and verification of important claims.
+Use fresh-context delegated self-check passes by default for substantial changes and whenever practical for normal implementation. Delegate at least coverage, code, security, and docs/artifact checks when the changed surface is non-trivial. This implementation self-check does not replace `/sdd-review` as the local PR gate. The orchestrator remains responsible for final judgment and verification of important claims.
 
 Automatically remediate findings that are safe, in scope, and clearly tied to the change. Stop after the review iteration limit or when a finding needs the user's judgment.
 
@@ -311,11 +357,12 @@ A change is implementation-complete only when:
 - superseded or revised earlier Story truth has been reconciled, not merely contradicted by a later Story.
 - meaningful verification has passed or gaps are explicit.
 - manual UI confirmation steps are recorded for user-facing app changes, or `tasks.md` explains why no manual confirmation applies.
-- final review has no unresolved safe fixes.
+- the implementation self-check has no unresolved safe fixes.
 - `tasks.md` has an accurate final `Resume Here`, implementation ledger, verification ledger, blockers/open questions, and closeout state.
 - `tasks.md` records the review outcome as a `review.md` path, a clean review recorded in `tasks.md`, or an explicit user-approved review waiver before closeout.
 - `tasks.md` records manual UI confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
 - related proposal/design/tasks/review artifacts do not contain stale implementation-pending language or contradictory manual confirmation status unless clearly marked historical.
+- affected existing or locally required project docs under `docs/` no longer contradict implementation, Epic truth, branch/release policy, testing commands, architecture, data/API contracts, deployment behavior, operations, or visual style.
 - root `CHANGELOG.md` is current when required, using Keep a Changelog categories under `Unreleased`.
 - commits or commit candidates are recorded.
 
@@ -341,7 +388,7 @@ Stop and report when:
 - required artifacts are missing or contradictory.
 - the next slice would change product scope, user-visible behavior beyond the proposal, auth/security model, data model, public API, or Epic ownership.
 - implementation reveals meaningful PRD/product-direction drift that the user has not accepted.
-- branch policy is missing or violated.
+- branch policy is missing with no documented fallback, or violated.
 - unrelated dirty files block safe edits.
 - verification fails without a safe in-scope fix.
 - duplicate Story labels inside one Epic, duplicate full Story references, or duplicate legacy app-wide Story IDs exist without an explicit migration/blocking note.

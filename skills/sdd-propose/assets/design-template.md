@@ -14,6 +14,17 @@ Describe current behavior and the product or technical context needed to review 
 
 - TBD.
 
+## Planning Interview / Story Refinement
+
+- Scope boundary reviewed:
+- User decisions:
+- Assumptions:
+- Deferred scope:
+- Story boundaries challenged:
+- Requirements refined:
+- Scenario gaps considered:
+- Open questions that block implementation:
+
 ## Epic Changes
 
 ### Create Epic: EPIC TITLE

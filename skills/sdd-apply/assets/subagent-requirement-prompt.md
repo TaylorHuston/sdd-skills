@@ -4,8 +4,8 @@ You are implementing one bounded Requirement or Scenario for a SDD change.
 
 ## Scope
 
-- App root: `APP_ROOT`
-- Workflow/vault root: `WORKFLOW_ROOT`
+- Implementation root: `IMPLEMENTATION_ROOT`
+- Workflow root: `WORKFLOW_ROOT`
 - Change folder: `CHANGE_PASDD`
 - Proposal: `PROPOSAL_PASDD`
 - Design: `DESIGN_PASDD`
@@ -30,9 +30,9 @@ Read:
 - `proposal.md`, `design.md`, and `tasks.md`
 - the target Epic `epic.md`
 - files listed or implied by the assigned Requirement or Scenario
-- specialist guidance named by the orchestrator
+- specialist guidance named by the orchestrator, such as project-local guidance, framework/platform docs, or available specialist skills
 
-Do not independently load broad unrelated technology skills. If the named specialist guidance appears insufficient or another specialist is clearly needed, report that recommendation before broadening scope.
+Do not independently load broad unrelated technology skills or docs. If the named specialist guidance appears insufficient or another specialist is clearly needed, report that recommendation before broadening scope.
 
 ## Constraints
 
@@ -59,10 +59,14 @@ Do not independently load broad unrelated technology skills. If the named specia
 Follow BDD/TDD when practical:
 
 1. Translate the assigned Scenario(s) into concrete tests, browser checks, command checks, or manual scenarios.
-2. Write or update focused tests/checks first.
-3. Confirm the new or changed test fails for the expected reason when practical.
-4. Implement the smallest code change that makes the slice pass.
-5. Run focused verification.
+2. Add risk-shaped coverage, not only the happy path, when the slice touches resettable state, external state refresh, overlapping async writes, debounced/autosaved edits, parser/extractor validation, permission/configuration failure, or portable path/environment assumptions.
+3. For resettable or seedable data, verify every mutable field that can be changed by this slice is restored or intentionally preserved.
+4. For editable UI or command surfaces backed by canonical state, verify identity, focus/draft preservation, and synchronization from external canonical updates when those behaviors can regress.
+5. For extraction, parsing, inference, or validation boundaries, include at least one adversarial negative case where the output mentions the target concept but does not satisfy the condition.
+6. Write or update focused tests/checks first.
+7. Confirm the new or changed test fails for the expected reason when practical.
+8. Implement the smallest code change that makes the slice pass.
+9. Run focused verification.
 
 If failing-first proof is not practical, report why.
 
@@ -90,6 +94,7 @@ Return:
 - Story/Requirement/Scenario IDs completed or reviewed
 - changed files in rough order, with a short reason for each important file or area
 - specialist guidance loaded, skipped, unavailable, or newly recommended, including why it mattered
+- suggested `tasks.md` `Specialist Checkpoint` row for this slice, or `not applicable` with a concrete reason
 - BDD/TDD evidence, including failing-first result or skip reason
 - verification commands and results
 - evidence type for important verification

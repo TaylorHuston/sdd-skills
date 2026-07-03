@@ -4,8 +4,8 @@ You are performing one fresh-context review pass for a SDD change implementation
 
 ## Scope
 
-- App root: `APP_ROOT`
-- Workflow/vault root: `WORKFLOW_ROOT`
+- Implementation root: `IMPLEMENTATION_ROOT`
+- Workflow root: `WORKFLOW_ROOT`
 - Change folder: `CHANGE_PASDD`
 - Proposal: `PROPOSAL_PASDD`
 - Design: `DESIGN_PASDD`
@@ -70,6 +70,7 @@ Return:
 - evidence inspected
 - manual UI confirmation walkthrough status, including missing or stale steps
 - specialist guidance loaded, skipped, unavailable, or newly recommended, including why it mattered
+- suggested `tasks.md` `Specialist Checkpoint` row for this review pass, or `not applicable` with a concrete reason
 - verification commands or scenarios run, if any
 - documentation, Epic, design, or tasks updates needed
 - whether `tasks.md` Resume Here is accurate enough for cold-start recovery
