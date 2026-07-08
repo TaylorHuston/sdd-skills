@@ -55,7 +55,8 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
    - Check for merge conflicts with target without performing the merge.
    - Confirm no active SDD change required for this release is missing `/sdd-review` readiness or accepted override.
    - Confirm release-relevant active or closed SDD changes have consistent review records, manual confirmation status, changelog state, PR/merge state, accepted deferred gaps, and folder location.
-   - Stop on duplicate Story IDs across active Epics unless the release is explicitly carrying the cleanup and it has already passed `/sdd-review`.
+   - Perform a cumulative source-vs-target release risk scan. Do not re-run full `/sdd-review`, but check whether the combined release diff contains important deterministic claims that local reviews only asserted, such as reset completeness, stable editable-state identity, async write ordering, parser/extractor rejection, remote/config failure behavior, or portable tooling assumptions. If a release-critical claim lacks proof or an accepted gap, stop or route back to `/sdd-review` or `/sdd-apply`.
+   - Stop on duplicate `S#` Story labels inside one Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs unless the release is explicitly carrying the cleanup and it has already passed `/sdd-review`.
    - Confirm root `CHANGELOG.md` exists or create it from `assets/changelog-template.md` only when the project does not have one and the user wants release notes.
    - Confirm secrets, env files, generated caches, build artifacts, and local-only files will not be staged.
 3. Resolve and run release checks before changelog bump.
@@ -68,15 +69,22 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
    - If no project-local release guidance exists and no meaningful local release gate can be identified, stop or explicitly record why release confidence cannot be established.
    - If project-local release guidance exists and says e2e or browser/provider checks are optional or not yet part of the required gate, do not stop solely because no e2e command exists; report the skipped optional gate and its documented reason.
    - If any required release check fails, stop before changelog edits unless the failure is caused by stale release metadata and the project policy permits fixing it first.
-4. Prepare the changelog.
+4. Prepare the changelog and version metadata.
    - Follow Keep a Changelog 1.1.0.
    - Keep `Unreleased` first.
-   - Determine the release version before editing. Use an explicit user-provided version first. Otherwise, when the app has a package or manifest version such as `package.json.version`, use that current project version for the release heading. For a first release, `0.1.0` is valid when the package already declares `0.1.0`.
-   - Move release-ready `Unreleased` entries into a new version/date heading when a release version is known from the user or project metadata.
+   - Determine the next release version before editing. `/sdd-release` means preparing a new release, not reusing the last released heading.
+   - Use an explicit user-provided version first.
+   - Otherwise, identify the latest released version from `CHANGELOG.md`, release tags, or the target production branch. If the app has a package or manifest version such as `package.json.version`, use it only when it is greater than the latest released version or when this is the first release.
+   - If the package/manifest version is equal to or lower than the latest released version, infer the next SemVer pre-1.0 version from the release contents: use the next `0.x.0` for new capabilities, product behavior, architecture, or broad UI/runtime changes; use the next `0.0.x` / patch for fixes, docs-only corrections, test-only hardening, release metadata, or narrow maintenance.
+   - If the next version is ambiguous after inspecting the closed changes and changelog, stop and ask instead of reusing an old version.
+   - When a package/manifest version exists and the workflow infers or receives a new release version, update that version metadata and its lockfile unless project-local release guidance says versions are changelog-only.
+   - Move release-ready `Unreleased` entries into a new version/date heading for the next release version.
    - For a first changelog release, add a short release-context sentence and usually place initial capabilities under `Added` rather than `Changed`, because there is no earlier released baseline being changed.
    - If no release version can be inferred from project metadata and the user did not provide one, stop and ask instead of leaving release-ready entries under `Unreleased` or inventing a semantic version.
    - Use the local shell date in ISO format for dated release headings.
    - Keep categories to `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security`.
+   - Include only user-facing changes in `CHANGELOG.md`: product functionality, visible behavior, meaningful UX changes, user-impacting fixes, and public operational/security notes.
+   - Exclude internal scaffolding, SDD/process changes, documentation-only edits, migrations with no user-facing impact, test-only changes, refactors, generated artifacts, and implementation bookkeeping from `CHANGELOG.md`; mention them in the release PR or SDD artifacts when useful.
    - Ensure entries are public-safe: no private vault context, SDD ledger details, raw Requirement/Scenario lists, secrets, internal-only task IDs, or speculative roadmap promises.
    - Verify the changelog matches the SDD changes intended for the release.
 5. Rerun release checks affected by changelog or release-artifact edits.
@@ -124,8 +132,10 @@ Scale to the app. A small static app may only have build. A local MVP may intent
 Treat `CHANGELOG.md` as public release communication.
 
 - Use Keep a Changelog 1.1.0 conventions.
-- Do not create release versions from guesses.
-- If the project has `package.json` versioning, use the current `package.json.version` as the changelog release heading. Only bump the package version itself when the user explicitly asks for a version bump or the project-local release process requires it.
+- Do not reuse an already released version heading for new release content.
+- Do not create release versions from guesses; infer the next SemVer version only when release contents make the level clear, otherwise ask.
+- If the project has package or manifest versioning, keep that version aligned with the changelog release heading unless project-local guidance says versions are changelog-only.
+- Include only user-facing release notes. Keep internal scaffolding, migrations without visible impact, docs-only changes, tests, refactors, SDD/process work, and generated artifacts out of `CHANGELOG.md`.
 - If there are no public-facing changes, record that in the release PR rather than fabricating changelog content.
 - If `Unreleased` is empty but SDD changes were released, inspect the relevant changes and Epics before adding entries.
 
@@ -140,7 +150,7 @@ Stop and report when:
 - no project-local release guidance exists and no meaningful local release gate can be identified or satisfied.
 - required release checks fail.
 - `/sdd-review` readiness is missing for release-blocking SDD changes.
-- release-relevant SDD closeout state is contradictory or duplicate Story IDs make Epic traceability unreliable.
+- release-relevant SDD closeout state is contradictory, duplicate Story labels/references make Epic traceability unreliable, or conflicting legacy app-wide Story IDs are unresolved.
 - `CHANGELOG.md` is missing and the user has not authorized creating one.
 - changelog content would require a product or release-version decision.
 - release requires secrets, production data, migrations, deploys, tags, package publishing, or external service changes not explicitly authorized.

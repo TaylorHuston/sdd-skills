@@ -1,6 +1,6 @@
 ---
 name: sdd-interactive
-description: Create and apply a lightweight SDD change in one tracked interactive working session. Use when the user invokes /sdd-interactive or asks for small UI tweaks, minor behavior refinements, polish, narrow bug fixes, or other concrete changes that should be documented as a docs/changes/yyyy-mm-dd-change-name change but do not need a full upfront /sdd-propose pass. Combines a minimal proposal/design/tasks setup with an immediate /sdd-apply-style interactive implementation loop, including development guidelines, BDD/TDD where practical, app-unique Story ID checks, Epic/Requirement/Scenario reconciliation, specialist skill routing when material, verification, manual confirmation tracking, and closeout consistency.
+description: Create and apply a lightweight SDD change in one tracked interactive working session. Use when the user invokes /sdd-interactive or asks for small UI tweaks, minor behavior refinements, polish, narrow bug fixes, or other concrete changes that should be documented as a docs/changes/yyyy-mm-dd-change-name change but do not need a full upfront /sdd-propose pass. Combines a minimal proposal/design/tasks setup with an immediate /sdd-apply-style interactive implementation loop, including development guidelines, BDD/TDD where practical, Story label/reference checks, Epic/Requirement/Scenario reconciliation, specialist skill routing when material, verification, manual confirmation tracking, and closeout consistency.
 ---
 
 # SDD Interactive
@@ -8,6 +8,8 @@ description: Create and apply a lightweight SDD change in one tracked interactiv
 Create the smallest useful SDD change record, then immediately work through the change interactively.
 
 This skill is for tracked working sessions. It is not a replacement for `/sdd-propose` when the change needs substantial product scoping, architecture design, data/auth/API changes, migration planning, or cross-Epic coordination.
+
+Delegation authorization: invoking `/sdd-interactive`, naming `sdd-interactive`, or asking to start/continue a tracked interactive SDD session is explicit permission to use bounded SDD subagents under this skill's delegation model. If the local tool policy requires an explicit user request before spawning subagents, this skill invocation satisfies that requirement for non-trivial implementation, verification, UI review, security review, broad discovery, or fresh-context review tasks that remain inside the selected interactive change. Do not ask for separate subagent permission unless the user asks for no delegation, the requested delegation would exceed the selected change, the tool requires a more specific approval than normal spawning, or a stop condition applies.
 
 ## Output
 
@@ -26,7 +28,7 @@ Use existing artifacts when the session continues an active change. Keep `tasks.
 1. Select the project and change.
    - Prefer an explicit project path or change name from the user.
    - Otherwise use the nearest application root with `.git/`, `package.json`, `docs/`, `AGENTS.md`, or existing `docs/changes/`.
-   - Do not write to the vault root unless the vault itself is the intended project.
+   - Do not write to the workflow root unless the workflow root itself is the intended project.
    - Derive a short kebab-case change name and prefix it with today's local shell date: `yyyy-mm-dd-<change-name>`.
    - If a matching active change exists, continue it only when the user's intent clearly matches that change.
 2. Load the minimum required context.
@@ -34,7 +36,7 @@ Use existing artifacts when the session continues an active change. Keep `tasks.
    - Read root `developer-guide.md` when present and development work is involved.
    - Read root `CHANGELOG.md` when the change may be release-relevant, public, security-relevant, migration-relevant, or operationally notable.
    - Read target `docs/epics/*/epic.md` files when existing behavior, Requirements, Scenarios, or Story ownership may be affected.
-   - Scan active `docs/epics/**/epic.md` files for existing Story IDs before adding or renumbering any Story.
+   - Scan active `docs/epics/**/epic.md` files for existing Story labels/references and legacy Story IDs before adding or renumbering any Story.
    - Check git status in every repo that may change and preserve unrelated dirty files.
 3. Create the lightweight change artifacts.
    - `proposal.md`: record why the session exists, in-scope work, explicit out-of-scope work, known Epic/Story impact, changelog impact, and when to stop and promote to `/sdd-propose`.
@@ -66,23 +68,28 @@ Use existing artifacts when the session continues an active change. Keep `tasks.
    - Read `.agents/skills/sdd-apply/references/specialist-routing.md` when technology, UI/UX, security, architecture, migration, deployment, browser verification, or framework guidance could materially affect the request.
    - Load only the specialist skills needed for the current request.
    - Prefer specialist subagents for non-trivial implementation, verification, UI review, security review, broad discovery, or fresh-context review.
+   - Treat the user's invocation of this skill as standing delegation authorization for bounded subagents inside the selected interactive change.
    - Record specialist skills or subagents used, skipped, unavailable, and their concrete impact in `tasks.md`.
+   - Record skipped delegation only when the slice is tiny, tooling is unavailable, isolation would add risk, or another explicit stop condition applies; do not cite generic lack of subagent permission.
    - Validate important subagent claims before updating durable truth or committing.
 8. Reconcile durable truth.
    - Update affected Epic `Implemented By`, `Verified By`, and `Verification Gaps` when implementation or verification reality changes.
    - Keep Epic `Verified By` as a scenario-mapped evidence index. Record chronological command output in `tasks.md` instead; broad gates are supporting evidence unless mapped to named behavior.
-   - Keep Story IDs stable. Preserve local Requirement and Scenario IDs when editing existing truth; add new IDs only for genuinely new behavior.
-   - Keep Story IDs unique across active Epics in the app. Stop on duplicates unless the session is explicitly resolving the duplicate.
+   - Distinguish evidence types where useful: focused automated tests, broad supporting gates, deterministic E2E, live-provider playtests, manual UI confirmation, and debug/log inspection.
+   - Search affected Epic Stories for older Requirements, Scenarios, `Verified By`, or `Verification Gaps` this quick change supersedes, and reconcile them before claiming completion.
+   - Keep Story labels or documented legacy Story IDs stable. Preserve local Requirement and Scenario IDs when editing existing truth; add new IDs only for genuinely new behavior.
+   - Keep `S#` Story labels unique within each Epic, full Story references traceable, and legacy app-wide Story IDs unique across active Epics in the app. Stop on duplicates unless the session is explicitly resolving the duplicate.
    - Update `CHANGELOG.md` under `Unreleased` using Keep a Changelog categories when the change is public/release relevant.
    - Keep public changelog entries human-facing; do not include internal SDD ledgers, private vault context, secrets, or speculative roadmap promises.
 9. Close the working session.
    - Run focused verification for every changed behavior and broader checks when risk warrants.
    - For browser-visible or otherwise user-facing app changes, walk the user through what to manually confirm in the UI: app URL, setup state, routes, clicks/inputs, expected results, failure signs, and what feedback would change Requirements, Scenarios, or implementation.
    - Record that walkthrough in `tasks.md` under `Manual UI Confirmation`. If no manual UI confirmation applies, record why.
+   - Record manual confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
    - Refresh `tasks.md` with the final resume state, changed files, verification evidence, manual confirmation status, changelog status, review record state, PR/merge state, unresolved gaps, accepted deferred gaps, and commit candidates or commits.
    - Recommend `/sdd-review` before merge or closeout when code, user-visible behavior, security, data, or release state changed.
    - Do not move the change to `docs/changes/closed/` unless the user explicitly asks or the closeout path is already authorized by the active workflow.
-   - When the user asks to close, finish, merge-and-close, or otherwise complete the change, first confirm `tasks.md` has no contradictory Resume Here, checklist, review, manual confirmation, changelog, PR/merge, deferred-gap, or folder-location claims.
+   - When the user asks to close, finish, merge-and-close, or otherwise complete the change, first confirm `tasks.md` has no contradictory Resume Here, checklist, review, manual confirmation, changelog, PR/merge, deferred-gap, or folder-location claims, and no proposal/design/tasks/review text still says completed work is not implemented, not verified, or pending unless clearly historical.
 
 ## Artifact Shape
 
@@ -146,6 +153,7 @@ Use this minimum structure when creating new artifacts. Treat these as trimmed s
 ## Verification Ledger
 
 ## Manual UI Confirmation
+- Status: pending user / user confirmed / accepted gap / not applicable
 - App URL / route:
 - Required setup or test data:
 - Steps for the user:

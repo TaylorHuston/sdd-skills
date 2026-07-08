@@ -48,7 +48,7 @@ Use:
 2. Locate the project root.
    - Prefer an explicit path from the user.
    - Otherwise use the nearest root with `.git/`, `package.json`, `docs/`, `AGENTS.md`, existing `docs/changes/`, or legacy `changes/`.
-   - Do not write to the vault root unless the vault itself is the intended project.
+   - Do not write to the workflow root unless the workflow root itself is the intended project.
 3. Load only the context needed to propose accurately.
    - Read project guidance such as `AGENTS.md`, `README.md`, and product/PRD context when present.
    - Read root `CHANGELOG.md` when it exists and the change may be user-facing, release-relevant, security-relevant, migration-relevant, operationally notable, or public documentation-worthy.

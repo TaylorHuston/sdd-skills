@@ -1,5 +1,5 @@
 ---
-modified: 2026-07-02
+modified: 2026-07-07
 ---
 # Changelog
 
@@ -12,6 +12,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 ### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.5.0] - 2026-07-07
+
+### Added
+
+- Added a packaged `/sdd-review` report template and browsable template example.
+
+### Changed
+
+- Added delegation authorization guidance across `/sdd-review`, `/sdd-epic-verify`, and `/sdd-interactive`.
+- Strengthened `/sdd-review` and `/sdd-release` around risk-shaped evidence, deterministic release-readiness claims, and manual UI testing handoffs.
+- Updated the packaged SDD doctrine for project docs, evidence discipline, superseded Story reconciliation, and package-neutral workflow wording.
 
 ### Deprecated
 

@@ -33,7 +33,7 @@ The report is advisory. Address findings through `/sdd-propose`, `/sdd-interacti
 Before auditing, read:
 
 - project-local `AGENTS.md`, especially branch policy and generated-file guidance
-- `developer-guide.md` from the vault root when available
+- `developer-guide.md` from the workflow root when available
 - `docs/epics/*/epic.md`
 - active and recent `docs/changes/**/{proposal.md,design.md,tasks.md,review.md}` only when they explain likely drift
 - project README, test docs, package scripts, framework config, and root `CHANGELOG.md` when they affect inventory or cleanup risk

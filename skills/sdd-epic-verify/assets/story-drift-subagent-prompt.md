@@ -5,14 +5,14 @@ You are auditing one embedded Story from a SDD Epic for implementation drift.
 ## Scope
 
 - App root: `APP_ROOT`
-- Workflow/vault root: `WORKFLOW_ROOT`
-- Epic file: `EPIC_PASDD`
+- Workflow root: `WORKFLOW_ROOT`
+- Epic file: `EPIC_PATH`
 - Story reference: `EPIC-ID/S#` or documented legacy Story ID
 - Story title: `STORY_TITLE`
 - Requirements and Scenarios: `REQUIREMENT_SCENARIO_LIST`
 - Claimed implementation: `IMPLEMENTED_BY`
 - Claimed verification: `VERIFIED_BY`
-- Relevant docs/code/tests: `RELEVANT_PASDDS`
+- Relevant docs/code/tests: `RELEVANT_PATHS`
 - Mode: read-only
 
 ## Goal

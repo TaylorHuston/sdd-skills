@@ -9,6 +9,8 @@ Audit one Epic as a durable capability truth source. It works with embedded Stor
 
 This skill verifies truth; it does not implement missing behavior and does not replace `/sdd-review` for a specific change. Use `/sdd-review` for change-local PR readiness. Use `/sdd-epic-verify` when the question is whether the whole Epic still matches product intent, current code, tests, docs, and evidence.
 
+Delegation authorization: invoking `/sdd-epic-verify`, naming `sdd-epic-verify`, asking to verify or audit an SDD Epic, or asking to detect Epic drift is explicit permission to use bounded SDD audit subagents under this skill's delegation model. If the local tool policy requires an explicit user request before spawning subagents, this skill invocation satisfies that requirement for Epic coherence, Story drift, implementation, verification, security, docs, or lifecycle audit passes that remain inside the selected Epic/app scope. Do not ask for separate subagent permission unless the user passed a no-delegation mode, the requested delegation would exceed the selected Epic/app scope, the tool requires a more specific approval than normal spawning, or a stop condition applies.
+
 ## Modes
 
 - Default: run a full Epic audit, run practical verification, write an Epic-local report, and report findings. Do not edit source artifacts except the report.
@@ -43,7 +45,7 @@ Before auditing, read:
 
 - app/workspace `AGENTS.md`, especially branch policy and test commands
 - canonical SDD doctrine named by workspace or project guidance, or the packaged `docs/story-driven-development.md` when available
-- `developer-guide.md` from the vault root when available
+- `developer-guide.md` from the workflow root when available
 - this skill's `assets/epic-template.md`, to check the target Epic against the canonical template shape
 - this skill's `scripts/epic_template_check.py`, to run the repeatable template-shape scan
 - target `docs/epics/<key>-<###>-epic-name>/epic.md`
@@ -77,10 +79,12 @@ Check git status in every repo that may be inspected or touched. Preserve unrela
    - Add candidate rows for suspected missing Stories, Requirements, or Scenarios when Epic outcome, Story capability, product/docs claims, UI/API/runtime surfaces, tests, or implementation imply behavior that is not represented in the Epic.
    - Include failure, empty, permission, validation, recovery, migration, and security-sensitive paths.
 4. Delegate by default when subagent tooling is available.
+   - The user's invocation of this skill is standing delegation authorization for bounded Epic audit subagents.
    - Use one Epic coherence audit subagent.
    - Use one Story implementation-drift subagent per Story when practical.
    - Use small Story batches when the Epic is large or subagent capacity is limited.
    - Use `assets/epic-coherence-subagent-prompt.md` and `assets/story-drift-subagent-prompt.md`.
+   - Record skipped delegation only when tooling is unavailable, the Epic is tiny, isolation would add risk, or another explicit stop condition applies; do not cite generic lack of subagent permission.
 5. Systematically test the Epic.
    - Run focused tests named in `Verified By` when safe.
    - Run broader project checks when changed or claimed surfaces warrant them: unit tests, integration tests, typecheck, lint, build, codegen, migration checks, browser checks, CLI smoke checks, or manual Obsidian/Vercel/Convex checks as appropriate.

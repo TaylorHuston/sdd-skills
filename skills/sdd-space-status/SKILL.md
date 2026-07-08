@@ -45,7 +45,7 @@ Read enough to orient and route. Prefer current, active, and recent artifacts ov
 
 1. Locate the project.
    - Prefer the nearest directory with `docs/epics/`, `docs/changes/`, `package.json`, `.git/`, framework config, or app-local `AGENTS.md`.
-   - If invoked from the vault root, infer the app from the user's target or an unambiguous artifact path.
+   - If invoked from the workflow root, infer the app from the user's target or an unambiguous artifact path.
    - Report the app root, git root, display name, active branch, dirty/clean context, PRD/Product Brief path if present, and main SDD roots.
 2. Read local guidance and onboarding docs.
    - Read app-local `AGENTS.md`, `README.md`, `docs/README.md`, and any obvious project guidance that explains branch policy, app purpose, docs inventory, or local workflow.

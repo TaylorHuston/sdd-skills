@@ -5,8 +5,8 @@ You are auditing SDD Epic-level coherence.
 ## Scope
 
 - App root: `APP_ROOT`
-- Workflow/vault root: `WORKFLOW_ROOT`
-- Epic file: `EPIC_PASDD`
+- Workflow root: `WORKFLOW_ROOT`
+- Epic file: `EPIC_PATH`
 - Embedded Stories: `STORY_SUMMARY`
 - Related artifacts: `RELATED_ARTIFACTS`
 - Mode: read-only
