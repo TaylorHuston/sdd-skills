@@ -12,7 +12,7 @@ stories:
 
 ## Product Context
 
-- PRD: `docs/path-or-private-prd.md`
+- PRD: `<planning-root>/prd.md`
 - Related docs:
 - Related ADRs:
 
@@ -114,7 +114,7 @@ This Epic is healthy when:
 - `Implemented By` points to the important starting files.
 - `Verified By` maps concrete evidence to Requirements/Scenarios.
 - `Verification Gaps` are real, current, and explicit.
-- Related changes, docs, indexes, reviews, and changelog entries do not contradict this Epic.
+- Related changes, docs, indexes, reviews, and release communication do not contradict this Epic.
 
 ## Notes
 

@@ -1,4 +1,4 @@
 interface:
   display_name: "SDD PR"
   short_description: "Open and steward SDD pull requests"
-  default_prompt: "Use $sdd-pr to open or steward a GitHub PR for SDD-backed work, process review comments and checks, address accepted feedback, and stop before merge until the user approves."
+  default_prompt: "Use $sdd-pr to steward an SDD-backed pull request through the configured provider, reconcile accepted feedback with Epic truth and review freshness, and stop before merge until the user approves."

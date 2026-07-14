@@ -14,8 +14,8 @@ You are implementing one bounded Requirement or Scenario for a SDD change.
 - Story: `STORY_ID - STORY_TITLE`
 - Requirement: `REQUIREMENT_ID - REQUIREMENT_TITLE`
 - Scenario(s): `SCENARIO_IDS_AND_TITLES`
-- Specialist guidance to load: `SPECIALIST_GUIDANCE`
-- Specialist routing reason: `SPECIALIST_ROUTING_REASON`
+- Selected skills / guidance to load: `SELECTED_GUIDANCE`
+- Selection reason: `GUIDANCE_SELECTION_REASON`
 - Run mode: `RUN_MODE`
 
 ## Goal
@@ -30,9 +30,9 @@ Read:
 - `proposal.md`, `design.md`, and `tasks.md`
 - the target Epic `epic.md`
 - files listed or implied by the assigned Requirement or Scenario
-- specialist guidance named by the orchestrator, such as project-local guidance, framework/platform docs, or available specialist skills
+- every selected skill and guidance item named by the orchestrator
 
-Do not independently load broad unrelated technology skills or docs. If the named specialist guidance appears insufficient or another specialist is clearly needed, report that recommendation before broadening scope.
+Read every selected skill completely, including its required references, and apply it before working. Do not independently load broad unrelated skills or docs. If the selected guidance appears insufficient or another capability is clearly needed, report that recommendation before broadening scope.
 
 ## Constraints
 
@@ -47,10 +47,10 @@ Do not independently load broad unrelated technology skills or docs. If the name
 - If the assigned work supersedes earlier Story, Requirement, Scenario, `Verified By`, or `Verification Gaps` wording, report the needed reconciliation instead of leaving the older truth contradictory.
 - Treat Requirements and Scenarios as observable behavior unless the orchestrator says a technical detail is user-visible.
 - Keep technical implementation guarantees in `design.md`, `tasks.md`, ADRs, or current-state docs; do not turn them into user-visible Requirements.
-- Stay within the selected specialist role.
-- Load and apply every named specialist skill or guidance item that is available.
-- If expected specialist guidance is unavailable, report that and continue with the best project-local fallback.
-- Do not copy or summarize specialist guidance into SDD artifacts unless it directly changes the implemented behavior, verification evidence, or a recorded gap.
+- Stay within the assigned slice and selected guidance.
+- Do not claim a selected skill was used unless its instructions were read and applied.
+- If selected guidance is unavailable, report it only when the absence changes implementation confidence, verification, or a stop condition; otherwise use the best project-local fallback.
+- Do not copy or summarize skill guidance into SDD artifacts unless it directly changes implemented behavior, verification evidence, or a recorded gap.
 - If implementation reveals missing product, security, migration, architecture, or scope decisions, stop and report rather than broadening work.
 - Do not update lifecycle/closeout state.
 
@@ -93,8 +93,7 @@ Return:
 - work completed
 - Story/Requirement/Scenario IDs completed or reviewed
 - changed files in rough order, with a short reason for each important file or area
-- specialist guidance loaded, skipped, unavailable, or newly recommended, including why it mattered
-- suggested `tasks.md` `Specialist Checkpoint` row for this slice, or `not applicable` with a concrete reason
+- selected skill guidance that materially changed the work, including the concrete consequence
 - BDD/TDD evidence, including failing-first result or skip reason
 - verification commands and results
 - evidence type for important verification
@@ -103,7 +102,7 @@ Return:
 - Epic Story `Implemented By`, scenario-mapped `Verified By`, `Verification Gaps`, or Notes updates needed
 - superseded Story/Requirement/Scenario wording or evidence that needs reconciliation
 - `tasks.md` checklist, implementation ledger, verification ledger, and `Resume Here` updates needed
-- review record, manual confirmation status, changelog status, PR/merge state, or closeout updates needed
+- review record, manual confirmation status, release-communication status, PR/merge state, or closeout updates needed
 - durable documentation updates needed
 - blockers or risks
 - slice outcome: `done`, `reviewed-no-change`, `superseded`, `deferred`, or `blocked`

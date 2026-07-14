@@ -1,11 +1,15 @@
 ---
 name: sdd-pr
-description: Use when the user invokes /sdd-pr or asks to open, manage, review, or steward a pull request for SDD-backed work according to the app's AGENTS.md branch policy. Creates a GitHub PR when one does not exist, and on later activations checks review comments, requested changes, status checks, and review threads; decides which feedback is valid; addresses accepted comments; replies and resolves handled threads; loops until no actionable comments remain; then asks the user to approve the actual merge. Use /sdd-release first for production-branch release PR creation and /sdd-pr afterward to steward an existing release PR.
+description: Use when the user invokes /sdd-pr or asks to open, manage, review, or steward a pull request for SDD-backed work according to project branch and review policy. Creates a PR through the configured provider when one does not exist, and on later activations checks comments, requested changes, status checks, and review threads; addresses accepted feedback; reconciles post-review changes into Epic truth; preserves review freshness against the current PR head; and asks the user to approve the actual merge only after the loop is clean. Use /sdd-release first for production release handoff preparation and /sdd-pr afterward when that handoff is a PR.
 ---
 
 # SDD PR
 
-Open and steward a GitHub pull request for SDD-backed work from one branch into another.
+Open and steward a pull request for SDD-backed work from one branch into another.
+
+## Authority And Project Profile
+
+Load `$sdd-doctrine` before judging reconciliation, evidence, review freshness, or merge readiness. Resolve the repository root, source and target policy, hosting provider, required checks, comment workflow, merge strategy, release communication, and permissions from project guidance. SDD artifacts remain under the canonical repository `docs/` tree. GitHub commands below apply only when GitHub is the configured provider.
 
 Use `/sdd-release` for production-branch release PR preparation. Use `/sdd-pr` for ongoing PR stewardship after a PR exists, or for non-production PRs that are part of the project's normal branch policy.
 
@@ -13,7 +17,9 @@ Resolve source and target branches from explicit user input first, then the app'
 
 This skill may create branches, commits, pushes, and PR comments when needed. Never merge the PR unless the user explicitly approves the final merge after the review loop is clean.
 
-Treat PR creation and PR stewardship as separate phases. On the activation that creates a new PR, do not immediately conclude there are no comments or that the PR is ready to merge; GitHub apps, CI, and humans need time to react. Report the new PR URL, current checks if any, and tell the user to rerun `/sdd-pr` after reviewers or bots have had time to comment. On later activations for an existing PR, run the comment/check stewardship loop.
+Treat PR creation and PR stewardship as separate phases. On the activation that creates a new PR, do not immediately conclude there are no comments or that the PR is ready to merge; CI, automation, and humans need time to react. Report the new PR URL, current checks if any, and tell the user to rerun `/sdd-pr` after reviewers or automation have had time to comment. On later activations for an existing PR, run the comment/check stewardship loop.
+
+Non-negotiable invariant: PR feedback must not move implementation beyond the durable Epic/Story map or beyond the commit covered by SDD review without an explicit reconciliation. Track the immutable reviewed source commit and the latest reconciled PR head. Do not return a merge-ready result while the current PR head contains unclassified or unreconciled post-review commits.
 
 ## Inputs
 
@@ -29,7 +35,7 @@ Infer inputs in this order:
   - `--until-clean`: keep looping until no actionable comments remain or a stop condition is reached.
   - `--check-now`: after creating a PR, immediately perform a best-effort comment/check pass anyway. Use only when the user explicitly asks for an immediate check.
 
-If the source branch, target branch, or app branch policy cannot be inferred safely, ask before touching git or GitHub.
+If the source branch, target branch, provider, or project policy cannot be inferred safely, ask before mutating git or remote review state.
 
 ## Initial Setup
 
@@ -47,13 +53,14 @@ If the source branch, target branch, or app branch policy cannot be inferred saf
    - If the current branch has uncommitted changes required for the PR, commit them only when the user has authorized PR work in this request or earlier in this PR workflow.
    - If the PR is for SDD-backed work, also check the workflow repo for related change folders, review reports, project docs, generated indexes, or lifecycle notes. Commit and push those related workflow files when commits are authorized before treating the PR branch as ready. Never include unrelated dirty files.
    - Use focused commit messages.
+   - Resolve the current source commit SHA and the last source commit covered by `/sdd-review` from `review.md`, `tasks.md`, or the PR body. Treat a branch name alone as mutable context, not as the review watermark.
 5. Push the source branch:
    - Use `git push -u origin <source>` when no upstream exists.
    - Do not force-push unless the user explicitly asks.
 
 ## Open Or Update The PR
 
-Prefer GitHub CLI when available:
+Use the configured provider's available tooling. For GitHub, the CLI commands are:
 
 ```bash
 gh pr view --base <target> --head <source> --json number,url,state,title,mergeStateStatus,reviewDecision
@@ -69,6 +76,9 @@ PR body should include:
 - verification run
 - known risks or follow-up decisions
 - SDD change, review, release, or plan links when present and public-safe
+- reviewed source commit
+- latest reconciled PR head
+- post-review change classifications, or `none`
 
 Do not put private planning notes into public PR bodies. Summarize public-safe facts only.
 
@@ -89,7 +99,7 @@ For an existing PR:
 
 ## Collect Comments And Checks
 
-Fetch all review surfaces, not just one:
+Fetch all review surfaces, not just one. For GitHub, this includes:
 
 ```bash
 gh pr view <number> --json comments,reviews,reviewDecision,mergeStateStatus,statusCheckRollup
@@ -113,19 +123,34 @@ Treat comments as advice, not commands. You are responsible for the final engine
 For each actionable comment:
 
 1. Locate the referenced code and confirm the issue against current source.
-2. Make the smallest correct change.
-3. Add or update tests when the risk warrants it.
-4. Run focused verification first, then broader checks as needed.
-5. Commit accepted fixes with a clear message.
-6. Push the source branch.
-7. Reply to the comment with what changed and the verification run.
-8. Resolve the review thread when the GitHub API exposes a resolvable thread id and the issue is actually handled.
+2. Classify the expected SDD impact using the reconciliation checkpoint below.
+3. Make the smallest correct change.
+4. Add or update tests when the risk warrants it.
+5. Reconcile Epic truth, evidence, supporting docs, release communication, and active task state required by the classification.
+6. Run focused verification first, then broader checks or a fresh `/sdd-review` as required.
+7. Commit accepted fixes with a clear message.
+8. Push the source branch.
+9. Record the new commit as the latest reconciled PR head in the PR body or a durable PR summary comment, including the impact classification and verification result.
+10. Reply to the comment with what changed and the verification run.
+11. Resolve the review thread when the provider exposes a resolvable thread and the issue is actually handled.
 
 For answer-only, declined, or stale comments:
 
 - Reply with the decision and reasoning.
 - Resolve the thread only when it is appropriate and supported by the API.
 - Do not mark a thread resolved if a human clearly needs to decide.
+
+## SDD Reconciliation Checkpoint
+
+Classify every accepted change after the last reviewed source commit. Comment disposition such as `actionable` or `declined` does not replace this impact classification.
+
+- `non-semantic`: formatting, comments, internal cleanup, or another change that does not alter observable behavior, important ownership, verification meaning, public documentation, or release communication. Record the rationale and focused verification; no Epic edit is required.
+- `code-map-or-evidence`: behavior is unchanged, but important implementation ownership, tests, assertions, or verification confidence changed. Update Story `Implemented By`, scenario-mapped `Verified By`, `Verification Gaps`, and affected supporting docs.
+- `existing-contract-fix`: implementation is corrected to satisfy an existing Requirement or Scenario. Update implementation/evidence maps and active task state when present, then run the affected SDD review gates. Use a fresh full `/sdd-review` when the fix materially changes the reviewed diff or risk surface.
+- `behavior-or-contract-change`: observable behavior, Requirements, Scenarios, API semantics, permissions, validation, recovery, data handling, security behavior, or user-facing release meaning changed. Reconcile the affected Epic, supporting docs, and release communication, then require a fresh `/sdd-review` before merge readiness.
+- `scope-product-or-architecture-change`: the feedback expands scope or changes product direction, Epic ownership, durable architecture, data model, auth model, public API, migration, deployment, or external-service behavior. Stop PR remediation and route to `/sdd-propose --replan`, `/sdd-adr`, or `/sdd-prd` as appropriate.
+
+Do not reopen a closed change merely to log ordinary PR feedback. Epic/Story truth is authoritative. Update a closed artifact only when its present-tense claims would otherwise materially contradict accepted behavior or lifecycle state.
 
 ## Review Loop
 
@@ -140,10 +165,11 @@ Repeat until one stop condition applies:
 Each loop iteration should:
 
 1. Refresh PR comments, review threads, checks, and branch status.
-2. Reclassify comments against current code.
-3. Address accepted comments.
-4. Push changes and reply/resolve threads.
-5. Update the PR body or a summary comment if the PR state materially changed.
+2. Resolve the current PR head and compare it with the reviewed source commit and latest reconciled PR head.
+3. Reclassify comments against current code and classify the SDD impact of accepted changes.
+4. Address accepted comments and reconcile required artifacts.
+5. Push changes and reply/resolve threads.
+6. Update the PR body or a durable summary comment with the current reconciliation watermark when the PR state materially changed.
 
 ## Verification
 
@@ -152,8 +178,9 @@ Choose verification from changed risk:
 - comment-specific focused tests
 - lint/typecheck/build
 - app-specific e2e or regression tests
-- SDD story index or generated docs checks when SDD files changed
+- SDD template, Story index, generated-doc, or traceability checks when reconciliation changes SDD artifacts or the PR fix could invalidate SDD integrity
 - security checks when comments touch auth, secrets, permissions, data exposure, or deployment config
+- a fresh `/sdd-review` when post-review changes alter behavior, contracts, security, data handling, APIs, architecture, or another material part of the reviewed risk surface
 
 Record exact commands and results in the final response and, when useful, in a PR comment.
 
@@ -168,17 +195,25 @@ When the existing PR has no actionable comments left:
    - unresolved threads
    - required status checks
    - mergeability
-2. Post a concise PR comment if useful:
+2. Confirm SDD review freshness:
+   - exact current PR head
+   - immutable source commit covered by the last `/sdd-review`
+   - latest reconciled PR head
+   - every commit after the reviewed source commit has an impact classification
+   - behavior, contract, security, data, API, architecture, or other material risk changes received a fresh `/sdd-review`
+   - Epic truth, evidence, supporting docs, and release communication match the current PR head
+3. Post a concise PR comment if useful:
    - comments addressed
    - declined comments and reasons
    - verification run
+   - reviewed source commit and latest reconciled PR head
    - remaining non-blocking risks
-3. Stop and prompt the user:
+4. Stop and prompt the user:
    - Say the PR is ready for their review/approval.
    - Provide the PR URL.
    - Ask them to approve the actual merge.
 
-Do not run `gh pr merge`, click merge buttons, delete branches, or change repository protection settings without explicit user approval after this final gate.
+Do not invoke the provider's merge action, delete branches, or change repository protection settings without explicit user approval after this final gate.
 
 ## Final Response
 
@@ -190,16 +225,9 @@ Include:
 - whether this activation created the PR or stewarded an existing PR
 - comments addressed, declined, stale, or blocked
 - commits pushed
+- reviewed source commit, current PR head, and latest reconciled PR head
+- post-review change classifications and SDD artifacts reconciled
 - verification commands and results
 - remaining risks or required user decisions
 - if newly created: tell the user to rerun `/sdd-pr` after review comments/checks have had time to appear
 - if existing and clean: clear request for the user to approve the merge when ready
-
-## Final Self-Improvement Action
-
-After completing or stopping this workflow, end the final user response with a concise self-improvement conclusion:
-
-- Ask yourself: "How well did this work, and what could have been improved?"
-- Tell the user the conclusion in 1-3 sentences.
-- Name any concrete skill, template, doctrine, or process improvement worth considering.
-- If no specific improvement is evident, say so plainly.

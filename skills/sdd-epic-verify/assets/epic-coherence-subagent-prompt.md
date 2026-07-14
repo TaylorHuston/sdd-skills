@@ -65,5 +65,3 @@ Return:
 - recommended remediation workflow
 - evidence inspected
 - residual risks
-
-Do not include a self-improvement conclusion.

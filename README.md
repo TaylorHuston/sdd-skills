@@ -1,5 +1,5 @@
 ---
-modified: 2026-07-07
+modified: 2026-07-11
 ---
 # SDD Skills
 
@@ -29,6 +29,7 @@ Support workflow:
 
 | Skill | Purpose |
 |---|---|
+| `/sdd-doctrine` | Supply the portable SDD semantic contract consumed by the other skills. |
 | `/sdd-adr` | Create, update, or assess ADRs for durable SDD architecture decisions. |
 | `/sdd-explore` | Think through ideas, compare approaches, investigate context, and offer ADR capture when durable architecture decisions emerge. |
 | `/sdd-interactive` | Track and implement small concrete changes in one working session. |
@@ -39,7 +40,7 @@ Support workflow:
 
 ## Artifact Model
 
-The default project shape is:
+The portable doctrine defines artifact roles, authority, and the required repository layout. Once an implementation repository is selected, the packaged skills expect this shape:
 
 ```text
 docs/
@@ -53,15 +54,21 @@ docs/
       tasks.md
       review.md        # only when review finds deficiencies
     closed/
+  adrs/
+    yyyy-mm-dd-decision-title.md
+  audits/
+    yyyy-mm-dd-orphan-audit.md
 ```
 
 Epics are the durable behavior-to-code map. Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, and `Verification Gaps` live inside each Epic's `epic.md`. `Verified By` is a scenario-mapped evidence index, not a chronological command log; broad gates such as lint, typecheck, build, or full CI are supporting evidence unless tied to a named Requirement or Scenario. If implemented behavior is not represented in an Epic/Story, treat it as undocumented drift until the map is updated or the code is removed through a tracked change.
 
 Change folders are working records. `proposal.md` defines scope, `design.md` defines the technical approach, and `tasks.md` is the adaptive implementation ledger and resume surface.
 
-For non-trivial changes, `design.md` should compare viable technical options before selecting an approach. When a change creates a durable architecture, data, dependency, integration, deployment, security, storage, or cross-cutting project decision, record it as an ADR under `docs/adrs/` unless project-local guidance uses a different ADR location.
+`/sdd-apply` has no fixed dependency on a catalog of companion skills. It discovers the skills exposed by the current runtime, selects the smallest set materially relevant to the active implementation slice, and enforces the selected guidance in both direct and delegated work. A consuming environment can have a different skill set, or no matching specialist skill at all; project guidance and normal engineering judgment remain the fallback.
 
-Product Briefs/PRDs and app visual/style guidance are project planning artifacts. Store them wherever the project keeps private planning docs, and reference them from SDD skills when product scope, UI identity, or release-readiness depends on them.
+For non-trivial changes, `design.md` should compare viable technical options before selecting an approach. When a change creates a durable architecture, data, dependency, integration, deployment, security, storage, or cross-cutting project decision, record it as an ADR under `docs/adrs/`.
+
+Product Briefs/PRDs and app visual/style guidance are private planning artifacts. By default, an idea lives at `<workspace-root>/ideas/<idea>/`, stores its PRD at `<planning-root>/prd.md`, and maps zero or more implementation repositories under `<workspace-root>/code/` through its Folder Note metadata. Reference planning artifacts when product scope, UI identity, or release readiness depends on them; keep accepted implementation truth in each code repository's Epic and Story map.
 
 Generated indexes are optional. If a project maintains `docs/epics/index.md` or `docs/epics/story-index.json`, treat them as generated navigation or validation artifacts, not canonical truth.
 
@@ -71,50 +78,106 @@ Canonical template examples are browsable in [docs/templates/](docs/templates/).
 
 This package is currently developed in a meta-repo situation: the reusable `sdd-skills` package lives inside a larger private workspace that also contains planning docs, shared guidance, and multiple application repositories. That shape is useful for developing the workflow because the active skills can be tested against real projects before being generalized back into this package.
 
-The package should not require that exact shape. A generic version of the development layout looks like this:
+The package ships with the same general idea/repository relationship as its default. A generic version looks like this:
 
 ```text
 workspace/
-  meta-vault/
-    spaces/
-      shared/
-        visual-style-guide.md
-        memories/
+  ideas/
+    product-one/
+      product-one.md
+      prd.md
+      visual-identity.md
+      exploration/
+  code/
+    product-one-web/
+      AGENTS.md
+      README.md
+      CHANGELOG.md
       docs/
-        app-one/
-          prd.md
-          visual-identity.md
-      code/
-        app-one/
-          AGENTS.md
-          README.md
-          CHANGELOG.md
-          docs/
-            epics/
-            changes/
-        sdd-skills/
-          README.md
-          docs/
-            story-driven-development.md
-          skills/
-            sdd-*/
+        epics/
+        changes/
+        adrs/
+        audits/
+    product-one-mobile/
+      AGENTS.md
+      README.md
+      docs/
+        epics/
+        changes/
+    sdd-skills/
+      README.md
+      docs/
+        story-driven-development.md
+      skills/
+        sdd-*/
+  shared/
+    visual-style-guide.md
 ```
 
-In that example, `meta-vault/` is the private workspace, `spaces/docs/` holds planning context, `spaces/code/app-one/` is an application repo with its own Git history, and `spaces/code/sdd-skills/` is this package repo. Other users might keep everything in one app repo, split planning docs into a separate private repo, or install the skills only at the user level.
+The idea Folder Note owns the relationship:
+
+```yaml
+repositories:
+  - path: code/product-one-web
+    role: web-client
+  - path: code/product-one-mobile
+    role: mobile-client
+```
+
+In that example, `ideas/product-one/` is the private planning root, the two mapped directories under `code/` are independent implementation repositories, and `code/sdd-skills/` is this package repository. Product and repository names do not need to match.
 
 ## Adapting The Skills To Your Shape
 
-Start by using project-local guidance before changing the packaged skills. A good `AGENTS.md` can usually teach the skills where your docs live, which branch policy applies, which checks matter, and what counts as done. Fork or edit the skills when your layout or workflow differs enough that local guidance would become repetitive or ambiguous.
+Start by defining project-local guidance. A good `AGENTS.md` should identify any exception to the default idea-owned repository mapping, branch and merge policy, required commands and release records, supporting docs, and project constraints. It should not relocate canonical SDD artifacts from an implementation repository's `docs/` tree.
 
 Common adaptation points:
 
-- Planning docs: `/sdd-prd`, `/sdd-propose`, `/sdd-review`, and `/sdd-release` may need updated language if Product Briefs, PRDs, visual identity docs, or design notes live outside the app repo.
-- SDD artifact paths: most skills assume `docs/epics/`, `docs/changes/`, and `docs/adrs/`. Alter `/sdd-propose`, `/sdd-apply`, `/sdd-review`, `/sdd-adr`, `/sdd-epic-verify`, `/sdd-space-status`, and `/sdd-orphan-audit` if your canonical paths differ.
+- Idea/repository mapping: the skills assume `ideas/<idea>/<idea>.md` owns a `repositories` list that may point to multiple `code/<repo>` repositories. Declare an exception in project guidance, or change the packaged default as described below.
+- Planning docs: `/sdd-prd`, `/sdd-explore`, `/sdd-space-status`, `/sdd-propose`, `/sdd-apply`, `/sdd-review`, `/sdd-epic-verify`, and `/sdd-release` resolve private context from the owning idea when relevant.
+- SDD artifact paths: `docs/epics/`, `docs/changes/`, `docs/changes/closed/`, `docs/adrs/`, and `docs/audits/` are package conventions, not `AGENTS.md` configuration points.
 - Branch and merge policy: `/sdd-review`, `/sdd-pr`, and `/sdd-release` are intentionally conservative. Update them or your app `AGENTS.md` for trunk-based development, no-PR workflows, required PR workflows, nonstandard production branches, or release trains.
 - Verification commands: `/sdd-apply`, `/sdd-review`, and `/sdd-release` should be aligned with your real test, lint, typecheck, security, build, migration, and manual acceptance gates.
-- Changelog and release records: `/sdd-review` and `/sdd-release` assume a Keep a Changelog-style `CHANGELOG.md`. Adjust if you use generated release notes, changesets, GitHub releases only, or another release record.
+- Available skills: `/sdd-apply` discovers relevant capabilities from the consuming runtime instead of requiring named companion skills. Keep that behavior capability-driven if you add local routing preferences, and avoid turning optional skills into package dependencies.
+- Changelog and release records: define whether the project uses Keep a Changelog, generated release notes, changesets, provider releases, another record, or no changelog. The skills follow that policy instead of imposing one.
 - UI and design guidance: `/sdd-review` looks for project visual/style guidance when UI changes are involved. Point it at your design system docs, brand guide, component guidelines, or remove that gate if the project does not need one.
 - Re-entry and audit heuristics: `/sdd-space-status` depends on naming conventions and recent workflow artifacts for orientation, while `/sdd-orphan-audit` depends on traceability evidence. Tune them after you see the first few reports against your codebase.
+
+### Changing The Idea/Repository Model
+
+The one-idea-to-many-repositories model is an opinionated default, not an SDD truth invariant.
+
+- The idea Folder Note is the canonical and only mapping source. Public code repositories should not contain reverse links to private idea paths.
+- One idea may map to zero, one, or many repositories. Under the default model, one repository is claimed by at most one idea; shared tooling repositories may remain unlinked.
+- Resolution is metadata-first, with a unique basename match only as a compatibility fallback. Ambiguous ownership or target-repository selection requires user input.
+- If one repository eventually needs to support multiple ideas, evolve the metadata and resolver deliberately into a many-to-many model instead of adding ad hoc reverse links.
+- For one project, declare an explicit exception in project guidance. For a package-wide change, edit `Default Idea-To-Repository Relationship` in `skills/sdd-doctrine/references/story-driven-development.md`, then keep `docs/story-driven-development.md` synchronized.
+- Keep operational skills expressed in terms of `<planning-root>` and `<implementation-root>` so changing roots or relationship metadata does not require rewriting every workflow.
+
+Audit relationship-resolution assumptions after customization:
+
+```bash
+rg -n 'ideas/<idea>|code/<repo>|repositories:|<planning-root>|<implementation-root>' skills/sdd-* docs README.md
+```
+
+### Changing The Repository-Internal SDD Layout
+
+Using a different SDD artifact layout requires a coordinated package customization. Do not change only `AGENTS.md`; that can make skills read and write different sources of truth.
+
+Update these locations together:
+
+- `skills/sdd-doctrine/references/story-driven-development.md`: `Core Doctrine And Project Profile`, `Core Terms`, and `Change Workflow`; keep `docs/story-driven-development.md` synchronized.
+- `skills/sdd-propose/SKILL.md`: `Output`, `Workflow`, and `Artifact Rules`.
+- `skills/sdd-apply/SKILL.md`: `Canonical Repository Layout`, `Select The Change`, `Required Context`, and closeout path operations.
+- `skills/sdd-review/SKILL.md`: `Select The Change And Branches`, `Required Context`, review-artifact output, and closeout path operations.
+- `skills/sdd-epic-verify/SKILL.md`, `skills/sdd-adr/SKILL.md`, `skills/sdd-interactive/SKILL.md`, and `skills/sdd-orphan-audit/SKILL.md`: their `Location`, `Output`, and `Required Context` sections.
+- `skills/sdd-explore/SKILL.md`, `skills/sdd-prd/SKILL.md`, `skills/sdd-pr/SKILL.md`, `skills/sdd-release/SKILL.md`, and `skills/sdd-space-status/SKILL.md`: context, capture, relationship, or landmark sections that locate SDD artifacts.
+- `skills/sdd-*/assets/`, `docs/templates/`, and path-aware helper scripts.
+
+Use this audit after customization:
+
+```bash
+rg -n 'docs/(epics|changes|adrs|audits)' skills/sdd-* docs/templates
+```
 
 ## Installation
 
@@ -132,7 +195,7 @@ For a user-level install:
 ./scripts/sync-skills.sh "${CODEX_HOME:-$HOME/.codex}/skills"
 ```
 
-The sync script copies every `skills/sdd-*` folder into the target and removes stale files inside those target skill folders. It does not delete unrelated skills.
+The sync script copies every `skills/sdd-*` folder, including the `sdd-doctrine` support skill, into the target and removes stale files inside those target skill folders. It does not delete unrelated skills.
 
 ## Validation
 
@@ -148,7 +211,7 @@ If `PyYAML` is not installed globally, install it into a temporary directory and
 
 ## Doctrine
 
-The workflow doctrine is in [docs/story-driven-development.md](docs/story-driven-development.md). Skills operationalize that doctrine. If a skill and the doctrine disagree, update one or both so the package stays internally consistent.
+The workflow doctrine ships in the [`sdd-doctrine` support skill](skills/sdd-doctrine/SKILL.md), with a browsable mirror in [docs/story-driven-development.md](docs/story-driven-development.md). Operational skills load that doctrine, then apply it through the consuming project's local profile. If a skill, the support-skill reference, and the docs mirror disagree, reconcile them before release.
 
 ## Project Guidance Expected By The Skills
 
@@ -156,13 +219,13 @@ The skills work best when each application repo has:
 
 - `AGENTS.md` with branch policy and project-specific guidance
 - `README.md` with setup and verification commands
-- `CHANGELOG.md` following Keep a Changelog
+- a configured changelog, release-note, changeset, or equivalent release-communication policy when releases need one
 - `docs/epics/` for durable capability truth
-- `docs/changes/` for active and closed changes
-- private planning docs for PRD/Product Brief and visual/style guidance when product or UI decisions need durable context
-- `docs/adrs/` or another project-local ADR location when durable architecture decisions need their own record
+- `docs/changes/` and `docs/changes/closed/` for active and closed changes
+- an owning private `ideas/<idea>/` root with Folder Note repository mappings when PRD/Product Brief, exploration, or visual/style decisions need durable context
+- `docs/adrs/` when durable architecture decisions need their own record
 
-The skills prefer project-local guidance over package defaults.
+The skills prefer project-local guidance for operating policy, project constraints, and explicit relationship exceptions. The default idea/repository model and canonical SDD artifact layout remain package-owned defaults.
 
 ## Status
 

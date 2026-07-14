@@ -7,9 +7,9 @@
 - Release version/date:
 - Included SDD changes:
 
-## Changelog
+## Release Communication
 
-- CHANGELOG.md updated:
+- Release communication updated:
 - Public release notes summary:
 
 ## Verification
@@ -26,6 +26,9 @@
 ## SDD Readiness
 
 - `/sdd-review` status:
+- Reviewed source commit:
+- Latest reconciled PR head:
+- Post-review change classifications: none
 - Epic/Story truth status:
 - Manual UI confirmation:
 

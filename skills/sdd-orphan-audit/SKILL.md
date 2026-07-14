@@ -7,6 +7,10 @@ description: Run a conservative SDD orphan and traceability audit for an applica
 
 Find likely orphaned code/tests and SDD traceability gaps without brute-force reading the repo.
 
+## Authority And Project Profile
+
+Load `$sdd-doctrine` before classifying traceability or artifact-authority gaps. Resolve the repository root from project guidance, then enforce Epics under `docs/epics/`, changes under `docs/changes/`, and audit reports under `docs/audits/`. Project guidance owns source, generated-file, test, and analyzer conventions.
+
 This is a report-first audit. It can identify candidates, confidence levels, and recommended follow-up workflows, but it must not delete code, remove tests, rewrite Epics, or make cleanup commits unless the user explicitly asks for a separate follow-up change.
 
 ## Modes
@@ -33,10 +37,10 @@ The report is advisory. Address findings through `/sdd-propose`, `/sdd-interacti
 Before auditing, read:
 
 - project-local `AGENTS.md`, especially branch policy and generated-file guidance
-- `developer-guide.md` from the workflow root when available
+- parent or workspace guidance when the project points to it
 - `docs/epics/*/epic.md`
 - active and recent `docs/changes/**/{proposal.md,design.md,tasks.md,review.md}` only when they explain likely drift
-- project README, test docs, package scripts, framework config, and root `CHANGELOG.md` when they affect inventory or cleanup risk
+- project README, test docs, package scripts, framework config, and configured release communication when they affect inventory or cleanup risk
 
 Check git status before writing a report. Preserve unrelated dirty files. Do not stage, commit, push, merge, deploy, or mutate external services.
 
@@ -45,7 +49,7 @@ Check git status before writing a report. Preserve unrelated dirty files. Do not
 1. Locate the application root.
    - Prefer an explicit path.
    - Otherwise use the nearest repo with `.git/`, `docs/epics/`, `docs/changes/`, `package.json`, or framework config.
-   - Do not audit the whole vault unless the vault itself is the intended target.
+   - Do not audit the whole workspace tree unless that tree is the intended target.
 2. Run the universal traceability script.
    - Use `scripts/sdd_orphan_audit.py <app-root> --format markdown` for a human summary.
    - Use `--format json` when the result will be post-processed.
@@ -132,5 +136,3 @@ Include:
 - stack analyzers used or intentionally skipped
 - recommended next workflow
 - reminder that no deletion happened
-
-End with a concise self-improvement conclusion: ask "How well did this work, and what could have been improved?" and name one process improvement if evident.

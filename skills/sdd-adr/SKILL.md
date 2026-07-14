@@ -7,6 +7,10 @@ description: Create, update, or assess Architecture Decision Records for SDD pro
 
 Create or update Architecture Decision Records for durable technical decisions in an SDD project.
 
+## Authority And Project Profile
+
+Load `$sdd-doctrine` before interpreting SDD artifact roles or lifecycle. Resolve the repository root from project guidance, then enforce ADR location under `docs/adrs/`. Project guidance still owns status vocabulary, required links, and write policy.
+
 Use this skill from `/sdd-explore` when a discussion reaches a durable architecture decision, and from `/sdd-propose` when the selected technical approach creates a rule future work should follow.
 
 ADRs complement SDD artifacts. They do not replace Product Briefs/PRDs, Epics, Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, proposal/design/tasks files, review reports, changelogs, or release records.
@@ -37,7 +41,7 @@ When unsure, offer an ADR candidate instead of writing a committed decision.
 
 ## Location
 
-Prefer project-local ADR guidance first. If none exists, use:
+Use the canonical SDD ADR location:
 
 ```text
 <project-root>/docs/adrs/yyyy-mm-dd-decision-title.md
@@ -45,7 +49,7 @@ Prefer project-local ADR guidance first. If none exists, use:
 
 Use the local shell date for `yyyy-mm-dd`. Keep the slug short and decision-oriented.
 
-If the project has no `docs/adrs/`, create it only when the user has asked to draft or capture the ADR. Do not create ADR folders just because an idea might eventually need one.
+If the project has no `docs/adrs/`, create it only when the user has asked to draft or capture the ADR. Do not create ADR folders just because an idea might eventually need one. A deliberately different ADR root requires modifying this skill and the shipped doctrine; an `AGENTS.md` path override alone is not sufficient.
 
 ## Workflow
 
@@ -88,12 +92,3 @@ Summarize:
 - options considered
 - links to related SDD artifacts
 - follow-up needed in `design.md`, `tasks.md`, Epic truth, or review
-
-## Final Self-Improvement Action
-
-After completing or stopping this workflow, end the final user response with a concise self-improvement conclusion:
-
-- Ask yourself: "How well did this work, and what could have been improved?"
-- Tell the user the conclusion in 1-3 sentences.
-- Name any concrete skill, template, doctrine, or process improvement worth considering.
-- If no specific improvement is evident, say so plainly.

@@ -7,6 +7,10 @@ description: Create, draft, update, review, or reason about private project plan
 
 Treat a Product Brief/PRD as durable private product direction above the SDD change workflow. Keep it high-level enough to guide `sdd-propose`, Epic scope, Story shape, and scope tradeoffs without becoming a roadmap, implementation spec, status page, worklog, or SDD change artifact.
 
+## Authority And Project Profile
+
+Load `$sdd-doctrine` before interpreting the PRD's relationship to Epics and changes. Resolve the idea-owned planning root and its mapped implementation repositories through the doctrine relationship model unless project guidance explicitly maps them differently. The default PRD is `<planning-root>/prd.md`; project guidance still owns filenames, frontmatter, privacy boundaries, interview/write authorization, and related product-doc conventions. Referenced Epics and changes use the canonical repository `docs/` layout inside each affected implementation repository.
+
 Use the smallest document that can keep future humans and agents aligned.
 
 ## SDD Relationship
@@ -23,7 +27,7 @@ Use this boundary:
 
 | Artifact | Owns |
 |---|---|
-| `<planning-root>/<app>/prd.md` | product purpose, audience, scope, principles, product-level capability areas, market/monetization, open product questions |
+| `<planning-root>/prd.md` | product purpose, audience, scope, principles, product-level capability areas, market/monetization, open product questions |
 | `docs/changes/yyyy-mm-dd-change-name/proposal.md` | why this specific change exists and what Epic actions it proposes |
 | `docs/changes/yyyy-mm-dd-change-name/design.md` | high-level technical approach plus proposed Epic/Story/Requirement/Scenario changes |
 | `docs/changes/yyyy-mm-dd-change-name/tasks.md` | implementation ledger, resume state, verification ledger, and closeout state |
@@ -37,13 +41,13 @@ Use this boundary:
 Create or update the canonical PRD at:
 
 ```text
-<planning-root>/<app>/prd.md
+<planning-root>/prd.md
 ```
 
 Create optional Feature or Capability Briefs only when a PRD would otherwise become too heavy:
 
 ```text
-<planning-root>/<app>/features/<feature-slug>.md
+<planning-root>/features/<feature-slug>.md
 ```
 
 Do not create PRDs or Feature Briefs in public app repositories unless the user explicitly asks.
@@ -204,12 +208,3 @@ Summarize:
 - open questions
 - SDD drift findings, if any
 - recommended next workflow, usually `sdd-propose` when the product direction is ready for a concrete change
-
-## Final Self-Improvement Action
-
-After completing or stopping this workflow, end the final user response with a concise self-improvement conclusion:
-
-- Ask yourself: "How well did this work, and what could have been improved?"
-- Tell the user the conclusion in 1-3 sentences.
-- Name any concrete skill, template, doctrine, or process improvement worth considering.
-- If no specific improvement is evident, say so plainly.

@@ -1,11 +1,15 @@
 ---
 name: sdd-propose
-description: Create or update a minimal SDD change folder under docs/changes/yyyy-mm-dd-change-name with proposal.md, design.md, and tasks.md. Use when the user invokes /sdd-propose or /sdd-propose --replan, asks to propose, scope, define the technical design for, prepare a product change, or revise an active change after newly discovered Requirements, Scenarios, constraints, or scope concerns need planning before implementation resumes. Supports the experimental OpenSpec-inspired SDD workflow, including changes that create new Epic directories, update existing Epic directories, or both. This single workflow should adapt to small fixes or whole-Epic changes without requiring separate approach or implementation-stub skills, while preserving Epic-scoped Story labels/references, concrete Requirements/Scenarios, manual confirmation tracking, changelog impact, and closeout-ready task ledgers.
+description: Create or update a minimal SDD change artifact set with proposal.md, design.md, and tasks.md. Use when the user invokes /sdd-propose or /sdd-propose --replan, asks to propose, scope, define the technical design for, prepare a product change, or revise an active change after newly discovered Requirements, Scenarios, constraints, or scope concerns need planning before implementation resumes. Adapts from small fixes to whole-Epic changes while preserving concrete Stories, Requirements, Scenarios, evidence planning, manual confirmation, release-communication impact, and closeout-ready task ledgers.
 ---
 
 # SDD Propose
 
 Create or refresh one change folder. This is workflow-based like OpenSpec's propose step, but it does not depend on a CLI, schema engine, separate approach skill, or separate implementation record skill.
+
+## Authority And Project Profile
+
+Load `$sdd-doctrine` before defining Stories, Requirements, Scenarios, evidence, or lifecycle state. Resolve the idea-owned planning root and target implementation repository through the doctrine relationship model unless project guidance explicitly maps them differently, then enforce changes under `docs/changes/`, Epics under `docs/epics/`, and ADRs under `docs/adrs/` inside the implementation repository. Project guidance owns branch/write policy, release conventions, required supporting docs, technology constraints, and available specialist guidance.
 
 Use `/sdd-interactive` instead when the user wants to create a lightweight tracked change and immediately work through small edits in the same interactive session.
 
@@ -45,17 +49,22 @@ Use:
    - If no clear change is provided, ask what the user wants to build or change.
    - Derive a short kebab-case `<change-name>` when the user provides prose.
    - Prefix the change folder with today's local date from the shell clock: `yyyy-mm-dd-<change-name>`.
-2. Locate the project root.
-   - Prefer an explicit path from the user.
-   - Otherwise use the nearest root with `.git/`, `package.json`, `docs/`, `AGENTS.md`, existing `docs/changes/`, or legacy `changes/`.
+2. Locate the idea planning root and target implementation repository.
+   - Prefer explicit idea or repository paths from the user.
+   - Otherwise use an explicit project-guidance mapping when present.
+   - From an idea, read the Folder Note `repositories` mapping and auto-select only when one repository is mapped or the requested change identifies one mapped repository unambiguously.
+   - From a code repository, scan idea Folder Note mappings for its path.
+   - Use a unique idea/repository basename match only as a compatibility fallback when no metadata mapping exists; do not silently persist that fallback as canonical ownership.
+   - Ask when an idea maps to multiple plausible target repositories, a repository is claimed by multiple ideas, or ownership remains ambiguous.
+   - Otherwise use the nearest implementation root with `.git/`, `package.json`, `docs/`, `AGENTS.md`, or existing `docs/changes/` and continue without private planning context only when the change does not depend on it.
    - Do not write to the workflow root unless the workflow root itself is the intended project.
 3. Load only the context needed to propose accurately.
    - Read project guidance such as `AGENTS.md`, `README.md`, and product/PRD context when present.
-   - Read root `CHANGELOG.md` when it exists and the change may be user-facing, release-relevant, security-relevant, migration-relevant, operationally notable, or public documentation-worthy.
+   - Read the project-defined release communication when it exists and the change may affect it.
    - Read project planning docs or PRD/Product Brief files when available; if product direction is missing or stale and the change depends on it, recommend `/sdd-prd` without blocking small experiments.
    - Inspect existing active changes under `docs/changes/` and closed changes under `docs/changes/closed/` only enough to avoid duplicate or conflicting scope.
    - In `--replan`, read the active change's `proposal.md`, `design.md`, `tasks.md`, any `review.md`, relevant implementation ledger entries, manual feedback, recent failing/passing checks, and enough current code or tests to understand the discovery.
-   - Inspect legacy `changes/` only enough to avoid duplicate scope or continue a pre-migration change; do not create new SDD changes there.
+   - Inspect legacy `changes/` only enough to avoid duplicate scope or identify migration input; do not continue or create SDD changes there.
    - Inspect existing Epic directories under `docs/epics/`.
    - Read existing `docs/epics/<key>-<###>-epic-name/epic.md` files when the change may modify them.
    - Scan target `docs/epics/**/epic.md` files for existing Story labels/references. New or normalized Epics should use Epic-scoped Story labels such as `S1`; legacy app-wide Story IDs may remain when existing references depend on them.
@@ -65,7 +74,7 @@ Use:
    - In `--replan`, do not create a second change unless the discovery is outside the current change and should become follow-up scope.
    - Create `docs/changes/<yyyy-mm-dd-change-name>/` when it does not exist.
    - If any target artifact already exists, read the existing artifacts and continue only when the user's intent is clearly to revise the change. Otherwise ask whether to revise it or create a differently named change.
-   - If a matching legacy `changes/<yyyy-mm-dd-change-name>/` exists, ask whether to continue that legacy change, migrate it to `docs/changes/`, or create a differently named change. Do not silently create duplicate active truth.
+   - If a matching legacy `changes/<yyyy-mm-dd-change-name>/` exists, require migration to `docs/changes/` or use a differently named canonical change. Do not continue it in place or silently create duplicate active truth.
 5. Interview and refine the proposal/design boundary.
    - First summarize the proposed scope boundary from the user's request, PRD/Product Brief, existing Epics, existing changes, and current implementation reality.
    - Ask the user all questions needed to properly design the proposal, Epic actions, Stories, Requirements, Scenarios, technical options, current and plausible future clients, API/frontend/backend boundaries, constraints, verification strategy, ADR needs, and task ledger.
@@ -79,7 +88,7 @@ Use:
    - If a scope-expanding question seems relevant, name it as out of scope or future work instead of pulling it into the current proposal.
    - Do not treat user interest in a broader idea as permission to expand the current change unless the user explicitly says to expand this proposal's scope.
    - For MVP work, bias toward the smallest proof loop that satisfies the stated MVP question; record adjacent product ambitions as deferred scope.
-   - Ask whether the scoped change should produce a public changelog entry only when that is not obvious from the proposal context.
+   - Ask whether the scoped change should update public release communication only when that is not obvious from the proposal context or project policy.
    - Prefer one high-leverage question at a time when the answer materially affects the design. Batch only tightly related naming or yes/no details when waiting would not improve the proposal. Do not ask questions already answered by project docs, existing Epics, existing changes, implementation, tests, or PRD context.
    - If the user declines to answer or asks to proceed, record the unresolved decision as an assumption, open question, candidate Story, or deferred scope instead of silently promoting it into accepted Requirements.
    - Stop interviewing only when remaining uncertainty can be recorded as an open question without weakening the proposal.
@@ -90,7 +99,7 @@ Use:
    - List proposed Epic actions: create a new Epic directory, update an existing Epic directory, or both.
    - Use Epic directory names shaped as `<key>-<###>-<epic-name>` and an `epic.md` file inside each directory.
    - Capture scope-expanding ideas from the interview as deferred scope or future work, not as current Epic actions.
-   - Add changelog impact: required, not required, or TBD; if required, name the likely Keep a Changelog category.
+   - Add release-communication impact: required, not required, or TBD; if required, name the configured record and likely section when known.
    - Capture open questions and impact without making low-confidence implementation claims.
 7. Draft `design.md`.
    - Describe the target Epic changes and high-level technical approach in enough detail for review before implementation.
@@ -123,7 +132,7 @@ Use:
    - Scale the detail to the change: one paragraph may be enough for a small change; broad or risky changes should capture architecture, client/API boundaries, data, auth, dependency, migration, state-transition, verification, and rollout implications as relevant.
 8. Invoke `/sdd-adr` when needed.
    - Use `/sdd-adr` to create or update ADR drafts when the chosen technical approach creates a durable rule future work should follow.
-   - Default ADR path is `docs/adrs/<yyyy-mm-dd-decision-title>.md` unless project-local guidance names a different ADR path.
+   - ADR path is `docs/adrs/<yyyy-mm-dd-decision-title>.md`.
    - Link each ADR from `design.md` and list it in `proposal.md` impact when relevant.
    - Keep ADRs concise: context, decision, considered options, consequences, validation, and status.
    - Use status `Proposed` during `/sdd-propose`; `/sdd-apply` or `/sdd-review` can update status only when implementation and review justify it.
@@ -133,21 +142,21 @@ Use:
    - Keep tasks at artifact, Story/capability, verification, and review level; do not write a file-by-file execution script.
    - Include a `Resume Here` section that can be updated during implementation.
    - Include a compact task checklist, implementation ledger, verification ledger, open blockers, and closeout checklist.
-   - Include a task to update root `CHANGELOG.md` when changelog impact is required or TBD.
+   - Include a task to update the project-defined release communication when its impact is required or TBD.
    - Include tasks to create, update, or review ADRs when `design.md` names ADRs or ADR candidates.
-   - Include a review task for `/sdd-review`, manual confirmation status using `not applicable`, `pending user`, `user confirmed`, or `accepted gap`, review record status, changelog status, PR/merge state, ADR status, accepted deferred gaps, superseded-truth reconciliation, stale proposal/design status cleanup, and a closing task that moves the completed change folder to `docs/changes/closed/` only after review/PR/merge/acceptance state is clear.
+   - Include a review task for `/sdd-review`, manual confirmation status using `not applicable`, `pending user`, `user confirmed`, or `accepted gap`, review record status, release-communication status, PR/merge state, ADR status, accepted deferred gaps, superseded-truth reconciliation, stale proposal/design status cleanup, and a closing task that moves the completed change folder to `docs/changes/closed/` only after review/PR/merge/acceptance state is clear.
    - In `--replan`, add a dated `Planning Updates` entry describing the discovery, classification, artifacts changed, and the next `/sdd-apply` starting point.
 10. Verify the artifacts.
    - Confirm all three files exist.
    - Confirm any ADR files named by `proposal.md` or `design.md` exist, or that `design.md` clearly labels them as ADR candidates not yet created.
    - Re-read them before final response.
    - Check that `proposal.md` names intended Epic actions.
-   - Check that `proposal.md` records changelog impact.
+   - Check that `proposal.md` records release-communication impact.
    - Check that `proposal.md` and `design.md` record the interview results: confirmed scope decisions, deferred scope, assumptions, unresolved questions, and any user decisions that shaped the Story/Requirement decomposition.
    - Check that `design.md` gives each Story a stable Epic-scoped label or documented legacy Story ID, local Requirement IDs, local Scenario IDs, `Implemented By`, `Verified By`, and `Verification Gaps`, plus right-sized technical options, selected approach, constraints, and ADR decisions or ADR non-applicability.
    - Check that each Story has been challenged for user-path fit and Epic ownership, each Requirement is an observable behavior rule, each Scenario names a real trigger/state/result, and the verification strategy can map evidence to Story/Requirement/Scenario IDs.
    - Check that `design.md` records any existing Epic truth that may be superseded and the intended reconciliation.
-   - Check that `tasks.md` can replace a separate implementation stub or ledger for this change and includes review record, manual confirmation status, changelog status, PR/merge state, ADR status, accepted deferred gaps, superseded-truth reconciliation, stale proposal/design cleanup, and closeout fields.
+   - Check that `tasks.md` can replace a separate implementation stub or ledger for this change and includes review record, manual confirmation status, release-communication status, PR/merge state, ADR status, accepted deferred gaps, superseded-truth reconciliation, stale proposal/design cleanup, and closeout fields.
    - Stop and ask a follow-up question instead of finalizing when a blocking ambiguity would make Stories, Requirements, Scenarios, or verification misleading.
    - In `--replan`, check that `Resume Here` points to the next `/sdd-apply` run and no stale checklist or blocker claims contradict the revised plan.
 
@@ -170,7 +179,7 @@ In `--replan`:
 2. Preserve the current change when the discovery is necessary to satisfy the original goal or accepted manual feedback.
 3. Recommend a new change when the discovery is adjacent follow-up work rather than required for the current change.
 4. Recommend `/sdd-prd` when the discovery changes product direction rather than implementation scope.
-5. Update `proposal.md` if scope, non-goals, Epic actions, impact, changelog impact, or open questions changed.
+5. Update `proposal.md` if scope, non-goals, Epic actions, impact, release-communication impact, or open questions changed.
 6. Update `design.md` with revised Stories, Requirements, Scenarios, technical options, selected approach, alternatives, ADR needs, constraints, risks, and verification strategy.
 7. Create or update ADR drafts when the discovery changes a durable architecture decision.
 8. Update `tasks.md` with a `Planning Updates` entry, revised checklist items, ADR tasks, a refreshed `Resume Here`, and any manual feedback or blocker state that remains relevant.
@@ -187,7 +196,7 @@ In `--replan`:
 - Treat Epics and Stories as durable but revisable truth. Stories may be renamed, reordered, split, merged, or moved between Epics as product understanding improves.
 - Treat moving a Story between Epics as an explicit Epic action: name the source Epic, destination Epic, old full Story reference, new full Story reference, and any Requirement/Scenario adjustments.
 - Treat `docs/changes/closed/` as the home for completed change folders; do not use `archived/`.
-- Treat root-level `changes/` as a legacy fallback only. New SDD changes belong under `docs/changes/`.
+- Treat root-level `changes/` as migration input only. Active SDD changes belong under `docs/changes/`.
 - Keep Requirements user-visible or externally observable.
 - Keep technical constraints out of Requirements unless they affect observable behavior.
 - Keep Story labels as durable internal labels, not file-routing concerns or UUID-like handles. New or normalized Epics should use `S#` labels scoped to the Epic; full references include the Epic ID, such as `EPIC-ID/S1`.
@@ -195,15 +204,15 @@ In `--replan`:
 - Keep `S#` labels unique within each Epic. Treat duplicate labels inside one Epic, duplicate full Story references, or duplicate legacy app-wide Story IDs as traceability drift unless this proposal is explicitly a migration cleanup to resolve the duplicate.
 - Use local Requirement and Scenario IDs for traceability: `R1`, `R2`, and `R1-S1`, `R1-S2`. Verification evidence should refer to these IDs; tasks and ledgers should use them when useful.
 - Avoid vague Scenario text such as "WHEN this Story's user-visible workflow is exercised". Rewrite it into a real condition/action and observable result.
-- Treat root `CHANGELOG.md` as public release communication, not SDD workflow truth. Use Keep a Changelog 1.1.0 conventions: `Unreleased` first, newest releases first, ISO dates for releases, and grouped entry types `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security`.
-- Do not put private vault context, SDD implementation ledger details, raw Requirement/Scenario lists, internal task IDs, secrets, or speculative roadmap promises in `CHANGELOG.md`.
+- Treat project-defined release communication as a transition record, not SDD workflow truth. Follow its configured location and format.
+- Keep public release communication free of private planning context, SDD implementation-ledger details, raw Requirement/Scenario lists, internal task IDs, secrets, and speculative roadmap promises.
 - Flag conflicts with project planning docs or PRD/Product Brief files as product drift; do not update PRD direction from this skill unless the user explicitly asks.
 - Put high-level technical approach, alternatives, constraints, transition contracts, and verification strategy in `design.md`, not in separate approach artifacts by default.
 - Use `/sdd-adr` for durable architecture decisions that future changes should follow. ADRs complement `design.md`; they do not replace Epics, Stories, Requirements, Scenarios, or implementation evidence.
-- Prefer `docs/adrs/<yyyy-mm-dd-decision-title>.md` unless project-local guidance defines a different ADR location or naming convention.
+- Use `docs/adrs/<yyyy-mm-dd-decision-title>.md` for ADRs.
 - Link ADRs from `design.md` and mention them in `tasks.md` closeout state when they affect implementation or review.
 - Put implementation progress, resume state, task status, verification results, and closeout state in `tasks.md`, not in separate implementation stubs or ledgers by default.
-- Put review outcome, review record path or clean-review note, manual confirmation status, changelog status, PR/merge state, and accepted deferred gaps in `tasks.md` so closeout can be validated without a special mode.
+- Put review outcome, review record path or clean-review note, manual confirmation status, release-communication status, PR/merge state, and accepted deferred gaps in `tasks.md` so closeout can be validated without a special mode.
 - Do not create or edit actual Epic files, separate implementation records, separate approach reports, or code from this skill unless the user explicitly asks for that extra work.
 - Do not use this skill as an interactive implementation loop. If the request is effectively `/sdd-propose --interactive` followed immediately by `/sdd-apply --interactive`, use `/sdd-interactive`.
 - Use `/sdd-propose --replan` instead of `/sdd-interactive` when an active change already exists and the discovery needs revised planning before implementation resumes.
@@ -220,5 +229,3 @@ Summarize:
 - major open questions or gaps
 - recommended next workflow
 - for `--replan`, the discovery classification, artifacts updated, and exact `/sdd-apply` restart point
-
-End with a concise self-improvement conclusion: ask "How well did this work, and what could have been improved?" and state one concrete improvement if evident.

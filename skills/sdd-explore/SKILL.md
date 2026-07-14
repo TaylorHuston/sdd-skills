@@ -7,6 +7,10 @@ description: Enter SDD explore mode as a thinking partner for product ideas, tec
 
 Explore mode is a stance, not a fixed workflow. Think with the user, investigate when useful, and help the shape of the problem emerge before forcing it into proposal artifacts.
 
+## Authority And Project Profile
+
+Load `$sdd-doctrine` when the discussion depends on SDD artifact roles, authority, or lifecycle. Resolve the idea-owned planning root and relevant implementation repository through the doctrine relationship model unless project guidance explicitly maps them differently. When an idea maps to multiple repositories, inspect or ask for only those relevant to the exploration. Enforce changes under `docs/changes/`, Epics under `docs/epics/`, and ADRs under `docs/adrs/` inside the selected implementation repository; project guidance owns privacy and write-authorization rules.
+
 Do not implement code in this mode. Reading files, searching code, sketching options, and updating exploration or change artifacts by request is allowed.
 
 ## Stance
@@ -46,11 +50,11 @@ Use this routing:
 | Technical approach, alternatives, risks, constraints, or verification strategy | `docs/changes/yyyy-mm-dd-change-name/design.md` |
 | Durable architecture, data, dependency, integration, deployment, security, storage, or cross-cutting project decision | `docs/adrs/yyyy-mm-dd-<decision-title>.md` |
 | Work item, blocker, resume state, implementation note, or verification result | `docs/changes/yyyy-mm-dd-change-name/tasks.md` |
-| Durable exploratory conclusion that should not become a change yet | `<planning-root>/<project>/exploration/yyyy-mm-dd-<slug>.md` |
+| Durable exploratory conclusion that should not become a change yet | `<planning-root>/exploration/yyyy-mm-dd-<slug>.md` |
 
 If no change exists and the idea has crystallized enough to formalize, offer to run `sdd-propose`.
 
-If the discussion reaches a durable architecture decision, offer to draft an ADR. Do not auto-create one. Use the project's ADR location when guidance exists; otherwise default to:
+If the discussion reaches a durable architecture decision, offer to draft an ADR. Do not auto-create one. Use the canonical ADR location:
 
 ```text
 <project-root>/docs/adrs/yyyy-mm-dd-<decision-title>.md
@@ -67,7 +71,7 @@ Write a summary only when the user asks to save, capture, summarize, remember, o
 Default location:
 
 ```text
-<planning-root>/<project>/exploration/yyyy-mm-dd-<slug>.md
+<planning-root>/exploration/yyyy-mm-dd-<slug>.md
 ```
 
 Use the local shell date for `yyyy-mm-dd`. Keep the slug short and based on the topic. Create the `exploration/` directory if needed. If a same-day file already exists for the topic, update it when clearly continuing the same exploration; otherwise use a more specific slug.
@@ -126,5 +130,3 @@ When the discussion reaches a useful pause, optionally summarize:
 - remaining uncertainty
 - whether this is ready for `sdd-propose`
 - whether anything should be captured in a change artifact, ADR, or exploration summary
-
-End final responses with a concise self-improvement conclusion: ask "How well did this work, and what could have been improved?" and name one process improvement if evident.

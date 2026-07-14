@@ -7,6 +7,10 @@ description: Audit a SDD Epic end to end against current implementation reality 
 
 Audit one Epic as a durable capability truth source. It works with embedded Stories inside `docs/epics/<key>-<###>-epic-name>/epic.md`.
 
+## Authority And Project Profile
+
+Load `$sdd-doctrine` before judging artifact authority, traceability, evidence, or lifecycle drift. Resolve the idea-owned planning root and target implementation repository through the doctrine relationship model unless project guidance explicitly maps them differently, then enforce Epics and their verification reports under `docs/epics/` and related changes under `docs/changes/` inside the implementation repository. Project guidance owns test, security, and supporting-doc commands and requirements.
+
 This skill verifies truth; it does not implement missing behavior and does not replace `/sdd-review` for a specific change. Use `/sdd-review` for change-local PR readiness. Use `/sdd-epic-verify` when the question is whether the whole Epic still matches product intent, current code, tests, docs, and evidence.
 
 Delegation authorization: invoking `/sdd-epic-verify`, naming `sdd-epic-verify`, asking to verify or audit an SDD Epic, or asking to detect Epic drift is explicit permission to use bounded SDD audit subagents under this skill's delegation model. If the local tool policy requires an explicit user request before spawning subagents, this skill invocation satisfies that requirement for Epic coherence, Story drift, implementation, verification, security, docs, or lifecycle audit passes that remain inside the selected Epic/app scope. Do not ask for separate subagent permission unless the user passed a no-delegation mode, the requested delegation would exceed the selected Epic/app scope, the tool requires a more specific approval than normal spawning, or a stop condition applies.
@@ -44,14 +48,14 @@ The report is the durable audit record. Findings are addressed through the workf
 Before auditing, read:
 
 - app/workspace `AGENTS.md`, especially branch policy and test commands
-- canonical SDD doctrine named by workspace or project guidance, or the packaged `docs/story-driven-development.md` when available
-- `developer-guide.md` from the workflow root when available
+- the already loaded `$sdd-doctrine` reference plus any explicit project SDD overlay
+- parent or workspace guidance when the project points to it
 - this skill's `assets/epic-template.md`, to check the target Epic against the canonical template shape
 - this skill's `scripts/epic_template_check.py`, to run the repeatable template-shape scan
 - target `docs/epics/<key>-<###>-epic-name>/epic.md`
 - relevant `docs/changes/**/proposal.md`, `design.md`, `tasks.md`, and `review.md` when they mention the Epic, its Story labels, full Story references, or legacy Story IDs
 - enough of every active `docs/epics/*/epic.md` to detect duplicate Story labels inside an Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs
-- project planning docs or PRD/Product Brief files when product direction exists or drift is suspected
+- planning-root docs or the PRD/Product Brief when product direction exists or drift is suspected
 - README, testing docs, architecture docs, ADRs, data-model docs, current-state docs, and root `CHANGELOG.md` when they claim behavior owned by the Epic
 - source files, tests, configs, generated artifacts, and runtime surfaces listed in Story `Implemented By` and `Verified By`
 
@@ -103,75 +107,28 @@ Check git status in every repo that may be inspected or touched. Preserve unrela
    - `scope-drift`: Story/Requirement/Scenario no longer belongs, is missing, has moved to another Epic, or is too broad/narrow for the Epic or Story.
    - `product-drift`: Epic conflicts with PRD/product direction or current product reality.
    - `security-drift`: security, privacy, auth, data, dependency, or destructive-flow risk is unresolved.
-   - `lifecycle-drift`: related change folders, review records, manual confirmation status, changelog state, PR/merge state, deferred gaps, or closed-folder state contradict each other. This includes completed or closed artifacts that still say work is `Not implemented yet`, `Not verified yet`, pending implementation/verification, or use obsolete manual confirmation status vocabulary.
+   - `lifecycle-drift`: related change folders, review records, manual confirmation status, release-communication state, PR/merge state, deferred gaps, or closed-folder state contradict each other. This includes completed or closed artifacts that still say work is `Not implemented yet`, `Not verified yet`, pending implementation/verification, or use obsolete manual confirmation status vocabulary.
    - `superseded-truth-drift`: later Stories, Requirements, Scenarios, implementation, or docs changed a boundary but earlier Epic truth still reads as current.
 8. Write or print the report.
    - Include the `scripts/epic_template_check.py` command and result in `Tests And Checks`.
    - Summarize template-shape findings in the Epic template adherence gate and `Template drift` line.
 9. In `--propose-fixes`, create a scoped SDD change for findings that require implementation or risky decisions after the report exists.
 10. After every non-`--check` run, ask the user whether to apply any safe artifact fixes identified by the audit. Do not apply those fixes until the user explicitly agrees.
-11. End with the final self-improvement action.
 
 ## Gates
 
-Use `pass`, `findings`, `blocked`, or `not applicable`.
+Use `pass`, `findings`, `blocked`, or `not applicable`. Apply `$sdd-doctrine`, `assets/epic-template.md`, the repeatable template checker, selected available skills, and project guidance instead of restating their detailed rules here.
 
-1. SDD Doctrine Adherence
-   - The Epic supports the SDD north star: an evidence-backed map from product behavior to implementation files and verification evidence.
-   - Epic/Story truth remains the durable answer to "what is actually implemented?" Accepted behavior does not live only in code, chat, stale reports, private memory, README text, generated indexes, or change ledgers.
-   - Artifact authority is respected: running behavior and tests reveal reality, Epic files are durable accepted truth, active changes are working records, and PRDs/product docs guide intent without replacing Epic truth.
-   - `proposal.md`, `design.md`, `tasks.md`, reviews, release notes, changelogs, and generated indexes do not contradict or outrank the Epic.
-   - The audit flags core SDD anti-patterns: creating a new Story to avoid fixing stale truth, hiding product scope expansion inside design or implementation tasks, turning Stories into tiny UI controls, hand-maintaining generated indexes, and closing or promoting work with contradictory Epic/change/review/changelog/manual-confirmation state.
-2. Epic Coherence
-   - Description, Outcome, Current Scope, Deferred Scope, Cross-Story Concerns, Open Decisions, Notes, and Completion Criteria still match embedded Stories.
-   - The Story set is complete enough to fulfill the Epic's stated behavior, product/docs claims, and observable runtime surface. Missing Stories are findings.
-   - Story ownership still makes sense for this Epic; MVP/container Epics may need Stories moved into more focused Epics as the product matures.
-3. Epic Template Adherence
-   - The Epic passes `scripts/epic_template_check.py` or every failure is reported as `template-drift`.
-   - Frontmatter includes the canonical Epic metadata fields when available: `id`, `status`, `created`, `modified`, `last_verified`, and `stories`.
-   - The Epic uses the canonical section spine: Product Context, Outcome, Current Scope, Deferred Scope, Candidate Stories, Story Index, Stories, Cross-Story Concerns, Open Decisions, Completion Criteria, and Notes.
-   - Candidate Stories remain unlabeled until promoted. Labels are assigned only inside the accepted `Stories` section.
-   - Promoted Story headings use `### Story S#` for new or normalized Epics, or a documented legacy app-wide Story ID when existing references depend on it.
-   - Each promoted Story follows the canonical subsection shape: Story statement, Requirements And Scenarios, `#### Requirement R#`, `##### Scenario R#-S#`, `Implemented By`, scenario-mapped `Verified By`, `Verification Gaps`, and Story Notes.
-   - Older headings such as `Potential Stories`, standalone Acceptance Criteria sections, chronological command logs as Story evidence, or UUID-like Story handles are findings unless explicitly marked as historical migration material.
-4. Story Shape
-   - Stories are capability-level user outcomes, not tiny UI actions or implementation tasks.
-   - Stories normally use `As a <actor>, I want <capability>, so that <outcome>`.
-5. Story Requirement Completeness
-   - Each Story's Requirements cover the full stated capability, current implementation behavior, relevant UI/API/CLI/runtime surfaces, and product/docs claims.
-   - Each Story's Scenarios cover the important happy path plus relevant failure, empty, validation, permission, recovery, migration, and security-sensitive modes.
-   - Missing Requirements or Scenarios are findings even when the existing declared Scenarios pass.
-   - Requirements and Scenarios are not overloaded catch-alls that hide multiple behaviors, nor tiny implementation tasks that obscure the user path.
-   - Do not mark the Story aligned when implemented behavior is broader than the declared Requirements/Scenarios unless the extra behavior is explicitly recorded as a gap, deferred scope, or orphan.
-6. Story Reference Traceability
-   - Story labels or documented legacy Story IDs are stable.
-   - `S#` Story labels are unique within each Epic, full Story references are traceable, and legacy app-wide Story IDs remain unique across active Epics in the app.
-   - Story labels or legacy Story IDs survive rename, reorder, and Epic moves unless deliberate renumbering is documented.
-   - Requirements use local `R#`.
-   - Scenarios use local `R#-S#`.
-   - Stale `AC-#` or `TAC-#` labels are mapped to current IDs or marked legacy.
-7. Requirement And Scenario Truth
-   - Requirements and Scenarios are observable and concrete.
-   - Generic Scenarios such as "WHEN this Story's workflow is exercised" are findings.
-   - Failure, empty, validation, permission, recovery, and security-sensitive modes are covered where relevant.
-8. Implementation Drift
-   - `Implemented By` maps point to current files and meaningful roles.
-   - Current code behavior satisfies or explicitly defers every in-scope Scenario.
-9. Verification Strength
-   - `Verified By` evidence is current, concrete, and mapped to Story label/reference plus Requirement/Scenario IDs.
-   - Broad gates such as lint, typecheck, build, codegen, or full CI are supporting evidence unless mapped to a named Scenario or behavior assertion.
-   - Chronological command history lives in change `tasks.md` ledgers, not as the primary Epic `Verified By` shape.
-   - Evidence type is explicit where it matters: focused automated tests, broad supporting gates, deterministic E2E, live-provider playtests, manual UI confirmation, and debug/log inspection are not treated as interchangeable.
-   - Tests prove production paths where risk warrants it, not only helper or mock behavior.
-   - Stale `AC-#` or `TAC-#` evidence references are mapped to current IDs or marked legacy.
-10. Docs And Product Alignment
-   - README, ADRs, data docs, current-state docs, PRD, and changelog do not contradict the Epic.
-   - Related active and closed SDD changes do not contradict their folder state, review outcome, manual confirmation status, changelog status, PR/merge state, or deferred gaps.
-   - Manual confirmation status uses canonical vocabulary: `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
-   - Completed active or closed changes do not retain stale proposal/design/task wording that contradicts accepted Epic truth unless explicitly historical and non-authoritative.
-   - Generated Story indexes are treated as optional project-local validation artifacts, not durable source of truth. When a project intentionally maintains them, confirm they are current and do not point to missing evidence paths.
-11. Security And Data Safety
-   - Auth, permissions, secrets, user data, generated content, migrations, destructive operations, and external services are safe or explicitly out of scope.
+1. **Doctrine and authority**: the Epic remains the durable accepted map from product behavior to implementation and evidence, and no supporting artifact contradicts or outranks it.
+2. **Epic coherence and completeness**: outcome, scope, Story ownership, Story ordering, cross-Story concerns, open decisions, and completion criteria form a coherent capability; missing Stories, Requirements, or Scenarios are findings.
+3. **Canonical shape**: the Epic passes the template checker or every reported deviation is intentional and documented.
+4. **Traceability**: Story references and local Requirement/Scenario IDs are stable and unique, `Implemented By` is a useful code map, and moves or legacy identifiers remain traceable.
+5. **Implementation truth**: observable runtime behavior satisfies, defers, gaps, or exposes drift for every declared and materially missing behavior path.
+6. **Verification strength**: `Verified By` is scenario-mapped, evidence types remain distinct, broad gates are supporting evidence, production/mock boundaries are honest, and gaps state the remaining risk.
+7. **Supporting alignment and lifecycle**: project docs, product direction, ADRs, active/closed changes, manual confirmation, release communication, generated indexes, and review/merge state do not contradict the Epic.
+8. **Security and data safety**: apply relevant available security guidance to auth, permissions, secrets, user data, migrations, destructive actions, dependencies, and external services implicated by the Epic.
+
+Do not report `aligned` merely because the declared Scenarios pass. The audit must also look for implemented behavior missing from the Epic and behavior the Epic needs but has not represented.
 
 ## Finding Severity
 
@@ -233,12 +190,3 @@ Include:
 - delegation shape
 - whether a SDD change was created
 - exact next action
-
-## Final Self-Improvement Action
-
-After completing or stopping this workflow, end the final user response with a concise self-improvement conclusion:
-
-- Ask yourself: "How well did this work, and what could have been improved?"
-- Tell the user the conclusion in 1-3 sentences.
-- Name any concrete skill, template, doctrine, or process improvement worth considering.
-- If no specific improvement is evident, say so plainly.

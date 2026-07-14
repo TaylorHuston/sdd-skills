@@ -43,10 +43,10 @@ Summarize the behavior that will change.
 - Docs:
 - ADRs:
 
-## Changelog Impact
+## Release Communication Impact
 
 - Required: TBD
-- Category: TBD
+- Record / section: TBD
 - Public summary: TBD
 
 ## Open Questions

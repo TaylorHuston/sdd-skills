@@ -51,13 +51,13 @@
 
 ### 6. Review And Closeout
 
-- [ ] 6.1 Update root `CHANGELOG.md` when `proposal.md` says changelog impact is required or TBD.
-- [ ] 6.2 Run `sdd-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, changelog, ADR consistency, and branch readiness.
+- [ ] 6.1 Update the project-defined release communication when `proposal.md` says release-communication impact is required or TBD.
+- [ ] 6.2 Run `sdd-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, release communication, ADR consistency, and branch readiness.
 - [ ] 6.3 Record review outcome as a `review.md` path, a clean review recorded in this ledger, or an explicit user-approved review waiver.
 - [ ] 6.4 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
 - [ ] 6.5 Record manual UI confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
 - [ ] 6.6 Confirm proposal/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
-- [ ] 6.7 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, changelog, ADR, PR/merge, deferred-gap, or folder-location claims.
+- [ ] 6.7 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, release communication, ADR, PR/merge, deferred-gap, or folder-location claims.
 - [ ] 6.8 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus user authorization allow it.
 - [ ] 6.9 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
 
@@ -114,7 +114,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 - Scenario-mapped Verified By maps current:
 - Superseded earlier Epic truth reconciled:
 - ADR status:
-- Changelog current:
+- Release communication current:
 - `sdd-review` verdict:
 - Review record:
 - `review.md` findings resolved:

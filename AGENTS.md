@@ -1,5 +1,5 @@
 ---
-modified: 2026-06-30
+modified: 2026-07-11
 ---
 # SDD Skills Agent Guide
 
@@ -14,7 +14,7 @@ The packaged skills follow the `.agents/` skill-folder convention and should be 
 ## Read First
 
 - Read `README.md` for package purpose, artifact model, installation, and validation guidance.
-- Read `docs/story-driven-development.md` before changing SDD doctrine, artifact semantics, or workflow behavior.
+- Read `skills/sdd-doctrine/SKILL.md` and its doctrine reference before changing SDD artifact semantics or workflow behavior; keep `docs/story-driven-development.md` as a synchronized browsable mirror.
 - Check `CHANGELOG.md` when changing public package behavior, the packaged skill set, or release-facing docs.
 - Prefer package-local files and public workflow doctrine over assumptions from any surrounding workspace.
 
@@ -42,10 +42,10 @@ scripts/
 - Keep skills self-contained and compliant with the OpenAI/Codex skill format.
 - Keep package docs public-safe. Do not add private vault notes, local paths, credentials, or project-specific secrets.
 - Prefer project-neutral wording. Use "the user", "project owner", or "application repo" instead of a specific person's name.
-- Do not assume a consuming project has a private workspace, a specific machine path, or the same docs layout as this package's development environment.
+- Assume the documented idea-owned one-to-many repository mapping by default, but never assume a specific machine path. Keep project overrides possible through local guidance and keep package-wide customization instructions accurate.
 - Keep README and CHANGELOG aligned with the actual package contents.
 - Do not add broad framework-specific guidance directly into `SKILL.md` files unless it is core to the skill. Prefer progressively loaded references.
-- If a skill and `docs/story-driven-development.md` disagree, update one or both so the package stays internally consistent.
+- If a skill, `skills/sdd-doctrine/references/story-driven-development.md`, and `docs/story-driven-development.md` disagree, reconcile them so the package stays internally consistent.
 
 ## Validation
 
@@ -65,7 +65,8 @@ For docs-only changes that do not alter skill files, skill metadata, or package 
 
 Keep these references in mind when working on this package:
 
-- `docs/story-driven-development.md` - source of truth for the public SDD workflow this repo distributes.
+- `skills/sdd-doctrine/references/story-driven-development.md` - doctrine that actually ships with installed skills.
+- `docs/story-driven-development.md` - browsable mirror of the shipped doctrine.
 - `README.md` - package overview, installation, artifact model, and adaptation guidance.
 - `CHANGELOG.md` - public release history and release-facing behavior notes.
 - The local `skill-creator` system skill, when available - canonical guidance for OpenAI/Codex skill structure and validation.

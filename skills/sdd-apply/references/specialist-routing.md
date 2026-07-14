@@ -1,55 +1,45 @@
-# Specialist Routing
+# Available Skill Routing
 
-Use this reference during the `sdd-apply` specialist checkpoint. It is a routing aid, not a replacement for project-local guidance, framework/platform documentation, or specialist skills.
+Use this reference to select and enforce guidance that is materially relevant to a `/sdd-apply` slice. It is a discovery protocol, not a fixed dependency list.
 
-Keep `sdd-apply` as the orchestrator. Load or assign specialist guidance only when the selected Requirement, Scenario, touched files, package/config files, user-visible behavior, or verification risk makes that guidance material.
+Keep `/sdd-apply` as the orchestrator. Project-local instructions remain authoritative. Available skills contribute domain workflows and checks; they do not own scope, lifecycle, commits, or Epic truth.
 
-## Routing Protocol
+## Discovery Protocol
 
-1. Identify the slice: Story, Requirement, Scenario, touched files, commands, and user-visible behavior.
-2. Identify material risk surfaces: UI, backend, data, auth/security, API contract, deployment, migration, AI/model behavior, browser verification, performance, docs, release, or CI/PR readiness.
-3. Select the smallest set of specialist guidance that could change implementation, verification, or stop conditions.
-4. Prefer project-local guidance first, then framework/platform docs, then available specialist skills or router skills.
-5. Record selected, skipped, unavailable, or intentionally avoided specialist guidance in the `tasks.md` `Specialist Checkpoint` table with the consequence for the slice.
-6. Stop if specialist findings change product scope, public contracts, auth/security boundaries, data model, migrations, deployment behavior, destructive behavior, or external-service state beyond the selected change.
+1. Identify the slice: Story, Requirement, Scenario, touched surfaces, commands, user-visible behavior, and expected evidence.
+2. Identify material risk categories: UI/accessibility, backend/API, data/migration, auth/security, AI/model behavior, deployment/platform, performance/diagnosis, testing/browser evidence, documentation, or CI/PR/release.
+3. Inspect the skill catalog exposed by the current runtime. Match skills by their descriptions and capabilities, not by a hard-coded name list.
+4. Select the smallest set that could materially change implementation, verification, or stop conditions.
+5. Read every selected skill completely, including any required references, before acting. Follow its instructions unless they conflict with higher-priority or project-local guidance.
+6. If no matching skill is available, use project guidance, current framework/platform documentation, and sound engineering judgment. Do not fabricate, install, or require a skill that the user did not provide or authorize.
+7. Stop when selected guidance reveals unapproved product, contract, security, data, migration, deployment, destructive, or external-service scope.
 
-## Common Signals
+## Capability Signals
 
-| Signal | Specialist Guidance |
+| Risk Surface | Guidance To Look For |
 |---|---|
-| Browser-visible UI, interaction behavior, accessibility, responsive layout, design-system components, or screenshot evidence | Use project UI guidance, design system docs, browser verification tools, or available UI/accessibility/design specialist skills. |
-| Server routes, route handlers, RPC/actions, backend functions, webhooks, queues, jobs, or API contracts | Use project backend/API guidance, framework docs, OpenAPI or typed-contract docs, or available backend specialist skills. |
-| Database schema, migrations, seed/reset behavior, persistence, subscriptions, data integrity, or generated data artifacts | Use project data guidance, migration docs, ORM/backend-platform docs, or available data/platform specialist skills. |
-| Auth, authorization, tenancy, secrets, input/output handling, payments, destructive flows, migrations, or production data | Use security/auth guidance and treat unresolved findings as blockers or `/sdd-review` escalation. |
-| AI/model calls, agents, chat, RAG, tools, structured output, embeddings, model/provider choice, or streaming UI | Use current provider/framework docs and verify current model IDs, SDK APIs, and configuration before implementation. |
-| Deployment, environment variables, hosting config, domains, logs, cron, storage, queues, cache, or platform state | Use platform docs or CLI guidance. Do not mutate production/platform state without explicit authorization. |
-| Package installation, dependency upgrades, framework migration, schema migration, data backfill, or generated-file churn | Select relevant stack guidance and treat broad or irreversible changes as stop conditions unless already authorized. |
-| Hard bugs, flaky failures, regressions, production-only symptoms, or performance regressions | Use diagnosis or performance guidance before implementing a speculative fix. |
-| CI, PR checks, branch policy, merge readiness, review comments, or publishing | Use project branch/CI guidance and available PR/CI tooling. Do not push or open PRs unless authorized by workflow mode and branch policy. |
-| README, architecture, testing, deployment, style, data/API contracts, operations, or current-state docs may become stale | Use project docs guidance and update only supporting docs whose truth value changes. |
+| Browser or mobile UI, interaction, accessibility, responsive layout, design systems, or visual evidence | UI/UX, component, accessibility, browser-verification, screenshot, or visual-regression skills and project design guidance. |
+| Routes, handlers, RPC/actions, backend functions, webhooks, queues, jobs, or public contracts | Backend, framework, API-contract, OpenAPI, service-integration, or architecture skills. |
+| Schema, migrations, persistence, subscriptions, reset/seed behavior, or data integrity | Database, ORM, migration, backend-platform, or data-model skills. |
+| Auth, authorization, tenancy, secrets, payments, input/output handling, destructive flows, or production data | Security, auth, privacy, threat-model, or security-review skills. Treat unresolved findings as blockers. |
+| AI/model calls, agents, chat, RAG, tools, structured output, embeddings, or streaming | Current provider, SDK, model-routing, evaluation, prompt-safety, or AI-interface skills. Verify current APIs and model identifiers. |
+| Deployment, environment variables, hosting, domains, logs, cron, storage, cache, or platform state | Deployment, platform, observability, environment, or CLI skills. Do not mutate external or production state without authorization. |
+| Hard bugs, flaky failures, regressions, or performance problems | Diagnosis, debugging, profiling, or performance skills before speculative implementation. |
+| Tests, browser evidence, mocks/fakes, coverage, or BDD/TDD design | Testing, TDD, browser-verification, or test-engineering skills. |
+| CI, PR feedback, branch policy, merge readiness, publishing, or release work | CI, GitHub/SCM, PR-stewardship, release, or deployment skills, subject to workflow authorization. |
+| README, architecture, testing, deployment, style, data/API, operations, or current-state docs may become stale | Documentation or architecture guidance plus the project's existing docs conventions. |
 
-## Optional Known Skill Examples
+## Enforcement And Delegation
 
-If these skills are installed, they may be useful. They are examples, not package requirements:
+When delegating, pass each selected skill through the orchestration tool's supported skill, path, or mention mechanism. Tell the worker why it applies and require it to read and follow the skill before working.
 
-- `convex` for Convex schema/functions/auth/performance.
-- `clerk-*` for Clerk auth.
-- `ai-sdk` for AI SDK usage.
-- `next-best-practices` for Next.js boundaries.
-- `shadcn`, `building-components`, `web-design-guidelines`, or `ui-ux-pro-max` for UI systems.
-- `vercel-cli` or Vercel platform skills for Vercel checks.
-- `turborepo` for monorepo build/cache behavior.
-- `diagnose` for hard bugs, flaky failures, or regressions.
+The handoff should include:
 
-## Delegation Handoff
+- selected skill or guidance identifiers
+- why each applies to the assigned Requirement or Scenario
+- files, routes, commands, configuration, or runtime surfaces to inspect
+- allowed and prohibited operations
+- expected verification or evidence
+- stop conditions the worker must return to the orchestrator
 
-When specialist guidance is selected for a delegated implementation or review pass, pass:
-
-- specialist guidance names, docs, or paths to load
-- why each one applies to the selected Requirement or Scenario
-- files, routes, commands, config files, or runtime surfaces to inspect
-- allowed operations and prohibited operations
-- verification commands or evidence expected from that specialist perspective
-- specific stop conditions that the subagent must report instead of resolving alone
-
-The orchestrator remains responsible for loading `sdd-apply`, selecting the change, validating subagent claims, committing, updating durable SDD artifacts, and deciding whether a stop condition is hit.
+The orchestrator must validate that the resulting work reflects the selected guidance. Record only consequential outcomes in the existing Implementation or Verification Ledger. Do not maintain an inventory of skills considered, skipped, or unavailable.

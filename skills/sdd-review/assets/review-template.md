@@ -18,7 +18,7 @@ changes-requested | blocked | ready
 | Visual / UX consistency | TBD | TBD |
 | Security review | TBD | TBD |
 | Documentation | TBD | TBD |
-| Changelog | TBD | TBD |
+| Release communication | TBD | TBD |
 | Branch and merge readiness | TBD | TBD |
 | PRD alignment | TBD | TBD |
 
@@ -45,6 +45,7 @@ changes-requested | blocked | ready
 ## Review Bundle
 
 - Source branch/ref:
+- Reviewed source commit:
 - Target branch/ref:
 - Merge base:
 - Source-only commits:
@@ -64,12 +65,13 @@ changes-requested | blocked | ready
 | Verification coverage | TBD | TBD | TBD |
 | Security | TBD | TBD | TBD |
 | UI / visual identity | TBD | TBD | TBD |
-| Docs / changelog / PRD | TBD | TBD | TBD |
+| Docs / release communication / PRD | TBD | TBD | TBD |
 | Integration readiness | TBD | TBD | TBD |
 
 ## PR / Merge Readiness
 
 - Source branch:
+- Reviewed source commit:
 - Target branch:
 - Conflict check:
 - Commit state:

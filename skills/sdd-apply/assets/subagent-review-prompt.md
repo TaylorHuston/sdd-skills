@@ -15,8 +15,8 @@ You are performing one fresh-context review pass for a SDD change implementation
 - Source branch/ref: `SOURCE_BRANCH`
 - Target branch/ref: `TARGET_BRANCH`
 - Changed files: `CHANGED_FILES`
-- Specialist guidance to load: `SPECIALIST_GUIDANCE`
-- Specialist routing reason: `SPECIALIST_ROUTING_REASON`
+- Selected skills / guidance to load: `SELECTED_GUIDANCE`
+- Selection reason: `GUIDANCE_SELECTION_REASON`
 
 ## Goal
 
@@ -31,15 +31,15 @@ Read:
 - the target Epic `epic.md`
 - changed files and relevant tests
 - root-level app docs and vault project docs when assigned docs/artifact review
-- specialist guidance named by the orchestrator
+- every selected skill and guidance item named by the orchestrator
 
-Do not independently load broad unrelated technology skills. If the named specialist guidance appears insufficient or another specialist is clearly needed, report that as a finding or recommended follow-up instead of expanding the review scope silently.
+Read every selected skill completely, including its required references, and apply it before reviewing. Do not independently load broad unrelated skills. If the selected guidance appears insufficient or another capability is clearly needed, report that as a finding or recommended follow-up instead of expanding the review scope silently.
 
 ## Review Passes
 
 Apply the assigned `REVIEW_PASS`:
 
-- `artifact-truth`: check proposal, design, tasks, Epic Story labels/references, Requirement IDs, Scenario IDs, Implemented By, scenario-mapped Verified By, Verification Gaps, review record, manual confirmation status, changelog status, PR/merge state, and closeout state agree with reality. Flag `Verified By` sections that are only command logs or unmapped broad gates, and flag proposal/design/tasks text that still says completed work is not implemented, not verified, or pending.
+- `artifact-truth`: check proposal, design, tasks, Epic Story labels/references, Requirement IDs, Scenario IDs, Implemented By, scenario-mapped Verified By, Verification Gaps, review record, manual confirmation status, release-communication status, PR/merge state, and closeout state agree with reality. Flag `Verified By` sections that are only command logs or unmapped broad gates, and flag proposal/design/tasks text that still says completed work is not implemented, not verified, or pending.
 - `coverage`: check Story label/reference plus Requirement/Scenario coverage, negative paths, browser or production-path proof, mock/fake boundaries, regression risk, flaky risk, scenario-mapped verification evidence, evidence type separation, and verification gaps. Evidence type separation means deterministic E2E, live-provider playtests, manual UI confirmation, broad gates, and debug/log inspection are not treated as interchangeable.
 - `manual-ui-confirmation`: check that browser-visible or otherwise user-facing app changes have a concise `tasks.md` walkthrough the user can execute, including route, setup, actions, expected results, feedback classification, and status of `not applicable`, `pending user`, `user confirmed`, or `accepted gap`. If no manual confirmation applies, check that the reason is recorded.
 - `code`: check correctness, maintainability, regressions, accidental scope expansion, brittle tests, architecture fit, and documentation impact.
@@ -69,8 +69,7 @@ Return:
 - production-path and mock/fake boundaries reviewed
 - evidence inspected
 - manual UI confirmation walkthrough status, including missing or stale steps
-- specialist guidance loaded, skipped, unavailable, or newly recommended, including why it mattered
-- suggested `tasks.md` `Specialist Checkpoint` row for this review pass, or `not applicable` with a concrete reason
+- selected skill guidance that materially changed the review, including the concrete consequence
 - verification commands or scenarios run, if any
 - documentation, Epic, design, or tasks updates needed
 - whether `tasks.md` Resume Here is accurate enough for cold-start recovery

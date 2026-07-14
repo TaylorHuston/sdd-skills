@@ -1,5 +1,5 @@
 ---
-modified: 2026-07-07
+modified: 2026-07-14
 ---
 # Changelog
 
@@ -12,6 +12,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 ### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.6.0] - 2026-07-14
+
+### Added
+
+- Added `/sdd-doctrine` as an installable support skill so the portable SDD semantic contract ships with the workflow skills.
+
+### Changed
+
+- Updated `/sdd-pr` to classify every post-review change, reconcile affected Epic/Story truth and evidence, and require fresh SDD review for material behavior, contract, security, data, API, architecture, or risk changes.
+- Added immutable reviewed-source and latest-reconciled commit watermarks to `/sdd-review`, `/sdd-release`, and their public templates so PR readiness cannot silently outlive the reviewed diff.
+- Kept remote review configuration provider-neutral instead of assuming a specific review service.
+- Generalized `/sdd-apply` to discover and enforce materially relevant skills exposed by the consuming runtime without requiring a fixed companion-skill catalog.
+- Removed mandatory skill-selection telemetry from `/sdd-apply`; only consequential guidance outcomes belong in the existing implementation and verification record.
+- Separated portable SDD doctrine from consuming-project policy across the skill suite. The doctrine now enforces canonical SDD artifacts under the repository `docs/` tree, while branches, commands, release conventions, technology constraints, explicit idea/repository relationship exceptions, and local preferences resolve from project guidance.
+- Added a default idea-owned one-to-many repository model: private planning lives under `ideas/<idea>/`, Folder Note metadata maps zero or more `code/<repo>` repositories, basename matching is fallback-only, and public repos do not need private reverse links.
+- Generalized `/sdd-pr` and `/sdd-release` around the configured review provider, production target, versioning policy, and release-record format instead of requiring GitHub, `main`, SemVer inference, or Keep a Changelog.
 
 ### Deprecated
 

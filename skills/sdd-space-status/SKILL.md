@@ -7,6 +7,10 @@ description: Produce a read-only re-entry brief for an SDD application project o
 
 Produce a read-only re-entry brief for an app or space after time away.
 
+## Authority And Project Profile
+
+Load `$sdd-doctrine` before interpreting artifact authority or lifecycle state. Resolve the idea-owned planning root and mapped implementation repositories through the doctrine relationship model unless project guidance explicitly maps them differently, then use canonical SDD landmarks under `docs/epics/`, `docs/changes/`, `docs/adrs/`, and `docs/audits/` inside each relevant implementation repository. Release communication and non-SDD project docs remain project-specific.
+
 Orient the user quickly: what the app is, what work was active, where durable SDD truth lives, what looks stale or blocked enough to care about, and what to do next.
 
 This is not an audit gate. Do not edit, close, move, merge, implement, test, verify, replan, or reconcile artifacts. Do not claim full review readiness, release readiness, or Epic alignment unless a dedicated review/verification artifact already supports that claim. Route to `/sdd-review`, `/sdd-epic-verify`, `/sdd-release`, or another focused skill when confidence would require deeper work.
@@ -24,7 +28,7 @@ Start from any of these:
 Common landmarks:
 
 ```text
-<planning-root>/<project>/prd.md
+<planning-root>/prd.md
 <app-root>/AGENTS.md
 <app-root>/README.md
 <app-root>/docs/README.md
@@ -49,7 +53,7 @@ Read enough to orient and route. Prefer current, active, and recent artifacts ov
    - Report the app root, git root, display name, active branch, dirty/clean context, PRD/Product Brief path if present, and main SDD roots.
 2. Read local guidance and onboarding docs.
    - Read app-local `AGENTS.md`, `README.md`, `docs/README.md`, and any obvious project guidance that explains branch policy, app purpose, docs inventory, or local workflow.
-   - Read workspace SDD doctrine when present and needed to interpret artifact authority or workflow routing.
+   - Read any project-specific SDD overlay only when it adds to the already loaded portable doctrine.
 3. Reconstruct product intent.
    - Read the Product Brief/PRD when present.
    - Read enough README/docs context to answer what the app is, who it is for, and what shape the product currently has.
@@ -159,13 +163,4 @@ Do not bundle unrelated follow-up actions into the status report. The status rep
 - Do not treat broad status uncertainty as a defect. Say what was not checked and route to the appropriate deeper skill.
 - Do not over-rank low-confidence risks. If a concern is only a hunch, label it as a hunch.
 - Do not let the report become a template-compliance review. Mention only drift that affects re-entry or the likely next action.
-
-## Final Self-Improvement Action
-
-After completing or stopping this workflow, end the final user response with a concise self-improvement conclusion:
-
-- Ask yourself: "How well did this work, and what could have been improved?"
-- Tell the user the conclusion in 1-3 sentences.
-- Name any concrete skill, template, doctrine, or process improvement worth considering.
-- If no specific improvement is evident, say so plainly.
 - Do not edit skills or doctrine during normal status work unless the user explicitly asks.
