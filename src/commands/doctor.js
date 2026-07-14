@@ -29,28 +29,39 @@ export async function diagnoseWorkspace(startPath) {
       configPath: join(workspaceRoot, ".sdd", "config.yaml"),
       findings,
       counts,
+      remediations: [],
       healthy: false,
     };
   }
 
   const checkDirectory = async (label, configuredPath, level = "warning") => {
-    if (!(await isDirectory(resolveWorkspacePath(workspaceRoot, configuredPath)))) {
+    const exists = await isDirectory(resolveWorkspacePath(workspaceRoot, configuredPath));
+    if (!exists) {
       findings.push({ level, message: `${label} does not exist: ${configuredPath}.` });
     }
+    return exists;
   };
 
+  let planningRootExists = true;
   if (typeof config.planning?.root === "string") {
-    await checkDirectory("Planning root", config.planning.root);
+    planningRootExists = await checkDirectory("Planning root", config.planning.root);
   }
+  const repositoryRootExists = {};
   for (const [rootId, repositoryRoot] of Object.entries(config.repositories?.roots ?? {})) {
-    await checkDirectory(`Repository root ${rootId}`, repositoryRoot);
+    repositoryRootExists[rootId] = await checkDirectory(
+      `Repository root ${rootId}`,
+      repositoryRoot,
+    );
   }
   for (const [ideaId, idea] of Object.entries(config.ideas ?? {})) {
-    await checkDirectory(
-      `Planning directory for ${ideaId}`,
-      resolveIdeaPlanningPath(config, ideaId, idea),
-    );
+    if (planningRootExists || idea.planningPath !== undefined) {
+      await checkDirectory(
+        `Planning directory for ${ideaId}`,
+        resolveIdeaPlanningPath(config, ideaId, idea),
+      );
+    }
     for (const repository of idea.repositories ?? []) {
+      if (repository.root && repositoryRootExists[repository.root] === false) continue;
       await checkDirectory(`Repository for ${ideaId}`, resolveRepositoryPath(config, repository));
     }
   }
@@ -63,12 +74,22 @@ export async function diagnoseWorkspace(startPath) {
     errors: findings.filter((finding) => finding.level === "error").length,
     warnings: findings.filter((finding) => finding.level === "warning").length,
   };
+  const remediations =
+    !planningRootExists || Object.values(repositoryRootExists).some((exists) => !exists)
+      ? [
+          {
+            command: "sdd configure",
+            message: "Repair missing planning or repository roots using detected workspace paths.",
+          },
+        ]
+      : [];
   return {
     command: "doctor",
     workspaceRoot,
     configPath: join(workspaceRoot, ".sdd", "config.yaml"),
     findings,
     counts,
+    remediations,
     healthy: counts.errors === 0,
   };
 }

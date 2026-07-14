@@ -6,6 +6,7 @@ import {
   readConfig,
   resolveIdeaPlanningPath,
   resolveRepositoryPath,
+  resolveWorkspaceStatus,
   resolveWorkspacePath,
 } from "./config.js";
 import { isPathInside } from "./fs.js";
@@ -22,6 +23,7 @@ export async function resolveWorkspaceContext(startPath) {
   const matches = [];
 
   for (const [ideaId, idea] of Object.entries(config.ideas ?? {})) {
+    const ideaStatus = resolveWorkspaceStatus(idea.status);
     const resolvedPlanningPath = resolveIdeaPlanningPath(config, ideaId, idea);
     const planningPath = resolveWorkspacePath(
       workspaceRoot,
@@ -29,12 +31,14 @@ export async function resolveWorkspaceContext(startPath) {
     );
     const resolvedRepositories = (idea.repositories ?? []).map((repository) => ({
       ...repository,
+      status: resolveWorkspaceStatus(repository.status),
       resolvedPath: normalizeRelativePath(resolveRepositoryPath(config, repository)),
     }));
     if (isPathInside(planningPath, targetPath)) {
       matches.push({
         kind: "planning",
         idea: ideaId,
+        ideaStatus,
         spaceId: ideaId,
         matchedPath: planningPath,
         planningPath: normalizeRelativePath(resolvedPlanningPath),
@@ -51,6 +55,7 @@ export async function resolveWorkspaceContext(startPath) {
         matches.push({
           kind: "repository",
           idea: ideaId,
+          ideaStatus,
           spaceId: ideaId,
           repository,
           matchedPath: repositoryPath,
@@ -70,6 +75,7 @@ export async function resolveWorkspaceContext(startPath) {
     relativePath: normalizeRelativePath(relative(workspaceRoot, targetPath)),
     kind: match?.kind ?? (targetPath === workspaceRoot ? "workspace" : withinWorkspace ? "unmapped" : "external"),
     idea: match?.idea ?? null,
+    ideaStatus: match?.ideaStatus ?? null,
     spaceId: match?.spaceId ?? null,
     planningPath: match?.planningPath ?? null,
     repository: match?.repository ?? null,

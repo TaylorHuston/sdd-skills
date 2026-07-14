@@ -13,6 +13,12 @@ import {
 import { SddError } from "./errors.js";
 import { isDirectory, isPathInside, pathExists } from "./fs.js";
 
+export const WORKSPACE_STATUSES = Object.freeze(["active", "inactive", "archived"]);
+
+export function resolveWorkspaceStatus(value) {
+  return value ?? "active";
+}
+
 export function getConfigDirectory(workspaceRoot) {
   return join(workspaceRoot, CONFIG_DIRECTORY_NAME);
 }
@@ -91,12 +97,16 @@ function normalizeRepositoryEntries(value) {
   }
   return value.flatMap((entry) => {
     if (typeof entry === "string") {
-      return [{ path: entry }];
+      return [{ path: entry, status: "active" }];
     }
     if (!entry || typeof entry !== "object" || typeof entry.path !== "string") {
       return [];
     }
-    return entry.role ? [{ path: entry.path, role: String(entry.role) }] : [{ path: entry.path }];
+    return [{
+      path: entry.path,
+      ...(entry.role ? { role: String(entry.role) } : {}),
+      status: WORKSPACE_STATUSES.includes(entry.status) ? entry.status : "active",
+    }];
   });
 }
 
@@ -131,14 +141,16 @@ function toRepositoryReference(workspaceRoot, repository, repositoryRoots) {
     .sort((left, right) => right.absolutePath.length - left.absolutePath.length);
 
   const role = repository.role ? { role: repository.role } : {};
+  const status = { status: resolveWorkspaceStatus(repository.status) };
   if (matches.length === 0) {
-    return { path: normalizePath(repository.path), ...role };
+    return { path: normalizePath(repository.path), ...role, ...status };
   }
   const match = matches[0];
   return {
     root: match.root,
     path: normalizePath(relative(match.absolutePath, repositoryPath)),
     ...role,
+    ...status,
   };
 }
 
@@ -158,13 +170,16 @@ export async function importIdeas(workspaceRoot, planningRoot, repositoryRoots) 
     const planningPath = join(planningRoot, directory.name);
     const manifestPath = join(workspaceRoot, planningPath, `${directory.name}.md`);
     let repositories = [];
+    let status = "active";
     if (await pathExists(manifestPath)) {
       const frontmatter = parseFrontmatter(await readFile(manifestPath, "utf8"), manifestPath);
+      status = WORKSPACE_STATUSES.includes(frontmatter.status) ? frontmatter.status : "active";
       repositories = normalizeRepositoryEntries(frontmatter.repositories).map((repository) =>
         toRepositoryReference(workspaceRoot, repository, repositoryRoots),
       );
     }
     ideas[directory.name] = {
+      status,
       repositories,
     };
   }
@@ -177,11 +192,21 @@ export async function createInitialConfig(
 ) {
   const detectedPlanningRoot =
     planningRoot ??
-    (await detectRoot(workspaceRoot, ["03-spaces/ideas", "ideas", "planning"], "planning"));
+    (await detectRoot(
+      workspaceRoot,
+      ["03-spaces/ideas", "spaces/ideas", "ideas", "planning"],
+      "planning",
+    ));
   const detectedRepositoryRoots =
     repositoryRoots?.length > 0
       ? repositoryRoots
-      : [await detectRoot(workspaceRoot, ["03-spaces/code", "code", "repositories"], "code")];
+      : [
+          await detectRoot(
+            workspaceRoot,
+            ["03-spaces/code", "spaces/code", "code", "repositories"],
+            "code",
+          ),
+        ];
   const repositoryRootMap = createRepositoryRootMap(detectedRepositoryRoots);
 
   return {
@@ -213,7 +238,10 @@ export function migrateConfig(config, workspaceRoot) {
   const ideas = {};
 
   for (const [ideaId, idea] of Object.entries(config.ideas ?? {})) {
-    const migratedIdea = { repositories: [] };
+    const migratedIdea = {
+      status: resolveWorkspaceStatus(idea?.status),
+      repositories: [],
+    };
     if (typeof idea?.planning === "string" && typeof planningRoot === "string") {
       const absolutePlanningRoot = resolve(workspaceRoot, planningRoot);
       const absoluteIdeaPlanning = resolve(workspaceRoot, idea.planning);
@@ -321,6 +349,9 @@ export function validateConfig(config) {
         error(`ideas.${ideaId} must be a mapping.`);
         continue;
       }
+      if (idea.status !== undefined && !WORKSPACE_STATUSES.includes(idea.status)) {
+        error(`ideas.${ideaId}.status must be one of: ${WORKSPACE_STATUSES.join(", ")}.`);
+      }
       if (idea.planning !== undefined) {
         validatePath(`ideas.${ideaId}.planning`, idea.planning);
       }
@@ -349,6 +380,11 @@ export function validateConfig(config) {
         }
         if (repository.role !== undefined && (typeof repository.role !== "string" || !repository.role)) {
           error(`ideas.${ideaId}.repositories role must be a non-empty string.`);
+        }
+        if (repository.status !== undefined && !WORKSPACE_STATUSES.includes(repository.status)) {
+          error(
+            `ideas.${ideaId}.repositories status must be one of: ${WORKSPACE_STATUSES.join(", ")}.`,
+          );
         }
         const resolvedRepository =
           repository.root && Object.hasOwn(config.repositories?.roots ?? {}, repository.root)

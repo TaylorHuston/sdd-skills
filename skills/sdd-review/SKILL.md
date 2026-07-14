@@ -19,7 +19,7 @@ Use `assets/review-template.md` when creating or refreshing `review.md`.
 
 Use `/sdd-review` to prepare routine changes for the project-defined integration target. Whether that requires a PR or direct local integration belongs to project policy; production-target promotion belongs to `/sdd-release`.
 
-Do not treat this as more implementation planning. In default mode, run the full PR-style review, use fresh-context delegated review passes when available and useful, fix narrow clearly safe deficiencies as they are found, commit those fixes after affected verification passes, report what was fixed and committed, and stop. The user may rerun `/sdd-review` manually for a fresh-context pass until it reports clean. If the review finds deficiencies that are unsafe to fix automatically, write or update `review.md` in the active change folder so the findings can be addressed in a later `/sdd-apply` or targeted review pass.
+Do not treat this as more implementation planning. In default mode, run the complete PR-style review before beginning remediation. Launch materially relevant fresh-context review passes together, collect all results, validate and deduplicate their findings, and publish one consolidated finding set. Then fix the complete safe subset as one batch, rerun affected verification, and perform one regression-focused rereview of the updated diff. Do not stop between those stages merely to report ordinary findings. Stop only for a defined stop condition, user judgment, or an unsafe remediation boundary. If deficiencies remain outside safe review remediation, write or update `review.md` so one later `/sdd-apply` can address the consolidated batch.
 
 Delegation authorization: invoking `/sdd-review`, naming `sdd-review`, asking to review an SDD change, or asking to close/finish/merge a SDD change is explicit permission to use bounded SDD review subagents under this skill's delegation model. If the local tool policy requires an explicit user request before spawning subagents, this skill invocation satisfies that requirement for non-trivial artifact, code, verification, security, UI, docs, or branch-readiness review passes that remain inside the selected change. Do not ask for separate subagent permission unless the user passed `--no-delegate`, the requested delegation would exceed the selected change, the tool requires a more specific approval than normal spawning, or a stop condition applies.
 
@@ -31,7 +31,7 @@ Start from an explicit change folder, change name, source branch, target branch,
 
 Supported modes:
 
-- Default: run the deep PR-style review against the selected target branch, use delegated fresh-context review passes when available and materially useful, fix narrow clearly safe in-scope findings once, rerun affected checks, commit only the safe-fix diff, report what was fixed and committed, and stop with the current verdict. Do not create a PR, merge, push, or close the change without confirmation. If the verdict is `ready`, the target is non-production, and closeout readiness passes, ask whether to perform the policy-defined merge-and-close next.
+- Default: run one complete deep PR-style discovery wave against the selected target branch, consolidate and validate all findings, fix the complete safe in-scope subset as one batch, rerun affected checks, perform one regression-focused rereview, commit only the verified safe-fix batch, and report the resulting verdict. Do not pause after individual findings or require the user to invoke `/sdd-review` again merely to discover the next review category. Do not create a PR, merge, push, or close the change without confirmation. If the verdict is `ready`, the target is non-production, and closeout readiness passes, ask whether to perform the policy-defined merge-and-close next.
 - `--deep`: explicit alias for default behavior.
 - `--fast`: run a lightweight review on the main thread only. Still check source-vs-target diff, required SDD artifacts, branch policy, dirty state, security, and verification evidence, but skip delegated review passes and broad optional checks unless a risk is obvious.
 - `--artifact-only`: review SDD artifacts, Epic truth, Change status, manual confirmation status, release-communication status, and PRD alignment when applicable. Do not review application code beyond what is necessary to confirm artifact claims. Do not return `ready` for integration from this mode; use `artifact-ready`, `changes-requested`, or `blocked`.
@@ -39,8 +39,8 @@ Supported modes:
 - `--no-delegate`: use the main thread only. Use when subagent tooling is unavailable, the change is tiny, or delegation would add more noise than useful independent review.
 - `--check`: review only and do not edit any files, including `review.md`.
 - `--no-fix`: review only, write or update `review.md` when deficiencies exist, and report the verdict.
-- `--fix`: same safe-fix behavior as default, kept as an explicit alias for callers that want to signal remediation intent. Do not broaden scope.
-- `--until-ready`: run a bounded review-fix-reverify loop until all gates pass or a stop condition occurs. Requires `--fix`.
+- `--fix`: same consolidated safe-fix behavior as default, kept as an explicit alias for callers that want to signal remediation intent. Do not broaden scope.
+- `--until-ready`: after the default full discovery, batch remediation, and regression rereview, allow additional bounded remediation cycles until all gates pass or a stop condition occurs. Requires `--fix`.
 - `--max-iterations N`: cap `--until-ready`; default to `3`.
 - `--pr`: when all gates pass, create a non-production pull request following the app's branch policy. If the target is the production branch, use `/sdd-release` instead.
 - `--merge`: when all gates pass, merge to the non-production integration branch following the app's branch policy. If the target is the production branch, use `/sdd-release` instead.
@@ -158,6 +158,16 @@ Use the main thread only when:
 
 Parallelize read-only delegated review passes when their scopes do not overlap. Do not delegate Change-status decisions, commits, PR creation, merges, closeout moves, branch operations, or final verdicts.
 
+Treat all materially relevant delegated passes plus the orchestrator's own inspection as one review discovery wave. Do not begin ordinary remediation while required passes are still outstanding. Once the wave completes or reaches the bounded fallback threshold:
+
+1. Validate findings against the actual source-vs-target diff and artifacts.
+2. Deduplicate findings that describe the same root cause.
+3. Resolve contradictions between reviewers before editing.
+4. Classify the complete set by severity and remediation boundary.
+5. Create one ordered remediation batch grouped by root cause and affected verification.
+
+A confirmed critical security issue, destructive-data risk, active production hazard, or ambiguity that makes continued inspection unsafe may stop the wave early. Ordinary code, test, accessibility, documentation, CI, or artifact findings should be accumulated instead of surfaced as serial interruptions.
+
 Keep delegated review waits bounded. Continue independent review work after spawning, and wait only when the next required decision depends on delegated evidence. Never wait silently for more than 60 seconds; report which gates are complete and which review pass remains. After roughly three minutes of cumulative waiting on one pass or review wave, interrupt or close the slow reviewer and complete that gate locally, or re-delegate a narrower question. An optional reviewer must never prevent a concise status response. Close completed or abandoned reviewers promptly.
 
 Use `assets/subagent-pr-review-prompt.md` for delegated passes when structured prompts help. Each delegated review prompt must include:
@@ -188,6 +198,8 @@ Run every gate that applies and record `pass`, `findings`, `blocked`, or `not ap
 7. **Supporting truth**: required project docs, release communication, generated indexes, ADRs, and product direction do not contradict the implementation or Epic map.
 8. **Integration readiness**: source, target, reviewed commit, dirty state, conflict state, required checks, authorization, and the project-defined PR/merge/closeout path are unambiguous.
 
+Before finalizing the discovery wave, explicitly challenge cross-cutting failure classes that commonly escape happy-path tests when they are relevant to the diff: upgrade paths and migration immutability, existing-data compatibility, async focus or draft preservation, responsive interaction targets and accessibility, dependency or CI action validity, generated-contract drift, and fresh-install versus existing-install behavior. Keep this framework-neutral and mark irrelevant classes `not applicable`; do not manufacture work where the diff creates no such risk.
+
 Select the smallest materially relevant set of available skills for these gates, read them completely, pass them into delegated review work, and validate their consequences. Absence of an optional skill is not a blocker; unresolved risk is.
 
 Do not use verdict `ready` unless the complete review bundle and every required gate pass with no unresolved blocking finding. Narrow modes may report narrower outcomes but must not imply full integration readiness.
@@ -200,13 +212,13 @@ Classify findings as:
 - `REQUIRED`: should be resolved unless the user explicitly accepts the risk.
 - `SUGGESTION`: non-blocking improvement.
 
-When unresolved `BLOCKING` or `REQUIRED` findings remain after the safe-fix pass, create or update the review artifact at the project-resolved change location using `assets/review-template.md`. Do not duplicate the template in this skill.
+When unresolved `BLOCKING` or `REQUIRED` findings remain after consolidated safe remediation and regression rereview, create or update the review artifact at the project-resolved change location using `assets/review-template.md`. Do not duplicate the template in this skill.
 
 If the review is clean, a separate review artifact is optional unless project policy requires one. Record the verdict, date, review scope, source and target, and exact reviewed source commit in the task ledger so later PR stewardship can detect review staleness.
 
 ## Remediation
 
-Default mode may fix findings once. With default mode or `--fix`, only fix findings that are:
+Default mode performs one consolidated safe-remediation batch after the complete discovery wave. With default mode or `--fix`, only include findings that are:
 
 - clearly in scope for the SDD change
 - small enough to verify in the same review pass
@@ -214,14 +226,18 @@ Default mode may fix findings once. With default mode or `--fix`, only fix findi
 
 Safe automatic fixes include stale generated indexes, stale task-ledger checkboxes, missing verification entries for checks already run, small Epic evidence/date corrections, mechanical release-communication placement, formatting/lint fixes with obvious local intent, mechanical duplicate Story reference cleanup when ownership is obvious, and similarly narrow artifact drift.
 
-After every fix:
+After the finding set is consolidated:
 
-1. Update `review.md`.
-2. Rerun affected verification.
-3. Rerun code and security review on the updated diff.
-4. Confirm the working tree contains only the intended safe-fix files plus any unrelated pre-existing dirty files, and stage only the intended safe-fix files.
-5. Create a local commit for the safe review fix with a concise message, such as `Address sdd-review findings`, scoped to the current repo. Do not stage unrelated dirty files, do not amend earlier commits, and do not push.
-6. Stop and report what was fixed, the commit hash, and any unrelated dirty files that were preserved. Do not immediately loop to a clean verdict unless `--until-ready` is explicitly set; the user can rerun `/sdd-review` for a fresh-context pass.
+1. Update `review.md` with the complete validated finding set and planned safe batch when a review artifact is required.
+2. Apply all independent safe fixes in one remediation phase, ordered so shared root causes are corrected before dependent symptoms.
+3. Rerun the union of affected focused verification and required broad gates once after the batch, not once per finding unless an intermediate check is necessary to avoid compounding risk.
+4. Perform one regression-focused rereview of the updated diff. Recheck code, security, data, artifacts, and any gate touched by remediation; do not repeat unaffected discovery work without a concrete reason.
+5. Reconcile `review.md`, `tasks.md`, and Epic evidence with the post-remediation truth.
+6. Confirm the working tree contains only the intended safe-fix files plus any unrelated pre-existing dirty files, and stage only the intended safe-fix files.
+7. Create one local commit for the verified safe review batch with a concise message, such as `Address sdd-review findings`, scoped to the current repo. Do not stage unrelated dirty files, do not amend earlier commits, and do not push.
+8. Report the final verdict, consolidated fixes, commit hash, residual findings, and unrelated dirty files that were preserved.
+
+The regression rereview is a validation pass, not a second broad discovery wave. If it reveals a genuinely new safe regression introduced by the batch, fix it within the same run when practical and rerun only affected checks. If it reveals pre-existing review scope that the original complete wave should have covered, record the process miss and consolidate the remainder before stopping; do not drip-feed one finding per invocation. Additional broad review-fix cycles require `--until-ready`.
 
 If the safe-fix diff cannot be isolated from unrelated dirty files, affected verification fails, or the local commit fails, stop and report the blocker instead of continuing.
 

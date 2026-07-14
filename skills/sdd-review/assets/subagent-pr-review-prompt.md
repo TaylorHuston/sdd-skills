@@ -78,10 +78,12 @@ Reject your own finding if it is only a preference, lacks impact, or cannot be t
 
 ## Report Back
 
+Return one complete report for the assigned pass. Inspect the full assigned surface before reporting; do not stop after the first actionable issue or reserve lower-severity findings for a later pass.
+
 Return:
 
 - review pass and outcome: `pass`, `findings`, `blocked`, or `not applicable`
-- top findings ordered by severity
+- all validated findings ordered by severity and grouped by root cause when useful
 - source-vs-target surfaces inspected
 - artifact files inspected
 - Requirements, Scenarios, or risks reviewed

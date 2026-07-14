@@ -56,6 +56,7 @@
         "type": "object",
         "required": ["repositories"],
         "properties": {
+          "status": { "enum": ["active", "inactive", "archived"] },
           "planning": { "type": "string", "minLength": 1 },
           "planningPath": { "type": "string", "minLength": 1 },
           "repositories": {
@@ -66,7 +67,8 @@
               "properties": {
                 "root": { "type": "string", "minLength": 1 },
                 "path": { "type": "string", "minLength": 1 },
-                "role": { "type": "string", "minLength": 1 }
+                "role": { "type": "string", "minLength": 1 },
+                "status": { "enum": ["active", "inactive", "archived"] }
               },
               "additionalProperties": false
             }

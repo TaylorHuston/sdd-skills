@@ -5,7 +5,7 @@ description: Create or update a minimal SDD change artifact set with proposal.md
 
 # SDD Propose
 
-Create or refresh one change folder. This is workflow-based like OpenSpec's propose step, but it does not depend on a CLI, schema engine, separate approach skill, or separate implementation record skill.
+Create or refresh one change folder. This is workflow-based like OpenSpec's propose step. Use the CLI for deterministic scaffolding when available, while this skill remains responsible for the planning interview, Story/Requirement quality, technical decisions, and artifact content.
 
 ## Authority And Project Profile
 
@@ -16,6 +16,8 @@ Use `/sdd-interactive` instead when the user wants to create a lightweight track
 Use `/sdd-propose --replan` when an active `/sdd-apply` run or manual feedback discovers new or changed Requirements, Scenarios, constraints, Epic ownership, or scope questions that need planning before more code changes. This mode updates the active change's planning artifacts, then hands back to a fresh `/sdd-apply`.
 
 ## Output
+
+By default, write an active proposed Change inside the selected implementation repository as shown below. When the user explicitly wants to plan independently before repository or branch work begins, run `sdd change create <space-id> <slug>` and refine the resulting private Planned Change Draft under the idea's configured `plannedChangesDirectory`. A planned draft is not an active repository Change and must not be handed to `/sdd-apply`; run `sdd change promote <space-id> <change-id>` with explicit `--repo` selections when needed, then reconcile each promoted repository Change's scope before implementation begins. Do not maintain duplicate planned and active truth after promotion.
 
 Write these files:
 
@@ -69,6 +71,9 @@ Use:
    - Scan target `docs/epics/**/epic.md` files for existing Story labels/references. New or normalized Epics should use Epic-scoped Story labels such as `S1`; legacy app-wide Story IDs may remain when existing references depend on them.
    - Read code only when current behavior needs accurate `Implemented By` or `Verified By` maps.
 4. Create or continue the change folder.
+   - When the user explicitly requests independent pre-implementation planning, prefer `sdd change create <space-id> <slug>` for the initial private scaffold, then refine that planned draft in place.
+   - Treat a Planned Change Draft as private planning context only. Before recommending `/sdd-apply`, run `sdd change promote <space-id> <change-id>` with every repository that owns part of the work selected through `--repo`. Do not move or copy the draft manually when the CLI is available.
+   - After promotion, inspect each repository copy and reconcile repository-specific scope, Epic actions, design, tasks, dependencies, and coordination notes. Promotion handles deterministic movement and path hygiene; it does not make product or technical planning decisions.
    - In `--replan`, require an existing active `docs/changes/<yyyy-mm-dd-change-name>/` folder with `proposal.md`, `design.md`, and `tasks.md`.
    - In `--replan`, do not create a second change unless the discovery is outside the current change and should become follow-up scope.
    - Create `docs/changes/<yyyy-mm-dd-change-name>/` when it does not exist.

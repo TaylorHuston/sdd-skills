@@ -61,9 +61,9 @@ Private product direction is idea-owned, and an idea may map to zero, one, or ma
     <repo-b>/
 ```
 
-- **Planning root**: `planning.root` in `.sdd/config.yaml`. An idea defaults to `<planning.root>/<idea-key>` and may declare `planning` relative to that root or exceptional workspace-relative `planningPath`. This is the private product surface, including `prd.md`, Feature/Capability Briefs, exploration summaries, visual identity, research, and private navigation.
+- **Planning root**: `planning.root` in `.sdd/config.yaml`. An idea defaults to `<planning.root>/<idea-key>` and may declare `planning` relative to that root or exceptional workspace-relative `planningPath`. This is the private product surface, including `prd.md`, Feature/Capability Briefs, exploration summaries, visual identity, research, private navigation, and optional planned Change drafts under the configured `plannedChangesDirectory`.
 - **Repository roots**: named entries under `repositories.roots` in `.sdd/config.yaml`. Each points to a workspace-relative directory containing implementation repositories.
-- **Canonical relationship**: each `ideas.<idea>.repositories` entry declares a repository `path`, optional named `root`, and optional concise `role`. A rooted path resolves relative to that named repository root; an entry without `root` is an explicit workspace-relative exception.
+- **Canonical relationship**: each `ideas.<idea>` entry declares lifecycle `status`, and each repository entry declares a `path`, lifecycle `status`, optional named `root`, and optional concise `role`. A rooted path resolves relative to that named repository root; an entry without `root` is an explicit workspace-relative exception.
 
 ```yaml
 planning:
@@ -73,27 +73,34 @@ repositories:
     code: code
 ideas:
   product:
+    status: active
     repositories:
       - root: code
         path: product-web
         role: web-client
+        status: active
       - root: code
         path: product-mobile
         role: mobile-client
+        status: inactive
 ```
 
 The mapping is intentionally private-workspace-owned. Do not require public code repositories to contain reverse links to private idea paths.
 
+Idea and repository lifecycle status uses exactly `active`, `inactive`, or `archived`. `active` means current development and is included in default workspace status and new Change targeting. `inactive` retains a potential or paused mapping without surfacing it as current work. `archived` is historical/read-only reference. Missing status in an older v2 config is treated as `active` for backward compatibility, but new and maintained configurations should write it explicitly. An idea and each mapped repository have independent status: an active replacement effort may retain an archived predecessor repository.
+
 Resolve roots in this order:
 
-1. Run `sdd context <relevant-path> --json` and use its workspace, idea, `planningPath`, repository, role, resolved path, and related repositories.
+1. Run `sdd context <relevant-path> --json` and use its workspace, idea, idea status, `planningPath`, repository, repository status, role, resolved path, and related repositories.
 2. Prefer an explicit user-selected repository when more than one mapped repository is relevant.
 3. Apply declared project guidance only when it intentionally overrides the configured topology for the active operation.
 4. Ask when multiple target repositories remain plausible or ownership cannot be resolved safely. Do not infer or persist an undeclared relationship silently.
 
 One idea may map to many repositories. Under the current model, one repository should be claimed by at most one idea, and shared tooling repositories may remain unlinked. If real usage requires one repository to support multiple ideas, evolve the config schema and resolver deliberately into a many-to-many model rather than adding ad hoc reverse links.
 
-Idea Folder Note metadata may be imported by `sdd init`, but `.sdd/config.yaml` is authoritative afterward. Do not create a missing idea directory during read-only work. Change configured relationships only when the active workflow is authorized to modify workspace topology. To change the packaged model, update this section, the config schema, CLI resolution behavior, and affected skills together.
+Idea Folder Note metadata may be imported by `sdd init`, but `.sdd/config.yaml` is authoritative afterward. Do not create a missing idea directory during read-only work. When a configured planning or repository root moves, use `sdd configure` to repair the root while preserving Space IDs, statuses, roles, mappings, and artifact settings. Change configured relationships only when the active workflow is authorized to modify workspace topology. To change the packaged model, update this section, the config schema, CLI resolution behavior, and affected skills together.
+
+Default inventory commands include only active ideas and active repositories. Use `sdd status --all` for lifecycle auditing and historical inventory. Explicit `sdd status <space-id>` remains able to show every repository mapped to that Space. Do not create or apply new work against an inactive idea or inactive/archived repository; update the workspace lifecycle status first when work intentionally resumes.
 
 The planning root is not a second implementation source of truth. Product direction and private context live there; accepted implemented behavior, code maps, and verification maps remain in Epics and Stories under the implementation repository's `docs/` tree.
 
@@ -108,6 +115,7 @@ The planning root is not a second implementation source of truth. Product direct
 - **Implemented By**: A developer starting index for the important files, modules, routes, components, APIs, migrations, or support files that implement or materially support the Story.
 - **Verified By**: A behavior evidence index. It should name concrete tests, assertions, browser/manual scenarios, review artifacts, or other proof tied to the Requirement or Scenario. It is not a chronological command log.
 - **Verification Gaps**: Known missing, deferred, or accepted gaps. Empty or stale gaps are misleading and should be cleaned up.
+- **Planned Change Draft**: An optional private pre-implementation scaffold under `<planning-path>/<plannedChangesDirectory>/yyyy-mm-dd-change-name/`. It may use `proposal.md`, `design.md`, and `tasks.md` with `status: proposed`, but it is not an active repository Change, does not authorize implementation, and does not override Epic/Story truth.
 - **Change**: A tracked working artifact set under `docs/changes/yyyy-mm-dd-change-name/` containing `proposal.md`, `design.md`, and `tasks.md`. The change may create a new Epic, update an existing Epic, or both. Its active status is machine-readable from `tasks.md`; its closed state is derived from folder location.
 
 ## Artifact Authority
@@ -180,6 +188,8 @@ Capture important failure modes as Scenarios when they affect user-visible behav
 
 ## Change Workflow
 
+Product work may be drafted privately before implementation begins. `sdd change create <space-id> <slug>` deterministically scaffolds a Planned Change Draft under the owning Space's configured planning path, using canonical templates and explicit mapped-repository selection when a Space has multiple repositories. Planned drafts are not included in active repository status and must not be passed to `/sdd-apply` in place. Before implementation, run `sdd change promote <space-id> <change-id>` with explicit `--repo` selections when needed. Promotion validates the proposed draft, creates each selected repository Change under its configured active-Change path, removes private planning-path references, and removes the planning draft only after every selected destination succeeds. `/sdd-propose` must then reconcile repository-specific scope before handing the Change to `/sdd-apply`; there must be only one active truth for each repository Change.
+
 Use the canonical dated change layout:
 
 ```text
@@ -244,9 +254,9 @@ Manual UI confirmation is part of the workflow for browser-visible or otherwise 
 
 Manual confirmation status must use the same vocabulary everywhere: `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
 
-`/sdd-apply` should treat Epic/Story truth as non-negotiable while implementation is happening. Behavior changes, stale Story wording, changed Requirement or Scenario meaning, moved Epic ownership, and changed verification confidence must be reconciled into affected Epics during the apply work or called out as a blocker before claiming progress. `/sdd-apply` should end implementation with an implementation self-check: confirm the slice is complete, verified, reconciled into Epic truth, and ready for independent review. This self-check does not replace `/sdd-review`.
+`/sdd-apply` should treat Epic/Story truth as non-negotiable while implementation is happening. Behavior changes, stale Story wording, changed Requirement or Scenario meaning, moved Epic ownership, and changed verification confidence must be reconciled into affected Epics during the apply work or called out as a blocker before claiming progress. `/sdd-apply` should end implementation with an implementation self-check: confirm the slice is complete, verified, reconciled into Epic truth, and ready for independent review. The self-check should gather its materially relevant specialist findings before remediation, apply the safe set as one batch, and run one regression-focused validation pass rather than surfacing findings serially. This self-check does not replace `/sdd-review`.
 
-`/sdd-review` is the local PR-style gate after implementation. It independently checks proposal/design/tasks, Epic truth, Requirements, Scenarios, tests, manual confirmation, code quality, security, docs, release-communication impact, branch policy, and closeout consistency. If it finds deficiencies, it creates or updates `review.md`. If it returns clean for a non-production integration target, it should offer the policy-defined merge-and-close as the recommended next action, but must ask the user before merging, moving the change folder, pushing, or taking any other integration action.
+`/sdd-review` is the local PR-style gate after implementation. It independently checks proposal/design/tasks, Epic truth, Requirements, Scenarios, tests, manual confirmation, code quality, security, docs, release-communication impact, branch policy, and closeout consistency. Review should be comprehensive rather than serial: complete the materially relevant review wave, validate and consolidate all findings, remediate the complete safe subset as one batch, then perform one regression-focused rereview. It should not require repeated user invocations merely to reveal the next review category. If deficiencies remain, it creates or updates `review.md` with the consolidated set. If it returns clean for a non-production integration target, it should offer the policy-defined merge-and-close as the recommended next action, but must ask the user before merging, moving the change folder, pushing, or taking any other integration action.
 
 Status transitions must accompany the work that justifies them: `/sdd-propose` creates `proposed`; `/sdd-apply` changes it to `in_progress` and then `review` at implementation handoff; `/sdd-review` keeps `review`, returns deficiencies to `in_progress` or `replanning`, and sets `ready_to_close` only when closeout gates pass. Closing is represented only by moving the folder.
 

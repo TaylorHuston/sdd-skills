@@ -9,29 +9,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-14
+
 ### Added
 
-- Added an npm-distributed `sdd` CLI preview with `init`, `update`, `doctor`, and `context` commands.
-- Added workspace-local `.sdd/config.yaml` and installation-lock support for configurable planning roots, repository roots, repository artifact paths, and one-to-many idea mappings.
-- Added checksum-managed skill installation that preserves unrelated skills, adopts matching installations, blocks local overwrites by default, and supports explicit dry-run and force modes.
-- Added machine-readable JSON output and automated coverage for initialization, mapping import, diagnostics, context resolution, idempotency, and managed-skill safety.
-- Added checksum-managed `.sdd/story-driven-development.md` installation, updates, conflict protection, and diagnostics.
-- Added a machine-readable Change `status` vocabulary in `tasks.md` and CLI diagnostics for configured repositories.
-- Added `sdd status` summary and Space-detail views, with stable Space IDs defined by `.sdd/config.yaml` `ideas` keys.
+- Added the `sdd` CLI with workspace initialization, configuration repair, managed updates, diagnostics, context resolution, status reporting, and planned-Change commands.
+- Added workspace-local `.sdd/config.yaml` topology with stable Space IDs, one-to-many idea/repository mappings, and independent `active`, `inactive`, and `archived` lifecycle status.
+- Added checksum-protected installation and updates for the managed workflow and workspace-local SDD skills without overwriting unrelated or locally modified skills by default.
+- Added `sdd status` summary and Space-detail views with active Change state plus repository branch and clean/dirty Git metadata.
+- Added `sdd change create` and `sdd change promote` for private planning drafts and collision-safe promotion into one or more active implementation repositories.
+- Added human-readable and machine-readable JSON output, with dry-run support for mutating workspace and Change commands.
 
 ### Changed
 
 - Expanded the package from a skills-only distribution into an early SDD toolchain while retaining the legacy sync script for pre-CLI installations.
 - Expanded `/sdd-explore` into a durable space-level discussion workflow that maintains idea-owned exploration records, routes mature conclusions to stronger artifacts, and resolves workspace ownership through configurable CLI topology when available.
-- Made first-time interactive `sdd init` ask for workspace-root-relative planning and repository paths, with detected defaults, multiple repository roots, explicit path flags, and a `--yes` automation mode.
-- Replaced repeated idea and repository paths with a v2 derived-path configuration: idea planning defaults to the idea key, repositories reference named roots, explicit workspace-relative overrides remain available, and `sdd init` migrates v1 workspaces automatically.
+- Made first-time `sdd init` collect workspace-relative planning and repository roots interactively or through explicit automation flags.
+- Replaced repeated idea and repository paths with a v2 derived-path configuration while preserving explicit overrides and automatic v1 migration.
 - Updated every SDD workflow skill to resolve topology through `sdd context` and load the CLI-managed workspace workflow instead of a support skill.
 - Simplified `/sdd-space-status` into a read-only semantic wrapper around `sdd status --json`, leaving deterministic discovery and ordering to the CLI.
-- Limited the `sdd status` summary to one row per repository with active work, grouped by configured role, and updated `/sdd-space-status` to distinguish official application work from prototype and reference work.
-- Grouped detailed `sdd status <space-id>` output by repository, including each repository's active Changes, Epics, and recent Changes.
-- Added bounded delegation waits across SDD orchestration skills so slow subagents trigger visible status updates and a local or narrower fallback instead of indefinite polling.
-
-### Deprecated
+- Grouped status by idea and repository, including active entries without current Changes; `--all` retains inactive and archived inventory.
+- Changed `/sdd-review` and `/sdd-apply` to collect complete specialist findings before editing, remediate safe findings as one consolidated batch, and use a regression-focused validation pass instead of serial review/apply loops.
+- Made `sdd doctor` report moved topology roots once and recommend `sdd configure` for remediation.
 
 ### Removed
 
@@ -39,7 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
-### Security
+- Improved human-readable status output spacing.
 
 ## [0.6.0] - 2026-07-14
 
@@ -58,14 +57,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added a default idea-owned one-to-many repository model: private planning lives under `ideas/<idea>/`, Folder Note metadata maps zero or more `code/<repo>` repositories, basename matching is fallback-only, and public repos do not need private reverse links.
 - Generalized `/sdd-pr` and `/sdd-release` around the configured review provider, production target, versioning policy, and release-record format instead of requiring GitHub, `main`, SemVer inference, or Keep a Changelog.
 
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
-
 ## [0.5.0] - 2026-07-07
 
 ### Added
@@ -78,14 +69,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Strengthened `/sdd-review` and `/sdd-release` around risk-shaped evidence, deterministic release-readiness claims, and manual UI testing handoffs.
 - Updated the packaged SDD doctrine for project docs, evidence discipline, superseded Story reconciliation, and package-neutral workflow wording.
 
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
-
 ## [0.4.0] - 2026-07-02
 
 ### Added
@@ -97,14 +80,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Updated `/sdd-epic-verify` reports to include the Epic template checker as a required template-adherence gate.
 - Tightened `/sdd-propose` so proposal work requires explicit planning interview, Story/Requirement challenge, scope-decision capture, and scenario-mapped verification planning before artifacts are finalized.
 - Updated `/sdd-apply` promotion guidance for package-neutral workflow roots, user confirmation vocabulary, default-layout adaptation, explicit delegation authorization, risk-shaped evidence, and category-first specialist routing.
-
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
 
 ## [0.3.0] - 2026-07-01
 

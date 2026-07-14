@@ -8,6 +8,10 @@ Explain the problem, opportunity, or product pressure behind this change.
 
 Summarize the behavior that will change.
 
+## Target Repositories
+
+- TBD.
+
 ## Epic Actions
 
 ### New Epic Directories
@@ -32,6 +36,7 @@ Summarize the behavior that will change.
 
 ## Change Folder
 
+- Planned location: not applicable
 - Active location: `docs/changes/yyyy-mm-dd-change-name/`
 - Closed location: `docs/changes/closed/yyyy-mm-dd-change-name/`
 

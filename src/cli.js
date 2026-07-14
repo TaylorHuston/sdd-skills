@@ -2,23 +2,29 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 
+import { configureWorkspace } from "./commands/configure.js";
 import { getWorkspaceContext } from "./commands/context.js";
+import { createPlannedChange } from "./commands/change-create.js";
+import { promotePlannedChange } from "./commands/change-promote.js";
 import { diagnoseWorkspace } from "./commands/doctor.js";
 import { initWorkspace } from "./commands/init.js";
 import { getStatus } from "./commands/status.js";
 import { updateWorkspace } from "./commands/update.js";
 import { PACKAGE_JSON_PATH } from "./constants.js";
 import { SddError } from "./errors.js";
-import { collectInitOptions } from "./prompts.js";
+import { collectConfigureOptions, collectInitOptions } from "./prompts.js";
 
 const HELP = `Story-Driven Development CLI
 
 Usage:
   sdd init [path] [options]       Initialize or reconcile an SDD workspace
+  sdd configure [path] [options]  Repair configured workspace topology paths
   sdd update [path] [options]     Update the managed workflow and SDD skills
   sdd doctor [path] [--json]      Validate workspace, installation, and Change statuses
   sdd context [path] [--json]     Resolve the current planning/repository context
   sdd status [space-id] [options] List Space status or show one Space in detail
+  sdd change create [options]     Scaffold a planned Change for a Space
+  sdd change promote [options]    Promote a planned Change into repository work
   sdd --version                   Print the package version
 
 Init options:
@@ -30,6 +36,13 @@ Init options:
   --force                         Replace conflicting managed workflow or skills
   --json                          Emit machine-readable JSON
 
+Configure options:
+  --planning-root <path>          Set the planning root
+  --repository-root <name=path>   Set a named repository root; may be repeated
+  --yes                           Accept detected replacements without prompting
+  --dry-run                       Report changes without writing configuration
+  --json                          Emit machine-readable JSON
+
 Update options:
   --dry-run                       Report without writing files
   --force                         Replace conflicting managed workflow or skills
@@ -37,6 +50,26 @@ Update options:
 
 Status options:
   --workspace <path>              Resolve status from this workspace (default: current directory)
+  --all                           Include inactive and archived ideas and repositories
+  --json                          Emit machine-readable JSON
+
+Change create usage:
+  sdd change create <space-id> <slug> [options]
+
+Change create options:
+  --workspace <path>              Resolve the initialized workspace (default: current directory)
+  --repo <path>                   Select a mapped repository; may be repeated
+  --date <yyyy-mm-dd>             Override the local creation date
+  --dry-run                       Report the scaffold without writing files
+  --json                          Emit machine-readable JSON
+
+Change promote usage:
+  sdd change promote <space-id> <change-id> [options]
+
+Change promote options:
+  --workspace <path>              Resolve the initialized workspace (default: current directory)
+  --repo <path>                   Select a mapped repository; may be repeated
+  --dry-run                       Report the promotion without writing files
   --json                          Emit machine-readable JSON
 `;
 
@@ -59,6 +92,23 @@ function requireAtMostOnePath(positionals, command) {
   return resolve(positionals[0] ?? process.cwd());
 }
 
+function parseRepositoryRootOverrides(values = []) {
+  const roots = {};
+  for (const value of values) {
+    const separator = value.indexOf("=");
+    const rootId = separator === -1 ? "" : value.slice(0, separator).trim();
+    const path = separator === -1 ? "" : value.slice(separator + 1).trim();
+    if (!rootId || !path) {
+      throw new SddError(`Invalid repository root override: ${value}`, {
+        code: "USAGE",
+        details: ["Use --repository-root <name=path>, for example code=spaces/code."],
+      });
+    }
+    roots[rootId] = path;
+  }
+  return roots;
+}
+
 function printSkillActions(actions) {
   const changed = actions.filter((entry) => !["unchanged", "adopt"].includes(entry.action));
   const adopted = actions.filter((entry) => entry.action === "adopt");
@@ -72,27 +122,16 @@ function printWorkflowAction(workflow) {
   console.log(`Workflow: ${workflow.action} (${workflow.path})`);
 }
 
-function printRows(headers, rows) {
-  const widths = headers.map((header, index) =>
-    Math.max(header.length, ...rows.map((row) => String(row[index]).length)),
-  );
-  const printRow = (row) =>
-    console.log(row.map((value, index) => String(value).padEnd(widths[index])).join("  ").trimEnd());
-  printRow(headers);
-  printRow(widths.map((width) => "-".repeat(width)));
-  for (const row of rows) printRow(row);
-}
-
 export function statusSummaryRows(result) {
   return result.spaces.flatMap((space) => {
-    const activeRepositories = space.repositoryActivity.filter(
-      (repository) => repository.activeChangeCount > 0,
-    );
-    if (activeRepositories.length > 0) {
-      return activeRepositories.map((repository) => {
-        const change = repository.activeChanges[0];
+    const repositories = space.repositoryActivity;
+    if (repositories.length > 0) {
+      return repositories.map((repository) => {
+        const change = repository.activeChanges[0] ?? repository.change;
         return [
           space.spaceId,
+          space.status,
+          repository.status,
           repository.role ?? "-",
           change?.status ?? "-",
           change?.changeId ?? "-",
@@ -101,23 +140,63 @@ export function statusSummaryRows(result) {
         ];
       });
     }
-    return [];
+    return [[space.spaceId, space.status, "-", "-", "-", "-", "-", 0]];
   });
+}
+
+function formatGitStatus(git) {
+  if (!git?.available) return `unavailable (${git?.error ?? "unknown error"})`;
+  const location = git.detached
+    ? `detached at ${git.head?.slice(0, 12) ?? "unknown commit"}`
+    : git.branch ?? "unknown branch";
+  if (!git.dirty) return `${location}, clean`;
+  const counts = [
+    git.staged > 0 ? `${git.staged} staged` : null,
+    git.unstaged > 0 ? `${git.unstaged} unstaged` : null,
+    git.untracked > 0 ? `${git.untracked} untracked` : null,
+    git.conflicted > 0 ? `${git.conflicted} conflicted` : null,
+  ].filter(Boolean);
+  return `${location}, dirty${counts.length > 0 ? ` (${counts.join(", ")})` : ""}`;
 }
 
 function printStatus(result) {
   if (result.mode === "summary") {
     console.log(`SDD workspace: ${result.workspaceRoot}`);
-    const rows = statusSummaryRows(result);
-    if (rows.length === 0) {
-      console.log("No active Changes in mapped repositories.");
+    if (result.spaces.length === 0) {
+      console.log(result.filter === "all" ? "No configured ideas." : "No active ideas.");
       return;
     }
-    printRows(["SPACE ID", "ROLE", "STATUS", "CHANGE", "REPOSITORY", "ACTIVE"], rows);
+    console.log(`Ideas (${result.spaces.length}, ${result.filter}):`);
+    for (const space of result.spaces) {
+      console.log("");
+      console.log(`${space.spaceId} [${space.status}]`);
+      console.log(`  Planning: ${space.planningPath}`);
+      if (space.repositoryActivity.length === 0) {
+        console.log("  Repositories: none");
+        continue;
+      }
+      for (const repository of space.repositoryActivity) {
+        const change = repository.activeChanges[0] ?? repository.change;
+        console.log(
+          `  Repository: ${repository.resolvedPath} [${repository.status}]${repository.role ? ` (${repository.role})` : ""}`,
+        );
+        console.log(`    Git: ${formatGitStatus(repository.git)}`);
+        if (!change) {
+          console.log("    Change: none");
+        } else {
+          console.log(
+            `    ${change.closed ? "Latest Change" : "Active Change"}: ${change.changeId} [${change.status}]`,
+          );
+        }
+        if (repository.activeChangeCount > 1) {
+          console.log(`    Active Changes: ${repository.activeChangeCount}`);
+        }
+      }
+    }
     return;
   }
 
-  console.log(`Space: ${result.spaceId}`);
+  console.log(`Space: ${result.spaceId} [${result.status}]`);
   console.log(`Planning path: ${result.planningPath}`);
   if (result.repositoryDetails.length === 0) {
     console.log("Repositories: none");
@@ -125,7 +204,10 @@ function printStatus(result) {
   }
   for (const repository of result.repositoryDetails) {
     console.log("");
-    console.log(`Repository: ${repository.resolvedPath}${repository.role ? ` (${repository.role})` : ""}`);
+    console.log(
+      `Repository: ${repository.resolvedPath}${repository.role ? ` (${repository.role})` : ""} [${repository.status}]`,
+    );
+    console.log(`Git: ${formatGitStatus(repository.git)}`);
     console.log(`Active Changes (${repository.activeChangeCount}):`);
     if (repository.activeChangeCount === 0) console.log("  none");
     for (const change of repository.activeChanges) {
@@ -166,6 +248,21 @@ function printHuman(result) {
     printSkillActions(result.skills.actions);
     return;
   }
+  if (result.command === "configure") {
+    console.log(
+      `${result.dryRun ? "Would configure" : result.changed ? "Configured" : "Checked"} SDD workspace: ${result.workspaceRoot}`,
+    );
+    if (result.changes.length === 0) {
+      console.log("No path changes required.");
+      return;
+    }
+    for (const change of result.changes) {
+      const label = change.kind === "planning" ? "Planning root" : `Repository root ${change.rootId}`;
+      console.log(`${label}: ${change.from} -> ${change.to}`);
+    }
+    if (result.dryRun) console.log("Configuration was not written.");
+    return;
+  }
   if (result.command === "doctor") {
     console.log(`SDD workspace: ${result.workspaceRoot}`);
     if (result.findings.length === 0) {
@@ -175,6 +272,9 @@ function printHuman(result) {
         console.log(`${finding.level.toUpperCase()}: ${finding.message}`);
       }
       console.log(`Findings: ${result.counts.errors} error(s), ${result.counts.warnings} warning(s)`);
+      for (const remediation of result.remediations ?? []) {
+        console.log(`Next: ${remediation.message} Run \`${remediation.command}\`.`);
+      }
     }
     return;
   }
@@ -183,15 +283,41 @@ function printHuman(result) {
     console.log(`Path: ${result.relativePath}`);
     console.log(`Context: ${result.kind}`);
     if (result.spaceId) console.log(`Space ID: ${result.spaceId}`);
+    if (result.ideaStatus) console.log(`Idea status: ${result.ideaStatus}`);
     if (result.planningPath) console.log(`Planning path: ${result.planningPath}`);
     if (result.repository) {
       console.log(`Repository: ${result.repository.resolvedPath}`);
       if (result.repository.role) console.log(`Role: ${result.repository.role}`);
+      console.log(`Repository status: ${result.repository.status}`);
     }
     return;
   }
   if (result.command === "status") {
     printStatus(result);
+    console.log("");
+    return;
+  }
+  if (result.command === "change-create") {
+    console.log(`${result.dryRun ? "Would create" : "Created"} planned Change: ${result.changeId}`);
+    console.log(`Space: ${result.spaceId}`);
+    console.log(`Path: ${result.path}`);
+    console.log(
+      `Repositories: ${result.repositories.length > 0
+        ? result.repositories.map((repository) => repository.resolvedPath).join(", ")
+        : "none"}`,
+    );
+    console.log(`Files: ${result.files.join(", ")}`);
+    return;
+  }
+  if (result.command === "change-promote") {
+    console.log(`${result.dryRun ? "Would promote" : "Promoted"} planned Change: ${result.changeId}`);
+    console.log(`Space: ${result.spaceId}`);
+    console.log(`Source: ${result.sourcePath}${result.dryRun ? " (would remove)" : " (removed)"}`);
+    for (const repository of result.repositories) {
+      console.log(`Repository: ${repository.resolvedPath}${repository.role ? ` (${repository.role})` : ""}`);
+      console.log(`  Change: ${repository.path}`);
+    }
+    console.log(`Files: ${result.files.join(", ")}`);
   }
 }
 
@@ -225,6 +351,36 @@ async function executeCommand(command, args) {
     });
     const result = await initWorkspace(workspaceRoot, initOptions);
     return { result, json: values.json ?? false };
+  }
+
+  if (command === "configure") {
+    const { values, positionals } = parseCommandArgs(
+      args,
+      commandOptions({
+        "planning-root": { type: "string" },
+        "repository-root": { type: "string", multiple: true },
+        yes: { type: "boolean", short: "y" },
+        "dry-run": { type: "boolean" },
+      }),
+    );
+    if (values.help) return { help: true };
+    const workspaceRoot = requireAtMostOnePath(positionals, command);
+    const configureOptions = await collectConfigureOptions(
+      workspaceRoot,
+      {
+        planningRoot: values["planning-root"],
+        repositoryRoots: parseRepositoryRootOverrides(values["repository-root"]),
+        acceptSuggestions: values.yes ?? false,
+        dryRun: values["dry-run"] ?? false,
+      },
+      {
+        interactive: !values.yes && Boolean(process.stdin.isTTY && process.stdout.isTTY),
+      },
+    );
+    return {
+      result: await configureWorkspace(workspaceRoot, configureOptions),
+      json: values.json ?? false,
+    };
   }
 
   if (command === "update") {
@@ -264,14 +420,69 @@ async function executeCommand(command, args) {
   if (command === "status") {
     const { values, positionals } = parseCommandArgs(
       args,
-      commandOptions({ workspace: { type: "string" } }),
+      commandOptions({ workspace: { type: "string" }, all: { type: "boolean" } }),
     );
     if (values.help) return { help: true };
     if (positionals.length > 1) {
       throw new SddError("status accepts at most one Space ID.", { code: "USAGE" });
     }
     return {
-      result: await getStatus(resolve(values.workspace ?? process.cwd()), positionals[0] ?? null),
+      result: await getStatus(resolve(values.workspace ?? process.cwd()), positionals[0] ?? null, {
+        includeAll: values.all ?? false,
+      }),
+      json: values.json ?? false,
+    };
+  }
+
+  if (command === "change") {
+    const subcommand = args[0];
+    if (!["create", "promote"].includes(subcommand)) {
+      throw new SddError(
+        subcommand ? `Unknown change command: ${subcommand}` : "change requires a subcommand.",
+        { code: "USAGE", details: ["Available commands: change create, change promote"] },
+      );
+    }
+    const { values, positionals } = parseCommandArgs(
+      args.slice(1),
+      commandOptions({
+        workspace: { type: "string" },
+        repo: { type: "string", multiple: true },
+        ...(subcommand === "create" ? { date: { type: "string" } } : {}),
+        "dry-run": { type: "boolean" },
+      }),
+    );
+    if (values.help) return { help: true };
+    if (positionals.length !== 2) {
+      throw new SddError(
+        `change ${subcommand} requires <space-id> and <${subcommand === "create" ? "slug" : "change-id"}>.`,
+        { code: "USAGE" },
+      );
+    }
+    if (subcommand === "promote") {
+      return {
+        result: await promotePlannedChange(
+          resolve(values.workspace ?? process.cwd()),
+          positionals[0],
+          positionals[1],
+          {
+            repositories: values.repo ?? [],
+            dryRun: values["dry-run"] ?? false,
+          },
+        ),
+        json: values.json ?? false,
+      };
+    }
+    return {
+      result: await createPlannedChange(
+        resolve(values.workspace ?? process.cwd()),
+        positionals[0],
+        positionals[1],
+        {
+          repositories: values.repo ?? [],
+          date: values.date ?? null,
+          dryRun: values["dry-run"] ?? false,
+        },
+      ),
       json: values.json ?? false,
     };
   }

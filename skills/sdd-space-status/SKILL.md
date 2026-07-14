@@ -7,7 +7,7 @@ description: Produce a concise read-only re-entry brief for an SDD Space. Use wh
 
 Turn deterministic CLI inventory into a concise re-entry brief: what the Space is, where work stopped, what matters now, and which SDD action should come next.
 
-This skill is a semantic wrapper around `sdd status`, not a second discovery engine. The CLI owns Space IDs, idea-to-repository relationships, Epic and Change enumeration, Change ordering, and machine-readable status. This skill owns interpretation, selective context reading, and next-action routing.
+This skill is a semantic wrapper around `sdd status`, not a second discovery engine. The CLI owns Space IDs, idea-to-repository relationships, Epic and Change enumeration, Change ordering, repository Git state, and machine-readable status. This skill owns interpretation, selective context reading, and next-action routing.
 
 ## Authority
 
@@ -24,14 +24,14 @@ Accept a Space ID, planning or repository path, SDD artifact path, project name,
 - With a Space ID, run `sdd status <space-id> --json` directly.
 - With a path, run `sdd context <path> --json`, take `spaceId`, then run the detailed status command.
 - With no explicit target, resolve from the current directory or recent conversation context.
-- If no Space ID resolves, run `sdd status --json` for the available inventory and ask the user when selection remains ambiguous. Do not invent or persist a relationship.
+- If no Space ID resolves, run `sdd status --json` for active development inventory and ask the user when selection remains ambiguous. Use `sdd status --all --json` only when the user asks for inactive, archived, or complete lifecycle inventory. Do not invent or persist a relationship.
 
 ## Workflow
 
 1. Load deterministic inventory.
    - Run `sdd status <space-id> --json`.
-   - Use its planning path, mapped repositories, repository roles, `repositoryDetails`, per-repository activity, Epic paths, recent Changes, effective status, stored status, and aggregate active Change count.
-   - Present one active-work row per repository, repeating the Space ID when needed. Omit mapped repositories and Spaces with no active Change from the workspace summary. Keep official application work distinct from prototypes, references, clients, services, and other mapped repositories; never collapse multiple active repositories into one idea-level row or report an aggregate count without explaining its sources.
+   - Use its idea lifecycle status, planning path, mapped repositories, repository lifecycle statuses and roles, repository `git` state, `repositoryDetails`, per-repository activity, Epic paths, recent Changes, effective Change status, stored Change status, and aggregate active Change count.
+   - Present every active idea and group its active repositories beneath it, including active ideas without a repository and active repositories without an unclosed Change. Omit inactive and archived lifecycle entries from the default workspace summary; use `--all` when complete lifecycle inventory is requested. Keep official application work distinct from prototypes, references, clients, services, and other mapped repositories; never collapse multiple active repositories into one ambiguous idea-level work state.
    - If status data is missing or invalid, run `sdd doctor` and report the finding instead of silently inferring a replacement value.
 2. Read only the context needed for re-entry.
    - Read the Product Brief/PRD and enough planning context to explain what the Space is and which product goal matters.
@@ -40,7 +40,7 @@ Accept a Space ID, planning or repository path, SDD artifact path, project name,
    - Read `review.md` or a recent Epic verification report only when the inventory or active ledger points to it.
    - Read the most relevant Epic files at summary depth: Outcome, Current Scope, Story Index, Open Decisions, Completion Criteria, and obvious Verification Gaps. Do not exhaustively audit every Requirement or Scenario.
    - Read recent closed Changes only when needed to avoid recommending completed work or to explain recent direction.
-   - Check branch and concise git status in mapped repositories that contribute active work. Preserve unrelated dirty state and do not mutate it.
+   - Use the CLI-provided branch and concise Git status for each mapped repository. Run additional Git inspection only when that metadata is unavailable or a targeted contradiction needs diagnosis. Preserve unrelated dirty state and do not mutate it.
 3. Reconcile obvious re-entry signals.
    - Identify the active Change, most useful resume point, branch, blockers, pending review or acceptance, and important Epic/Story context.
    - Mention only contradictions visible from the targeted reads. Do not turn re-entry into a full drift, template, security, or implementation audit.
@@ -55,8 +55,10 @@ Keep the brief concise and trim sections that add no value:
 
 ```text
 Space: <space-id>
+Lifecycle: <active / inactive / archived>
 Planning path: <absolute path>
-Repository: <path and role>
+Repository: <path, lifecycle, and role>
+- Git: <branch or detached head, clean or dirty, and concise change counts>
 - Active Changes: <count and current status>
 - Important Epics: <summary for this repository>
 - Recent Changes: <relevant recent history for this repository>

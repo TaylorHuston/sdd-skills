@@ -58,10 +58,12 @@ Apply the assigned `REVIEW_PASS`:
 
 ## Report Back
 
+Inspect the complete assigned surface before reporting. Return all validated findings from this pass together; do not stop after the first issue or defer lower-severity findings to another invocation.
+
 Return:
 
 - review pass and outcome: `pass`, `findings`, `gaps`, `needed`, or `blocked`
-- blocking findings first, each with severity, file/line, impact, and required change
+- all validated findings ordered by severity and grouped by root cause when useful, each with file/line, impact, and required change
 - Requirements, Scenarios, or risks reviewed
 - Story reference traceability reviewed, including stale `AC-#` or `TAC-#` references if present
 - duplicate Story label/reference or closeout contradiction findings, if present

@@ -64,8 +64,9 @@ Use the explicit path or name if provided. Otherwise:
 1. Infer from conversation context when a change was just discussed.
 2. List active folders under `docs/changes/`, excluding `docs/changes/closed/`.
 3. If no canonical active change is found, inspect legacy `changes/` only as migration input. Do not apply it in place; stop and require migration into `docs/changes/` before implementation continues.
-4. Auto-select only when exactly one active change exists.
-5. Ask the user when multiple active changes match or no change can be inferred.
+4. Do not select a private Planned Change Draft from the idea planning path. Stop and require `sdd change promote <space-id> <change-id>` plus repository-specific `/sdd-propose` reconciliation before implementation continues.
+5. Auto-select only when exactly one active change exists.
+6. Ask the user when multiple active changes match or no change can be inferred.
 
 Always announce the selected change and how to override it.
 
@@ -345,7 +346,9 @@ Before reporting the change as implemented or ready for `/sdd-review`, run an im
 
 Use fresh-context delegated self-check passes by default for substantial changes and whenever practical for normal implementation. Delegate at least coverage, code, security, and docs/artifact checks when the changed surface is non-trivial. This implementation self-check does not replace `/sdd-review` as the local PR gate. The orchestrator remains responsible for final judgment and verification of important claims.
 
-Automatically remediate findings that are safe, in scope, and clearly tied to the change. Stop after the review iteration limit or when a finding needs the user's judgment.
+Run the implementation self-check as one complete discovery wave before remediation: start materially relevant passes together, collect their complete results, validate and deduplicate findings, and group them by root cause. Explicitly check relevant cross-cutting risks such as migration immutability and upgrade behavior, existing-data compatibility, async focus or draft preservation, responsive accessibility, CI/dependency validity, generated-contract drift, and fresh-install versus existing-install behavior. Mark irrelevant classes `not applicable` rather than expanding scope.
+
+Automatically remediate the complete safe, in-scope finding set as one batch. Then run the union of affected focused checks and required broad gates once, followed by one regression-focused self-check of changed surfaces. Do not stop after each finding, ask the user to resume between ordinary remediation slices, or rerun unaffected specialist passes without a concrete reason. Stop after the review iteration limit, when remediation introduces a genuinely new unresolved regression, or when a finding needs user judgment or crosses another stop condition.
 
 ## Completion And Closeout
 
