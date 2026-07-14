@@ -11,8 +11,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Added an npm-distributed `sdd` CLI preview with `init`, `update`, `doctor`, and `context` commands.
+- Added workspace-local `.sdd/config.yaml` and installation-lock support for configurable planning roots, repository roots, repository artifact paths, and one-to-many idea mappings.
+- Added checksum-managed skill installation that preserves unrelated skills, adopts matching installations, blocks local overwrites by default, and supports explicit dry-run and force modes.
+- Added machine-readable JSON output and automated coverage for initialization, mapping import, diagnostics, context resolution, idempotency, and managed-skill safety.
+
 ### Changed
 
+- Expanded the package from a skills-only distribution into an early SDD toolchain while retaining the legacy sync script and current doctrine-backed skills during migration.
+- Expanded `/sdd-explore` into a durable space-level discussion workflow that maintains idea-owned exploration records, routes mature conclusions to stronger artifacts, and resolves workspace ownership through configurable CLI topology when available.
+- Made first-time interactive `sdd init` ask for workspace-root-relative planning and repository paths, with detected defaults, multiple repository roots, explicit path flags, and a `--yes` automation mode.
+- Replaced repeated idea and repository paths with a v2 derived-path configuration: idea planning defaults to the idea key, repositories reference named roots, explicit workspace-relative overrides remain available, and `sdd init` migrates v1 workspaces automatically.
 ### Deprecated
 
 ### Removed

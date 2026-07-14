@@ -1,0 +1,28 @@
+{
+  "name": "@taylorhuston/sdd",
+  "version": "0.7.0-dev.0",
+  "description": "CLI and agent skills for Story-Driven Development.",
+  "type": "module",
+  "bin": {
+    "sdd": "./bin/sdd.js"
+  },
+  "files": [
+    "CHANGELOG.md",
+    "README.md",
+    "bin",
+    "docs",
+    "schemas",
+    "skills",
+    "src"
+  ],
+  "scripts": {
+    "check": "npm test && node ./bin/sdd.js --help",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "yaml": "^2.9.0"
+  }
+}

@@ -1,13 +1,13 @@
 ---
-modified: 2026-07-11
+modified: 2026-07-14
 ---
-# SDD Skills Agent Guide
+# SDD Toolchain Agent Guide
 
 Guidance for assistants working in this repository.
 
 ## Purpose
 
-This repository packages reusable Codex skills for Story-Driven Development. Keep the package portable: the skills and docs should make sense outside the private workspace where they are developed.
+This repository packages the Story-Driven Development CLI, configuration schemas, and reusable Codex skills. Keep the package portable: the CLI, skills, schemas, and docs should make sense outside the private workspace where they are developed.
 
 The packaged skills follow the `.agents/` skill-folder convention and should be usable by tools that respect that structure.
 
@@ -29,17 +29,29 @@ The packaged skills follow the `.agents/` skill-folder convention and should be 
 ## Repository Shape
 
 ```text
+bin/
+  sdd.js
+src/
+  cli.js
+  commands/
+schemas/
+  workspace.schema.json
 skills/
   sdd-*/
 docs/
   story-driven-development.md
 scripts/
   sync-skills.sh
+test/
 ```
 
 ## Package Rules
 
 - Keep skills self-contained and compliant with the OpenAI/Codex skill format.
+- Keep CLI behavior deterministic and expose machine-readable JSON for agent-facing commands.
+- Treat `.sdd/config.yaml` as the CLI workspace topology and `.sdd/install-lock.json` as generated installation evidence, not a second product-behavior source of truth.
+- Never overwrite locally modified managed skills without an explicit `--force` operation.
+- Keep the checked workspace schema, runtime validation, README examples, and generated configuration shape aligned.
 - Keep package docs public-safe. Do not add private vault notes, local paths, credentials, or project-specific secrets.
 - Prefer project-neutral wording. Use "the user", "project owner", or "application repo" instead of a specific person's name.
 - Assume the documented idea-owned one-to-many repository mapping by default, but never assume a specific machine path. Keep project overrides possible through local guidance and keep package-wide customization instructions accurate.
@@ -48,6 +60,12 @@ scripts/
 - If a skill, `skills/sdd-doctrine/references/story-driven-development.md`, and `docs/story-driven-development.md` disagree, reconcile them so the package stays internally consistent.
 
 ## Validation
+
+Run the Node package checks for CLI, schema, installer, or package changes:
+
+```bash
+npm run check
+```
 
 Validate every changed skill with `quick_validate.py` before calling the work done:
 
@@ -66,6 +84,8 @@ For docs-only changes that do not alter skill files, skill metadata, or package 
 Keep these references in mind when working on this package:
 
 - `skills/sdd-doctrine/references/story-driven-development.md` - doctrine that actually ships with installed skills.
+- `schemas/workspace.schema.json` - checked shape of workspace `.sdd/config.yaml` files.
+- `src/commands/` - CLI command behavior and workspace mutations.
 - `docs/story-driven-development.md` - browsable mirror of the shipped doctrine.
 - `README.md` - package overview, installation, artifact model, and adaptation guidance.
 - `CHANGELOG.md` - public release history and release-facing behavior notes.

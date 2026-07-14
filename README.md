@@ -1,17 +1,113 @@
 ---
-modified: 2026-07-11
+modified: 2026-07-14
 ---
-# SDD Skills
+# SDD Toolchain
 
-Reusable Codex skills for Story-Driven Development: an LLM-friendly workflow for planning, implementing, reviewing, and releasing larger application changes without losing traceability between product behavior, code, and verification evidence.
+CLI tooling and reusable Codex skills for Story-Driven Development: an LLM-friendly workflow for planning, implementing, reviewing, and releasing larger application changes without losing traceability between product behavior, code, and verification evidence.
 
-This repository packages the current SDD workflow skills as portable OpenAI/Codex skill folders. The skills are opinionated, but intentionally file-based: they work by reading and writing normal project artifacts such as Markdown specs, Epic files, change folders, task ledgers, review reports, and changelogs.
+This repository packages the current SDD workflow skills as portable OpenAI/Codex skill folders and contains an early CLI that makes workspace layout, idea-to-repository relationships, and skill installation deterministic. SDD remains file-based: normal YAML, JSON, Markdown, and Git repositories stay inspectable without a hosted service.
 
 ## What This Workflow Is For
 
 SDD is designed for solo developers and small teams using LLM agents on non-trivial codebases.
 
 The core idea is that SDD maintains an evidence-backed map from product behavior to implementation. Durable product behavior should live in Epics, Stories, Requirements, Scenarios, and evidence indexes that point back to the relevant implementation and tests. Agents can then resume work, review drift, debug broken behavior, and safely continue implementation without rediscovering the whole codebase every time.
+
+## CLI Preview
+
+The `0.7.0-dev` CLI is an additive MVP. It initializes a workspace-level `.sdd/` contract, imports existing one-to-many idea mappings, installs or updates packaged skills under the workspace `.agents/skills/` directory, and exposes deterministic diagnostics and context resolution.
+
+```bash
+npm install
+npm link
+
+cd /path/to/workspace
+sdd init
+sdd doctor
+sdd context
+```
+
+On first initialization in an interactive terminal, `sdd init` asks where planning documents and implementation repositories live. Enter paths relative to the workspace root, meaning the directory that will contain `.sdd/`, not relative to the `.sdd/` directory itself. Detected paths are offered as defaults, and multiple repository roots may be entered as a comma-separated list.
+
+For scripts or users who want to accept detected defaults without questions, use `sdd init --yes`. Explicit `--planning-root` and repeated `--repository-root` flags bypass their corresponding questions. Non-interactive input also uses detection automatically.
+
+Available commands:
+
+| Command | Purpose |
+|---|---|
+| `sdd init [path]` | Ask for workspace paths, create `.sdd/config.yaml`, import detectable mappings, and safely install packaged skills. |
+| `sdd update [path]` | Reconcile installed skills with the current package version. |
+| `sdd doctor [path]` | Check configuration, paths, relationship ownership, installation lock, and managed skill drift. |
+| `sdd context [path]` | Resolve a path to its workspace, idea planning root, repository, role, and related repositories. |
+
+All commands support human-readable and `--json` output. `init` and `update` also support `--dry-run`. Managed skills are checksum-protected: locally modified skills produce a conflict instead of being silently overwritten, and `--force` is required to replace them.
+
+An initialized workspace looks like:
+
+```text
+workspace/
+  .sdd/
+    config.yaml
+    install-lock.json
+  .agents/
+    skills/
+      sdd-*/
+```
+
+Example topology:
+
+```yaml
+version: 2
+schema: sdd-v2
+skills:
+  directory: .agents/skills
+planning:
+  root: product/ideas
+  plannedChangesDirectory: planned-changes
+repositories:
+  roots:
+    apps: apps
+    services: services
+repositoryArtifacts:
+  activeChanges: docs/changes
+  closedChanges: docs/changes/closed
+  epics: docs/epics
+  adrs: docs/adrs
+  audits: docs/audits
+ideas:
+  billing:
+    repositories:
+      - root: services
+        path: billing-api
+        role: api
+      - root: apps
+        path: customer-portal
+        role: web-client
+```
+
+Top-level roots are relative to the initialized workspace. An idea's planning directory defaults to `<planning.root>/<idea-key>`; set `planning` only when its directory differs from the idea key. Repository paths are relative to their named root. This keeps root changes centralized instead of repeating full paths for every idea.
+
+Project-specific exceptions remain explicit:
+
+```yaml
+ideas:
+  renamed-product:
+    planning: legacy-product-name
+    repositories:
+      - root: apps
+        path: renamed-product
+  external-layout:
+    planningPath: private/special-plans/external-layout
+    repositories:
+      - path: integrations/external-layout
+        role: integration
+```
+
+`planningPath` and repository entries without `root` are workspace-relative overrides. `planning` is relative to `planning.root`. One idea may map to zero, one, or many repositories; duplicate resolved repository ownership is a validation error. Parent traversal and absolute paths remain prohibited.
+
+`sdd init` automatically migrates the original v1 repeated-path shape to this derived-path v2 shape.
+
+The installed skills still use the `0.6.x` doctrine and relationship resolution internally. Migrating those workflows to consume `sdd context` and other CLI instructions is subsequent work. During this preview, `.sdd/config.yaml` is authoritative for CLI commands, while the existing Folder Note mapping remains necessary for skills that have not yet migrated.
 
 ## Packaged Skills
 
@@ -31,7 +127,7 @@ Support workflow:
 |---|---|
 | `/sdd-doctrine` | Supply the portable SDD semantic contract consumed by the other skills. |
 | `/sdd-adr` | Create, update, or assess ADRs for durable SDD architecture decisions. |
-| `/sdd-explore` | Think through ideas, compare approaches, investigate context, and offer ADR capture when durable architecture decisions emerge. |
+| `/sdd-explore` | Maintain a durable private exploration while discussing substantial product, business, design, technical, architecture, workflow, or requirement questions about a space. |
 | `/sdd-interactive` | Track and implement small concrete changes in one working session. |
 | `/sdd-epic-verify` | Audit an Epic against current implementation and evidence. |
 | `/sdd-pr` | Open or steward SDD-backed pull requests, process review comments/checks, and stop before merge for user approval. |
@@ -179,9 +275,9 @@ Use this audit after customization:
 rg -n 'docs/(epics|changes|adrs|audits)' skills/sdd-* docs/templates
 ```
 
-## Installation
+## Skills-Only Installation
 
-Copy the skill folders into a Codex-discoverable skills directory.
+The legacy sync script remains available for users who want the `0.6.x` skills without initializing a CLI workspace.
 
 For a project-local install:
 
@@ -199,7 +295,13 @@ The sync script copies every `skills/sdd-*` folder, including the `sdd-doctrine`
 
 ## Validation
 
-Validate with Codex's `skill-creator` validator:
+Run the CLI package checks:
+
+```bash
+npm run check
+```
+
+When skill files change, also validate them with Codex's `skill-creator` validator:
 
 ```bash
 for d in skills/sdd-*; do

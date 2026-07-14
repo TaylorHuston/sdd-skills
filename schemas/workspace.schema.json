@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/TaylorHuston/sdd-skills/schemas/workspace.schema.json",
+  "title": "SDD Workspace Configuration",
+  "type": "object",
+  "required": ["version", "schema", "skills", "planning", "repositories", "repositoryArtifacts", "ideas"],
+  "properties": {
+    "version": { "const": 2 },
+    "schema": { "const": "sdd-v2" },
+    "skills": {
+      "type": "object",
+      "required": ["directory"],
+      "properties": {
+        "directory": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "planning": {
+      "type": "object",
+      "required": ["root", "plannedChangesDirectory"],
+      "properties": {
+        "root": { "type": "string", "minLength": 1 },
+        "plannedChangesDirectory": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "repositories": {
+      "type": "object",
+      "required": ["roots"],
+      "properties": {
+        "roots": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "repositoryArtifacts": {
+      "type": "object",
+      "required": ["activeChanges", "closedChanges", "epics", "adrs", "audits"],
+      "properties": {
+        "activeChanges": { "type": "string", "minLength": 1 },
+        "closedChanges": { "type": "string", "minLength": 1 },
+        "epics": { "type": "string", "minLength": 1 },
+        "adrs": { "type": "string", "minLength": 1 },
+        "audits": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "ideas": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["repositories"],
+        "properties": {
+          "planning": { "type": "string", "minLength": 1 },
+          "planningPath": { "type": "string", "minLength": 1 },
+          "repositories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["path"],
+              "properties": {
+                "root": { "type": "string", "minLength": 1 },
+                "path": { "type": "string", "minLength": 1 },
+                "role": { "type": "string", "minLength": 1 }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "not": { "required": ["planning", "planningPath"] },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
