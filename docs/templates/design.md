@@ -88,7 +88,7 @@ Use this section only when the change proposes edits to an existing Epic.
 
 - Earlier Story, Requirement, Scenario, or boundary wording this change supersedes:
 - `Verified By` or `Verification Gaps` entries that must be rewritten or reclassified:
-- Closed or active change artifacts likely to need lifecycle/status cleanup:
+- Closed or active Change artifacts likely to need status cleanup:
 - Manual confirmation status updates expected:
 
 ## Epic File Rules

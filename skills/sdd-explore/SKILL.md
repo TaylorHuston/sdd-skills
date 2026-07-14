@@ -13,7 +13,7 @@ The discussion may concern product direction, user needs, business model, visual
 
 Resolve the idea-owned planning root and related implementation repositories from the nearest workspace `.sdd/config.yaml`. When the `sdd` CLI is available, prefer `sdd context <relevant-path> --json` and use its idea, planning, repository, role, and related-repository results. If the workspace is not initialized or the CLI is unavailable, use project guidance and explicit relationship metadata; ask when ownership remains ambiguous. Never assume fixed workspace directory names. One idea may relate to zero, one, or many repositories; inspect only those relevant to the discussion.
 
-Read applicable project SDD guidance when the discussion depends on artifact authority, Epic or Story truth, Requirements and Scenarios, evidence, change lifecycle, or repository artifact locations. Do not require SDD artifacts merely to discuss a space.
+When the discussion depends on artifact authority, Epic or Story truth, Requirements and Scenarios, evidence, Change status, or repository artifact locations, read `<workspaceRoot>/.sdd/story-driven-development.md` completely. If that managed workflow document is missing, direct the user to `sdd init` or `sdd doctor`. Do not require SDD artifacts merely to discuss a space.
 
 Do not implement application code in this mode. Reading files, searching code, conducting research, sketching options, and maintaining the exploration record are allowed. If the user wants implementation, route the settled outcome to the appropriate execution workflow.
 

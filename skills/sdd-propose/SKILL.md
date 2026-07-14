@@ -9,7 +9,7 @@ Create or refresh one change folder. This is workflow-based like OpenSpec's prop
 
 ## Authority And Project Profile
 
-Load `$sdd-doctrine` before defining Stories, Requirements, Scenarios, evidence, or lifecycle state. Resolve the idea-owned planning root and target implementation repository through the doctrine relationship model unless project guidance explicitly maps them differently, then enforce changes under `docs/changes/`, Epics under `docs/epics/`, and ADRs under `docs/adrs/` inside the implementation repository. Project guidance owns branch/write policy, release conventions, required supporting docs, technology constraints, and available specialist guidance.
+Resolve the workspace, idea-owned planning path, and target implementation repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before defining Stories, Requirements, Scenarios, evidence, or Change status. Use the resolved topology unless project guidance declares an explicit exception, then enforce changes under `docs/changes/`, Epics under `docs/epics/`, and ADRs under `docs/adrs/` inside the implementation repository. Project guidance owns branch/write policy, release conventions, required supporting docs, technology constraints, and available specialist guidance. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
 
 Use `/sdd-interactive` instead when the user wants to create a lightweight tracked change and immediately work through small edits in the same interactive session.
 
@@ -51,10 +51,9 @@ Use:
    - Prefix the change folder with today's local date from the shell clock: `yyyy-mm-dd-<change-name>`.
 2. Locate the idea planning root and target implementation repository.
    - Prefer explicit idea or repository paths from the user.
-   - Otherwise use an explicit project-guidance mapping when present.
-   - From an idea, read the Folder Note `repositories` mapping and auto-select only when one repository is mapped or the requested change identifies one mapped repository unambiguously.
-   - From a code repository, scan idea Folder Note mappings for its path.
-   - Use a unique idea/repository basename match only as a compatibility fallback when no metadata mapping exists; do not silently persist that fallback as canonical ownership.
+   - Otherwise use the result of `sdd context <relevant-path> --json`, including its idea, planning path, repository, role, resolved path, and related repositories.
+   - Apply explicit project guidance only when it intentionally overrides the configured topology for this operation.
+   - Use a unique idea/repository basename match only as a compatibility fallback when no configured mapping exists; do not silently persist that fallback as canonical ownership.
    - Ask when an idea maps to multiple plausible target repositories, a repository is claimed by multiple ideas, or ownership remains ambiguous.
    - Otherwise use the nearest implementation root with `.git/`, `package.json`, `docs/`, `AGENTS.md`, or existing `docs/changes/` and continue without private planning context only when the change does not depend on it.
    - Do not write to the workflow root unless the workflow root itself is the intended project.
@@ -139,6 +138,7 @@ Use:
    - If an ADR seems useful but not enough is known, record an ADR candidate in `design.md` instead of inventing a final decision.
 9. Draft `tasks.md`.
    - Treat `tasks.md` as the lightweight implementation ledger and resume surface for the change.
+   - Start YAML frontmatter with `status: proposed`. Use only `proposed`, `in_progress`, `review`, `replanning`, or `ready_to_close`; never write `closed` as a status.
    - Keep tasks at artifact, Story/capability, verification, and review level; do not write a file-by-file execution script.
    - Include a `Resume Here` section that can be updated during implementation.
    - Include a compact task checklist, implementation ledger, verification ledger, open blockers, and closeout checklist.
@@ -175,7 +175,7 @@ Do not use `--replan` for simple defects, missing tests, stale `Implemented By` 
 
 In `--replan`:
 
-1. Classify the discovery as `in-scope refinement`, `scope expansion`, `product drift`, `Epic ownership change`, `technical constraint`, or `follow-up change`.
+1. Set `tasks.md` frontmatter to `status: replanning`, then classify the discovery as `in-scope refinement`, `scope expansion`, `product drift`, `Epic ownership change`, `technical constraint`, or `follow-up change`.
 2. Preserve the current change when the discovery is necessary to satisfy the original goal or accepted manual feedback.
 3. Recommend a new change when the discovery is adjacent follow-up work rather than required for the current change.
 4. Recommend `/sdd-prd` when the discovery changes product direction rather than implementation scope.
@@ -186,7 +186,7 @@ In `--replan`:
 9. Keep Story labels/references and Requirement/Scenario IDs stable when editing existing behavior. Add new IDs only for genuinely new behavior rules or scenarios.
 10. Do not edit application code from this mode.
 11. Do not edit actual Epic files unless the user explicitly asks to apply planning changes to durable Epic truth immediately.
-12. End by recommending the next `/sdd-apply` invocation for the revised change.
+12. When the revised artifacts are coherent and ready to apply, set `tasks.md` to `status: in_progress` and end by recommending the next `/sdd-apply` invocation. Leave `replanning` in place when unresolved planning decisions still block implementation.
 
 ## Artifact Rules
 
@@ -212,6 +212,7 @@ In `--replan`:
 - Use `docs/adrs/<yyyy-mm-dd-decision-title>.md` for ADRs.
 - Link ADRs from `design.md` and mention them in `tasks.md` closeout state when they affect implementation or review.
 - Put implementation progress, resume state, task status, verification results, and closeout state in `tasks.md`, not in separate implementation stubs or ledgers by default.
+- Keep the machine-readable `tasks.md` `status` current. Folder location, not a `closed` value, represents closed Changes.
 - Put review outcome, review record path or clean-review note, manual confirmation status, release-communication status, PR/merge state, and accepted deferred gaps in `tasks.md` so closeout can be validated without a special mode.
 - Do not create or edit actual Epic files, separate implementation records, separate approach reports, or code from this skill unless the user explicitly asks for that extra work.
 - Do not use this skill as an interactive implementation loop. If the request is effectively `/sdd-propose --interactive` followed immediately by `/sdd-apply --interactive`, use `/sdd-interactive`.

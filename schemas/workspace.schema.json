@@ -50,6 +50,8 @@
     },
     "ideas": {
       "type": "object",
+      "description": "Mapping keyed by stable, case-sensitive Space ID.",
+      "propertyNames": { "minLength": 1 },
       "additionalProperties": {
         "type": "object",
         "required": ["repositories"],

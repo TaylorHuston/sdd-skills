@@ -6,13 +6,15 @@ import {
   createInitialConfig,
   getConfigDirectory,
   getConfigPath,
+  getInstallLockPath,
   migrateConfig,
   readConfig,
   writeConfig,
 } from "../config.js";
 import { SddError } from "../errors.js";
-import { pathExists } from "../fs.js";
+import { pathExists, writeJson } from "../fs.js";
 import { applySkillSync, planSkillSync } from "../skills.js";
+import { applyWorkflowSync, planWorkflowSync } from "../workflow.js";
 
 export async function initWorkspace(
   targetPath,
@@ -41,6 +43,7 @@ export async function initWorkspace(
   assertValidConfig(config, "initialize");
 
   const skillPlan = await planSkillSync(workspaceRoot, config, { force });
+  const workflowPlan = await planWorkflowSync(workspaceRoot, { force });
   if (!dryRun) {
     if (!existing || migratedFrom) {
       await writeConfig(workspaceRoot, config);
@@ -50,7 +53,14 @@ export async function initWorkspace(
       await writeFile(`${getConfigDirectory(workspaceRoot)}/.gitignore`, "cache/\n", "utf8");
     }
   }
+  const workflow = await applyWorkflowSync(workflowPlan, { dryRun });
   const skills = await applySkillSync(workspaceRoot, skillPlan, { dryRun });
+  if (!dryRun) {
+    await writeJson(getInstallLockPath(workspaceRoot), {
+      ...skillPlan.lock,
+      managedWorkflow: workflowPlan.lock,
+    });
+  }
 
   return {
     command: "init",
@@ -61,6 +71,7 @@ export async function initWorkspace(
     configPath: getConfigPath(workspaceRoot),
     ideasImported: Object.keys(config.ideas ?? {}).length,
     config,
+    workflow,
     skills,
   };
 }

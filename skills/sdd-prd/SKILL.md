@@ -9,7 +9,7 @@ Treat a Product Brief/PRD as durable private product direction above the SDD cha
 
 ## Authority And Project Profile
 
-Load `$sdd-doctrine` before interpreting the PRD's relationship to Epics and changes. Resolve the idea-owned planning root and its mapped implementation repositories through the doctrine relationship model unless project guidance explicitly maps them differently. The default PRD is `<planning-root>/prd.md`; project guidance still owns filenames, frontmatter, privacy boundaries, interview/write authorization, and related product-doc conventions. Referenced Epics and changes use the canonical repository `docs/` layout inside each affected implementation repository.
+Resolve the workspace, idea-owned planning path, and mapped implementation repositories with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before interpreting the PRD's relationship to Epics and changes. Use the resolved topology unless project guidance declares an explicit exception. The default PRD is `<planningPath>/prd.md`; project guidance still owns filenames, frontmatter, privacy boundaries, interview/write authorization, and related product-doc conventions. Referenced Epics and changes use the canonical repository `docs/` layout inside each affected implementation repository. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
 
 Use the smallest document that can keep future humans and agents aligned.
 

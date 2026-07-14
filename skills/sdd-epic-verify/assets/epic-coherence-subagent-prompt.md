@@ -13,14 +13,14 @@ You are auditing SDD Epic-level coherence.
 
 ## Goal
 
-Determine whether the Epic still makes sense as a capability truth source after implementation and verification work. Do not edit files, commit, change lifecycle state, or decide final Epic status.
+Determine whether the Epic still makes sense as a capability truth source after implementation and verification work. Do not edit files, commit, modify Change status, or decide final Epic status.
 
 ## Required Context
 
 Read:
 
 - project guidance named by the orchestrator
-- canonical SDD doctrine named by the orchestrator
+- canonical managed SDD workflow named by the orchestrator
 - canonical Epic template named by the orchestrator, usually `assets/epic-template.md`
 - the Epic file
 - relevant PRD/Product Brief, docs, ADRs, change artifacts, and current-state docs named in scope
@@ -32,7 +32,7 @@ Evaluate:
 - The Epic supports the SDD north star: an evidence-backed map from product behavior to implementation files and verification evidence.
 - Epic/Story truth remains the durable answer to "what is actually implemented?"; accepted behavior is not represented only in code, chat, reports, generated indexes, README text, or change ledgers.
 - Artifact authority is respected: implementation/tests reveal reality, Epics record accepted truth, active changes are working records, and PRDs/product docs guide intent.
-- SDD anti-patterns are absent: new Stories are not used to dodge stale truth, scope expansion is not hidden in design/tasks/code, generated indexes are not hand-maintained as canonical truth, and lifecycle state is not contradictory.
+- SDD anti-patterns are absent: new Stories are not used to dodge stale truth, scope expansion is not hidden in design/tasks/code, generated indexes are not hand-maintained as canonical truth, and Change status is not contradictory.
 - Epic Description, Outcome, Current Scope, Deferred Scope, Cross-Story Concerns, Open Decisions, Notes, and Completion Criteria match the embedded Stories.
 - Story set is complete enough to fulfill the Epic's stated behavior, product/docs claims, and observable runtime surface; missing Stories are explicit findings.
 - Story set is non-duplicative and ordered by intended completion/dependency sequence.
@@ -47,7 +47,7 @@ Evaluate:
 - Requirements and Scenarios are not absorbing implementation-only technical details that belong in design, ADRs, data docs, or tasks.
 - PRD/product direction and public docs do not contradict the Epic.
 - The Epic is usable for future `/sdd-propose`, `/sdd-apply`, and `/sdd-review` work.
-- Related change folders do not contradict their lifecycle state when they are used as evidence.
+- Related Change folders use only `proposed`, `in_progress`, `review`, `replanning`, or `ready_to_close` in `tasks.md`, treat folder location under `closed/` as closed, and do not contradict that status when used as evidence.
 - Related active or closed change folders do not still claim accepted work is not implemented, not verified, implementation pending, verification pending, or manually accepted under obsolete status vocabulary.
 - Manual confirmation status uses canonical vocabulary: `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
 
@@ -57,7 +57,7 @@ Return:
 
 - Epic coherence result: `aligned`, `changes-requested`, `needs artifact fix`, `needs missing story`, `needs product decision`, `blocked`
 - findings by severity with file/path references
-- doctrine-drift findings when SDD north star, artifact authority, Definition of Done, or anti-pattern rules are violated
+- workflow-drift findings when SDD north star, artifact authority, Definition of Done, or anti-pattern rules are violated
 - template-drift findings when the Epic file shape, candidate Story handling, Story headings, or per-Story subsection shape diverges from the canonical template
 - Story ordering, reference, scope, split/merge, or missing Story recommendations
 - superseded-truth reconciliation findings

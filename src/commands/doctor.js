@@ -9,7 +9,9 @@ import {
   validateConfig,
 } from "../config.js";
 import { isDirectory } from "../fs.js";
+import { inspectChangeStatuses } from "../change-status.js";
 import { inspectSkillInstallation } from "../skills.js";
+import { inspectWorkflowInstallation } from "../workflow.js";
 
 export async function diagnoseWorkspace(startPath) {
   const workspaceRoot = await findWorkspaceRoot(startPath);
@@ -54,6 +56,8 @@ export async function diagnoseWorkspace(startPath) {
   }
 
   findings.push(...(await inspectSkillInstallation(workspaceRoot, config)));
+  findings.push(...(await inspectWorkflowInstallation(workspaceRoot)));
+  findings.push(...(await inspectChangeStatuses(workspaceRoot, config)));
 
   const counts = {
     errors: findings.filter((finding) => finding.level === "error").length,

@@ -9,7 +9,7 @@ Create or update Architecture Decision Records for durable technical decisions i
 
 ## Authority And Project Profile
 
-Load `$sdd-doctrine` before interpreting SDD artifact roles or lifecycle. Resolve the repository root from project guidance, then enforce ADR location under `docs/adrs/`. Project guidance still owns status vocabulary, required links, and write policy.
+Resolve the workspace and repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before interpreting SDD artifact roles or Change status. Use the resolved repository and enforce ADR location under `docs/adrs/`. Project guidance still owns ADR status vocabulary, required links, and write policy. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
 
 Use this skill from `/sdd-explore` when a discussion reaches a durable architecture decision, and from `/sdd-propose` when the selected technical approach creates a rule future work should follow.
 
@@ -49,7 +49,7 @@ Use the canonical SDD ADR location:
 
 Use the local shell date for `yyyy-mm-dd`. Keep the slug short and decision-oriented.
 
-If the project has no `docs/adrs/`, create it only when the user has asked to draft or capture the ADR. Do not create ADR folders just because an idea might eventually need one. A deliberately different ADR root requires modifying this skill and the shipped doctrine; an `AGENTS.md` path override alone is not sufficient.
+If the project has no `docs/adrs/`, create it only when the user has asked to draft or capture the ADR. Do not create ADR folders just because an idea might eventually need one. A deliberately different ADR root requires modifying this skill and the managed workflow source; an `AGENTS.md` path override alone is not sufficient.
 
 ## Workflow
 

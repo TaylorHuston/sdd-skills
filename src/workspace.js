@@ -35,6 +35,7 @@ export async function resolveWorkspaceContext(startPath) {
       matches.push({
         kind: "planning",
         idea: ideaId,
+        spaceId: ideaId,
         matchedPath: planningPath,
         planningPath: normalizeRelativePath(resolvedPlanningPath),
         repositories: resolvedRepositories,
@@ -50,6 +51,7 @@ export async function resolveWorkspaceContext(startPath) {
         matches.push({
           kind: "repository",
           idea: ideaId,
+          spaceId: ideaId,
           repository,
           matchedPath: repositoryPath,
           planningPath: normalizeRelativePath(resolvedPlanningPath),
@@ -68,6 +70,7 @@ export async function resolveWorkspaceContext(startPath) {
     relativePath: normalizeRelativePath(relative(workspaceRoot, targetPath)),
     kind: match?.kind ?? (targetPath === workspaceRoot ? "workspace" : withinWorkspace ? "unmapped" : "external"),
     idea: match?.idea ?? null,
+    spaceId: match?.spaceId ?? null,
     planningPath: match?.planningPath ?? null,
     repository: match?.repository ?? null,
     relatedRepositories: match?.repositories ?? [],

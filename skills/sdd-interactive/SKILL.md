@@ -9,7 +9,7 @@ Create the smallest useful SDD change record, then immediately work through the 
 
 ## Authority And Project Profile
 
-Load `$sdd-doctrine` before creating or reconciling SDD artifacts. Resolve the idea-owned planning root and target implementation repository through the doctrine relationship model unless project guidance explicitly maps them differently, then create the change under `docs/changes/` and reconcile Epics under `docs/epics/` inside the implementation repository. Project guidance owns branch and commit policy, verification commands, supporting-doc requirements, release conventions, technology constraints, and permissions.
+Resolve the workspace, idea-owned planning path, and target implementation repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before creating or reconciling SDD artifacts. Use the resolved topology unless project guidance declares an explicit exception, then create the change under `docs/changes/` and reconcile Epics under `docs/epics/` inside the implementation repository. Project guidance owns branch and commit policy, verification commands, supporting-doc requirements, release conventions, technology constraints, and permissions. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
 
 This skill is for tracked working sessions. It is not a replacement for `/sdd-propose` when the change needs substantial product scoping, architecture design, data/auth/API changes, migration planning, or cross-Epic coordination.
 
@@ -45,7 +45,7 @@ Use existing artifacts when the session continues an active change. Keep `tasks.
 3. Create the lightweight change artifacts.
    - `proposal.md`: record why the session exists, in-scope work, explicit out-of-scope work, known Epic/Story impact, release-communication impact, and when to stop and promote to `/sdd-propose`.
    - `design.md`: record the current understanding, high-level technical approach, alternatives or deferred approaches when relevant, affected Epic truth, and open questions.
-   - `tasks.md`: record `Resume Here`, the interactive request log, task checklist, implementation ledger, verification ledger, manual UI confirmation checklist, artifact updates, open questions, and closeout state.
+   - `tasks.md`: begin with `status: in_progress` YAML frontmatter and record `Resume Here`, the interactive request log, task checklist, implementation ledger, verification ledger, manual UI confirmation checklist, artifact updates, open questions, and closeout state.
    - Keep these short. For a small UI tweak, a few bullets are enough.
 4. Confirm the scope boundary.
    - Summarize the intended working-session scope before code edits.
@@ -73,7 +73,8 @@ Use existing artifacts when the session continues an active change. Keep `tasks.
    - Read every selected skill completely, including required references, and enforce it in direct or delegated work.
    - Prefer bounded subagents for non-trivial implementation, verification, UI review, security review, broad discovery, or fresh-context review when tooling allows it.
    - Treat the user's invocation of this skill as standing delegation authorization for bounded subagents inside the selected interactive change.
-   - If no relevant skill is available, continue from doctrine, project guidance, current technical documentation, and sound engineering judgment.
+   - Continue independent work after spawning. Never wait silently for more than 60 seconds; report what is complete and which delegated result remains. After roughly three minutes of cumulative waiting on one task or wave, interrupt or close the slow agent and finish locally, or re-delegate a narrower question. Close completed or abandoned agents promptly.
+   - If no relevant skill is available, continue from the managed workflow, project guidance, current technical documentation, and sound engineering judgment.
    - Record only concrete consequences that changed implementation, verification, artifacts, or stop conditions; do not maintain a skills-considered inventory.
    - Validate important subagent claims before updating durable truth or committing.
 8. Reconcile durable truth.
@@ -91,6 +92,7 @@ Use existing artifacts when the session continues an active change. Keep `tasks.
    - Record that walkthrough in `tasks.md` under `Manual UI Confirmation`. If no manual UI confirmation applies, record why.
    - Record manual confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
    - Refresh `tasks.md` with the final resume state, changed files, verification evidence, manual confirmation status, release-communication status, review record state, PR/merge state, unresolved gaps, accepted deferred gaps, and commit candidates or commits.
+   - Keep status `in_progress` while work or remediation remains; set it to `review` when implementation is ready for independent review.
    - Recommend `/sdd-review` before merge or closeout when code, user-visible behavior, security, data, or release state changed.
    - Do not move the change to `docs/changes/closed/` unless the user explicitly asks or the closeout path is already authorized by the active workflow.
    - When the user asks to close, finish, merge-and-close, or otherwise complete the change, first confirm `tasks.md` has no contradictory Resume Here, checklist, review, manual confirmation, release communication, PR/merge, deferred-gap, or folder-location claims, and no proposal/design/tasks/review text still says completed work is not implemented, not verified, or pending unless clearly historical.
@@ -142,6 +144,9 @@ Use this minimum structure when creating new artifacts. Treat these as trimmed s
 `tasks.md`:
 
 ```markdown
+---
+status: in_progress
+---
 # Tasks: <Title>
 
 ## Resume Here

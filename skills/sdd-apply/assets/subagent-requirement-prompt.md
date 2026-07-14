@@ -52,7 +52,7 @@ Read every selected skill completely, including its required references, and app
 - If selected guidance is unavailable, report it only when the absence changes implementation confidence, verification, or a stop condition; otherwise use the best project-local fallback.
 - Do not copy or summarize skill guidance into SDD artifacts unless it directly changes implemented behavior, verification evidence, or a recorded gap.
 - If implementation reveals missing product, security, migration, architecture, or scope decisions, stop and report rather than broadening work.
-- Do not update lifecycle/closeout state.
+- Do not update Change status or closeout state.
 
 ## BDD/TDD
 

@@ -4,10 +4,12 @@ import { fileURLToPath } from "node:url";
 export const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const PACKAGE_JSON_PATH = resolve(PACKAGE_ROOT, "package.json");
 export const BUNDLED_SKILLS_DIRECTORY = resolve(PACKAGE_ROOT, "skills");
+export const WORKFLOW_SOURCE_PATH = resolve(PACKAGE_ROOT, "docs", "story-driven-development.md");
 
 export const CONFIG_DIRECTORY_NAME = ".sdd";
 export const CONFIG_FILE_NAME = "config.yaml";
 export const INSTALL_LOCK_FILE_NAME = "install-lock.json";
+export const WORKFLOW_RELATIVE_PATH = ".sdd/story-driven-development.md";
 export const CONFIG_VERSION = 2;
 export const SCHEMA_VERSION = "sdd-v2";
 

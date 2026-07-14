@@ -5,6 +5,7 @@ import { parseArgs } from "node:util";
 import { getWorkspaceContext } from "./commands/context.js";
 import { diagnoseWorkspace } from "./commands/doctor.js";
 import { initWorkspace } from "./commands/init.js";
+import { getStatus } from "./commands/status.js";
 import { updateWorkspace } from "./commands/update.js";
 import { PACKAGE_JSON_PATH } from "./constants.js";
 import { SddError } from "./errors.js";
@@ -14,9 +15,10 @@ const HELP = `Story-Driven Development CLI
 
 Usage:
   sdd init [path] [options]       Initialize or reconcile an SDD workspace
-  sdd update [path] [options]     Update managed SDD skills
-  sdd doctor [path] [--json]      Validate workspace configuration and skills
+  sdd update [path] [options]     Update the managed workflow and SDD skills
+  sdd doctor [path] [--json]      Validate workspace, installation, and Change statuses
   sdd context [path] [--json]     Resolve the current planning/repository context
+  sdd status [space-id] [options] List Space status or show one Space in detail
   sdd --version                   Print the package version
 
 Init options:
@@ -25,12 +27,16 @@ Init options:
   --skills-dir <path>             Skill installation directory (default: .agents/skills)
   --yes                           Accept detected paths without interactive questions
   --dry-run                       Report without writing files
-  --force                         Replace conflicting managed skill directories
+  --force                         Replace conflicting managed workflow or skills
   --json                          Emit machine-readable JSON
 
 Update options:
   --dry-run                       Report without writing files
-  --force                         Replace conflicting managed skill directories
+  --force                         Replace conflicting managed workflow or skills
+  --json                          Emit machine-readable JSON
+
+Status options:
+  --workspace <path>              Resolve status from this workspace (default: current directory)
   --json                          Emit machine-readable JSON
 `;
 
@@ -62,6 +68,82 @@ function printSkillActions(actions) {
   }
 }
 
+function printWorkflowAction(workflow) {
+  console.log(`Workflow: ${workflow.action} (${workflow.path})`);
+}
+
+function printRows(headers, rows) {
+  const widths = headers.map((header, index) =>
+    Math.max(header.length, ...rows.map((row) => String(row[index]).length)),
+  );
+  const printRow = (row) =>
+    console.log(row.map((value, index) => String(value).padEnd(widths[index])).join("  ").trimEnd());
+  printRow(headers);
+  printRow(widths.map((width) => "-".repeat(width)));
+  for (const row of rows) printRow(row);
+}
+
+export function statusSummaryRows(result) {
+  return result.spaces.flatMap((space) => {
+    const activeRepositories = space.repositoryActivity.filter(
+      (repository) => repository.activeChangeCount > 0,
+    );
+    if (activeRepositories.length > 0) {
+      return activeRepositories.map((repository) => {
+        const change = repository.activeChanges[0];
+        return [
+          space.spaceId,
+          repository.role ?? "-",
+          change?.status ?? "-",
+          change?.changeId ?? "-",
+          repository.resolvedPath,
+          repository.activeChangeCount,
+        ];
+      });
+    }
+    return [];
+  });
+}
+
+function printStatus(result) {
+  if (result.mode === "summary") {
+    console.log(`SDD workspace: ${result.workspaceRoot}`);
+    const rows = statusSummaryRows(result);
+    if (rows.length === 0) {
+      console.log("No active Changes in mapped repositories.");
+      return;
+    }
+    printRows(["SPACE ID", "ROLE", "STATUS", "CHANGE", "REPOSITORY", "ACTIVE"], rows);
+    return;
+  }
+
+  console.log(`Space: ${result.spaceId}`);
+  console.log(`Planning path: ${result.planningPath}`);
+  if (result.repositoryDetails.length === 0) {
+    console.log("Repositories: none");
+    return;
+  }
+  for (const repository of result.repositoryDetails) {
+    console.log("");
+    console.log(`Repository: ${repository.resolvedPath}${repository.role ? ` (${repository.role})` : ""}`);
+    console.log(`Active Changes (${repository.activeChangeCount}):`);
+    if (repository.activeChangeCount === 0) console.log("  none");
+    for (const change of repository.activeChanges) {
+      console.log(`  ${change.changeId} [${change.status}]`);
+    }
+    console.log(`Epics (${repository.epics.length}):`);
+    if (repository.epics.length === 0) console.log("  none");
+    for (const epic of repository.epics) {
+      console.log(`  ${epic.id}${epic.status ? ` [${epic.status}]` : ""} ${epic.title}`);
+    }
+    console.log(`Recent Changes (${repository.changes.length}):`);
+    if (repository.changes.length === 0) console.log("  none");
+    for (const change of repository.changes) {
+      console.log(`  ${change.changeId} [${change.status}]`);
+    }
+  }
+}
+
 function printHuman(result) {
   if (result.command === "init") {
     console.log(`${result.dryRun ? "Would initialize" : result.created ? "Initialized" : "Reconciled"} SDD workspace: ${result.workspaceRoot}`);
@@ -74,11 +156,13 @@ function printHuman(result) {
         .join(", ")}`,
     );
     console.log(`Ideas mapped: ${result.ideasImported}`);
+    printWorkflowAction(result.workflow);
     printSkillActions(result.skills.actions);
     return;
   }
   if (result.command === "update") {
     console.log(`${result.dryRun ? "Would update" : "Updated"} SDD workspace: ${result.workspaceRoot}`);
+    printWorkflowAction(result.workflow);
     printSkillActions(result.skills.actions);
     return;
   }
@@ -98,12 +182,16 @@ function printHuman(result) {
     console.log(`Workspace: ${result.workspaceRoot}`);
     console.log(`Path: ${result.relativePath}`);
     console.log(`Context: ${result.kind}`);
-    if (result.idea) console.log(`Idea: ${result.idea}`);
+    if (result.spaceId) console.log(`Space ID: ${result.spaceId}`);
     if (result.planningPath) console.log(`Planning path: ${result.planningPath}`);
     if (result.repository) {
       console.log(`Repository: ${result.repository.resolvedPath}`);
       if (result.repository.role) console.log(`Role: ${result.repository.role}`);
     }
+    return;
+  }
+  if (result.command === "status") {
+    printStatus(result);
   }
 }
 
@@ -169,6 +257,21 @@ async function executeCommand(command, args) {
     if (values.help) return { help: true };
     return {
       result: await getWorkspaceContext(requireAtMostOnePath(positionals, command)),
+      json: values.json ?? false,
+    };
+  }
+
+  if (command === "status") {
+    const { values, positionals } = parseCommandArgs(
+      args,
+      commandOptions({ workspace: { type: "string" } }),
+    );
+    if (values.help) return { help: true };
+    if (positionals.length > 1) {
+      throw new SddError("status accepts at most one Space ID.", { code: "USAGE" });
+    }
+    return {
+      result: await getStatus(resolve(values.workspace ?? process.cwd()), positionals[0] ?? null),
       json: values.json ?? false,
     };
   }

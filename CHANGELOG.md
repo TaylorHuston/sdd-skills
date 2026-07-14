@@ -15,16 +15,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added workspace-local `.sdd/config.yaml` and installation-lock support for configurable planning roots, repository roots, repository artifact paths, and one-to-many idea mappings.
 - Added checksum-managed skill installation that preserves unrelated skills, adopts matching installations, blocks local overwrites by default, and supports explicit dry-run and force modes.
 - Added machine-readable JSON output and automated coverage for initialization, mapping import, diagnostics, context resolution, idempotency, and managed-skill safety.
+- Added checksum-managed `.sdd/story-driven-development.md` installation, updates, conflict protection, and diagnostics.
+- Added a machine-readable Change `status` vocabulary in `tasks.md` and CLI diagnostics for configured repositories.
+- Added `sdd status` summary and Space-detail views, with stable Space IDs defined by `.sdd/config.yaml` `ideas` keys.
 
 ### Changed
 
-- Expanded the package from a skills-only distribution into an early SDD toolchain while retaining the legacy sync script and current doctrine-backed skills during migration.
+- Expanded the package from a skills-only distribution into an early SDD toolchain while retaining the legacy sync script for pre-CLI installations.
 - Expanded `/sdd-explore` into a durable space-level discussion workflow that maintains idea-owned exploration records, routes mature conclusions to stronger artifacts, and resolves workspace ownership through configurable CLI topology when available.
 - Made first-time interactive `sdd init` ask for workspace-root-relative planning and repository paths, with detected defaults, multiple repository roots, explicit path flags, and a `--yes` automation mode.
 - Replaced repeated idea and repository paths with a v2 derived-path configuration: idea planning defaults to the idea key, repositories reference named roots, explicit workspace-relative overrides remain available, and `sdd init` migrates v1 workspaces automatically.
+- Updated every SDD workflow skill to resolve topology through `sdd context` and load the CLI-managed workspace workflow instead of a support skill.
+- Simplified `/sdd-space-status` into a read-only semantic wrapper around `sdd status --json`, leaving deterministic discovery and ordering to the CLI.
+- Limited the `sdd status` summary to one row per repository with active work, grouped by configured role, and updated `/sdd-space-status` to distinguish official application work from prototype and reference work.
+- Grouped detailed `sdd status <space-id>` output by repository, including each repository's active Changes, Epics, and recent Changes.
+- Added bounded delegation waits across SDD orchestration skills so slow subagents trigger visible status updates and a local or narrower fallback instead of indefinite polling.
+
 ### Deprecated
 
 ### Removed
+
+- Removed the `/sdd-doctrine` support skill; its canonical content now ships from `docs/story-driven-development.md` into the workspace `.sdd/` directory.
 
 ### Fixed
 

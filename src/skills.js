@@ -1,4 +1,4 @@
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, rm } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 
 import {
@@ -16,7 +16,6 @@ import {
   pathExists,
   readJson,
   replaceDirectoryAtomically,
-  writeJson,
 } from "./fs.js";
 
 async function readPackageVersion() {
@@ -65,8 +64,10 @@ export async function planSkillSync(workspaceRoot, config, { force = false } = {
   const previousLock = await readInstallLock(workspaceRoot);
   const previousSkills = previousLock?.managedSkills ?? {};
   const actions = [];
+  const bundledSkills = await listBundledSkills();
+  const bundledSkillNames = new Set(bundledSkills);
 
-  for (const skillName of await listBundledSkills()) {
+  for (const skillName of bundledSkills) {
     const source = join(BUNDLED_SKILLS_DIRECTORY, skillName);
     const target = join(skillsDirectory, skillName);
     const sourceHash = await hashDirectory(source);
@@ -90,6 +91,23 @@ export async function planSkillSync(workspaceRoot, config, { force = false } = {
     actions.push({ skillName, action, source, target, sourceHash, targetHash, previousHash });
   }
 
+  for (const [skillName, previousHash] of Object.entries(previousSkills)) {
+    if (bundledSkillNames.has(skillName) || !/^sdd-[a-z0-9-]+$/.test(skillName)) continue;
+    const target = join(skillsDirectory, skillName);
+    if (!(await isDirectory(target))) continue;
+    const targetHash = await hashDirectory(target);
+    const action = targetHash === previousHash ? "remove" : force ? "remove-forced" : "conflict";
+    actions.push({
+      skillName,
+      action,
+      source: null,
+      target,
+      sourceHash: null,
+      targetHash,
+      previousHash,
+    });
+  }
+
   const conflicts = actions.filter((entry) => entry.action === "conflict");
   if (conflicts.length > 0) {
     throw new SddError(
@@ -110,7 +128,9 @@ export async function planSkillSync(workspaceRoot, config, { force = false } = {
       schemaVersion: SCHEMA_VERSION,
       skillsDirectory: config.skills.directory,
       managedSkills: Object.fromEntries(
-        actions.map((entry) => [entry.skillName, entry.sourceHash]),
+        actions
+          .filter((entry) => entry.sourceHash)
+          .map((entry) => [entry.skillName, entry.sourceHash]),
       ),
     },
   };
@@ -121,9 +141,10 @@ export async function applySkillSync(workspaceRoot, plan, { dryRun = false } = {
     for (const entry of plan.actions) {
       if (["install", "update", "update-forced", "replace-forced"].includes(entry.action)) {
         await replaceDirectoryAtomically(entry.source, entry.target);
+      } else if (["remove", "remove-forced"].includes(entry.action)) {
+        await rm(entry.target, { recursive: true, force: true });
       }
     }
-    await writeJson(getInstallLockPath(workspaceRoot), plan.lock);
   }
 
   return {
@@ -170,6 +191,11 @@ export async function inspectSkillInstallation(workspaceRoot, config) {
       findings.push({
         level: "warning",
         message: `Skill ${entry.skillName} matches the package but is not recorded in the installation lock.`,
+      });
+    } else if (entry.action === "remove") {
+      findings.push({
+        level: "warning",
+        message: `Retired managed skill is still installed: ${entry.skillName}.`,
       });
     }
   }

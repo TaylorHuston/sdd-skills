@@ -1,8 +1,10 @@
+---
+status: proposed
+---
 # Tasks: CHANGE TITLE
 
 ## Resume Here
 
-- Current state: proposed
 - Last completed action: change artifacts drafted
 - Next action: review proposal, design, and tasks
 - Active branch/ref: unknown
@@ -57,9 +59,10 @@
 - [ ] 6.4 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
 - [ ] 6.5 Record manual UI confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
 - [ ] 6.6 Confirm proposal/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
-- [ ] 6.7 Confirm closeout state has no contradictory Resume Here, checklist, review, manual confirmation, release communication, ADR, PR/merge, deferred-gap, or folder-location claims.
-- [ ] 6.8 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus user authorization allow it.
-- [ ] 6.9 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/`.
+- [ ] 6.7 Confirm machine-readable Change status agrees with Resume Here, checklist, review, manual confirmation, release communication, ADR, PR/merge, deferred-gap, and folder-location claims.
+- [ ] 6.8 Set `status: ready_to_close` only after every required closeout gate passes.
+- [ ] 6.9 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus user authorization allow it.
+- [ ] 6.10 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/` without writing a `closed` status.
 
 ## Implementation Ledger
 
@@ -108,6 +111,7 @@ Record `/sdd-propose --replan` updates when implementation or feedback discovers
 
 ## Closeout
 
+- Change status:
 - Epic files updated:
 - Story labels/references and Requirement/Scenario IDs current:
 - Implemented By maps current:

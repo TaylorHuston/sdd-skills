@@ -25,6 +25,8 @@ cd /path/to/workspace
 sdd init
 sdd doctor
 sdd context
+sdd status
+sdd status billing
 ```
 
 On first initialization in an interactive terminal, `sdd init` asks where planning documents and implementation repositories live. Enter paths relative to the workspace root, meaning the directory that will contain `.sdd/`, not relative to the `.sdd/` directory itself. Detected paths are offered as defaults, and multiple repository roots may be entered as a comma-separated list.
@@ -35,12 +37,13 @@ Available commands:
 
 | Command | Purpose |
 |---|---|
-| `sdd init [path]` | Ask for workspace paths, create `.sdd/config.yaml`, import detectable mappings, and safely install packaged skills. |
-| `sdd update [path]` | Reconcile installed skills with the current package version. |
-| `sdd doctor [path]` | Check configuration, paths, relationship ownership, installation lock, and managed skill drift. |
-| `sdd context [path]` | Resolve a path to its workspace, idea planning root, repository, role, and related repositories. |
+| `sdd init [path]` | Ask for workspace paths, create `.sdd/config.yaml`, import detectable mappings, and safely install the workflow and skills. |
+| `sdd update [path]` | Reconcile the managed workflow and installed skills with the current package version. |
+| `sdd doctor [path]` | Check configuration, paths, relationship ownership, installation lock, workflow integrity, managed skill drift, and Change status frontmatter. |
+| `sdd context [path]` | Resolve a path to its workspace, Space ID, planning path, repository, role, and related repositories. |
+| `sdd status [space-id]` | List every Space and its newest active or closed Change with active work grouped by repository and role, or show one Space's repositories, Epics, and five newest Changes. |
 
-All commands support human-readable and `--json` output. `init` and `update` also support `--dry-run`. Managed skills are checksum-protected: locally modified skills produce a conflict instead of being silently overwritten, and `--force` is required to replace them.
+All commands support human-readable and `--json` output. `init` and `update` also support `--dry-run`. Managed skills and `.sdd/story-driven-development.md` are checksum-protected: local modifications produce a conflict instead of being silently overwritten, and `--force` is required to replace them.
 
 An initialized workspace looks like:
 
@@ -49,6 +52,7 @@ workspace/
   .sdd/
     config.yaml
     install-lock.json
+    story-driven-development.md
   .agents/
     skills/
       sdd-*/
@@ -85,7 +89,9 @@ ideas:
         role: web-client
 ```
 
-Top-level roots are relative to the initialized workspace. An idea's planning directory defaults to `<planning.root>/<idea-key>`; set `planning` only when its directory differs from the idea key. Repository paths are relative to their named root. This keeps root changes centralized instead of repeating full paths for every idea.
+Top-level roots are relative to the initialized workspace. Each key under `ideas` is its stable, case-sensitive Space ID and is the identifier accepted by commands such as `sdd status billing`. Treat it as an opaque identifier rather than a display title. A Space's planning directory defaults to `<planning.root>/<space-id>`; set `planning` only when its directory differs from the Space ID. Repository paths are relative to their named root. This keeps root changes centralized instead of repeating full paths for every Space.
+
+`sdd status` reads only configured Space relationships. It does not infer that similarly named planning and code directories belong together. Map each implementation repository under the owning Space when it should contribute Epics or Changes to that Space's status. The human workspace summary is an active-work view: it prints one row per mapped repository with at least one unclosed Change, repeats the Space ID when an idea has concurrent work in multiple repositories, and omits inactive repositories and Spaces. A detailed `sdd status <space-id>` groups active Changes, Epics, and recent Changes under each mapped repository. JSON preserves aggregate fields for compatibility and exposes the same grouping through `repositoryActivity` and `repositoryDetails`.
 
 Project-specific exceptions remain explicit:
 
@@ -107,7 +113,7 @@ ideas:
 
 `sdd init` automatically migrates the original v1 repeated-path shape to this derived-path v2 shape.
 
-The installed skills still use the `0.6.x` doctrine and relationship resolution internally. Migrating those workflows to consume `sdd context` and other CLI instructions is subsequent work. During this preview, `.sdd/config.yaml` is authoritative for CLI commands, while the existing Folder Note mapping remains necessary for skills that have not yet migrated.
+The skills resolve workspace topology through `sdd context` and read the managed `.sdd/story-driven-development.md` contract when SDD semantics matter. Folder Note mappings remain an initialization import source; `.sdd/config.yaml` is authoritative after initialization.
 
 ## Packaged Skills
 
@@ -125,7 +131,6 @@ Support workflow:
 
 | Skill | Purpose |
 |---|---|
-| `/sdd-doctrine` | Supply the portable SDD semantic contract consumed by the other skills. |
 | `/sdd-adr` | Create, update, or assess ADRs for durable SDD architecture decisions. |
 | `/sdd-explore` | Maintain a durable private exploration while discussing substantial product, business, design, technical, architecture, workflow, or requirement questions about a space. |
 | `/sdd-interactive` | Track and implement small concrete changes in one working session. |
@@ -136,7 +141,7 @@ Support workflow:
 
 ## Artifact Model
 
-The portable doctrine defines artifact roles, authority, and the required repository layout. Once an implementation repository is selected, the packaged skills expect this shape:
+The managed workflow defines artifact roles, authority, and the required repository layout. Once an implementation repository is selected, the packaged skills expect this shape:
 
 ```text
 docs/
@@ -158,13 +163,13 @@ docs/
 
 Epics are the durable behavior-to-code map. Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, and `Verification Gaps` live inside each Epic's `epic.md`. `Verified By` is a scenario-mapped evidence index, not a chronological command log; broad gates such as lint, typecheck, build, or full CI are supporting evidence unless tied to a named Requirement or Scenario. If implemented behavior is not represented in an Epic/Story, treat it as undocumented drift until the map is updated or the code is removed through a tracked change.
 
-Change folders are working records. `proposal.md` defines scope, `design.md` defines the technical approach, and `tasks.md` is the adaptive implementation ledger and resume surface.
+Change folders are working records. `proposal.md` defines scope, `design.md` defines the technical approach, and `tasks.md` is the adaptive implementation ledger and resume surface. Every `tasks.md` has a machine-readable YAML `status`: `proposed`, `in_progress`, `review`, `replanning`, or `ready_to_close`. There is no `closed` status value; moving the folder under `docs/changes/closed/` is the closed state, and the file retains its last active status.
 
 `/sdd-apply` has no fixed dependency on a catalog of companion skills. It discovers the skills exposed by the current runtime, selects the smallest set materially relevant to the active implementation slice, and enforces the selected guidance in both direct and delegated work. A consuming environment can have a different skill set, or no matching specialist skill at all; project guidance and normal engineering judgment remain the fallback.
 
 For non-trivial changes, `design.md` should compare viable technical options before selecting an approach. When a change creates a durable architecture, data, dependency, integration, deployment, security, storage, or cross-cutting project decision, record it as an ADR under `docs/adrs/`.
 
-Product Briefs/PRDs and app visual/style guidance are private planning artifacts. By default, an idea lives at `<workspace-root>/ideas/<idea>/`, stores its PRD at `<planning-root>/prd.md`, and maps zero or more implementation repositories under `<workspace-root>/code/` through its Folder Note metadata. Reference planning artifacts when product scope, UI identity, or release readiness depends on them; keep accepted implementation truth in each code repository's Epic and Story map.
+Product Briefs/PRDs and app visual/style guidance are private planning artifacts. By default, an idea lives at `<planning-root>/<idea>/`, stores its PRD at `<planning-root>/<idea>/prd.md`, and maps zero or more implementation repositories through `.sdd/config.yaml`. Reference planning artifacts when product scope, UI identity, or release readiness depends on them; keep accepted implementation truth in each code repository's Epic and Story map.
 
 Generated indexes are optional. If a project maintains `docs/epics/index.md` or `docs/epics/story-index.json`, treat them as generated navigation or validation artifacts, not canonical truth.
 
@@ -210,17 +215,26 @@ workspace/
     visual-style-guide.md
 ```
 
-The idea Folder Note owns the relationship:
+After `sdd init`, `.sdd/config.yaml` owns the relationship:
 
 ```yaml
+planning:
+  root: ideas
 repositories:
-  - path: code/product-one-web
-    role: web-client
-  - path: code/product-one-mobile
-    role: mobile-client
+  roots:
+    code: code
+ideas:
+  product-one:
+    repositories:
+      - root: code
+        path: product-one-web
+        role: web-client
+      - root: code
+        path: product-one-mobile
+        role: mobile-client
 ```
 
-In that example, `ideas/product-one/` is the private planning root, the two mapped directories under `code/` are independent implementation repositories, and `code/sdd-skills/` is this package repository. Product and repository names do not need to match.
+In that example, `ideas/product-one/` is the private planning path, the two mapped directories under `code/` are independent implementation repositories, and `code/sdd-skills/` is this package repository. Product and repository names do not need to match. Idea Folder Note metadata can seed this mapping during initialization, but it is not authoritative afterward.
 
 ## Adapting The Skills To Your Shape
 
@@ -228,7 +242,7 @@ Start by defining project-local guidance. A good `AGENTS.md` should identify any
 
 Common adaptation points:
 
-- Idea/repository mapping: the skills assume `ideas/<idea>/<idea>.md` owns a `repositories` list that may point to multiple `code/<repo>` repositories. Declare an exception in project guidance, or change the packaged default as described below.
+- Idea/repository mapping: the skills resolve the one-idea-to-many-repositories mapping from `.sdd/config.yaml` through `sdd context`. Declare an exception in project guidance, or change the packaged default as described below.
 - Planning docs: `/sdd-prd`, `/sdd-explore`, `/sdd-space-status`, `/sdd-propose`, `/sdd-apply`, `/sdd-review`, `/sdd-epic-verify`, and `/sdd-release` resolve private context from the owning idea when relevant.
 - SDD artifact paths: `docs/epics/`, `docs/changes/`, `docs/changes/closed/`, `docs/adrs/`, and `docs/audits/` are package conventions, not `AGENTS.md` configuration points.
 - Branch and merge policy: `/sdd-review`, `/sdd-pr`, and `/sdd-release` are intentionally conservative. Update them or your app `AGENTS.md` for trunk-based development, no-PR workflows, required PR workflows, nonstandard production branches, or release trains.
@@ -242,11 +256,11 @@ Common adaptation points:
 
 The one-idea-to-many-repositories model is an opinionated default, not an SDD truth invariant.
 
-- The idea Folder Note is the canonical and only mapping source. Public code repositories should not contain reverse links to private idea paths.
+- `.sdd/config.yaml` is the canonical mapping source after initialization. Idea Folder Notes may supply mappings during `sdd init`; public code repositories should not contain reverse links to private idea paths.
 - One idea may map to zero, one, or many repositories. Under the default model, one repository is claimed by at most one idea; shared tooling repositories may remain unlinked.
-- Resolution is metadata-first, with a unique basename match only as a compatibility fallback. Ambiguous ownership or target-repository selection requires user input.
+- Resolution is config-first through `sdd context`. Ambiguous target-repository selection requires user input.
 - If one repository eventually needs to support multiple ideas, evolve the metadata and resolver deliberately into a many-to-many model instead of adding ad hoc reverse links.
-- For one project, declare an explicit exception in project guidance. For a package-wide change, edit `Default Idea-To-Repository Relationship` in `skills/sdd-doctrine/references/story-driven-development.md`, then keep `docs/story-driven-development.md` synchronized.
+- For one project, declare an explicit exception in `.sdd/config.yaml` or project guidance. For a package-wide change, edit `Default Idea-To-Repository Relationship` in `docs/story-driven-development.md` and update affected CLI resolution behavior.
 - Keep operational skills expressed in terms of `<planning-root>` and `<implementation-root>` so changing roots or relationship metadata does not require rewriting every workflow.
 
 Audit relationship-resolution assumptions after customization:
@@ -261,7 +275,7 @@ Using a different SDD artifact layout requires a coordinated package customizati
 
 Update these locations together:
 
-- `skills/sdd-doctrine/references/story-driven-development.md`: `Core Doctrine And Project Profile`, `Core Terms`, and `Change Workflow`; keep `docs/story-driven-development.md` synchronized.
+- `docs/story-driven-development.md`: `Core Doctrine And Project Profile`, `Core Terms`, and `Change Workflow`.
 - `skills/sdd-propose/SKILL.md`: `Output`, `Workflow`, and `Artifact Rules`.
 - `skills/sdd-apply/SKILL.md`: `Canonical Repository Layout`, `Select The Change`, `Required Context`, and closeout path operations.
 - `skills/sdd-review/SKILL.md`: `Select The Change And Branches`, `Required Context`, review-artifact output, and closeout path operations.
@@ -275,9 +289,9 @@ Use this audit after customization:
 rg -n 'docs/(epics|changes|adrs|audits)' skills/sdd-* docs/templates
 ```
 
-## Skills-Only Installation
+## Legacy Skills Sync
 
-The legacy sync script remains available for users who want the `0.6.x` skills without initializing a CLI workspace.
+Current skills require an initialized CLI workspace and its managed workflow document. The legacy sync script remains only for maintaining pre-CLI `0.6.x` installations; it is not a complete current installation method.
 
 For a project-local install:
 
@@ -291,7 +305,7 @@ For a user-level install:
 ./scripts/sync-skills.sh "${CODEX_HOME:-$HOME/.codex}/skills"
 ```
 
-The sync script copies every `skills/sdd-*` folder, including the `sdd-doctrine` support skill, into the target and removes stale files inside those target skill folders. It does not delete unrelated skills.
+The sync script copies current `skills/sdd-*` folders into the target and removes stale files inside those target skill folders. It does not install `.sdd/story-driven-development.md`, manage retired skills, or delete unrelated skills.
 
 ## Validation
 
@@ -311,9 +325,9 @@ done
 
 If `PyYAML` is not installed globally, install it into a temporary directory and set `PYTHONPATH` for the validation command.
 
-## Doctrine
+## Managed Workflow
 
-The workflow doctrine ships in the [`sdd-doctrine` support skill](skills/sdd-doctrine/SKILL.md), with a browsable mirror in [docs/story-driven-development.md](docs/story-driven-development.md). Operational skills load that doctrine, then apply it through the consuming project's local profile. If a skill, the support-skill reference, and the docs mirror disagree, reconcile them before release.
+[docs/story-driven-development.md](docs/story-driven-development.md) is the canonical package workflow. `sdd init` installs it at `.sdd/story-driven-development.md`; `sdd update` refreshes it safely; and `sdd doctor` verifies its checksum. Operational skills resolve the workspace with `sdd context`, load that managed document when SDD semantics matter, and combine it with the consuming project's local guidance.
 
 ## Project Guidance Expected By The Skills
 

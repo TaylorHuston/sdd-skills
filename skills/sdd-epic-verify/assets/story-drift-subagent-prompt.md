@@ -17,7 +17,7 @@ You are auditing one embedded Story from a SDD Epic for implementation drift.
 
 ## Goal
 
-Determine whether current implementation and verification still satisfy this Story's Requirements and Scenarios, and whether the Story is missing Requirements or Scenarios needed to describe its actual behavior. Do not edit files, commit, change lifecycle state, or decide final Epic status.
+Determine whether current implementation and verification still satisfy this Story's Requirements and Scenarios, and whether the Story is missing Requirements or Scenarios needed to describe its actual behavior. Do not edit files, commit, modify Change status, or decide final Epic status.
 
 ## Required Context
 

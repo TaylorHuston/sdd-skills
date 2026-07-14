@@ -43,52 +43,63 @@ Project or workspace guidance owns the operating profile:
 - required supporting docs and architecture, API, UI, security, or platform constraints
 - available tools and skills, external-service permissions, and local reporting preferences
 
-Each skill must read the project profile before acting and apply this doctrine through that profile. Once the idea planning root and target implementation repository are resolved, this package requires Epics under `docs/epics/`, active changes under `docs/changes/`, closed changes under `docs/changes/closed/`, ADRs under `docs/adrs/`, and package-defined audit/report locations under the implementation repository's relevant `docs/` subtree. Project guidance may override idea/repository resolution explicitly, but it may not silently relocate canonical SDD artifacts inside the implementation repository. A project that intentionally uses another repository-internal layout must modify the shipped doctrine, affected skills, and templates together. Operational customization must not weaken artifact authority, behavior-to-code traceability, evidence honesty, or reconciliation requirements.
+Each skill must read the project profile before acting and apply this workflow through that profile. Once the idea planning path and target implementation repository are resolved, this package requires Epics under `docs/epics/`, active changes under `docs/changes/`, closed changes under `docs/changes/closed/`, ADRs under `docs/adrs/`, and package-defined audit/report locations under the implementation repository's relevant `docs/` subtree. Project guidance may override idea/repository resolution explicitly, but it may not silently relocate canonical SDD artifacts inside the implementation repository. A project that intentionally uses another repository-internal layout must modify the canonical workflow source, affected skills, and templates together. Operational customization must not weaken artifact authority, behavior-to-code traceability, evidence honesty, or reconciliation requirements.
 
 ### Default Idea-To-Repository Relationship
 
-By default, private product direction is idea-owned and an idea may map to zero, one, or many implementation repositories:
+Private product direction is idea-owned, and an idea may map to zero, one, or many implementation repositories. Workspace topology is defined in `.sdd/config.yaml`:
 
 ```text
 <workspace-root>/
-  ideas/
+  .sdd/
+    config.yaml
+    story-driven-development.md
+  <planning-root>/
     <idea>/
-      <idea>.md
-  code/
+  <repository-root>/
     <repo-a>/
     <repo-b>/
 ```
 
-- **Planning root**: `<workspace-root>/ideas/<idea>/`. This is the private product surface, including `prd.md`, Feature/Capability Briefs, exploration summaries, visual identity, research, and private navigation.
-- **Implementation root**: `<workspace-root>/code/<repo>/`. This is one selected Git repository containing application code and canonical SDD artifacts under `docs/`.
-- **Canonical relationship**: the idea Folder Note at `<planning-root>/<idea>.md` owns a YAML `repositories` list. Each entry requires a workspace-relative `path` to `code/<repo>` and may include a concise `role`.
+- **Planning root**: `planning.root` in `.sdd/config.yaml`. An idea defaults to `<planning.root>/<idea-key>` and may declare `planning` relative to that root or exceptional workspace-relative `planningPath`. This is the private product surface, including `prd.md`, Feature/Capability Briefs, exploration summaries, visual identity, research, and private navigation.
+- **Repository roots**: named entries under `repositories.roots` in `.sdd/config.yaml`. Each points to a workspace-relative directory containing implementation repositories.
+- **Canonical relationship**: each `ideas.<idea>.repositories` entry declares a repository `path`, optional named `root`, and optional concise `role`. A rooted path resolves relative to that named repository root; an entry without `root` is an explicit workspace-relative exception.
 
 ```yaml
+planning:
+  root: ideas
 repositories:
-  - path: code/product-web
-    role: web-client
-  - path: code/product-mobile
-    role: mobile-client
+  roots:
+    code: code
+ideas:
+  product:
+    repositories:
+      - root: code
+        path: product-web
+        role: web-client
+      - root: code
+        path: product-mobile
+        role: mobile-client
 ```
 
 The mapping is intentionally private-workspace-owned. Do not require public code repositories to contain reverse links to private idea paths.
 
 Resolve roots in this order:
 
-1. Prefer explicit idea and repository paths from the user or project guidance.
-2. When starting from an idea, read its Folder Note mapping. Auto-select only when one repository is mapped or the requested work identifies one repository unambiguously; otherwise ask which repository is the target.
-3. When starting from a code repository, scan `ideas/*/*.md` Folder Note frontmatter for a matching repository path.
-4. If no metadata mapping exists, use a unique idea/repository basename match only as a compatibility fallback. Do not silently create or persist a relationship from that fallback.
-5. Ask when multiple ideas claim one repository, multiple target repositories remain plausible, or ownership cannot be resolved safely.
+1. Run `sdd context <relevant-path> --json` and use its workspace, idea, `planningPath`, repository, role, resolved path, and related repositories.
+2. Prefer an explicit user-selected repository when more than one mapped repository is relevant.
+3. Apply declared project guidance only when it intentionally overrides the configured topology for the active operation.
+4. Ask when multiple target repositories remain plausible or ownership cannot be resolved safely. Do not infer or persist an undeclared relationship silently.
 
-One idea may map to many repositories. Under the default model, one repository should be claimed by at most one idea, and shared tooling repositories may remain unlinked. If real usage requires one repository to support multiple ideas, evolve the metadata and resolver deliberately into a many-to-many model rather than adding ad hoc reverse links.
+One idea may map to many repositories. Under the current model, one repository should be claimed by at most one idea, and shared tooling repositories may remain unlinked. If real usage requires one repository to support multiple ideas, evolve the config schema and resolver deliberately into a many-to-many model rather than adding ad hoc reverse links.
 
-Do not create a missing idea directory during read-only work. Create or change relationship metadata only when the active workflow is authorized to write private planning artifacts. If a workspace uses different roots or mapping metadata, declare the resolution rule in project guidance; to change the packaged default, edit this section and keep the shipped doctrine mirror synchronized.
+Idea Folder Note metadata may be imported by `sdd init`, but `.sdd/config.yaml` is authoritative afterward. Do not create a missing idea directory during read-only work. Change configured relationships only when the active workflow is authorized to modify workspace topology. To change the packaged model, update this section, the config schema, CLI resolution behavior, and affected skills together.
 
 The planning root is not a second implementation source of truth. Product direction and private context live there; accepted implemented behavior, code maps, and verification maps remain in Epics and Stories under the implementation repository's `docs/` tree.
 
 ## Core Terms
 
+- **Space / Space ID**: A planning-owned product or work area represented by one key under `.sdd/config.yaml` `ideas`. That exact, case-sensitive key is the stable Space ID used by CLI commands and may map to zero, one, or many implementation repositories. Treat it as an opaque identifier, not a display title.
 - **Product Brief/PRD**: Private product context stored by default at `<planning-root>/prd.md`. It describes product purpose, audience, scope, principles, market context when useful, and open product questions. It guides SDD work but is not an implementation checklist.
 - **Epic**: The durable capability file. It lives at `docs/epics/<key>-<###>-epic-name>/epic.md` and contains the capability narrative, embedded Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, and known gaps.
 - **Story**: A durable user-path contract embedded inside an Epic. New Epics should use Epic-scoped Story labels such as `S1`, `S2`, and full references such as `EPIC-ID/S1`; legacy app-wide Story IDs may remain when existing tests, reports, or history depend on them. Stories should usually use "As a <actor>, I want to <action/path>, so that <user-facing value/outcome>." A Story should describe a meaningful user action or outcome, not a tiny UI requirement.
@@ -97,7 +108,7 @@ The planning root is not a second implementation source of truth. Product direct
 - **Implemented By**: A developer starting index for the important files, modules, routes, components, APIs, migrations, or support files that implement or materially support the Story.
 - **Verified By**: A behavior evidence index. It should name concrete tests, assertions, browser/manual scenarios, review artifacts, or other proof tied to the Requirement or Scenario. It is not a chronological command log.
 - **Verification Gaps**: Known missing, deferred, or accepted gaps. Empty or stale gaps are misleading and should be cleaned up.
-- **Change**: A tracked working artifact set under `docs/changes/yyyy-mm-dd-change-name/` containing `proposal.md`, `design.md`, and `tasks.md`. The change may create a new Epic, update an existing Epic, or both.
+- **Change**: A tracked working artifact set under `docs/changes/yyyy-mm-dd-change-name/` containing `proposal.md`, `design.md`, and `tasks.md`. The change may create a new Epic, update an existing Epic, or both. Its active status is machine-readable from `tasks.md`; its closed state is derived from folder location.
 
 ## Artifact Authority
 
@@ -185,13 +196,35 @@ docs/changes/yyyy-mm-dd-change-name/
 
 `tasks.md` is the adaptive implementation ledger. It records `Resume Here`, task progress, implementation evidence, verification evidence, manual UI confirmation status, release-communication impact, review status, branch/PR/merge state, deferred gaps, and closeout readiness.
 
+### Change Status
+
+Every Change `tasks.md`, active or closed, must begin with YAML frontmatter containing exactly one `status` value:
+
+```yaml
+---
+status: proposed
+---
+```
+
+The portable status vocabulary is:
+
+- `proposed`: the Change artifacts are being drafted or are ready for implementation to begin.
+- `in_progress`: implementation, verification, or ordinary remediation is underway.
+- `review`: implementation is believed complete and the Change is awaiting or undergoing independent review.
+- `replanning`: a discovery requires proposal, design, Requirement, Scenario, scope, or ownership refinement before implementation continues.
+- `ready_to_close`: review and required acceptance gates are satisfied, but the active Change folder has not yet been moved.
+
+These values are workflow signals, not a rigid one-way state machine. Review findings can return a Change to `in_progress` or `replanning`. Set `replanning` before revising planning artifacts and restore `in_progress` when the revised plan is ready to apply. Set `ready_to_close` only when no unresolved review, verification, manual acceptance, release-communication, branch, PR/merge, or artifact-truth condition blocks closeout.
+
+There is no `closed` value. Moving the entire Change folder to `docs/changes/closed/` is the canonical and machine-readable closed state. The moved `tasks.md` retains its last active status, normally `ready_to_close`; folder location takes precedence.
+
 Closeout must reconcile both forward and backward. Updating the current Story is not sufficient when a change changes the meaning of earlier Stories, Requirements, Scenarios, `Verified By`, `Verification Gaps`, or closed change records. Before closing, scan affected Epics and related active/closed change artifacts for stale assumptions such as "Not implemented yet", "Not verified yet", outdated manual confirmation status, old boundary wording, or accepted gaps that no longer match reality.
 
 Changes may be small or large. Small fixes still deserve enough tracking to keep Epic truth accurate. Large changes should remain adaptable rather than pretending every implementation phase is knowable up front.
 
 Planning artifacts are documentation, but their allowed branch and commit behavior belongs to project policy. Before writing them, follow the consuming project's documentation policy. Before changing application code, tests, schemas, configuration, generated project artifacts, or runtime behavior, follow its implementation branch and authorization policy.
 
-When implementation or manual feedback discovers a new or meaningfully changed Requirement, Scenario, constraint, or Epic ownership question that needs planning before more code changes, use `/sdd-propose --replan` against the active change. That mode updates `proposal.md`, `design.md`, and `tasks.md`, records the planning update, and then hands back to a fresh `/sdd-apply`.
+When implementation or manual feedback discovers a new or meaningfully changed Requirement, Scenario, constraint, or Epic ownership question that needs planning before more code changes, use `/sdd-propose --replan` against the active change. That mode sets `tasks.md` status to `replanning`, updates `proposal.md`, `design.md`, and `tasks.md`, records the planning update, restores status to `in_progress` when the revised plan is ready, and then hands back to a fresh `/sdd-apply`.
 
 ## Implementation And Review
 
@@ -205,6 +238,8 @@ Implementation should usually follow a BDD/TDD loop around each Requirement or S
 
 Use subagents for isolated implementation slices, specialist guidance, and fresh-context review when the work is non-trivial. The orchestrating agent remains responsible for validating subagent claims, reconciling artifacts, and deciding whether to stop.
 
+Delegation must not make the workflow appear stuck. After spawning a subagent, continue independent local work instead of waiting immediately. When the main thread is genuinely blocked on delegated output, wait at most 60 seconds without a user-visible status update. If the subagent is still running, report what is complete and what remains, then continue any available work. Treat roughly three minutes of cumulative waiting on one delegated task or wave as a recovery threshold: interrupt or close the agent and finish locally, or delegate the remaining question again with a narrower scope. Do not repeatedly poll, silently wait on optional verification, or let a slow reviewer prevent a concise status response. Close completed or abandoned agents promptly.
+
 Manual UI confirmation is part of the workflow for browser-visible or otherwise user-facing changes. The agent should walk the user through what to manually confirm, record the status in `tasks.md`, and classify feedback as implementation bug, requirement change, follow-up, or accepted gap.
 
 Manual confirmation status must use the same vocabulary everywhere: `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
@@ -212,6 +247,8 @@ Manual confirmation status must use the same vocabulary everywhere: `not applica
 `/sdd-apply` should treat Epic/Story truth as non-negotiable while implementation is happening. Behavior changes, stale Story wording, changed Requirement or Scenario meaning, moved Epic ownership, and changed verification confidence must be reconciled into affected Epics during the apply work or called out as a blocker before claiming progress. `/sdd-apply` should end implementation with an implementation self-check: confirm the slice is complete, verified, reconciled into Epic truth, and ready for independent review. This self-check does not replace `/sdd-review`.
 
 `/sdd-review` is the local PR-style gate after implementation. It independently checks proposal/design/tasks, Epic truth, Requirements, Scenarios, tests, manual confirmation, code quality, security, docs, release-communication impact, branch policy, and closeout consistency. If it finds deficiencies, it creates or updates `review.md`. If it returns clean for a non-production integration target, it should offer the policy-defined merge-and-close as the recommended next action, but must ask the user before merging, moving the change folder, pushing, or taking any other integration action.
+
+Status transitions must accompany the work that justifies them: `/sdd-propose` creates `proposed`; `/sdd-apply` changes it to `in_progress` and then `review` at implementation handoff; `/sdd-review` keeps `review`, returns deficiencies to `in_progress` or `replanning`, and sets `ready_to_close` only when closeout gates pass. Closing is represented only by moving the folder.
 
 `/sdd-release` prepares promotion to the project-defined production target. It runs the project-defined release checks, updates required release communication according to project policy, and opens or prepares the required release handoff. It does not merge, deploy, tag, publish, or mutate production state without explicit authorization.
 
@@ -221,7 +258,7 @@ PR feedback does not bypass Epic truth or invalidate review silently. `/sdd-revi
 
 Each application repo owns its branch policy in its local `AGENTS.md`. Read it before creating branches, choosing merge targets, opening PRs, running reviews, or planning implementation.
 
-SDD does not prescribe branch names, branch count, integration topology, PR usage, merge strategy, or release target. Skills must resolve those facts from project guidance and stop before branch, PR, merge, closeout, or release mutations when the policy is missing or ambiguous. SDD does require the review surface and lifecycle state to identify the actual source, target, and reviewed commit precisely enough that later changes cannot silently invalidate readiness.
+SDD does not prescribe branch names, branch count, integration topology, PR usage, merge strategy, or release target. Skills must resolve those facts from project guidance and stop before branch, PR, merge, closeout, or release mutations when the policy is missing or ambiguous. SDD does require the review surface and Change status to identify the actual source, target, and reviewed commit precisely enough that later changes cannot silently invalidate readiness.
 
 ## Definition Of Done For A Story
 
@@ -275,7 +312,6 @@ Use the skills to apply this doctrine consistently:
 
 | Skill | Purpose |
 |---|---|
-| `/sdd-doctrine` | Supply the portable semantic contract and separate core SDD invariants from project operating policy. |
 | `/sdd-prd` | Create or revise the private Product Brief/PRD that guides product scope, audience, principles, market context, monetization, and open product questions. |
 | `/sdd-explore` | Think through product ideas, technical options, codebase findings, or requirement questions before deciding whether to create a change. |
 | `/sdd-adr` | Create, update, or assess ADRs for durable technical decisions that future SDD work should respect. |
@@ -283,7 +319,7 @@ Use the skills to apply this doctrine consistently:
 | `/sdd-interactive` | Create and apply a lightweight tracked change in one working session for small concrete changes that do not need a full upfront proposal pass. |
 | `/sdd-apply` | Implement or continue an active change using Requirement/Scenario-driven slices, subagent delegation when useful, verification, artifact reconciliation, and manual UI confirmation. |
 | `/sdd-review` | Run the local PR-style integration gate after implementation or before closing a change. |
-| `/sdd-epic-verify` | Audit an Epic end to end against current implementation, tests, evidence, change lifecycle state, and Story/Requirement/Scenario quality. |
+| `/sdd-epic-verify` | Audit an Epic end to end against current implementation, tests, evidence, Change status, and Story/Requirement/Scenario quality. |
 | `/sdd-space-status` | Produce a read-only re-entry brief for returning to an app after time away. |
 | `/sdd-orphan-audit` | Find likely orphaned code/tests and SDD traceability gaps conservatively. |
 | `/sdd-release` | Prepare the project-defined production release handoff, including release checks and required release communication. |

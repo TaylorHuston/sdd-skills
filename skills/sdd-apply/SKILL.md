@@ -9,7 +9,7 @@ Apply a SDD change from its change folder. This is the implementation-side compa
 
 ## Authority And Project Profile
 
-Load `$sdd-doctrine` before interpreting SDD artifact authority, evidence, reconciliation, or closeout. Resolve the idea-owned planning root and target implementation repository through the doctrine relationship model unless project guidance explicitly maps them differently, then enforce the canonical `docs/epics/`, `docs/changes/`, and `docs/changes/closed/` layout inside the implementation repository. Project guidance owns branch and commit policy, verification commands, supporting-doc requirements, release conventions, technology constraints, and permissions.
+Resolve the workspace, idea-owned planning path, and target implementation repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before interpreting SDD artifact authority, evidence, reconciliation, or closeout. Use the resolved topology unless project guidance declares an explicit exception, then enforce the canonical `docs/epics/`, `docs/changes/`, and `docs/changes/closed/` layout inside the implementation repository. Project guidance owns branch and commit policy, verification commands, supporting-doc requirements, release conventions, technology constraints, and permissions. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
 
 Non-negotiable invariant: Epic/Story truth must stay aligned with implementation reality as the work proceeds. If implementation changes behavior, reveals stale Story wording, changes Requirement or Scenario meaning, moves Epic ownership, or changes verification confidence, update the affected Epic/Story truth in the same run or stop before claiming implementation progress.
 
@@ -38,7 +38,7 @@ Required SDD layout inside the implementation repository:
 - Epics: `docs/epics/<key>-<###>-<epic-name>/epic.md`
 - release communication: whatever changelog, release-note, changeset, or equivalent record project guidance requires
 
-Project-local guidance may adapt branch policy, release-communication location, test commands, and supporting-doc inventory. It may not relocate canonical SDD artifacts. A deliberately different SDD layout requires modifying this section, every affected path operation in this skill, the shipped doctrine, and corresponding templates.
+Project-local guidance may adapt branch policy, release-communication location, test commands, and supporting-doc inventory. It may not relocate canonical SDD artifacts. A deliberately different SDD layout requires modifying this section, every affected path operation in this skill, the managed workflow source, and corresponding templates.
 
 ## Inputs And Modes
 
@@ -93,6 +93,7 @@ Start every run with Discovery, even when resuming.
 Check that:
 
 - `proposal.md`, `design.md`, and `tasks.md` agree about the change scope.
+- `tasks.md` frontmatter has exactly one valid `status`: `proposed`, `in_progress`, `review`, `replanning`, or `ready_to_close`. Set it to `in_progress` before implementation or remediation begins. Stop and route to `/sdd-propose --replan` when status is `replanning` and planning is not yet resolved.
 - `design.md` identifies whether the change creates new Epic directories, edits existing Epic directories, or both.
 - each targeted Epic path follows `docs/epics/key-###-epic-name/epic.md`.
 - Stories stay embedded in Epic `epic.md` files; do not create `docs/stories/`.
@@ -188,6 +189,14 @@ Use the main thread directly when:
 
 Parallelize read-only discovery and review subagents when their scopes do not overlap. Serialize implementation subagents unless the slices touch clearly independent files and the tool environment can isolate or merge their work safely.
 
+Keep delegated waits bounded:
+
+- Continue non-overlapping main-thread work immediately after spawning.
+- Wait only when the next required action genuinely depends on the result.
+- Never wait silently for more than 60 seconds; give the user a concise status update that distinguishes completed work from the delegated result still pending.
+- After roughly three minutes of cumulative waiting on one task or wave, interrupt or close the slow agent and finish locally, or re-delegate a narrower question.
+- Do not let an optional self-check or reviewer block a status response, and close completed or abandoned agents promptly.
+
 ## Available Skill Use
 
 Before a non-trivial implementation, verification, or self-check slice:
@@ -211,7 +220,7 @@ Every delegated implementation prompt must include:
 - why each selected skill or guidance item applies to this slice
 - expected files or surfaces to inspect
 - allowed toolsets and edit permissions
-- explicit instruction not to commit, push, merge, close, or update lifecycle state
+- explicit instruction not to commit, push, merge, close, or update Change status
 - BDD/TDD expectation, including failing-first proof when practical
 - verification commands or browser/manual checks to run
 - required report shape
@@ -246,7 +255,7 @@ Implement one coherent behavior or capability slice at a time.
    - Scope the subagent with `assets/subagent-requirement-prompt.md`.
    - Pass every selected available skill or required guidance item and require the subagent to load and apply it.
    - Allow edits only for the assigned slice.
-   - Require the subagent to report needed artifact updates instead of making lifecycle or closeout decisions.
+   - Require the subagent to report needed artifact updates instead of making Change-status or closeout decisions.
 4. Follow BDD/TDD for the selected Requirement or Scenario when practical.
    - Translate Scenarios into concrete tests, browser checks, command checks, or manual scenarios.
    - Preserve Requirement and Scenario IDs in test names, verification notes, or `tasks.md` entries when that improves traceability.
@@ -301,6 +310,7 @@ Implement one coherent behavior or capability slice at a time.
    - Record any superseded Story/Requirement/Scenario wording and the artifact reconciliation performed.
    - Keep old proposal/design status text from contradicting completed work. If design sections still say `Not implemented yet`, `Not verified yet`, or implementation is pending after implementation has landed, update or clearly mark that text as historical before closeout.
    - Record consequential skill guidance or delegation outcomes only when they changed implementation, verification, artifacts, or stop conditions; also record blockers, departures, and commit hashes or commit candidates.
+   - Keep `status: in_progress` while implementation, verification, remediation, or unresolved blockers remain. Set `status: review` only after implementation is complete and the Change is ready for independent `/sdd-review`.
    - Before the implementation commit exists, record the relevant ledger rows as `commit pending`, `uncommitted`, or a clear commit candidate rather than inventing a hash.
 12. Commit locally when authorized, the slice is verified, and changes are commit-shaped.
    - Do not stage unrelated dirty files.
@@ -363,11 +373,11 @@ Do not move the change to `docs/changes/closed/` unless the user explicitly asks
 
 When closing:
 
-1. Ensure `tasks.md` closeout reflects review outcome, review record, manual confirmation status, release-communication status, PR/merge state, remaining accepted risks, and no contradictory checklist or Resume Here state.
+1. Ensure `tasks.md` has `status: ready_to_close` and its closeout reflects review outcome, review record, manual confirmation status, release-communication status, PR/merge state, remaining accepted risks, and no contradictory checklist or Resume Here state.
    - Confirm manual confirmation status uses only `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
    - Confirm related active and closed artifacts no longer contradict the accepted Epic state, including stale `Not implemented yet`, `Not verified yet`, old boundary wording, or obsolete manual status vocabulary.
 2. Move `docs/changes/yyyy-mm-dd-change-name/` to `docs/changes/closed/yyyy-mm-dd-change-name/`.
-3. Update the moved `tasks.md` closeout section.
+3. Update the moved `tasks.md` closeout section without changing status to `closed`; folder location is the closed state.
 4. Verify no active references still point to the old active path unless they intentionally describe history.
 
 ## Stop Conditions
@@ -402,7 +412,7 @@ When stopping or completing, report:
 - manual UI confirmation walkthrough for the user, or why none applies
 - commits by repo or commit candidates
 - remaining gaps or blockers
-- closeout readiness and any contradictory lifecycle state
+- Change status, closeout readiness, and any contradictory state
 - whether `/sdd-review`, closeout, or acceptance remains pending
 
 Before reporting success, confirm that Discovery ran, branch/git state was checked, focused verification ran, applicable manual UI confirmation steps were produced, Epic and change artifacts were reconciled, `tasks.md` can cold-resume the work, and no disallowed git/deploy/destructive action occurred.

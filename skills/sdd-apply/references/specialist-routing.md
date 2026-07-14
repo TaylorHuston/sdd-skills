@@ -2,7 +2,7 @@
 
 Use this reference to select and enforce guidance that is materially relevant to a `/sdd-apply` slice. It is a discovery protocol, not a fixed dependency list.
 
-Keep `/sdd-apply` as the orchestrator. Project-local instructions remain authoritative. Available skills contribute domain workflows and checks; they do not own scope, lifecycle, commits, or Epic truth.
+Keep `/sdd-apply` as the orchestrator. Project-local instructions remain authoritative. Available skills contribute domain workflows and checks; they do not own scope, Change status, commits, or Epic truth.
 
 ## Discovery Protocol
 

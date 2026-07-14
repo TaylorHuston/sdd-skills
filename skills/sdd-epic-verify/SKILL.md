@@ -1,6 +1,6 @@
 ---
 name: sdd-epic-verify
-description: Audit a SDD Epic end to end against current implementation reality with subagent delegation, systematic Requirement/Scenario testing, Epic coherence review, missing Story/Requirement/Scenario detection, Story label/reference traceability checks, lifecycle and evidence drift detection, and an Epic-local verification report. Use when the user invokes /sdd-epic-verify, asks whether an Epic is still accurate, asks to detect implementation drift across an Epic, asks to test every Story/Requirement/Scenario in an Epic, or wants to know what needs a SDD change, artifact fix, verification pass, or PRD update before continuing.
+description: Audit a SDD Epic end to end against current implementation reality with subagent delegation, systematic Requirement/Scenario testing, Epic coherence review, missing Story/Requirement/Scenario detection, Story label/reference traceability checks, Change-status and evidence drift detection, and an Epic-local verification report. Use when the user invokes /sdd-epic-verify, asks whether an Epic is still accurate, asks to detect implementation drift across an Epic, asks to test every Story/Requirement/Scenario in an Epic, or wants to know what needs a SDD change, artifact fix, verification pass, or PRD update before continuing.
 ---
 
 # SDD Epic Verify
@@ -9,11 +9,11 @@ Audit one Epic as a durable capability truth source. It works with embedded Stor
 
 ## Authority And Project Profile
 
-Load `$sdd-doctrine` before judging artifact authority, traceability, evidence, or lifecycle drift. Resolve the idea-owned planning root and target implementation repository through the doctrine relationship model unless project guidance explicitly maps them differently, then enforce Epics and their verification reports under `docs/epics/` and related changes under `docs/changes/` inside the implementation repository. Project guidance owns test, security, and supporting-doc commands and requirements.
+Resolve the workspace, idea-owned planning path, and target implementation repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before judging artifact authority, traceability, evidence, or Change-status drift. Use the resolved topology unless project guidance declares an explicit exception, then enforce Epics and their verification reports under `docs/epics/` and related changes under `docs/changes/` inside the implementation repository. Project guidance owns test, security, and supporting-doc commands and requirements. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
 
 This skill verifies truth; it does not implement missing behavior and does not replace `/sdd-review` for a specific change. Use `/sdd-review` for change-local PR readiness. Use `/sdd-epic-verify` when the question is whether the whole Epic still matches product intent, current code, tests, docs, and evidence.
 
-Delegation authorization: invoking `/sdd-epic-verify`, naming `sdd-epic-verify`, asking to verify or audit an SDD Epic, or asking to detect Epic drift is explicit permission to use bounded SDD audit subagents under this skill's delegation model. If the local tool policy requires an explicit user request before spawning subagents, this skill invocation satisfies that requirement for Epic coherence, Story drift, implementation, verification, security, docs, or lifecycle audit passes that remain inside the selected Epic/app scope. Do not ask for separate subagent permission unless the user passed a no-delegation mode, the requested delegation would exceed the selected Epic/app scope, the tool requires a more specific approval than normal spawning, or a stop condition applies.
+Delegation authorization: invoking `/sdd-epic-verify`, naming `sdd-epic-verify`, asking to verify or audit an SDD Epic, or asking to detect Epic drift is explicit permission to use bounded SDD audit subagents under this skill's delegation model. If the local tool policy requires an explicit user request before spawning subagents, this skill invocation satisfies that requirement for Epic coherence, Story drift, implementation, verification, security, docs, or Change-status audit passes that remain inside the selected Epic/app scope. Do not ask for separate subagent permission unless the user passed a no-delegation mode, the requested delegation would exceed the selected Epic/app scope, the tool requires a more specific approval than normal spawning, or a stop condition applies.
 
 ## Modes
 
@@ -48,7 +48,7 @@ The report is the durable audit record. Findings are addressed through the workf
 Before auditing, read:
 
 - app/workspace `AGENTS.md`, especially branch policy and test commands
-- the already loaded `$sdd-doctrine` reference plus any explicit project SDD overlay
+- the already loaded `.sdd/story-driven-development.md` workflow plus any explicit project SDD overlay
 - parent or workspace guidance when the project points to it
 - this skill's `assets/epic-template.md`, to check the target Epic against the canonical template shape
 - this skill's `scripts/epic_template_check.py`, to run the repeatable template-shape scan
@@ -89,6 +89,8 @@ Check git status in every repo that may be inspected or touched. Preserve unrela
    - Use small Story batches when the Epic is large or subagent capacity is limited.
    - Use `assets/epic-coherence-subagent-prompt.md` and `assets/story-drift-subagent-prompt.md`.
    - Record skipped delegation only when tooling is unavailable, the Epic is tiny, isolation would add risk, or another explicit stop condition applies; do not cite generic lack of subagent permission.
+   - Continue independent matrix and evidence work after spawning. Never wait silently for more than 60 seconds; report completed audit work and the delegated passes still pending.
+   - After roughly three minutes of cumulative waiting on one agent or audit wave, interrupt or close the slow agent and finish that audit locally, or re-delegate a narrower Story batch. Do not let an optional audit pass prevent a status response, and close completed or abandoned agents promptly.
 5. Systematically test the Epic.
    - Run focused tests named in `Verified By` when safe.
    - Run broader project checks when changed or claimed surfaces warrant them: unit tests, integration tests, typecheck, lint, build, codegen, migration checks, browser checks, CLI smoke checks, or manual Obsidian/Vercel/Convex checks as appropriate.
@@ -98,7 +100,7 @@ Check git status in every repo that may be inspected or touched. Preserve unrela
    - Re-read important files, inspect relevant diffs, and rerun or spot-check critical commands when practical.
    - Treat subagent findings as evidence, not final truth.
 7. Classify drift.
-   - `doctrine-drift`: Epic truth, artifact authority, change lifecycle, or behavior evidence violates the SDD north star or anti-patterns.
+   - `workflow-drift`: Epic truth, artifact authority, Change status, or behavior evidence violates the SDD north star or anti-patterns.
    - `template-drift`: Epic file shape, frontmatter, canonical sections, Story headings, candidate Story handling, or per-Story subsections diverge from the current Epic template without a documented migration reason.
    - `artifact-drift`: Epic/docs are stale but implementation is likely correct.
    - `implementation-drift`: code behavior no longer satisfies Epic truth.
@@ -107,7 +109,7 @@ Check git status in every repo that may be inspected or touched. Preserve unrela
    - `scope-drift`: Story/Requirement/Scenario no longer belongs, is missing, has moved to another Epic, or is too broad/narrow for the Epic or Story.
    - `product-drift`: Epic conflicts with PRD/product direction or current product reality.
    - `security-drift`: security, privacy, auth, data, dependency, or destructive-flow risk is unresolved.
-   - `lifecycle-drift`: related change folders, review records, manual confirmation status, release-communication state, PR/merge state, deferred gaps, or closed-folder state contradict each other. This includes completed or closed artifacts that still say work is `Not implemented yet`, `Not verified yet`, pending implementation/verification, or use obsolete manual confirmation status vocabulary.
+   - `status-drift`: related Change `tasks.md` status, folder location, review records, manual confirmation status, release-communication state, PR/merge state, or deferred gaps contradict each other. Active status must be `proposed`, `in_progress`, `review`, `replanning`, or `ready_to_close`; folder location under `closed/` means closed. This also includes completed or closed artifacts that still say work is `Not implemented yet`, `Not verified yet`, pending implementation/verification, or use obsolete manual confirmation status vocabulary.
    - `superseded-truth-drift`: later Stories, Requirements, Scenarios, implementation, or docs changed a boundary but earlier Epic truth still reads as current.
 8. Write or print the report.
    - Include the `scripts/epic_template_check.py` command and result in `Tests And Checks`.
@@ -117,7 +119,7 @@ Check git status in every repo that may be inspected or touched. Preserve unrela
 
 ## Gates
 
-Use `pass`, `findings`, `blocked`, or `not applicable`. Apply `$sdd-doctrine`, `assets/epic-template.md`, the repeatable template checker, selected available skills, and project guidance instead of restating their detailed rules here.
+Use `pass`, `findings`, `blocked`, or `not applicable`. Apply the managed workflow document, `assets/epic-template.md`, the repeatable template checker, selected available skills, and project guidance instead of restating their detailed rules here.
 
 1. **Doctrine and authority**: the Epic remains the durable accepted map from product behavior to implementation and evidence, and no supporting artifact contradicts or outranks it.
 2. **Epic coherence and completeness**: outcome, scope, Story ownership, Story ordering, cross-Story concerns, open decisions, and completion criteria form a coherent capability; missing Stories, Requirements, or Scenarios are findings.
@@ -125,7 +127,7 @@ Use `pass`, `findings`, `blocked`, or `not applicable`. Apply `$sdd-doctrine`, `
 4. **Traceability**: Story references and local Requirement/Scenario IDs are stable and unique, `Implemented By` is a useful code map, and moves or legacy identifiers remain traceable.
 5. **Implementation truth**: observable runtime behavior satisfies, defers, gaps, or exposes drift for every declared and materially missing behavior path.
 6. **Verification strength**: `Verified By` is scenario-mapped, evidence types remain distinct, broad gates are supporting evidence, production/mock boundaries are honest, and gaps state the remaining risk.
-7. **Supporting alignment and lifecycle**: project docs, product direction, ADRs, active/closed changes, manual confirmation, release communication, generated indexes, and review/merge state do not contradict the Epic.
+7. **Supporting alignment and status**: project docs, product direction, ADRs, active/closed Changes, machine-readable Change status, manual confirmation, release communication, generated indexes, and review/merge state do not contradict the Epic.
 8. **Security and data safety**: apply relevant available security guidance to auth, permissions, secrets, user data, migrations, destructive actions, dependencies, and external services implicated by the Epic.
 
 Do not report `aligned` merely because the declared Scenarios pass. The audit must also look for implemented behavior missing from the Epic and behavior the Epic needs but has not represented.

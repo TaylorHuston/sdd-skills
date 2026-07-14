@@ -9,7 +9,7 @@ Open and steward a pull request for SDD-backed work from one branch into another
 
 ## Authority And Project Profile
 
-Load `$sdd-doctrine` before judging reconciliation, evidence, review freshness, or merge readiness. Resolve the repository root, source and target policy, hosting provider, required checks, comment workflow, merge strategy, release communication, and permissions from project guidance. SDD artifacts remain under the canonical repository `docs/` tree. GitHub commands below apply only when GitHub is the configured provider.
+Resolve the workspace and repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before judging reconciliation, evidence, review freshness, or merge readiness. Resolve source and target policy, hosting provider, required checks, comment workflow, merge strategy, release communication, and permissions from project guidance. SDD artifacts remain under the resolved repository's canonical `docs/` tree. GitHub commands below apply only when GitHub is the configured provider. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
 
 Use `/sdd-release` for production-branch release PR preparation. Use `/sdd-pr` for ongoing PR stewardship after a PR exists, or for non-production PRs that are part of the project's normal branch policy.
 
@@ -51,7 +51,7 @@ If the source branch, target branch, provider, or project policy cannot be infer
 3. Preserve unrelated dirty files. Do not stash, reset, or overwrite user changes unless explicitly approved.
 4. Ensure source branch has the intended commits:
    - If the current branch has uncommitted changes required for the PR, commit them only when the user has authorized PR work in this request or earlier in this PR workflow.
-   - If the PR is for SDD-backed work, also check the workflow repo for related change folders, review reports, project docs, generated indexes, or lifecycle notes. Commit and push those related workflow files when commits are authorized before treating the PR branch as ready. Never include unrelated dirty files.
+   - If the PR is for SDD-backed work, also check the workflow repo for related Change folders, machine-readable `tasks.md` status, review reports, project docs, or generated indexes. Commit and push those related workflow files when commits are authorized before treating the PR branch as ready. Never include unrelated dirty files.
    - Use focused commit messages.
    - Resolve the current source commit SHA and the last source commit covered by `/sdd-review` from `review.md`, `tasks.md`, or the PR body. Treat a branch name alone as mutable context, not as the review watermark.
 5. Push the source branch:
@@ -150,7 +150,7 @@ Classify every accepted change after the last reviewed source commit. Comment di
 - `behavior-or-contract-change`: observable behavior, Requirements, Scenarios, API semantics, permissions, validation, recovery, data handling, security behavior, or user-facing release meaning changed. Reconcile the affected Epic, supporting docs, and release communication, then require a fresh `/sdd-review` before merge readiness.
 - `scope-product-or-architecture-change`: the feedback expands scope or changes product direction, Epic ownership, durable architecture, data model, auth model, public API, migration, deployment, or external-service behavior. Stop PR remediation and route to `/sdd-propose --replan`, `/sdd-adr`, or `/sdd-prd` as appropriate.
 
-Do not reopen a closed change merely to log ordinary PR feedback. Epic/Story truth is authoritative. Update a closed artifact only when its present-tense claims would otherwise materially contradict accepted behavior or lifecycle state.
+Do not reopen a closed Change merely to log ordinary PR feedback. Epic/Story truth is authoritative. Update a closed artifact only when its present-tense claims would otherwise materially contradict accepted behavior or Change status.
 
 ## Review Loop
 

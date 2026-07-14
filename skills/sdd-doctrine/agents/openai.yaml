@@ -1,4 +1,0 @@
-interface:
-  display_name: "SDD Doctrine"
-  short_description: "Load portable SDD process doctrine"
-  default_prompt: "Use $sdd-doctrine to interpret the portable SDD process separately from project-specific operating policy."

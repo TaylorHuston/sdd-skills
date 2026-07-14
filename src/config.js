@@ -313,6 +313,10 @@ export function validateConfig(config) {
   } else {
     const claimedRepositories = new Map();
     for (const [ideaId, idea] of Object.entries(config.ideas)) {
+      if (!ideaId) {
+        error("ideas keys must be non-empty Space IDs.");
+        continue;
+      }
       if (!idea || typeof idea !== "object" || Array.isArray(idea)) {
         error(`ideas.${ideaId} must be a mapping.`);
         continue;

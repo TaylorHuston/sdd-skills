@@ -22,7 +22,7 @@ mode: default
 
 | Gate | Result | Notes |
 |---|---|---|
-| SDD doctrine adherence | TBD | TBD |
+| SDD workflow adherence | TBD | TBD |
 | Epic coherence | TBD | TBD |
 | Epic template adherence | TBD | Include `scripts/epic_template_check.py` result. |
 | Story shape | TBD | TBD |
@@ -31,7 +31,7 @@ mode: default
 | Requirement and Scenario truth | TBD | TBD |
 | Implementation drift | TBD | TBD |
 | Verification strength | TBD | TBD |
-| Change lifecycle traceability | TBD | TBD |
+| Change status traceability | TBD | TBD |
 | Docs and product alignment | TBD | TBD |
 | Security and data safety | TBD | TBD |
 

@@ -9,7 +9,7 @@ Review a SDD change like a local pull request. This is the final independent gat
 
 ## Authority And Project Profile
 
-Load `$sdd-doctrine` before judging artifact authority, traceability, evidence, reconciliation, or closeout. Resolve the idea-owned planning root and target implementation repository through the doctrine relationship model unless project guidance explicitly maps them differently, then enforce Epics under `docs/epics/` and active/closed changes under `docs/changes/` inside the implementation repository. Project guidance owns source and target policy, required checks, merge/PR rules, supporting-doc requirements, release conventions, technology constraints, available review skills, and permissions.
+Resolve the workspace, idea-owned planning path, and target implementation repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before judging artifact authority, traceability, evidence, reconciliation, or closeout. Use the resolved topology unless project guidance declares an explicit exception, then enforce Epics under `docs/epics/` and active/closed changes under `docs/changes/` inside the implementation repository. Project guidance owns source and target policy, required checks, merge/PR rules, supporting-doc requirements, release conventions, technology constraints, available review skills, and permissions. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
 
 Default behavior is deep review. A clean `/sdd-review` means the source branch is ready to integrate into the selected target branch, not merely that the active change folder looks plausible. The primary review surface is the source-vs-target diff plus the SDD artifacts that claim to explain it. When default review returns `ready` for a non-production target and closeout readiness passes, treat merge-and-close as the obvious recommended next action and ask the user to confirm it. Use cheaper or narrower modes only when the user asks for them explicitly.
 
@@ -34,7 +34,7 @@ Supported modes:
 - Default: run the deep PR-style review against the selected target branch, use delegated fresh-context review passes when available and materially useful, fix narrow clearly safe in-scope findings once, rerun affected checks, commit only the safe-fix diff, report what was fixed and committed, and stop with the current verdict. Do not create a PR, merge, push, or close the change without confirmation. If the verdict is `ready`, the target is non-production, and closeout readiness passes, ask whether to perform the policy-defined merge-and-close next.
 - `--deep`: explicit alias for default behavior.
 - `--fast`: run a lightweight review on the main thread only. Still check source-vs-target diff, required SDD artifacts, branch policy, dirty state, security, and verification evidence, but skip delegated review passes and broad optional checks unless a risk is obvious.
-- `--artifact-only`: review SDD artifacts, Epic truth, lifecycle state, manual confirmation status, release-communication status, and PRD alignment when applicable. Do not review application code beyond what is necessary to confirm artifact claims. Do not return `ready` for integration from this mode; use `artifact-ready`, `changes-requested`, or `blocked`.
+- `--artifact-only`: review SDD artifacts, Epic truth, Change status, manual confirmation status, release-communication status, and PRD alignment when applicable. Do not review application code beyond what is necessary to confirm artifact claims. Do not return `ready` for integration from this mode; use `artifact-ready`, `changes-requested`, or `blocked`.
 - `--diff-only`: review the source-vs-target code/config/test/docs diff, branch readiness, security, and verification evidence. Do not reconcile full Epic or PRD truth beyond obvious contradictions. Do not return full SDD closeout readiness from this mode.
 - `--no-delegate`: use the main thread only. Use when subagent tooling is unavailable, the change is tiny, or delegation would add more noise than useful independent review.
 - `--check`: review only and do not edit any files, including `review.md`.
@@ -115,6 +115,8 @@ Before reviewing, read:
 - `docs/changes/yyyy-mm-dd-change-name/design.md`
 - `docs/changes/yyyy-mm-dd-change-name/tasks.md`
 - existing `docs/changes/yyyy-mm-dd-change-name/review.md`, if present
+
+Validate that active `tasks.md` frontmatter uses `proposed`, `in_progress`, `review`, `replanning`, or `ready_to_close`. In mutating modes, set `status: review` when independent review begins. In `--check`, report a stale or invalid status without editing it.
 - project-defined release communication when the proposal or task ledger says it is affected, or implementation changes public release meaning
 - relevant target Epic files under `docs/epics/*/epic.md`
 - enough of every active `docs/epics/*/epic.md` to detect duplicate Story labels inside an Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs
@@ -137,7 +139,7 @@ The user's invocation of this skill is the standing delegation authorization for
 
 Use delegated fresh-context passes for:
 
-- artifact truth and lifecycle consistency
+- artifact truth and Change-status consistency
 - source-vs-target code review
 - verification and Requirement/Scenario coverage
 - risk-shaped evidence review for deterministic edge cases the happy path may miss
@@ -154,7 +156,9 @@ Use the main thread only when:
 - subagent tooling is unavailable
 - the user needs to answer a question before a reviewer can be scoped
 
-Parallelize read-only delegated review passes when their scopes do not overlap. Do not delegate lifecycle decisions, commits, PR creation, merges, closeout moves, branch operations, or final verdicts.
+Parallelize read-only delegated review passes when their scopes do not overlap. Do not delegate Change-status decisions, commits, PR creation, merges, closeout moves, branch operations, or final verdicts.
+
+Keep delegated review waits bounded. Continue independent review work after spawning, and wait only when the next required decision depends on delegated evidence. Never wait silently for more than 60 seconds; report which gates are complete and which review pass remains. After roughly three minutes of cumulative waiting on one pass or review wave, interrupt or close the slow reviewer and complete that gate locally, or re-delegate a narrower question. An optional reviewer must never prevent a concise status response. Close completed or abandoned reviewers promptly.
 
 Use `assets/subagent-pr-review-prompt.md` for delegated passes when structured prompts help. Each delegated review prompt must include:
 
@@ -166,21 +170,21 @@ Use `assets/subagent-pr-review-prompt.md` for delegated passes when structured p
 - relevant Story, Requirement, and Scenario IDs when known
 - branch policy summary
 - selected available skills and guidance to load, with selection reasons
-- explicit instruction not to edit, commit, push, merge, close, or update lifecycle state
+- explicit instruction not to edit, commit, push, merge, close, or update Change status
 - required report shape
 
 Treat subagent output as evidence, not final truth. Validate important claims by inspecting the referenced files, checking the source-vs-target diff, rerunning focused commands when practical, and rejecting vague findings without concrete impact.
 
 ## Review Gates
 
-Run every gate that applies and record `pass`, `findings`, `blocked`, or `not applicable`. Apply the detailed semantics from `$sdd-doctrine`, the canonical templates, selected available review skills, and project guidance instead of restating them here.
+Run every gate that applies and record `pass`, `findings`, `blocked`, or `not applicable`. Apply the detailed semantics from the managed workflow document, the canonical templates, selected available review skills, and project guidance instead of restating them here.
 
-1. **Artifact truth**: proposal, design, task ledger, Epic/Story truth, Requirements, Scenarios, evidence maps, gaps, and lifecycle state agree with implementation reality.
+1. **Artifact truth**: proposal, design, task ledger, Epic/Story truth, Requirements, Scenarios, evidence maps, gaps, and Change status agree with implementation reality.
 2. **Source-vs-target code review**: review the actual diff and source-only commits for correctness, regressions, maintainability, accidental scope, project-pattern fit, and user-visible state handling.
 3. **Verification**: scenario-mapped focused evidence exists, broad gates are not substituted for behavior proof, production/mock boundaries are honest, and required project checks pass or have explicit blocking gaps.
 4. **Risk-shaped evidence**: important deterministic claims are challenged against plausible failure modes and supported by tests, source inspection, repeatable runtime evidence, or an explicit gap.
 5. **Security and data safety**: use relevant available security guidance and inspect the risk surfaces identified by the diff and project policy.
-6. **Manual acceptance**: user-facing changes have the doctrine-defined walkthrough and status when applicable; project policy decides whether confirmation itself blocks readiness.
+6. **Manual acceptance**: user-facing changes have the workflow-defined walkthrough and status when applicable; project policy decides whether confirmation itself blocks readiness.
 7. **Supporting truth**: required project docs, release communication, generated indexes, ADRs, and product direction do not contradict the implementation or Epic map.
 8. **Integration readiness**: source, target, reviewed commit, dirty state, conflict state, required checks, authorization, and the project-defined PR/merge/closeout path are unambiguous.
 
@@ -223,6 +227,8 @@ If the safe-fix diff cannot be isolated from unrelated dirty files, affected ver
 
 If findings require implementation work beyond safe review remediation, leave them in `review.md` and recommend returning to `/sdd-apply`.
 
+Set `tasks.md` status from the verdict: use `in_progress` when implementation or ordinary remediation remains, `replanning` when product/Requirement/Scenario/scope/ownership decisions must be revised, `review` when review is incomplete or blocked without requiring replanning, and `ready_to_close` only when the full review and closeout gates pass.
+
 ## PR, Merge, And Closeout
 
 When all gates pass:
@@ -246,9 +252,9 @@ When merge-and-closing:
 
 When closing:
 
-1. Ensure `tasks.md` closeout reflects review outcome, review record, manual confirmation status, release-communication status, PR/merge state, remaining accepted risks, and that no contradictory checklist or Resume Here state remains.
+1. Ensure `tasks.md` has `status: ready_to_close` and its closeout reflects review outcome, review record, manual confirmation status, release-communication status, PR/merge state, remaining accepted risks, and that no contradictory checklist or Resume Here state remains.
 2. Move `docs/changes/yyyy-mm-dd-change-name/` to `docs/changes/closed/yyyy-mm-dd-change-name/`.
-3. Verify references to the active path are historical or updated.
+3. Do not write `status: closed`; folder location is the closed state. Verify references to the active path are historical or updated.
 
 ## Stop Conditions
 
@@ -290,7 +296,7 @@ Include:
 - Epic truth result
 - test and verification commands/results
 - manual UI confirmation walkthrough status, plus a concise `Suggested manual UI testing` list with route/setup/actions/expected result for anything the user should confirm; say `none` when no manual UI confirmation is useful
-- closeout readiness and any contradictory lifecycle state
+- Change status, closeout readiness, and any contradictory state
 - formal security review result
 - docs result
 - release-communication result

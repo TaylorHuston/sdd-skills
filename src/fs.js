@@ -65,6 +65,38 @@ export async function hashDirectory(root) {
   return `sha256:${hash.digest("hex")}`;
 }
 
+export async function hashFile(path) {
+  return `sha256:${createHash("sha256").update(await readFile(path)).digest("hex")}`;
+}
+
+export async function replaceFileAtomically(source, target) {
+  const parent = dirname(target);
+  const name = basename(target);
+  const nonce = `${process.pid}-${Date.now()}`;
+  const temporary = join(parent, `.${name}.sdd-new-${nonce}`);
+  const backup = join(parent, `.${name}.sdd-old-${nonce}`);
+  const targetExists = await pathExists(target);
+
+  await mkdir(parent, { recursive: true });
+  try {
+    await cp(source, temporary);
+    if (targetExists) {
+      await rename(target, backup);
+    }
+    await rename(temporary, target);
+  } catch (error) {
+    await rm(temporary, { force: true });
+    if (targetExists && (await pathExists(backup)) && !(await pathExists(target))) {
+      await rename(backup, target);
+    }
+    throw error;
+  }
+
+  if (targetExists) {
+    await rm(backup, { force: true }).catch(() => {});
+  }
+}
+
 export async function replaceDirectoryAtomically(source, target) {
   const parent = dirname(target);
   const name = basename(target);
