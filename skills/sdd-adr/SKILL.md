@@ -11,7 +11,7 @@ Create or update Architecture Decision Records for durable technical decisions i
 
 Resolve the workspace and repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before interpreting SDD artifact roles or Change status. Use the resolved repository and enforce ADR location under `docs/adrs/`. Project guidance still owns ADR status vocabulary, required links, and write policy. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
 
-Use this skill from `/sdd-explore` when a discussion reaches a durable architecture decision, and from `/sdd-propose` when the selected technical approach creates a rule future work should follow.
+Use this skill from `/sdd-explore` when a discussion reaches a durable architecture decision, and from `/sdd-change --plan` or `--replan` when the selected technical approach creates a rule future work should follow. Do not create an ADR from `/sdd-change --brief`; briefs intentionally avoid technical decisions.
 
 ADRs complement SDD artifacts. They do not replace Product Briefs/PRDs, Epics, Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, proposal/design/tasks files, review reports, changelogs, or release records.
 
@@ -65,8 +65,8 @@ If the project has no `docs/adrs/`, create it only when the user has asked to dr
    - Use status values that match the project when present; otherwise use `Proposed`, `Accepted`, `Superseded`, or `Rejected`.
 4. Link the ADR.
    - Link related SDD change folders, Epics, Stories, Requirements, Scenarios, PRs, or implementation evidence when known.
-   - If invoked during `/sdd-propose`, ensure `design.md` and `tasks.md` mention the ADR path or ADR candidate.
-   - If invoked during `/sdd-explore`, offer to link the ADR from an exploration summary or later `/sdd-propose`.
+   - If invoked during `/sdd-change --plan` or `--replan`, ensure `design.md` and `tasks.md` mention the ADR path or ADR candidate.
+   - If invoked during `/sdd-explore`, offer to link the ADR from an exploration summary or later `/sdd-change --plan`.
 5. Verify the ADR.
    - Re-read the ADR.
    - Confirm it states context, decision, options considered, consequences, validation, and reconsideration signals.

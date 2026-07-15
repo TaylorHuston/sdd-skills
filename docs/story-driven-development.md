@@ -1,6 +1,6 @@
 ---
 created: 2026-06-13
-modified: 2026-07-11
+modified: 2026-07-15
 ---
 # Story-Driven Development
 
@@ -61,7 +61,7 @@ Private product direction is idea-owned, and an idea may map to zero, one, or ma
     <repo-b>/
 ```
 
-- **Planning root**: `planning.root` in `.sdd/config.yaml`. An idea defaults to `<planning.root>/<idea-key>` and may declare `planning` relative to that root or exceptional workspace-relative `planningPath`. This is the private product surface, including `prd.md`, Feature/Capability Briefs, exploration summaries, visual identity, research, private navigation, and optional planned Change drafts under the configured `plannedChangesDirectory`.
+- **Planning root**: `planning.root` in `.sdd/config.yaml`. An idea defaults to `<planning.root>/<idea-key>` and may declare `planning` relative to that root or exceptional workspace-relative `planningPath`. This is the private product surface, including `prd.md`, Feature/Capability Briefs, exploration summaries, visual identity, research, private navigation, Change Briefs, and planned Change drafts under the configured `plannedChangesDirectory`.
 - **Repository roots**: named entries under `repositories.roots` in `.sdd/config.yaml`. Each points to a workspace-relative directory containing implementation repositories.
 - **Canonical relationship**: each `ideas.<idea>` entry declares lifecycle `status`, and each repository entry declares a `path`, lifecycle `status`, optional named `root`, and optional concise `role`. A rooted path resolves relative to that named repository root; an entry without `root` is an explicit workspace-relative exception.
 
@@ -115,7 +115,8 @@ The planning root is not a second implementation source of truth. Product direct
 - **Implemented By**: A developer starting index for the important files, modules, routes, components, APIs, migrations, or support files that implement or materially support the Story.
 - **Verified By**: A behavior evidence index. It should name concrete tests, assertions, browser/manual scenarios, review artifacts, or other proof tied to the Requirement or Scenario. It is not a chronological command log.
 - **Verification Gaps**: Known missing, deferred, or accepted gaps. Empty or stale gaps are misleading and should be cleaned up.
-- **Planned Change Draft**: An optional private pre-implementation scaffold under `<planning-path>/<plannedChangesDirectory>/yyyy-mm-dd-change-name/`. It may use `proposal.md`, `design.md`, and `tasks.md` with `status: proposed`, but it is not an active repository Change, does not authorize implementation, and does not override Epic/Story truth.
+- **Change Brief**: An undated private outcome capture at `<planning-path>/<plannedChangesDirectory>/<change-slug>.md`. It records why a change may matter, the desired observable outcome, scope boundaries, success signals, durable constraints, and open product questions without choosing a technical approach. It has no Change status and does not authorize planning, promotion, or implementation by itself.
+- **Planned Change Draft**: A private implementation-ready scaffold under `<planning-path>/<plannedChangesDirectory>/yyyy-mm-dd-change-name/` containing `proposal.md`, `design.md`, and `tasks.md` with `status: proposed`. It is not an active repository Change, does not authorize implementation, and does not override Epic/Story truth.
 - **Change**: A tracked working artifact set under `docs/changes/yyyy-mm-dd-change-name/` containing `proposal.md`, `design.md`, and `tasks.md`. The change may create a new Epic, update an existing Epic, or both. Its active status is machine-readable from `tasks.md`; its closed state is derived from folder location.
 
 ## Artifact Authority
@@ -127,7 +128,7 @@ Use this authority order:
 1. Running implementation and tests reveal what the application actually does.
 2. Epic files are the durable written map for accepted implemented capabilities, embedded Stories, Requirements, Scenarios, implementation evidence, verification evidence, and known gaps.
 3. Active change folders are working records for proposed or in-progress changes.
-4. Product Briefs/PRDs guide product intent, audience, scope, principles, and open product questions.
+4. Product Briefs/PRDs and confirmed Change Briefs guide product intent, audience, scope, principles, desired outcomes, and open product questions. They never override current implementation or Epic truth.
 5. Reviews, release notes, changelogs, and exploration notes are evidence and transition records.
 6. READMEs and general docs are supporting documentation and must not contradict active Epic truth.
 
@@ -188,7 +189,16 @@ Capture important failure modes as Scenarios when they affect user-visible behav
 
 ## Change Workflow
 
-Product work may be drafted privately before implementation begins. `sdd change create <space-id> <slug>` deterministically scaffolds a Planned Change Draft under the owning Space's configured planning path, using canonical templates and explicit mapped-repository selection when a Space has multiple repositories. Planned drafts are not included in active repository status and must not be passed to `/sdd-apply` in place. Before implementation, run `sdd change promote <space-id> <change-id>` with explicit `--repo` selections when needed. Promotion validates the proposed draft, creates each selected repository Change under its configured active-Change path, removes private planning-path references, and removes the planning draft only after every selected destination succeeds. `/sdd-propose` must then reconcile repository-specific scope before handing the Change to `/sdd-apply`; there must be only one active truth for each repository Change.
+Use just-in-time elaboration instead of making early technical assumptions durable:
+
+1. `/sdd-change --brief` captures an undated private Change Brief containing durable product intent only. Briefs are not Changes, do not use the Change status vocabulary, and may wait in the backlog without technical plans becoming stale.
+2. `/sdd-change --plan` confirms the brief's outcome, refreshes current project and implementation context, and uses `sdd change create <space-id> <slug>` to scaffold the dated Planned Change Draft. When the Change introduces an Epic, use `sdd epic create <space-id> <epic-id> <slug>` so the repository artifact starts from the canonical validated shape rather than an agent-authored approximation. The skill then refines `proposal.md`, `design.md`, and `tasks.md` through product and technical planning. Assign the dated Change ID at this point, not when the brief is first captured.
+3. When a UI-bearing Change has material experience uncertainty, `/sdd-design` may converge user flow, responsive composition, component/state behavior, accessibility, and visual direction into the existing `design.md` and `tasks.md`. It does not add a status, change accepted behavior, or authorize application/Storybook edits. Behavioral discoveries route back through `/sdd-change --plan` or `--replan`.
+4. Once the planned artifacts validate and `proposal.md` preserves the brief's durable intent, the brief is consumed so there is no duplicate live planning truth. Planned drafts are not included in active repository status and must not be passed to `/sdd-apply` in place.
+5. `sdd change promote <space-id> <change-id>` promotes the settled draft with explicit `--repo` selections when needed. Promotion validates the proposed draft, creates each selected repository Change under its configured active-Change path, removes private planning-path references, and removes the planning draft only after every selected destination succeeds.
+6. `/sdd-change --plan` reconciles repository-specific scope after promotion before handing the Change to `/sdd-apply`. There must be only one active truth for each repository Change.
+
+When implementation is expected immediately, `--plan` may capture and confirm the brief-level outcome in the same invocation before technical planning. It must not silently skip the intent boundary merely because the brief is short-lived.
 
 Use the canonical dated change layout:
 
@@ -202,7 +212,7 @@ docs/changes/yyyy-mm-dd-change-name/
 
 `proposal.md` defines the problem, goal, scope, non-goals, affected Epics, and expected user/product outcome.
 
-`design.md` is the high-level technical approach. It should explain the chosen approach, important alternatives considered, risks, dependencies, migration or data implications, and how the Epic/Story/Requirement truth will change. It should not become a step-by-step implementation plan.
+`design.md` is the high-level solution approach. It should explain the chosen technical approach, important alternatives considered, risks, dependencies, migration or data implications, and how the Epic/Story/Requirement truth will change. For UI-bearing Changes, it may also contain a concise `Experience Design` contract linking the user-confirmed flow, responsive composition, component/state behavior, accessibility, visual direction, and stable prototype references. It should not become a step-by-step implementation plan or duplicate behavioral truth.
 
 `tasks.md` is the adaptive implementation ledger. It records `Resume Here`, task progress, implementation evidence, verification evidence, manual UI confirmation status, release-communication impact, review status, branch/PR/merge state, deferred gaps, and closeout readiness.
 
@@ -226,7 +236,7 @@ The portable status vocabulary is:
 
 These values are workflow signals, not a rigid one-way state machine. Review findings can return a Change to `in_progress` or `replanning`. Set `replanning` before revising planning artifacts and restore `in_progress` when the revised plan is ready to apply. Set `ready_to_close` only when no unresolved review, verification, manual acceptance, release-communication, branch, PR/merge, or artifact-truth condition blocks closeout.
 
-There is no `closed` value. Moving the entire Change folder to `docs/changes/closed/` is the canonical and machine-readable closed state. The moved `tasks.md` retains its last active status, normally `ready_to_close`; folder location takes precedence.
+There is no `closed` value. Moving the entire Change folder to `docs/changes/closed/` is the canonical and machine-readable closed state. After contextual review, acceptance, PR/merge, and authorization gates pass, use `sdd change close <space-id> <change-id>` with explicit `--repo` selections when needed. The command requires `status: ready_to_close`, preflights every selected destination, and performs only the configured folder transition; it does not decide readiness, merge branches, commit files, or reconcile product truth. The moved `tasks.md` retains `ready_to_close`; folder location takes precedence.
 
 Closeout must reconcile both forward and backward. Updating the current Story is not sufficient when a change changes the meaning of earlier Stories, Requirements, Scenarios, `Verified By`, `Verification Gaps`, or closed change records. Before closing, scan affected Epics and related active/closed change artifacts for stale assumptions such as "Not implemented yet", "Not verified yet", outdated manual confirmation status, old boundary wording, or accepted gaps that no longer match reality.
 
@@ -234,7 +244,15 @@ Changes may be small or large. Small fixes still deserve enough tracking to keep
 
 Planning artifacts are documentation, but their allowed branch and commit behavior belongs to project policy. Before writing them, follow the consuming project's documentation policy. Before changing application code, tests, schemas, configuration, generated project artifacts, or runtime behavior, follow its implementation branch and authorization policy.
 
-When implementation or manual feedback discovers a new or meaningfully changed Requirement, Scenario, constraint, or Epic ownership question that needs planning before more code changes, use `/sdd-propose --replan` against the active change. That mode sets `tasks.md` status to `replanning`, updates `proposal.md`, `design.md`, and `tasks.md`, records the planning update, restores status to `in_progress` when the revised plan is ready, and then hands back to a fresh `/sdd-apply`.
+When implementation or manual feedback discovers a new or meaningfully changed Requirement, Scenario, constraint, or Epic ownership question that needs planning before more code changes, use `/sdd-change --replan` against the active change. That mode sets `tasks.md` status to `replanning`, updates `proposal.md`, `design.md`, and `tasks.md`, records the planning update, restores status to `in_progress` when the revised plan is ready, and then hands back to a fresh `/sdd-apply`.
+
+## Deterministic Artifact Validation
+
+Use `sdd validate` as the machine-readable structural baseline for SDD work. It checks only facts derivable from workspace files: required Change files and core sections, valid status and folder placement, duplicate planned/active/closed locations, unresolved scaffolding, Epic template shape, Story Index alignment, Story/Requirement/Scenario identifier shape and uniqueness, traceability table headers, evidence references to declared Requirements/Scenarios, and broken local Markdown links to Epic or Change artifacts. Scope it by Space, repository, Change, or Epic when a workflow owns a narrower surface. A Change-scoped run also validates Epic paths declared under its proposal's `Epic Actions` and reports a missing affected Epic rather than silently returning `epics: 0`. Closed history still receives strict file, status, collision, and reference checks, but older title, section, and placeholder shape is reported as compatibility warnings so a newer template does not retroactively invalidate completed work.
+
+A passing validation result does not establish product completeness, implementation truth, test strength, manual acceptance, review readiness, or release readiness. Skills remain responsible for those contextual judgments and must not convert a structural pass into a semantic claim. A failing result is actionable workflow drift unless the finding is an intentional compatibility warning that the owning skill explicitly records.
+
+`/sdd-change --plan` and `--replan` validate the planned or replanned Change before handoff. `/sdd-apply` validates the selected Change and affected Epics during Discovery and again after reconciliation. `/sdd-review` treats scoped validation as one input to its independent diff and truth review. `/sdd-epic-verify` begins with scoped Epic validation before auditing completeness, implementation, and evidence quality.
 
 ## Implementation And Review
 
@@ -258,7 +276,7 @@ Manual confirmation status must use the same vocabulary everywhere: `not applica
 
 `/sdd-review` is the local PR-style gate after implementation. It independently checks proposal/design/tasks, Epic truth, Requirements, Scenarios, tests, manual confirmation, code quality, security, docs, release-communication impact, branch policy, and closeout consistency. Review should be comprehensive rather than serial: complete the materially relevant review wave, validate and consolidate all findings, remediate the complete safe subset as one batch, then perform one regression-focused rereview. It should not require repeated user invocations merely to reveal the next review category. If deficiencies remain, it creates or updates `review.md` with the consolidated set. If it returns clean for a non-production integration target, it should offer the policy-defined merge-and-close as the recommended next action, but must ask the user before merging, moving the change folder, pushing, or taking any other integration action.
 
-Status transitions must accompany the work that justifies them: `/sdd-propose` creates `proposed`; `/sdd-apply` changes it to `in_progress` and then `review` at implementation handoff; `/sdd-review` keeps `review`, returns deficiencies to `in_progress` or `replanning`, and sets `ready_to_close` only when closeout gates pass. Closing is represented only by moving the folder.
+Status transitions must accompany the work that justifies them: `/sdd-change --brief` creates no status, `/sdd-change --plan` creates `proposed`, `/sdd-apply` changes it to `in_progress` and then `review` at implementation handoff, and `/sdd-review` keeps `review`, returns deficiencies to `in_progress` or `replanning`, and sets `ready_to_close` only when closeout gates pass. Closing is represented only by the folder move performed through `sdd change close` after the owning skill has completed the contextual gates and obtained required authorization.
 
 `/sdd-release` prepares promotion to the project-defined production target. It runs the project-defined release checks, updates required release communication according to project policy, and opens or prepares the required release handoff. It does not merge, deploy, tag, publish, or mutate production state without explicit authorization.
 
@@ -325,7 +343,8 @@ Use the skills to apply this doctrine consistently:
 | `/sdd-prd` | Create or revise the private Product Brief/PRD that guides product scope, audience, principles, market context, monetization, and open product questions. |
 | `/sdd-explore` | Think through product ideas, technical options, codebase findings, or requirement questions before deciding whether to create a change. |
 | `/sdd-adr` | Create, update, or assess ADRs for durable technical decisions that future SDD work should respect. |
-| `/sdd-propose` | Create or update a dated change folder with `proposal.md`, `design.md`, and `tasks.md`; use `/sdd-propose --replan` for mid-change discoveries that need planning before `/sdd-apply` resumes. |
+| `/sdd-change` | Capture durable intent with `--brief`, create a just-in-time dated plan with `--plan`, or revise an active Change with `--replan`. |
+| `/sdd-design` | Resolve optional experience-design readiness for a UI-bearing planned or active Change without implementing application or Storybook code. |
 | `/sdd-interactive` | Create and apply a lightweight tracked change in one working session for small concrete changes that do not need a full upfront proposal pass. |
 | `/sdd-apply` | Implement or continue an active change using Requirement/Scenario-driven slices, subagent delegation when useful, verification, artifact reconciliation, and manual UI confirmation. |
 | `/sdd-review` | Run the local PR-style integration gate after implementation or before closing a change. |
@@ -349,6 +368,8 @@ Put project-specific branch, merge, release, deployment, and repository rules in
 Strong portable defaults such as BDD/TDD, orchestrator/subagent use for non-trivial work when tooling allows it, manual confirmation semantics, and Epic/Story truth discipline belong in this doctrine. Individual skills should explain how their workflow applies those defaults only where procedure or stop conditions differ.
 
 Skill-assisted implementation is capability-driven. `/sdd-apply` should inspect the skills available in the current runtime, select only those materially relevant to the active slice, read and enforce their guidance, and pass selected guidance into delegated work. The workflow must not require any named optional skill to be installed. When no matching skill is available, continue from project guidance, current SDD artifacts, and sound engineering judgment. Record concrete consequences of applied guidance in the existing implementation and verification record, not a separate skill-selection inventory.
+
+Design tooling is also capability-driven. `/sdd-design` may use installed visual-review, browser, prototyping, design-system, image, or accessibility capabilities, but portable SDD must not require Stitch, Penpot, Storybook, Figma, or any other named product. Stable references to selected external artifacts belong in the Change; prototypes remain design intent rather than behavioral or implementation truth.
 
 If this document and a skill disagree, update the skill or this document so they align rather than treating the disagreement as acceptable drift.
 

@@ -5,7 +5,7 @@ description: Apply or continue an active SDD change using a main orchestrator wi
 
 # SDD Apply
 
-Apply a SDD change from its change folder. This is the implementation-side companion to `/sdd-propose`: `proposal.md` defines scope, `design.md` defines the high-level technical approach and Epic changes, and `tasks.md` is the adaptive implementation ledger and cold-resume surface.
+Apply a SDD change from its change folder. This is the implementation-side companion to `/sdd-change --plan`: `proposal.md` defines scope, `design.md` defines the high-level technical approach and Epic changes, and `tasks.md` is the adaptive implementation ledger and cold-resume surface.
 
 ## Authority And Project Profile
 
@@ -64,7 +64,7 @@ Use the explicit path or name if provided. Otherwise:
 1. Infer from conversation context when a change was just discussed.
 2. List active folders under `docs/changes/`, excluding `docs/changes/closed/`.
 3. If no canonical active change is found, inspect legacy `changes/` only as migration input. Do not apply it in place; stop and require migration into `docs/changes/` before implementation continues.
-4. Do not select a private Planned Change Draft from the idea planning path. Stop and require `sdd change promote <space-id> <change-id>` plus repository-specific `/sdd-propose` reconciliation before implementation continues.
+4. Do not select a Change Brief or private Planned Change Draft from the idea planning path. Stop and require `/sdd-change --plan` for a brief, or `sdd change promote <space-id> <change-id>` plus repository-specific `/sdd-change --plan` reconciliation for a planned draft, before implementation continues.
 5. Auto-select only when exactly one active change exists.
 6. Ask the user when multiple active changes match or no change can be inferred.
 
@@ -93,9 +93,11 @@ Start every run with Discovery, even when resuming.
 
 Check that:
 
+- `sdd validate <space-id> --change <change-id> --repo <resolved-repository-path> --workspace <workspace-root> --json` has no unresolved deterministic errors. Inspect warnings and classify intentional compatibility exceptions instead of ignoring them. This structural gate does not replace the semantic Discovery checks below.
 - `proposal.md`, `design.md`, and `tasks.md` agree about the change scope.
-- `tasks.md` frontmatter has exactly one valid `status`: `proposed`, `in_progress`, `review`, `replanning`, or `ready_to_close`. Set it to `in_progress` before implementation or remediation begins. Stop and route to `/sdd-propose --replan` when status is `replanning` and planning is not yet resolved.
+- `tasks.md` frontmatter has exactly one valid `status`: `proposed`, `in_progress`, `review`, `replanning`, or `ready_to_close`. Set it to `in_progress` before implementation or remediation begins. Stop and route to `/sdd-change --replan` when status is `replanning` and planning is not yet resolved.
 - `design.md` identifies whether the change creates new Epic directories, edits existing Epic directories, or both.
+- For UI-bearing changes, any required `Experience Design` direction is confirmed, uses stable references, and resolves material responsive, state, accessibility, and visual questions before implementation begins.
 - each targeted Epic path follows `docs/epics/key-###-epic-name/epic.md`.
 - Stories stay embedded in Epic `epic.md` files; do not create `docs/stories/`.
 - Epics and Stories are durable but revisable truth; proposed Story moves, splits, merges, renames, and reorders are explicit Epic changes, not accidental implementation cleanup.
@@ -142,15 +144,16 @@ Before acting on feedback:
    - For `verification gap`, run or add the missing proof before claiming completion.
    - For `artifact drift`, update the stale artifact and record the reconciliation in `tasks.md`.
    - For small `requirement refinement`, update `design.md` and the target Epic Story Requirement/Scenario IDs before implementation, then add matching `tasks.md` checklist entries.
-   - For `planning discovery`, stop implementation and recommend `/sdd-propose --replan` against the active change. Resume with a fresh `/sdd-apply` only after `proposal.md`, `design.md`, and `tasks.md` are updated.
-   - For `scope expansion`, stop unless the user explicitly accepts expanding this change. If accepted and the expansion needs planning, route to `/sdd-propose --replan`; otherwise update `proposal.md`, `design.md`, Epic truth, and `tasks.md`. If not accepted, recommend `/sdd-propose` for a follow-up change.
+   - For `planning discovery`, stop implementation and recommend `/sdd-change --replan` against the active change. Resume with a fresh `/sdd-apply` only after `proposal.md`, `design.md`, and `tasks.md` are updated.
+   - For material experience-design uncertainty that does not yet change accepted behavior, stop the UI slice and recommend `/sdd-design`. If design discovery changes Requirements, Scenarios, scope, ownership, contracts, data, auth, or technical constraints, route through `/sdd-change --replan` before returning to design or implementation.
+   - For `scope expansion`, stop unless the user explicitly accepts expanding this change. If accepted and the expansion needs planning, route to `/sdd-change --replan`; otherwise update `proposal.md`, `design.md`, Epic truth, and `tasks.md`. If not accepted, recommend `/sdd-change --brief` for a follow-up change.
    - For `product drift`, stop or recommend `/sdd-prd` unless the user explicitly authorizes product-direction updates in the same run.
 
 When feedback changes a Requirement or Scenario, preserve the stable Story label/reference and local Requirement/Scenario ID when the behavior is an edit to existing truth. Add a new `R#` or `R#-S#` only when it is a genuinely new behavior rule or scenario. Do not silently renumber completed Requirements or Scenarios just to keep labels tidy.
 
 When feedback or implementation reveals that a Story belongs in a different Epic, treat it as Epic ownership change. Record the old full Story reference and the new full Story reference, update both source and destination Epic truth, and record the move in `tasks.md`; if the move was not in the proposal, stop or require explicit scope acceptance before applying it.
 
-Manual feedback is not `/sdd-review` by default. Create or update `review.md` only when the feedback is explicitly a review finding or comes from `/sdd-review`; otherwise keep the active record in `tasks.md` and the durable truth in `design.md` plus the Epic. When the feedback becomes planning-level discovery, let `/sdd-propose --replan` revise the planning artifacts before implementation resumes.
+Manual feedback is not `/sdd-review` by default. Create or update `review.md` only when the feedback is explicitly a review finding or comes from `/sdd-review`; otherwise keep the active record in `tasks.md` and the durable truth in `design.md` plus the Epic. When the feedback becomes planning-level discovery, let `/sdd-change --replan` revise the planning artifacts before implementation resumes.
 
 ## Phase Boundary
 
@@ -218,6 +221,7 @@ Every delegated implementation prompt must include:
 - target Epic path and the exact Story label/reference, Requirement ID, and Scenario ID scope
 - relevant technical approach, constraints, and stop conditions
 - selected available skills and other required guidance to load
+- confirmed experience-design references and UI stop conditions when the slice is user-facing
 - why each selected skill or guidance item applies to this slice
 - expected files or surfaces to inspect
 - allowed toolsets and edit permissions
@@ -362,11 +366,13 @@ A change is implementation-complete only when:
 - meaningful verification has passed or gaps are explicit.
 - manual UI confirmation steps are recorded for user-facing app changes, or `tasks.md` explains why no manual confirmation applies.
 - the implementation self-check has no unresolved safe fixes.
+- scoped `sdd validate` passes after the final Epic and Change reconciliation; warnings are either resolved or explicitly classified.
 - `tasks.md` has an accurate final `Resume Here`, implementation ledger, verification ledger, blockers/open questions, and closeout state.
 - `tasks.md` records the review outcome as a `review.md` path, a clean review recorded in `tasks.md`, or an explicit user-approved review waiver before closeout.
 - `tasks.md` records manual UI confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
 - related proposal/design/tasks/review artifacts do not contain stale implementation-pending language or contradictory manual confirmation status unless clearly marked historical.
 - affected existing or locally required project docs under `docs/` no longer contradict implementation, Epic truth, branch/release policy, testing commands, architecture, data/API contracts, deployment behavior, operations, or visual style.
+- when `design.md` contains a confirmed `Experience Design`, implementation and Storybook/manual evidence reflect its required flow, responsive composition, states, accessibility behavior, and explicitly accepted deviations.
 - project-defined release communication is current when required.
 - commits or commit candidates are recorded.
 
@@ -379,7 +385,7 @@ When closing:
 1. Ensure `tasks.md` has `status: ready_to_close` and its closeout reflects review outcome, review record, manual confirmation status, release-communication status, PR/merge state, remaining accepted risks, and no contradictory checklist or Resume Here state.
    - Confirm manual confirmation status uses only `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
    - Confirm related active and closed artifacts no longer contradict the accepted Epic state, including stale `Not implemented yet`, `Not verified yet`, old boundary wording, or obsolete manual status vocabulary.
-2. Move `docs/changes/yyyy-mm-dd-change-name/` to `docs/changes/closed/yyyy-mm-dd-change-name/`.
+2. Run `sdd change close <space-id> <change-id> --repo <resolved-repository-path> --workspace <workspace-root>`. Use repeated `--repo` selections only after every coordinated repository Change is independently ready.
 3. Update the moved `tasks.md` closeout section without changing status to `closed`; folder location is the closed state.
 4. Verify no active references still point to the old active path unless they intentionally describe history.
 

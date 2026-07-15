@@ -1,0 +1,4 @@
+interface:
+  display_name: "SDD Design"
+  short_description: "Resolve UI and interaction design readiness"
+  default_prompt: "Use $sdd-design to turn this UI-bearing Change into an approved, implementation-ready experience design."

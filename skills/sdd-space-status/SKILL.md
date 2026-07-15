@@ -97,7 +97,8 @@ Use absolute clickable file links in user-facing output. Say when a conclusion i
 
 - `/sdd-prd`: product purpose, audience, scope, or direction needs decisions.
 - `/sdd-explore`: the product or technical path is still unclear.
-- `/sdd-propose`: a new Change or planning revision is needed.
+- `/sdd-change --brief`: a deferred desired outcome should be retained without technical planning.
+- `/sdd-change --plan` or `--replan`: a new implementation plan or active planning revision is needed.
 - `/sdd-apply`: an active Change has a clear implementation or remediation slice.
 - `/sdd-review`: implementation is ready for the independent local gate.
 - `/sdd-release`: reviewed work is ready for production handoff preparation.

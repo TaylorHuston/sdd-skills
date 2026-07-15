@@ -30,7 +30,7 @@ Default report path:
 
 Use `assets/orphan-audit-report-template.md` when writing the report. Create `docs/audits/` only when writing a report.
 
-The report is advisory. Address findings through `/sdd-propose`, `/sdd-interactive`, `/sdd-apply`, `/sdd-review`, or `/sdd-epic-verify` depending on the finding.
+The report is advisory. Address findings through `/sdd-change --brief`, `/sdd-change --plan`, `/sdd-interactive`, `/sdd-apply`, `/sdd-review`, or `/sdd-epic-verify` depending on the finding.
 
 ## Required Context
 
@@ -72,7 +72,7 @@ Check git status before writing a report. Preserve unrelated dirty files. Do not
    - `inconclusive`: dynamic import, framework convention, generated file, plugin registration, reflection, CLI entrypoint, or insufficient evidence prevents a useful conclusion.
 6. Recommend the next workflow.
    - Use `/sdd-epic-verify` when an Epic may be stale or missing evidence.
-   - Use `/sdd-propose` for planned cleanup, Story moves, artifact corrections with implementation implications, or broad traceability repair.
+   - Use `/sdd-change --brief` for deferred cleanup outcomes and `/sdd-change --plan` for current Story moves, artifact corrections with implementation implications, or broad traceability repair.
    - Use `/sdd-interactive` for small, obvious traceability fixes or narrowly scoped cleanup.
    - Use `/sdd-apply` only when an active change already owns the cleanup.
    - Use `/sdd-review` when cleanup has been implemented and needs local PR-style validation.

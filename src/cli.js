@@ -4,12 +4,15 @@ import { parseArgs } from "node:util";
 
 import { configureWorkspace } from "./commands/configure.js";
 import { getWorkspaceContext } from "./commands/context.js";
+import { closeChange } from "./commands/change-close.js";
 import { createPlannedChange } from "./commands/change-create.js";
 import { promotePlannedChange } from "./commands/change-promote.js";
 import { diagnoseWorkspace } from "./commands/doctor.js";
+import { createEpic } from "./commands/epic-create.js";
 import { initWorkspace } from "./commands/init.js";
 import { getStatus } from "./commands/status.js";
 import { updateWorkspace } from "./commands/update.js";
+import { validateArtifacts } from "./commands/validate.js";
 import { PACKAGE_JSON_PATH } from "./constants.js";
 import { SddError } from "./errors.js";
 import { collectConfigureOptions, collectInitOptions } from "./prompts.js";
@@ -23,8 +26,11 @@ Usage:
   sdd doctor [path] [--json]      Validate workspace, installation, and Change statuses
   sdd context [path] [--json]     Resolve the current planning/repository context
   sdd status [space-id] [options] List Space status or show one Space in detail
+  sdd validate [space-id] [options] Validate SDD artifact structure and references
+  sdd epic create [options]       Scaffold a canonical Epic in one repository
   sdd change create [options]     Scaffold a planned Change for a Space
   sdd change promote [options]    Promote a planned Change into repository work
+  sdd change close [options]      Move a ready Change into closed history
   sdd --version                   Print the package version
 
 Init options:
@@ -53,6 +59,23 @@ Status options:
   --all                           Include inactive and archived ideas and repositories
   --json                          Emit machine-readable JSON
 
+Validate options:
+  --workspace <path>              Resolve the initialized workspace (default: current directory)
+  --repo <path>                   Select a mapped repository; may be repeated
+  --change <change-id>            Validate one planned, active, or closed Change
+  --epic <epic-id>                Validate one Epic
+  --json                          Emit machine-readable JSON
+
+Epic create usage:
+  sdd epic create <space-id> <epic-id> <slug> [options]
+
+Epic create options:
+  --workspace <path>              Resolve the initialized workspace (default: current directory)
+  --repo <path>                   Select the target mapped repository
+  --date <yyyy-mm-dd>             Override the local creation date
+  --dry-run                       Report the scaffold without writing files
+  --json                          Emit machine-readable JSON
+
 Change create usage:
   sdd change create <space-id> <slug> [options]
 
@@ -71,6 +94,50 @@ Change promote options:
   --repo <path>                   Select a mapped repository; may be repeated
   --dry-run                       Report the promotion without writing files
   --json                          Emit machine-readable JSON
+
+Change close usage:
+  sdd change close <space-id> <change-id> [options]
+
+Change close options:
+  --workspace <path>              Resolve the initialized workspace (default: current directory)
+  --repo <path>                   Select a mapped repository; may be repeated
+  --dry-run                       Report the closeout without moving files
+  --json                          Emit machine-readable JSON
+`;
+
+const CHANGE_HELP = `SDD Change commands
+
+Usage:
+  sdd change create <space-id> <slug> [options]
+  sdd change promote <space-id> <change-id> [options]
+  sdd change close <space-id> <change-id> [options]
+
+Commands:
+  create   Scaffold a private planned Change
+  promote  Move a proposed draft into repository work
+  close    Move a ready Change into closed history
+
+Shared options:
+  --workspace <path>  Resolve the initialized workspace (default: current directory)
+  --repo <path>       Select a mapped repository; may be repeated
+  --dry-run           Report without writing files
+  --json              Emit machine-readable JSON
+`;
+
+const EPIC_HELP = `SDD Epic commands
+
+Usage:
+  sdd epic create <space-id> <epic-id> <slug> [options]
+
+Commands:
+  create   Scaffold and structurally validate a canonical Epic
+
+Options:
+  --workspace <path>  Resolve the initialized workspace (default: current directory)
+  --repo <path>       Select the target mapped repository
+  --date <yyyy-mm-dd> Override the local creation date
+  --dry-run           Report without writing files
+  --json              Emit machine-readable JSON
 `;
 
 function commandOptions(extra = {}) {
@@ -297,6 +364,31 @@ function printHuman(result) {
     console.log("");
     return;
   }
+  if (result.command === "validate") {
+    console.log(`SDD validation: ${result.valid ? "pass" : "findings"}`);
+    console.log(`Workspace: ${result.workspaceRoot}`);
+    if (result.scope.spaceId) console.log(`Space: ${result.scope.spaceId}`);
+    if (result.scope.changeId) console.log(`Change: ${result.scope.changeId}`);
+    if (result.scope.epicId) console.log(`Epic: ${result.scope.epicId}`);
+    console.log(
+      `Artifacts: ${result.summary.plannedChanges} planned Change(s), ${result.summary.changes} repository Change(s), ${result.summary.epics} Epic(s)`,
+    );
+    for (const entry of result.findings) {
+      console.log(`${entry.level.toUpperCase()} [${entry.code}] ${entry.path}: ${entry.message}`);
+    }
+    console.log(`Findings: ${result.summary.errors} error(s), ${result.summary.warnings} warning(s)`);
+    return;
+  }
+  if (result.command === "epic-create") {
+    console.log(`${result.dryRun ? "Would create" : "Created"} Epic: ${result.epicId}`);
+    console.log(`Space: ${result.spaceId}`);
+    console.log(`Repository: ${result.repository.resolvedPath}`);
+    console.log(`Path: ${result.path}`);
+    if (result.validation) {
+      console.log(`Structural validation: ${result.validation.valid ? "pass" : "findings"}`);
+    }
+    return;
+  }
   if (result.command === "change-create") {
     console.log(`${result.dryRun ? "Would create" : "Created"} planned Change: ${result.changeId}`);
     console.log(`Space: ${result.spaceId}`);
@@ -318,6 +410,16 @@ function printHuman(result) {
       console.log(`  Change: ${repository.path}`);
     }
     console.log(`Files: ${result.files.join(", ")}`);
+    return;
+  }
+  if (result.command === "change-close") {
+    console.log(`${result.dryRun ? "Would close" : "Closed"} Change: ${result.changeId}`);
+    console.log(`Space: ${result.spaceId}`);
+    for (const repository of result.repositories) {
+      console.log(`Repository: ${repository.resolvedPath}${repository.role ? ` (${repository.role})` : ""}`);
+      console.log(`  Source: ${repository.sourcePath}`);
+      console.log(`  Closed: ${repository.path}`);
+    }
   }
 }
 
@@ -434,12 +536,85 @@ async function executeCommand(command, args) {
     };
   }
 
+  if (command === "validate") {
+    const { values, positionals } = parseCommandArgs(
+      args,
+      commandOptions({
+        workspace: { type: "string" },
+        repo: { type: "string", multiple: true },
+        change: { type: "string" },
+        epic: { type: "string" },
+      }),
+    );
+    if (values.help) return { help: true };
+    if (positionals.length > 1) {
+      throw new SddError("validate accepts at most one Space ID.", { code: "USAGE" });
+    }
+    return {
+      result: await validateArtifacts(resolve(values.workspace ?? process.cwd()), {
+        spaceId: positionals[0] ?? null,
+        repositories: values.repo ?? [],
+        changeId: values.change ?? null,
+        epicId: values.epic ?? null,
+      }),
+      json: values.json ?? false,
+    };
+  }
+
+  if (command === "epic") {
+    const subcommand = args[0];
+    if (["--help", "-h", "help"].includes(subcommand)) {
+      return { help: true, helpText: EPIC_HELP };
+    }
+    if (subcommand !== "create") {
+      throw new SddError(
+        subcommand ? `Unknown epic command: ${subcommand}` : "epic requires a subcommand.",
+        { code: "USAGE", details: ["Available command: epic create"] },
+      );
+    }
+    const { values, positionals } = parseCommandArgs(
+      args.slice(1),
+      commandOptions({
+        workspace: { type: "string" },
+        repo: { type: "string", multiple: true },
+        date: { type: "string" },
+        "dry-run": { type: "boolean" },
+      }),
+    );
+    if (values.help) return { help: true, helpText: EPIC_HELP };
+    if (positionals.length !== 3) {
+      throw new SddError("epic create requires <space-id>, <epic-id>, and <slug>.", {
+        code: "USAGE",
+      });
+    }
+    return {
+      result: await createEpic(
+        resolve(values.workspace ?? process.cwd()),
+        positionals[0],
+        positionals[1],
+        positionals[2],
+        {
+          repositories: values.repo ?? [],
+          date: values.date ?? null,
+          dryRun: values["dry-run"] ?? false,
+        },
+      ),
+      json: values.json ?? false,
+    };
+  }
+
   if (command === "change") {
     const subcommand = args[0];
-    if (!["create", "promote"].includes(subcommand)) {
+    if (["--help", "-h", "help"].includes(subcommand)) {
+      return { help: true, helpText: CHANGE_HELP };
+    }
+    if (!["create", "promote", "close"].includes(subcommand)) {
       throw new SddError(
         subcommand ? `Unknown change command: ${subcommand}` : "change requires a subcommand.",
-        { code: "USAGE", details: ["Available commands: change create, change promote"] },
+        {
+          code: "USAGE",
+          details: ["Available commands: change create, change promote, change close"],
+        },
       );
     }
     const { values, positionals } = parseCommandArgs(
@@ -451,7 +626,7 @@ async function executeCommand(command, args) {
         "dry-run": { type: "boolean" },
       }),
     );
-    if (values.help) return { help: true };
+    if (values.help) return { help: true, helpText: CHANGE_HELP };
     if (positionals.length !== 2) {
       throw new SddError(
         `change ${subcommand} requires <space-id> and <${subcommand === "create" ? "slug" : "change-id"}>.`,
@@ -461,6 +636,20 @@ async function executeCommand(command, args) {
     if (subcommand === "promote") {
       return {
         result: await promotePlannedChange(
+          resolve(values.workspace ?? process.cwd()),
+          positionals[0],
+          positionals[1],
+          {
+            repositories: values.repo ?? [],
+            dryRun: values["dry-run"] ?? false,
+          },
+        ),
+        json: values.json ?? false,
+      };
+    }
+    if (subcommand === "close") {
+      return {
+        result: await closeChange(
           resolve(values.workspace ?? process.cwd()),
           positionals[0],
           positionals[1],
@@ -502,9 +691,9 @@ export async function runCli(args) {
       return 0;
     }
 
-    const { result, json, help } = await executeCommand(args[0], args.slice(1));
+    const { result, json, help, helpText } = await executeCommand(args[0], args.slice(1));
     if (help) {
-      console.log(HELP);
+      console.log(helpText ?? HELP);
       return 0;
     }
     if (json) {
@@ -512,7 +701,10 @@ export async function runCli(args) {
     } else {
       printHuman(result);
     }
-    return result.command === "doctor" && !result.healthy ? 1 : 0;
+    return (
+      (result.command === "doctor" && !result.healthy)
+      || (result.command === "validate" && !result.valid)
+    ) ? 1 : 0;
   } catch (error) {
     const isArgumentError = typeof error?.code === "string" && error.code.startsWith("ERR_PARSE_ARGS_");
     const normalized =

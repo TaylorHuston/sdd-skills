@@ -12,11 +12,14 @@ import {
   configureWorkspace,
   inspectWorkspaceConfiguration,
 } from "../src/commands/configure.js";
+import { closeChange } from "../src/commands/change-close.js";
 import { createPlannedChange } from "../src/commands/change-create.js";
 import { promotePlannedChange } from "../src/commands/change-promote.js";
+import { createEpic } from "../src/commands/epic-create.js";
 import { diagnoseWorkspace } from "../src/commands/doctor.js";
 import { initWorkspace } from "../src/commands/init.js";
 import { getStatus } from "../src/commands/status.js";
+import { validateArtifacts } from "../src/commands/validate.js";
 import { statusSummaryRows } from "../src/cli.js";
 import { updateWorkspace } from "../src/commands/update.js";
 import { getConfigPath, getInstallLockPath, readConfig, writeConfig } from "../src/config.js";
@@ -78,6 +81,220 @@ async function writeChange(root, repository, changeId, status, { closed = false 
   );
 }
 
+async function writeCanonicalChange(
+  root,
+  repository,
+  changeId,
+  status,
+  { closed = false } = {},
+) {
+  await writeChange(root, repository, changeId, status, { closed });
+  const changePath = join(
+    root,
+    "code",
+    repository,
+    "docs",
+    "changes",
+    ...(closed ? ["closed"] : []),
+    changeId,
+  );
+  await writeFile(
+    join(changePath, "proposal.md"),
+    [
+      `# Proposal: ${changeId}`,
+      "",
+      "## Why",
+      "",
+      "A concrete reason.",
+      "",
+      "## What Changes",
+      "",
+      "A concrete behavior change.",
+      "",
+      "## Impact",
+      "",
+      "Focused impact.",
+      "",
+      "## Open Questions",
+      "",
+      "None.",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await writeFile(
+    join(changePath, "design.md"),
+    [
+      `# Design: ${changeId}`,
+      "",
+      "## Context",
+      "",
+      "Current context.",
+      "",
+      "## Goals / Non-Goals",
+      "",
+      "A bounded goal.",
+      "",
+      "## Selected Approach",
+      "",
+      "A selected approach.",
+      "",
+      "## Verification Strategy",
+      "",
+      "Focused verification.",
+      "",
+      "## Risks / Trade-Offs",
+      "",
+      "Known trade-offs.",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await writeFile(
+    join(changePath, "tasks.md"),
+    [
+      "---",
+      `status: ${status}`,
+      "---",
+      `# Tasks: ${changeId}`,
+      "",
+      "## Resume Here",
+      "",
+      "Ready for the next action.",
+      "",
+      "## Task Checklist",
+      "",
+      "- [ ] Complete the work.",
+      "",
+      "## Implementation Ledger",
+      "",
+      "No implementation yet.",
+      "",
+      "## Verification Ledger",
+      "",
+      "No verification yet.",
+      "",
+      "## Blockers / Open Questions",
+      "",
+      "None.",
+      "",
+      "## Closeout",
+      "",
+      "Not ready to close.",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+}
+
+async function writeCanonicalEpic(root, repository, epicId = "SAMPLE-E001") {
+  const epicPath = join(root, "code", repository, "docs", "epics", "sample-e001-core");
+  await mkdir(epicPath, { recursive: true });
+  await writeFile(
+    join(epicPath, "epic.md"),
+    [
+      "---",
+      `id: ${epicId}`,
+      "status: active",
+      "created: 2026-07-14",
+      "modified: 2026-07-14",
+      "last_verified: 2026-07-14",
+      "stories:",
+      "  - S1",
+      "---",
+      "",
+      `# ${epicId} Core Experience`,
+      "",
+      "## Product Context",
+      "",
+      "Current product context.",
+      "",
+      "## Outcome",
+      "",
+      "Users can complete the core experience.",
+      "",
+      "## Current Scope",
+      "",
+      "- Core behavior.",
+      "",
+      "## Deferred Scope",
+      "",
+      "- None.",
+      "",
+      "## Candidate Stories",
+      "",
+      "- None.",
+      "",
+      "## Story Index",
+      "",
+      "| Story | Status | Capability | Last Verified | Notes |",
+      "|---|---|---|---|---|",
+      "| S1 | active | Core behavior. | 2026-07-14 | |",
+      "",
+      "## Stories",
+      "",
+      "### Story S1: Core Journey",
+      "",
+      "Status: active",
+      "Created: 2026-07-14",
+      "Modified: 2026-07-14",
+      "Last verified: 2026-07-14",
+      "",
+      "As a user, I want the core journey, so that I can reach the expected outcome.",
+      "",
+      "#### Requirements And Scenarios",
+      "",
+      "##### Requirement R1: Complete The Journey",
+      "",
+      "The system SHALL complete the journey.",
+      "",
+      "###### Scenario R1-S1: Successful Completion",
+      "",
+      "- WHEN the user starts the journey",
+      "- THEN the expected result is returned",
+      "",
+      "#### Implemented By",
+      "",
+      "| Path | Role | Recheck Trigger |",
+      "|---|---|---|",
+      "| `src/core.js` | Primary | Recheck when the journey changes. |",
+      "",
+      "#### Verified By",
+      "",
+      "| Requirement / Scenario | Evidence | Proves | Status |",
+      "|---|---|---|---|",
+      "| S1/R1-S1 | `test/core.test.js` | Successful completion. | Passing 2026-07-14 |",
+      "",
+      "#### Verification Gaps",
+      "",
+      "- None.",
+      "",
+      "#### Story Notes",
+      "",
+      "- Durable context.",
+      "",
+      "## Cross-Story Concerns",
+      "",
+      "- None.",
+      "",
+      "## Open Decisions",
+      "",
+      "- None.",
+      "",
+      "## Completion Criteria",
+      "",
+      "- The current scope remains represented.",
+      "",
+      "## Notes",
+      "",
+      "- None.",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  return join(epicPath, "epic.md");
+}
+
 test("init creates a local workspace contract and imports one-to-many mappings", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -85,7 +302,7 @@ test("init creates a local workspace contract and imports one-to-many mappings",
   const result = await initWorkspace(root);
   assert.equal(result.created, true);
   assert.equal(result.ideasImported, 1);
-  assert.equal(result.skills.actions.length, 12);
+  assert.equal(result.skills.actions.length, 13);
   assert.ok(result.skills.actions.every((entry) => entry.action === "install"));
   assert.equal(result.workflow.action, "install");
 
@@ -98,7 +315,12 @@ test("init creates a local workspace contract and imports one-to-many mappings",
     { root: "code", path: "sample-web", role: "web", status: "active" },
     { root: "code", path: "sample-mobile", role: "mobile", status: "active" },
   ]);
-  assert.equal(await pathExists(join(root, ".agents", "skills", "sdd-propose", "SKILL.md")), true);
+  assert.equal(await pathExists(join(root, ".agents", "skills", "sdd-change", "SKILL.md")), true);
+  assert.equal(await pathExists(join(root, ".agents", "skills", "sdd-design", "SKILL.md")), true);
+  assert.equal(
+    await pathExists(join(root, ".agents", "skills", "sdd-change", "assets", "brief-template.md")),
+    true,
+  );
   assert.equal(await pathExists(join(root, ".sdd", "install-lock.json")), true);
   assert.equal(
     await readFile(join(root, ".sdd", "story-driven-development.md"), "utf8"),
@@ -299,7 +521,7 @@ test("update refuses to overwrite locally modified managed skills", async (t) =>
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
 
-  const managedSkill = join(root, ".agents", "skills", "sdd-propose", "SKILL.md");
+  const managedSkill = join(root, ".agents", "skills", "sdd-change", "SKILL.md");
   await writeFile(managedSkill, `${await readFile(managedSkill, "utf8")}\nlocal edit\n`, "utf8");
 
   await assert.rejects(
@@ -309,7 +531,7 @@ test("update refuses to overwrite locally modified managed skills", async (t) =>
 
   const diagnosis = await diagnoseWorkspace(root);
   assert.equal(diagnosis.healthy, false);
-  assert.ok(diagnosis.findings.some((finding) => finding.message.includes("sdd-propose")));
+  assert.ok(diagnosis.findings.some((finding) => finding.message.includes("sdd-change")));
 });
 
 test("forced update restores a conflicting managed skill", async (t) => {
@@ -317,12 +539,12 @@ test("forced update restores a conflicting managed skill", async (t) => {
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
 
-  const managedSkill = join(root, ".agents", "skills", "sdd-propose", "SKILL.md");
+  const managedSkill = join(root, ".agents", "skills", "sdd-change", "SKILL.md");
   await writeFile(managedSkill, "local replacement\n", "utf8");
 
   const result = await updateWorkspace(root, { force: true });
   assert.equal(
-    result.skills.actions.find((entry) => entry.skillName === "sdd-propose").action,
+    result.skills.actions.find((entry) => entry.skillName === "sdd-change").action,
     "update-forced",
   );
   assert.notEqual(await readFile(managedSkill, "utf8"), "local replacement\n");
@@ -835,6 +1057,93 @@ test("status rejects an unknown Space ID", async (t) => {
   );
 });
 
+test("epic create scaffolds and validates a canonical Epic in one repository", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+
+  const result = await createEpic(root, "sample", "SAMPLE-E002", "saved-searches", {
+    date: "2026-07-14",
+    repositories: ["code/sample-web"],
+  });
+
+  assert.equal(result.command, "epic-create");
+  assert.equal(result.epicId, "SAMPLE-E002");
+  assert.equal(result.path, "code/sample-web/docs/epics/sample-e002-saved-searches/epic.md");
+  assert.equal(result.repository.resolvedPath, "code/sample-web");
+  assert.equal(result.validation.valid, true);
+  assert.equal(result.validation.summary.epics, 1);
+
+  const source = await readFile(join(root, result.path), "utf8");
+  assert.match(source, /^id: SAMPLE-E002$/m);
+  assert.match(source, /^# SAMPLE-E002 Saved Searches$/m);
+  assert.match(source, /^## Notes$/m);
+  assert.match(source, /^#### Story Notes$/m);
+  assert.match(source, /^\| Path \| Role \| Recheck Trigger \|$/m);
+  assert.match(source, /^\| Requirement \/ Scenario \| Evidence \| Proves \| Status \|$/m);
+  assert.doesNotMatch(source, /EPIC-ID|Epic Name|yyyy-mm-dd/);
+});
+
+test("epic create refuses ambiguous repositories, collisions, and dry-run writes", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+
+  await assert.rejects(
+    () => createEpic(root, "sample", "SAMPLE-E002", "saved-searches", {
+      date: "2026-07-14",
+    }),
+    (error) => error instanceof SddError && error.code === "REPOSITORY_REQUIRED",
+  );
+
+  const dryRun = await createEpic(root, "sample", "SAMPLE-E002", "saved-searches", {
+    date: "2026-07-14",
+    repositories: ["sample-web"],
+    dryRun: true,
+  });
+  assert.equal(dryRun.dryRun, true);
+  assert.equal(await pathExists(join(root, dryRun.path)), false);
+
+  await createEpic(root, "sample", "SAMPLE-E002", "saved-searches", {
+    date: "2026-07-14",
+    repositories: ["sample-web"],
+  });
+  await assert.rejects(
+    () => createEpic(root, "sample", "SAMPLE-E002", "saved-searches", {
+      date: "2026-07-14",
+      repositories: ["sample-web"],
+    }),
+    (error) => error instanceof SddError && error.code === "EPIC_EXISTS",
+  );
+});
+
+test("CLI exposes epic create with JSON output", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "epic",
+    "create",
+    "sample",
+    "SAMPLE-E002",
+    "saved-searches",
+    "--workspace",
+    root,
+    "--repo",
+    "sample-web",
+    "--date",
+    "2026-07-14",
+    "--json",
+  ]);
+  const result = JSON.parse(stdout);
+
+  assert.equal(result.command, "epic-create");
+  assert.equal(result.epicId, "SAMPLE-E002");
+  assert.equal(result.validation.valid, true);
+});
+
 test("change create scaffolds a planned Change for a selected repository", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -868,6 +1177,8 @@ test("change create scaffolds a planned Change for a selected repository", async
   assert.match(proposal, /`code\/sample-mobile` \(mobile\)/);
   assert.match(design, /^# Design: Mobile Notes Access/m);
   assert.match(tasks, /^---\nstatus: proposed\n---/);
+  assert.match(tasks, /run scoped `sdd validate`/i);
+  assert.match(tasks, /run `sdd change close`/);
   assert.match(tasks, /^# Tasks: Mobile Notes Access/m);
   assert.doesNotMatch(`${proposal}\n${design}\n${tasks}`, /CHANGE TITLE|yyyy-mm-dd-change-name/);
 });
@@ -1146,6 +1457,656 @@ test("CLI exposes change promote with JSON output", async (t) => {
   assert.equal(result.command, "change-promote");
   assert.equal(result.sourceRemoved, true);
   assert.equal(result.repositories[0].resolvedPath, "code/sample-web");
+});
+
+test("change close moves a ready Change without writing a closed status", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-14-ready-change";
+  await writeChange(root, "sample-web", changeId, "ready_to_close");
+
+  const result = await closeChange(root, "sample", changeId, {
+    repositories: ["sample-web"],
+  });
+
+  assert.equal(result.command, "change-close");
+  assert.equal(result.dryRun, false);
+  assert.equal(result.repositories.length, 1);
+  assert.equal(
+    result.repositories[0].sourcePath,
+    `code/sample-web/docs/changes/${changeId}`,
+  );
+  assert.equal(
+    result.repositories[0].path,
+    `code/sample-web/docs/changes/closed/${changeId}`,
+  );
+  assert.equal(await pathExists(join(root, result.repositories[0].sourcePath)), false);
+  assert.equal(await pathExists(join(root, result.repositories[0].path)), true);
+  assert.match(
+    await readFile(join(root, result.repositories[0].path, "tasks.md"), "utf8"),
+    /^---\nstatus: ready_to_close\n---/,
+  );
+});
+
+test("change close dry-run validates without moving the Change", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-14-dry-close";
+  await writeChange(root, "sample-web", changeId, "ready_to_close");
+
+  const result = await closeChange(root, "sample", changeId, {
+    repositories: ["sample-web"],
+    dryRun: true,
+  });
+
+  assert.equal(result.dryRun, true);
+  assert.equal(
+    await pathExists(join(root, "code", "sample-web", "docs", "changes", changeId)),
+    true,
+  );
+  assert.equal(
+    await pathExists(join(root, "code", "sample-web", "docs", "changes", "closed", changeId)),
+    false,
+  );
+});
+
+test("change close requires ready_to_close status", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-14-still-reviewing";
+  await writeChange(root, "sample-web", changeId, "review");
+
+  await assert.rejects(
+    () => closeChange(root, "sample", changeId, { repositories: ["sample-web"] }),
+    (error) =>
+      error instanceof SddError &&
+      error.code === "CHANGE_NOT_READY_TO_CLOSE" &&
+      error.details.includes("Current status: review"),
+  );
+  assert.equal(
+    await pathExists(join(root, "code", "sample-web", "docs", "changes", changeId)),
+    true,
+  );
+});
+
+test("change close preflights every destination before moving any Change", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-14-coordinated-close";
+  await writeChange(root, "sample-web", changeId, "ready_to_close");
+  await writeChange(root, "sample-mobile", changeId, "ready_to_close");
+  await writeChange(root, "sample-mobile", changeId, "ready_to_close", { closed: true });
+
+  await assert.rejects(
+    () =>
+      closeChange(root, "sample", changeId, {
+        repositories: ["sample-web", "sample-mobile"],
+      }),
+    (error) => error instanceof SddError && error.code === "CHANGE_ALREADY_CLOSED",
+  );
+  assert.equal(
+    await pathExists(join(root, "code", "sample-web", "docs", "changes", changeId)),
+    true,
+  );
+  assert.equal(
+    await pathExists(join(root, "code", "sample-web", "docs", "changes", "closed", changeId)),
+    false,
+  );
+});
+
+test("CLI exposes change close with JSON output", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-14-cli-close";
+  await writeChange(root, "sample-web", changeId, "ready_to_close");
+
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "change",
+    "close",
+    "sample",
+    changeId,
+    "--workspace",
+    root,
+    "--repo",
+    "sample-web",
+    "--json",
+  ]);
+  const result = JSON.parse(stdout);
+
+  assert.equal(result.command, "change-close");
+  assert.equal(result.repositories[0].resolvedPath, "code/sample-web");
+  assert.equal(result.repositories[0].path, `code/sample-web/docs/changes/closed/${changeId}`);
+});
+
+test("CLI exposes change command-group help", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "change",
+    "--help",
+  ]);
+
+  assert.match(stdout, /sdd change create/);
+  assert.match(stdout, /sdd change promote/);
+  assert.match(stdout, /sdd change close/);
+});
+
+test("CLI exposes epic command-group help", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "epic",
+    "--help",
+  ]);
+
+  assert.match(stdout, /sdd epic create/);
+  assert.match(stdout, /structurally validate a canonical Epic/i);
+});
+
+test("validate accepts a canonical active Change", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-14-canonical-change";
+  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    changeId,
+  });
+
+  assert.equal(result.command, "validate");
+  assert.equal(result.valid, true);
+  assert.equal(result.summary.changes, 1);
+  assert.equal(result.summary.errors, 0);
+  assert.deepEqual(result.findings, []);
+});
+
+test("change-scoped validation includes Epic paths declared by the Change", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-14-affected-epic";
+  await writeCanonicalChange(root, "sample-web", changeId, "review");
+  const epicPath = await writeCanonicalEpic(root, "sample-web");
+  const changePath = join(root, "code", "sample-web", "docs", "changes", changeId);
+  const proposalPath = join(changePath, "proposal.md");
+  await writeFile(
+    proposalPath,
+    `${await readFile(proposalPath, "utf8")}\n## Epic Actions\n\n### Existing Epic Directory Updates\n\n- Revise \`docs/epics/sample-e001-core/epic.md\`.\n`,
+    "utf8",
+  );
+  await writeFile(
+    epicPath,
+    (await readFile(epicPath, "utf8")).replace("## Notes", "## Missing Notes"),
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    changeId,
+  });
+
+  assert.equal(result.summary.changes, 1);
+  assert.equal(result.summary.epics, 1);
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "MISSING_EPIC_SECTION" && finding.artifactId === "SAMPLE-E001"));
+});
+
+test("change-scoped validation reports a declared Epic path that does not exist", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-14-missing-affected-epic";
+  await writeCanonicalChange(root, "sample-web", changeId, "review");
+  const proposalPath = join(
+    root,
+    "code",
+    "sample-web",
+    "docs",
+    "changes",
+    changeId,
+    "proposal.md",
+  );
+  await writeFile(
+    proposalPath,
+    `${await readFile(proposalPath, "utf8")}\n## Epic Actions\n\n### New Epic Directories\n\n- Create \`docs/epics/sample-e002-missing/epic.md\`.\n`,
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    changeId,
+  });
+
+  assert.equal(result.summary.epics, 0);
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "AFFECTED_EPIC_NOT_FOUND"
+    && finding.path.endsWith("docs/epics/sample-e002-missing/epic.md")));
+});
+
+test("validate accepts the documented lightweight interactive Change shape", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-14-interactive-shape";
+  const changePath = join(root, "code", "sample-web", "docs", "changes", changeId);
+  await mkdir(changePath, { recursive: true });
+  await writeFile(
+    join(changePath, "proposal.md"),
+    [
+      "# Proposal: Interactive Shape",
+      "## Why",
+      "## Interactive Scope Boundary",
+      "## Epic / Story Impact",
+      "## Release Communication Impact",
+      "## Open Questions",
+    ].join("\n"),
+    "utf8",
+  );
+  await writeFile(
+    join(changePath, "design.md"),
+    [
+      "# Design: Interactive Shape",
+      "## Current Understanding",
+      "## Technical Approach",
+      "## Affected Epic Truth",
+      "## Alternatives / Deferred",
+      "## Open Questions",
+    ].join("\n"),
+    "utf8",
+  );
+  await writeFile(
+    join(changePath, "tasks.md"),
+    [
+      "---",
+      "status: in_progress",
+      "---",
+      "# Tasks: Interactive Shape",
+      "## Resume Here",
+      "## Interactive Log",
+      "## Checklist",
+      "## Implementation Ledger",
+      "## Verification Ledger",
+      "## Manual UI Confirmation",
+      "## Artifact Updates",
+      "## Open Questions",
+      "## Closeout",
+    ].join("\n"),
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    changeId,
+  });
+
+  assert.equal(result.valid, true);
+  assert.deepEqual(result.findings, []);
+});
+
+test("validate warns instead of failing on historical closed-Change section drift", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-14-historical-shape";
+  await writeCanonicalChange(root, "sample-web", changeId, "ready_to_close", { closed: true });
+  const proposalPath = join(
+    root,
+    "code",
+    "sample-web",
+    "docs",
+    "changes",
+    "closed",
+    changeId,
+    "proposal.md",
+  );
+  await writeFile(
+    proposalPath,
+    (await readFile(proposalPath, "utf8")).replace("## Open Questions", "## Historical Questions"),
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    changeId,
+  });
+
+  assert.equal(result.valid, true);
+  assert.ok(result.findings.some((finding) =>
+    finding.level === "warning" && finding.code === "MISSING_ARTIFACT_SECTION"));
+});
+
+test("validate reports malformed Change directory IDs", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalChange(root, "sample-web", "invalid-change-id", "in_progress");
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    changeId: "invalid-change-id",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) => finding.code === "INVALID_CHANGE_ID"));
+});
+
+test("validate discovers a private planned Change", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const created = await createPlannedChange(root, "sample", "planned-validation", {
+    date: "2026-07-14",
+    repositories: ["sample-web"],
+  });
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    changeId: created.changeId,
+  });
+
+  assert.equal(result.valid, true);
+  assert.equal(result.summary.plannedChanges, 1);
+  assert.equal(result.summary.changes, 0);
+  assert.ok(!result.findings.some((finding) => finding.code === "ARTIFACT_NOT_FOUND"));
+});
+
+test("validate ignores undated Change Brief files", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const plannedRoot = join(root, "ideas", "sample", "planned-changes");
+  await mkdir(plannedRoot, { recursive: true });
+  await writeFile(
+    join(plannedRoot, "future-outcome.md"),
+    "---\ntype: change-brief\ncreated: 2026-07-14\nmodified: 2026-07-14\n---\n# Change Brief: Future Outcome\n",
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, { spaceId: "sample" });
+
+  assert.equal(result.valid, true);
+  assert.equal(result.summary.plannedChanges, 0);
+});
+
+test("validate reports an active and closed Change collision", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-14-location-collision";
+  await writeCanonicalChange(root, "sample-web", changeId, "ready_to_close");
+  await writeCanonicalChange(root, "sample-web", changeId, "ready_to_close", { closed: true });
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    changeId,
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "CHANGE_LOCATION_COLLISION" && finding.artifactId === changeId));
+});
+
+test("validate accepts a canonical Epic by ID", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, true);
+  assert.equal(result.summary.epics, 1);
+  assert.deepEqual(result.findings, []);
+});
+
+test("validate reports duplicate Epic IDs within a repository", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const firstPath = await writeCanonicalEpic(root, "sample-web");
+  const secondRoot = join(root, "code", "sample-web", "docs", "epics", "sample-e002-other");
+  await mkdir(secondRoot, { recursive: true });
+  await writeFile(join(secondRoot, "epic.md"), await readFile(firstPath, "utf8"), "utf8");
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) => finding.code === "DUPLICATE_EPIC_ID"));
+});
+
+test("validate reports Story Index drift within an Epic", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const epicPath = await writeCanonicalEpic(root, "sample-web");
+  const source = await readFile(epicPath, "utf8");
+  await writeFile(epicPath, source.replace("| S1 | active |", "| S9 | active |"), "utf8");
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "EPIC_STORY_INDEX_DRIFT"
+    && finding.message.includes("Story Index")));
+});
+
+test("validate reports malformed Requirement IDs in an Epic", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const epicPath = await writeCanonicalEpic(root, "sample-web");
+  const source = await readFile(epicPath, "utf8");
+  await writeFile(
+    epicPath,
+    source.replace("##### Requirement R1:", "##### Requirement requirement-one:"),
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) => finding.code === "INVALID_REQUIREMENT_ID"));
+});
+
+test("validate reports a broken Verified By reference", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const epicPath = await writeCanonicalEpic(root, "sample-web");
+  const source = await readFile(epicPath, "utf8");
+  await writeFile(epicPath, source.replace("S1/R1-S1 |", "S1/R9-S1 |"), "utf8");
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "BROKEN_EVIDENCE_REFERENCE"
+    && finding.message.includes("S1/R9-S1")));
+});
+
+test("validate reports unresolved scaffolding in an active Change", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-14-unresolved-placeholder";
+  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
+  const proposalPath = join(root, "code", "sample-web", "docs", "changes", changeId, "proposal.md");
+  await writeFile(
+    proposalPath,
+    `${await readFile(proposalPath, "utf8")}\n## Deferred Detail\n\nCHANGE TITLE\n`,
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    changeId,
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "UNRESOLVED_TEMPLATE_PLACEHOLDER"
+    && finding.path.endsWith("proposal.md")));
+});
+
+test("validate reports a Change left in planning after promotion", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const created = await createPlannedChange(root, "sample", "stale-planned-copy", {
+    date: "2026-07-14",
+    repositories: ["sample-web"],
+  });
+  await writeCanonicalChange(root, "sample-web", created.changeId, "proposed");
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    changeId: created.changeId,
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "CHANGE_LOCATION_COLLISION"
+    && finding.message.includes("planning and repository")));
+});
+
+test("validate requires planned Changes to remain proposed", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const created = await createPlannedChange(root, "sample", "invalid-planned-status", {
+    date: "2026-07-14",
+    repositories: ["sample-web"],
+  });
+  const tasksPath = join(root, created.path, "tasks.md");
+  await writeFile(
+    tasksPath,
+    (await readFile(tasksPath, "utf8")).replace("status: proposed", "status: review"),
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    changeId: created.changeId,
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "CHANGE_STATUS_LOCATION_MISMATCH"));
+});
+
+test("validate reports broken Markdown links to SDD artifacts", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const epicPath = await writeCanonicalEpic(root, "sample-web");
+  await writeFile(
+    epicPath,
+    `${await readFile(epicPath, "utf8")}\n[Missing Change](../../changes/2026-07-14-missing/proposal.md)\n`,
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "BROKEN_ARTIFACT_LINK"
+    && finding.message.includes("docs/changes/2026-07-14-missing/proposal.md")));
+});
+
+test("CLI exposes scoped validation with JSON output", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-14-cli-validation";
+  await writeCanonicalChange(root, "sample-web", changeId, "review");
+
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "validate",
+    "sample",
+    "--workspace",
+    root,
+    "--repo",
+    "sample-web",
+    "--change",
+    changeId,
+    "--json",
+  ]);
+  const result = JSON.parse(stdout);
+
+  assert.equal(result.command, "validate");
+  assert.equal(result.valid, true);
+  assert.equal(result.scope.changeId, changeId);
+  assert.deepEqual(result.scope.repositories, ["code/sample-web"]);
+});
+
+test("CLI validation returns exit code one with structured findings", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-14-invalid-cli-validation";
+  await writeChange(root, "sample-web", changeId, "review");
+
+  await assert.rejects(
+    () => execFileAsync(process.execPath, [
+      join(PACKAGE_ROOT, "bin", "sdd.js"),
+      "validate",
+      "sample",
+      "--workspace",
+      root,
+      "--repo",
+      "sample-web",
+      "--change",
+      changeId,
+      "--json",
+    ]),
+    (error) => {
+      const result = JSON.parse(error.stdout);
+      return error.code === 1
+        && result.valid === false
+        && result.findings.some((finding) => finding.code === "MISSING_CHANGE_FILE");
+    },
+  );
 });
 
 test("workspace-local skill installation cannot escape the initialized root", async (t) => {

@@ -1,6 +1,6 @@
 ---
 name: sdd-explore
-description: Explore substantial product, technical, architectural, design, business, workflow, or requirement questions about a space before or during SDD work. Use when the user invokes /sdd-explore or wants a sustained discussion grounded in an idea and its related repositories with a durable private record. Create or resume a living exploration note under the owning idea's planning root, investigate only relevant context, and route mature conclusions toward sdd-prd, sdd-propose, sdd-adr, or another appropriate artifact without implementing application code.
+description: Explore substantial product, technical, architectural, design, business, workflow, or requirement questions about a space before or during SDD work. Use when the user invokes /sdd-explore or wants a sustained discussion grounded in an idea and its related repositories with a durable private record. Create or resume a living exploration note under the owning idea's planning root, investigate only relevant context, and route mature conclusions toward sdd-prd, sdd-change --brief or --plan, sdd-adr, or another appropriate artifact without implementing application code.
 ---
 
 # SDD Explore
@@ -124,7 +124,9 @@ The exploration record remains source context. When a stronger artifact becomes 
 | Conclusion | Preferred Destination |
 |---|---|
 | Durable product purpose, audience, principles, scope, market, or monetization direction | Idea-owned PRD/Product Brief through `/sdd-prd` |
-| A bounded product or implementation change | `docs/changes/yyyy-mm-dd-change-name/` through `/sdd-propose` |
+| A bounded desired outcome that may wait before implementation | A private Change Brief through `/sdd-change --brief` |
+| A bounded change ready for current product and technical planning | A Planned Change through `/sdd-change --plan` |
+| A UI-bearing planned or active Change that needs an approved flow, responsive composition, state contract, accessibility behavior, or visual direction | The existing Change through `/sdd-design` |
 | Technical approach, alternatives, risks, constraints, or verification strategy for an active change | The change's `design.md` |
 | Durable architecture, data, dependency, integration, deployment, security, storage, or cross-cutting repository decision | `docs/adrs/yyyy-mm-dd-<decision-title>.md` through `/sdd-adr` |
 | Work item, blocker, resume state, implementation note, or verification result for an active change | The change's `tasks.md` |
@@ -136,7 +138,7 @@ When an exploration produces a stronger artifact, link or mention that destinati
 
 - Do not implement application code.
 - Do not edit Epic specs unless the user explicitly asks to apply a settled change through an appropriate workflow.
-- Do not create `proposal.md`, `design.md`, or `tasks.md` unless the user asks to propose or capture into an existing change.
+- Do not create a Change Brief, `proposal.md`, `design.md`, or `tasks.md` unless the user asks to capture, plan, or update a change.
 - Do not create an ADR unless the user asks to capture or draft the architecture decision.
 - Do not pressure the user to formalize; offer the appropriate destination and continue or pause.
 - Keep exploration records in private idea-owned planning docs, not public application docs.
@@ -149,4 +151,4 @@ When the discussion reaches a useful pause:
 1. Update the record so `Current Understanding` stands alone.
 2. Record final decisions, unresolved questions, and realistic next steps.
 3. Set status to `paused`, `resolved`, or `superseded` as appropriate.
-4. Report the record path and whether the discussion appears ready for `/sdd-prd`, `/sdd-propose`, `/sdd-adr`, another workflow, or no further action.
+4. Report the record path and whether the discussion appears ready for `/sdd-prd`, `/sdd-change --brief`, `/sdd-change --plan`, `/sdd-design`, `/sdd-adr`, another workflow, or no further action.

@@ -20,6 +20,7 @@ status: proposed
 - [ ] 1.3 Refine Requirements and Scenarios into observable behavior, including relevant happy path, empty state, failure mode, permission/validation case, recovery path, integration boundary, or security-sensitive condition.
 - [ ] 1.4 Record assumptions, open questions, candidate Stories, and deferred scope instead of silently promoting uncertain behavior into accepted Requirements.
 - [ ] 1.5 Confirm the planned `Verified By` sections can become scenario-mapped evidence indexes.
+- [ ] 1.6 For UI-bearing changes with material experience uncertainty, complete `/sdd-design` or record why existing product conventions already make the direction implementation-ready.
 
 ### 2. Epic Artifacts
 
@@ -50,6 +51,7 @@ status: proposed
 - [ ] 5.2 Update Story-level Verified By maps with scenario-mapped evidence, not chronological command logs.
 - [ ] 5.3 Label evidence types where useful: focused automated test, broad supporting gate, deterministic E2E, live-provider playtest, manual UI confirmation, or debug/log inspection.
 - [ ] 5.4 Verify ADR assumptions or record the remaining decision risk.
+- [ ] 5.5 Run scoped `sdd validate` and resolve deterministic artifact errors before handoff.
 
 ### 6. Review And Closeout
 
@@ -62,7 +64,7 @@ status: proposed
 - [ ] 6.7 Confirm machine-readable Change status agrees with Resume Here, checklist, review, manual confirmation, release communication, ADR, PR/merge, deferred-gap, and folder-location claims.
 - [ ] 6.8 Set `status: ready_to_close` only after every required closeout gate passes.
 - [ ] 6.9 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus user authorization allow it.
-- [ ] 6.10 After review/PR/merge/acceptance is complete, move this change folder to `docs/changes/closed/` without writing a `closed` status.
+- [ ] 6.10 After review/PR/merge/acceptance is complete and `status: ready_to_close` is accurate, run `sdd change close` for this Space and Change instead of writing a `closed` status.
 
 ## Implementation Ledger
 
@@ -90,7 +92,7 @@ Record the user's manual testing feedback after implementation starts.
 
 ## Planning Updates
 
-Record `/sdd-propose --replan` updates when implementation or feedback discovers planning-level requirements.
+Record `/sdd-change --replan` updates when implementation or feedback discovers planning-level requirements.
 
 | Date | Discovery | Classification | Planning Updates | Next Apply Starting Point |
 |---|---|---|---|---|

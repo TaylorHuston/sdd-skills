@@ -1,6 +1,7 @@
 import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
+import { assertValidChangeId } from "../change-id.js";
 import { parseChangeStatus } from "../change-status.js";
 import { resolvedActiveRepositories, selectRepositories } from "../change-repositories.js";
 import {
@@ -19,14 +20,6 @@ const REQUIRED_FILES = Object.freeze(["proposal.md", "design.md", "tasks.md"]);
 
 function normalizePath(value) {
   return value.split("\\").join("/");
-}
-
-function assertValidChangeId(changeId) {
-  if (!/^\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*$/.test(changeId)) {
-    throw new SddError("Change ID must use YYYY-MM-DD followed by a lowercase kebab-case slug.", {
-      code: "INVALID_CHANGE_ID",
-    });
-  }
 }
 
 async function validateDraft(sourcePath, displayPath) {

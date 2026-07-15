@@ -57,7 +57,7 @@ changes-requested | blocked | ready
 - Dirty state:
 - Branch policy:
 
-## Delegated Review Passes
+## Discovery Wave
 
 | Pass | Reviewer | Result | Notes |
 |---|---|---|---|
@@ -68,6 +68,15 @@ changes-requested | blocked | ready
 | UI / visual identity | TBD | TBD | TBD |
 | Docs / release communication / PRD | TBD | TBD | TBD |
 | Integration readiness | TBD | TBD | TBD |
+
+## Consolidated Remediation
+
+- Root causes addressed:
+- Safe-fix batch:
+- Deferred or unsafe findings:
+- Affected verification union:
+- Regression-focused rereview:
+- New regressions introduced by remediation: none / list
 
 ## PR / Merge Readiness
 

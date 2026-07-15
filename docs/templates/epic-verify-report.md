@@ -24,7 +24,7 @@ mode: default
 |---|---|---|
 | SDD workflow adherence | TBD | TBD |
 | Epic coherence | TBD | TBD |
-| Epic template adherence | TBD | Include `scripts/epic_template_check.py` result. |
+| Epic template adherence | TBD | Include scoped `sdd validate` result. |
 | Story shape | TBD | TBD |
 | Story requirement completeness | TBD | TBD |
 | Story reference traceability | TBD | TBD |
@@ -73,7 +73,7 @@ mode: default
 
 | Command / Scenario | Result | Proves | Notes |
 |---|---|---|---|
-| `scripts/epic_template_check.py <epic.md>` | TBD | Canonical Epic section spine, Story metadata, `Implemented By`, and `Verified By` shape. | Required template-shape gate. |
+| `sdd validate <space-id> --epic <epic-id> --repo <repository> --json` | TBD | Deterministic Epic shape, IDs, Story Index, traceability tables, evidence references, and artifact links. | Required structural baseline. |
 | TBD | TBD | TBD | TBD |
 
 ## Delegated Audits
@@ -86,7 +86,7 @@ mode: default
 
 | Finding | Recommended Workflow | Owner Decision Needed |
 |---|---|---|
-| TBD | `ask to apply safe artifact fixes / sdd-propose -> sdd-apply -> sdd-review / sdd-prd / manual decision` | TBD |
+| TBD | `ask to apply safe artifact fixes / sdd-change --brief or --plan -> sdd-apply -> sdd-review / sdd-prd / manual decision` | TBD |
 
 ## Evidence Inspected
 

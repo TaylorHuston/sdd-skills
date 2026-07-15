@@ -33,12 +33,12 @@ Default output is a report under the Epic directory:
 
 Use `assets/epic-verify-report-template.md` for the report and `assets/epic-template.md` as the canonical Epic shape reference. Create `reviews/` only when writing a report.
 
-Use `scripts/epic_template_check.py` for the repeatable Epic template-shape scan. Run it against the selected Epic during every audit, and run it against the app root when the user asks for a workspace/app-wide template assessment.
+Use `sdd validate <space-id> --epic <epic-id> --repo <resolved-repository-path> --workspace <workspace-root> --json` for the repeatable Epic structure and traceability scan. Use `sdd validate <space-id> --repo <resolved-repository-path> --workspace <workspace-root> --json` when the user asks for an app-wide artifact assessment.
 
 The report is the durable audit record. Findings are addressed through the workflow named in the report:
 
 - `artifact-only`: after reporting, ask the user whether to apply the listed safe artifact fixes in the same thread.
-- `needs-change`: run `/sdd-propose` or `/sdd-epic-verify --propose-fixes`, then `/sdd-apply`, then `/sdd-review`.
+- `needs-change`: run `/sdd-change --plan` or `/sdd-epic-verify --propose-fixes`, then `/sdd-apply`, then `/sdd-review`. Use `/sdd-change --brief` instead when the remediation should be retained but not planned yet.
 - `needs-verification`: add or run the missing checks through a SDD change unless no source files need to change.
 - `needs-prd`: run `/sdd-prd` before changing Epic scope.
 - `blocked`: ask the user for the named decision.
@@ -51,7 +51,6 @@ Before auditing, read:
 - the already loaded `.sdd/story-driven-development.md` workflow plus any explicit project SDD overlay
 - parent or workspace guidance when the project points to it
 - this skill's `assets/epic-template.md`, to check the target Epic against the canonical template shape
-- this skill's `scripts/epic_template_check.py`, to run the repeatable template-shape scan
 - target `docs/epics/<key>-<###>-epic-name>/epic.md`
 - relevant `docs/changes/**/proposal.md`, `design.md`, `tasks.md`, and `review.md` when they mention the Epic, its Story labels, full Story references, or legacy Story IDs
 - enough of every active `docs/epics/*/epic.md` to detect duplicate Story labels inside an Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs
@@ -69,8 +68,8 @@ Check git status in every repo that may be inspected or touched. Preserve unrela
 2. Parse the Epic.
    - Identify Epic ID, current status, Story labels or documented legacy Story IDs, Story titles, Requirements, Scenarios, `Implemented By`, `Verified By`, and `Verification Gaps`.
    - Compare the Epic to the canonical template shape: frontmatter, Product Context, Outcome, Current Scope, Deferred Scope, Candidate Stories, Story Index, Stories, Cross-Story Concerns, Open Decisions, Completion Criteria, and Notes.
-   - Run `scripts/epic_template_check.py <epic.md>` and treat failures as `template-drift` findings. For app-wide template assessments, run `scripts/epic_template_check.py <app-root>` and summarize every Epic with findings.
-   - The template-shape scan must check top-level section spine, required frontmatter keys, promoted Story metadata lines, Story subsection presence, canonical `Implemented By` table header, canonical `Verified By` table header, and legacy/migration Story label warnings.
+   - Run scoped `sdd validate` and treat deterministic errors as `template-drift`, `status-drift`, or `verification-drift` findings according to their code and affected artifact. Inspect warnings rather than silently discarding them. For app-wide assessments, run Space/repository-scoped validation and summarize every Epic with findings.
+   - The CLI baseline checks top-level section spine, required frontmatter keys, Story Index alignment, promoted Story metadata lines, Story subsection presence, Story/Requirement/Scenario ID shape and duplicates, canonical `Implemented By` and `Verified By` table headers, evidence-reference integrity, broken SDD artifact links, and legacy/migration Story label warnings. Continue the semantic audit even when it passes.
    - Summarize the intended Epic behavior from outcome, current scope, completion criteria, PRD/product docs, public docs, and known runtime surfaces.
    - Confirm Story labels or documented legacy Story IDs are stable, Requirements use local `R#`, and Scenarios use local `R#-S#`.
    - Confirm `S#` Story labels are unique within each Epic, full Story references are traceable, and legacy app-wide Story IDs remain unique unless a temporary migration duplicate is explicitly documented as blocking further implementation.
@@ -112,18 +111,18 @@ Check git status in every repo that may be inspected or touched. Preserve unrela
    - `status-drift`: related Change `tasks.md` status, folder location, review records, manual confirmation status, release-communication state, PR/merge state, or deferred gaps contradict each other. Active status must be `proposed`, `in_progress`, `review`, `replanning`, or `ready_to_close`; folder location under `closed/` means closed. This also includes completed or closed artifacts that still say work is `Not implemented yet`, `Not verified yet`, pending implementation/verification, or use obsolete manual confirmation status vocabulary.
    - `superseded-truth-drift`: later Stories, Requirements, Scenarios, implementation, or docs changed a boundary but earlier Epic truth still reads as current.
 8. Write or print the report.
-   - Include the `scripts/epic_template_check.py` command and result in `Tests And Checks`.
+   - Include the exact scoped `sdd validate` command and result in `Tests And Checks`.
    - Summarize template-shape findings in the Epic template adherence gate and `Template drift` line.
 9. In `--propose-fixes`, create a scoped SDD change for findings that require implementation or risky decisions after the report exists.
 10. After every non-`--check` run, ask the user whether to apply any safe artifact fixes identified by the audit. Do not apply those fixes until the user explicitly agrees.
 
 ## Gates
 
-Use `pass`, `findings`, `blocked`, or `not applicable`. Apply the managed workflow document, `assets/epic-template.md`, the repeatable template checker, selected available skills, and project guidance instead of restating their detailed rules here.
+Use `pass`, `findings`, `blocked`, or `not applicable`. Apply the managed workflow document, `assets/epic-template.md`, scoped CLI validation, selected available skills, and project guidance instead of restating their detailed rules here.
 
 1. **Doctrine and authority**: the Epic remains the durable accepted map from product behavior to implementation and evidence, and no supporting artifact contradicts or outranks it.
 2. **Epic coherence and completeness**: outcome, scope, Story ownership, Story ordering, cross-Story concerns, open decisions, and completion criteria form a coherent capability; missing Stories, Requirements, or Scenarios are findings.
-3. **Canonical shape**: the Epic passes the template checker or every reported deviation is intentional and documented.
+3. **Canonical shape**: the Epic passes scoped `sdd validate` or every reported warning/deviation is intentional and documented.
 4. **Traceability**: Story references and local Requirement/Scenario IDs are stable and unique, `Implemented By` is a useful code map, and moves or legacy identifiers remain traceable.
 5. **Implementation truth**: observable runtime behavior satisfies, defers, gaps, or exposes drift for every declared and materially missing behavior path.
 6. **Verification strength**: `Verified By` is scenario-mapped, evidence types remain distinct, broad gates are supporting evidence, production/mock boundaries are honest, and gaps state the remaining risk.
@@ -163,7 +162,7 @@ Do not edit these as post-run artifact fixes:
 - external services, deployments, branches, PRs, git history
 - behavior semantics that need the user judgment
 
-If a finding requires code, tests, product behavior, or a debatable scope change, leave it in the report and recommend `/sdd-propose`.
+If a finding requires code, tests, product behavior, or a debatable scope change, leave it in the report and recommend `/sdd-change --plan`, or `/sdd-change --brief` when implementation should be deferred.
 
 ## Result Labels
 

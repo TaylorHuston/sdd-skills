@@ -144,6 +144,27 @@ Use this section for non-trivial changes. If only one path is reasonable, record
 
 Describe the chosen technical approach at the level needed to review and implement safely. Keep this high-level: architecture, data ownership, API/routes/functions, UI integration, auth/security, state transitions, dependencies, migrations, rollout, and verification strategy when relevant. For a small change, a short paragraph is enough.
 
+## Experience Design
+
+Use this section only when the Change has material UI or interaction design. Remove it when it does not apply; use `/sdd-design` when the direction needs user-guided convergence.
+
+- Applicability: required / not required
+- Confirmed direction:
+- User confirmation:
+- Reference artifacts:
+
+### User Flow And Information Architecture
+
+### Responsive Composition
+
+### Component And State Contract
+
+### Accessibility And Interaction
+
+### Visual Direction
+
+### Open Design Questions
+
 ## Client And API Boundary
 
 - Current clients:

@@ -1,6 +1,6 @@
 ---
 name: sdd-interactive
-description: Create and apply a lightweight SDD change in one tracked interactive working session. Use when the user invokes /sdd-interactive or asks for small UI tweaks, minor behavior refinements, polish, narrow bug fixes, or other concrete changes that deserve a durable change record but do not need a full upfront /sdd-propose pass. Combines a minimal proposal/design/tasks setup with an immediate /sdd-apply-style loop, including BDD/TDD where practical, Epic/Requirement/Scenario reconciliation, relevant available-skill guidance, verification, manual confirmation tracking, and closeout consistency.
+description: Create and apply a lightweight SDD change in one tracked interactive working session. Use when the user invokes /sdd-interactive or asks for small UI tweaks, minor behavior refinements, polish, narrow bug fixes, or other concrete changes that deserve a durable change record but do not need a full upfront /sdd-change --plan pass. Combines a minimal proposal/design/tasks setup with an immediate /sdd-apply-style loop, including BDD/TDD where practical, Epic/Requirement/Scenario reconciliation, relevant available-skill guidance, verification, manual confirmation tracking, and closeout consistency.
 ---
 
 # SDD Interactive
@@ -11,7 +11,7 @@ Create the smallest useful SDD change record, then immediately work through the 
 
 Resolve the workspace, idea-owned planning path, and target implementation repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before creating or reconciling SDD artifacts. Use the resolved topology unless project guidance declares an explicit exception, then create the change under `docs/changes/` and reconcile Epics under `docs/epics/` inside the implementation repository. Project guidance owns branch and commit policy, verification commands, supporting-doc requirements, release conventions, technology constraints, and permissions. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
 
-This skill is for tracked working sessions. It is not a replacement for `/sdd-propose` when the change needs substantial product scoping, architecture design, data/auth/API changes, migration planning, or cross-Epic coordination.
+This skill is for tracked working sessions. It is not a replacement for `/sdd-change --plan` when the change needs substantial product scoping, architecture design, data/auth/API changes, migration planning, or cross-Epic coordination.
 
 Delegation authorization: invoking `/sdd-interactive`, naming `sdd-interactive`, or asking to start/continue a tracked interactive SDD session is explicit permission to use bounded SDD subagents under this skill's delegation model. If the local tool policy requires an explicit user request before spawning subagents, this skill invocation satisfies that requirement for non-trivial implementation, verification, UI review, security review, broad discovery, or fresh-context review tasks that remain inside the selected interactive change. Do not ask for separate subagent permission unless the user asks for no delegation, the requested delegation would exceed the selected change, the tool requires a more specific approval than normal spawning, or a stop condition applies.
 
@@ -43,7 +43,7 @@ Use existing artifacts when the session continues an active change. Keep `tasks.
    - Scan active `docs/epics/**/epic.md` files for existing Story labels/references and legacy Story IDs before adding or renumbering any Story.
    - Check git status in every repo that may change and preserve unrelated dirty files.
 3. Create the lightweight change artifacts.
-   - `proposal.md`: record why the session exists, in-scope work, explicit out-of-scope work, known Epic/Story impact, release-communication impact, and when to stop and promote to `/sdd-propose`.
+   - `proposal.md`: record why the session exists, in-scope work, explicit out-of-scope work, known Epic/Story impact, release-communication impact, and when to stop and route to `/sdd-change --plan`.
    - `design.md`: record the current understanding, high-level technical approach, alternatives or deferred approaches when relevant, affected Epic truth, and open questions.
    - `tasks.md`: begin with `status: in_progress` YAML frontmatter and record `Resume Here`, the interactive request log, task checklist, implementation ledger, verification ledger, manual UI confirmation checklist, artifact updates, open questions, and closeout state.
    - Keep these short. For a small UI tweak, a few bullets are enough.
@@ -51,7 +51,7 @@ Use existing artifacts when the session continues an active change. Keep `tasks.
    - Summarize the intended working-session scope before code edits.
    - Ask only questions needed to avoid wrong or risky edits.
    - Do not ask scope-expanding questions as though they are part of this session.
-   - If the user request would materially expand product scope, user-visible behavior, Epic ownership, data model, auth/security model, public API, deployment behavior, or external-service state, stop and recommend `/sdd-propose` unless the user explicitly accepts expanding the active change.
+   - If the user request would materially expand product scope, user-visible behavior, Epic ownership, data model, auth/security model, public API, deployment behavior, or external-service state, stop and recommend `/sdd-change --plan` unless the user explicitly accepts expanding the active change.
 5. Enter the interactive apply loop.
    - Take one user request, manual-testing note, or tweak at a time.
    - Record it in `tasks.md` before or immediately after acting.
@@ -87,6 +87,7 @@ Use existing artifacts when the session continues an active change. Keep `tasks.
    - Update the project-defined release communication when project policy requires it.
    - Keep public release communication human-facing; do not include internal SDD ledgers, private planning context, secrets, or speculative roadmap promises.
 9. Close the working session.
+   - Run `sdd validate <space-id> --change <change-id> --repo <resolved-repository-path> --workspace <workspace-root> --json`; resolve deterministic errors introduced by the session and classify warnings. The lightweight artifact shape may omit full `/sdd-change --plan` detail, but it must still satisfy the validator's shared core contract.
    - Run focused verification for every changed behavior and broader checks when risk warrants.
    - For browser-visible or otherwise user-facing app changes, walk the user through what to manually confirm in the UI: app URL, setup state, routes, clicks/inputs, expected results, failure signs, and what feedback would change Requirements, Scenarios, or implementation.
    - Record that walkthrough in `tasks.md` under `Manual UI Confirmation`. If no manual UI confirmation applies, record why.
@@ -94,12 +95,12 @@ Use existing artifacts when the session continues an active change. Keep `tasks.
    - Refresh `tasks.md` with the final resume state, changed files, verification evidence, manual confirmation status, release-communication status, review record state, PR/merge state, unresolved gaps, accepted deferred gaps, and commit candidates or commits.
    - Keep status `in_progress` while work or remediation remains; set it to `review` when implementation is ready for independent review.
    - Recommend `/sdd-review` before merge or closeout when code, user-visible behavior, security, data, or release state changed.
-   - Do not move the change to `docs/changes/closed/` unless the user explicitly asks or the closeout path is already authorized by the active workflow.
-   - When the user asks to close, finish, merge-and-close, or otherwise complete the change, first confirm `tasks.md` has no contradictory Resume Here, checklist, review, manual confirmation, release communication, PR/merge, deferred-gap, or folder-location claims, and no proposal/design/tasks/review text still says completed work is not implemented, not verified, or pending unless clearly historical.
+   - Do not run `sdd change close` unless the user explicitly asks or the closeout path is already authorized by the active workflow.
+   - When the user asks to close, finish, merge-and-close, or otherwise complete the change, first confirm `tasks.md` has no contradictory Resume Here, checklist, review, manual confirmation, release communication, PR/merge, deferred-gap, or folder-location claims, and no proposal/design/tasks/review text still says completed work is not implemented, not verified, or pending unless clearly historical. Set `status: ready_to_close`, then use `sdd change close <space-id> <change-id>` with the resolved workspace and repository selections instead of moving the folder manually.
 
 ## Artifact Shape
 
-Use this minimum structure when creating new artifacts. Treat these as trimmed subsets of the `/sdd-propose` proposal, design, and tasks templates, not as an independent template family. If a lightweight session needs fields beyond this shape, either add only the needed `/sdd-propose` template section or promote the work to `/sdd-propose`.
+Use this minimum structure when creating new artifacts. Treat these as trimmed subsets of the `/sdd-change --plan` proposal, design, and tasks templates, not as an independent template family. If a lightweight session needs fields beyond this shape, either add only the needed `/sdd-change --plan` template section or route the work to `/sdd-change --plan`.
 
 `proposal.md`:
 
@@ -111,7 +112,7 @@ Use this minimum structure when creating new artifacts. Treat these as trimmed s
 ## Interactive Scope Boundary
 - In scope:
 - Out of scope:
-- Stop and promote to /sdd-propose if:
+- Stop and route to /sdd-change --plan if:
 
 ## Epic / Story Impact
 - Known affected Epics:
@@ -184,7 +185,7 @@ status: in_progress
 
 ## Stop Conditions
 
-Stop and ask, or recommend `/sdd-propose`, when the session reveals:
+Stop and ask, or recommend `/sdd-change --plan`, when the session reveals:
 
 - a new capability rather than a tweak or narrow refinement
 - unclear product intent that affects user-visible behavior

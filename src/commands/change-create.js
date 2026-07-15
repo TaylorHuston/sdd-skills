@@ -16,9 +16,9 @@ import { SddError } from "../errors.js";
 import { pathExists } from "../fs.js";
 
 const TEMPLATE_FILES = Object.freeze([
-  ["proposal.md", join(PACKAGE_ROOT, "skills", "sdd-propose", "assets", "proposal-template.md")],
-  ["design.md", join(PACKAGE_ROOT, "skills", "sdd-propose", "assets", "design-template.md")],
-  ["tasks.md", join(PACKAGE_ROOT, "skills", "sdd-propose", "assets", "tasks-template.md")],
+  ["proposal.md", join(PACKAGE_ROOT, "skills", "sdd-change", "assets", "proposal-template.md")],
+  ["design.md", join(PACKAGE_ROOT, "skills", "sdd-change", "assets", "design-template.md")],
+  ["tasks.md", join(PACKAGE_ROOT, "skills", "sdd-change", "assets", "tasks-template.md")],
 ]);
 
 function normalizePath(value) {

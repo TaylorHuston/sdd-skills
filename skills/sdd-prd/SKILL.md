@@ -5,7 +5,7 @@ description: Create, draft, update, review, or reason about private project plan
 
 # SDD Product Brief / PRD
 
-Treat a Product Brief/PRD as durable private product direction above the SDD change workflow. Keep it high-level enough to guide `sdd-propose`, Epic scope, Story shape, and scope tradeoffs without becoming a roadmap, implementation spec, status page, worklog, or SDD change artifact.
+Treat a Product Brief/PRD as durable private product direction above the SDD change workflow. Keep it high-level enough to guide `/sdd-change --brief`, later Change planning, Epic scope, Story shape, and scope tradeoffs without becoming a roadmap, implementation spec, status page, worklog, or SDD change artifact.
 
 ## Authority And Project Profile
 
@@ -18,7 +18,7 @@ Use the smallest document that can keep future humans and agents aligned.
 The normal ladder is:
 
 ```text
-sdd-explore -> sdd-prd -> sdd-propose -> sdd-apply -> sdd-review -> optional PR/merge/close
+sdd-explore -> sdd-prd -> sdd-change --brief -> sdd-change --plan -> promote -> sdd-apply -> sdd-review -> optional PR/merge/close
 ```
 
 `sdd-prd` is not required for early experiments. Suggest creating or refreshing a PRD when the project has momentum beyond experimentation, recurring product decisions, multiple Epics or SDD changes, unclear audience/scope/principles, public or monetization implications, or repeated product drift.
@@ -34,7 +34,7 @@ Use this boundary:
 | `docs/epics/<key>-<###>-<epic-name>/epic.md` | durable capability/Epic truth, embedded Stories, Requirements, Scenarios, code map, verification map, gaps |
 | `docs/changes/yyyy-mm-dd-change-name/review.md` | change-local review findings when `sdd-review` is not clean |
 
-`sdd-propose` should read the PRD when available and flag drift. `sdd-apply` should stop when implementation reveals meaningful product drift. `sdd-review` should include a lightweight PRD alignment check when product scope changed.
+`/sdd-change --brief` and `--plan` should read the PRD when available and flag drift. `/sdd-apply` should stop when implementation reveals meaningful product drift. `/sdd-review` should include a lightweight PRD alignment check when product scope changed.
 
 ## Locations
 
@@ -176,14 +176,14 @@ Use only sections that make the brief useful:
 
 ## Drift
 
-Notice PRD drift during `sdd-explore`, `sdd-propose`, `sdd-apply`, `sdd-review`, acceptance, and status work. Suggest a PRD revisit when implementation, testing, dogfooding, target users, scope boundaries, principles, market assumptions, monetization assumptions, or recurring decisions diverge from written product direction.
+Notice PRD drift during `sdd-explore`, `sdd-change`, `sdd-apply`, `sdd-review`, acceptance, and status work. Suggest a PRD revisit when implementation, testing, dogfooding, target users, scope boundaries, principles, market assumptions, monetization assumptions, or recurring decisions diverge from written product direction.
 
 Treat implementation and Epic truth as current behavioral reality. Treat the PRD as directional product intent. A valid drift-review outcome is `reviewed; no PRD change needed`.
 
 When drift is found:
 
 - If product intent changed, recommend updating `prd.md`.
-- If a proposed SDD change conflicts with product direction, flag the conflict before `sdd-propose` or `sdd-review` proceeds.
+- If a proposed SDD change conflicts with product direction, flag the conflict before `/sdd-change --plan` or `/sdd-review` proceeds.
 - If the PRD is intentionally broader than current implementation, leave it alone and make current implementation state clear in Epic/change artifacts.
 
 ## Completion Check
@@ -207,4 +207,4 @@ Summarize:
 - product decisions captured
 - open questions
 - SDD drift findings, if any
-- recommended next workflow, usually `sdd-propose` when the product direction is ready for a concrete change
+- recommended next workflow, usually `/sdd-change --brief` when a bounded outcome is worth retaining or `/sdd-change --plan` when implementation planning should begin now

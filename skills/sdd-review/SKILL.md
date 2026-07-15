@@ -117,12 +117,14 @@ Before reviewing, read:
 - existing `docs/changes/yyyy-mm-dd-change-name/review.md`, if present
 
 Validate that active `tasks.md` frontmatter uses `proposed`, `in_progress`, `review`, `replanning`, or `ready_to_close`. In mutating modes, set `status: review` when independent review begins. In `--check`, report a stale or invalid status without editing it.
+- Run `sdd validate <space-id> --change <change-id> --repo <resolved-repository-path> --workspace <workspace-root> --json` before the broad review wave and again after artifact remediation. Treat deterministic errors as review findings and inspect warnings, but continue the independent diff, implementation-truth, evidence-strength, security, docs, and acceptance review even when validation passes.
 - project-defined release communication when the proposal or task ledger says it is affected, or implementation changes public release meaning
 - relevant target Epic files under `docs/epics/*/epic.md`
 - enough of every active `docs/epics/*/epic.md` to detect duplicate Story labels inside an Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs
 - vault, workspace, and app `AGENTS.md`, especially app branch policy
 - planning-root docs or the PRD/Product Brief when product scope changed, the change claims product direction, or PRD drift was flagged
 - project visual/style guidance, design-system notes, or app visual identity docs when the change affects app UI, layout, styling, component density, interaction polish, or visual identity
+- the Change's `Experience Design` section and stable prototype/design references when present or required by `tasks.md`
 - project README and existing or locally required docs under `docs/` when affected, including architecture, testing, security, deployment, style, data/API contracts, operations, and current-state docs
 - source-vs-target diff and changed file list
 - code, tests, generated files, docs, and configuration touched by the change
@@ -145,6 +147,7 @@ Use delegated fresh-context passes for:
 - risk-shaped evidence review for deterministic edge cases the happy path may miss
 - security review
 - UI/UX and visual identity review when the diff affects user-visible UI
+- experience-contract review when a confirmed design direction exists, including flow, responsive composition, required states, accessibility behavior, and accepted deviations
 - documentation, release communication, and PRD alignment
 - branch, conflict, and integration readiness
 
@@ -243,6 +246,8 @@ If the safe-fix diff cannot be isolated from unrelated dirty files, affected ver
 
 If findings require implementation work beyond safe review remediation, leave them in `review.md` and recommend returning to `/sdd-apply`.
 
+If a finding is specifically unresolved experience direction within already accepted behavior, return the Change to `in_progress` and route it through `/sdd-design` before more UI implementation. If resolving the design would change Requirements, Scenarios, scope, ownership, contracts, data, auth, or technical constraints, use `replanning` and `/sdd-change --replan` instead.
+
 Set `tasks.md` status from the verdict: use `in_progress` when implementation or ordinary remediation remains, `replanning` when product/Requirement/Scenario/scope/ownership decisions must be revised, `review` when review is incomplete or blocked without requiring replanning, and `ready_to_close` only when the full review and closeout gates pass.
 
 ## PR, Merge, And Closeout
@@ -253,7 +258,7 @@ When all gates pass:
 - If `--pr` is authorized, create a PR following app branch policy. Include the change path, summary, Requirements/Scenarios covered, verification evidence, security review result, and remaining non-blocking risks.
 - If `--merge` is authorized, merge following app branch policy. Recheck target branch, conflict state, dirty state, and required checks immediately before merging.
 - If `--merge-and-close` is authorized, merge and close following app policy. Recheck target branch, conflict state, dirty state, required checks, and closeout state immediately before merging or closing. If app policy requires a PR, push, rebase, remote PR merge, or another action not explicitly authorized, stop before that action and report the remaining policy step.
-- If neither `--pr`, `--merge`, nor `--merge-and-close` is authorized and the ready verdict targets a non-production branch, ask the user whether to perform the policy-defined merge-and-close now. Spell out the source branch, target branch, merge strategy or policy requirement, closeout file move, closeout commit location, and any action that still requires separate authorization such as push, rebase, branch deletion, remote PR merge, deployment, or production promotion.
+- If neither `--pr`, `--merge`, nor `--merge-and-close` is authorized and the ready verdict targets a non-production branch, ask the user whether to perform the policy-defined merge-and-close now. Spell out the source branch, target branch, merge strategy or policy requirement, `sdd change close` transition, closeout commit location, and any action that still requires separate authorization such as push, rebase, branch deletion, remote PR merge, deployment, or production promotion.
 - If neither `--pr`, `--merge`, nor `--merge-and-close` is authorized and the ready verdict targets production, report that the change is locally ready and hand off to `/sdd-release`.
 
 Do not push unless explicitly authorized or required by an explicitly requested PR workflow. Do not close the change folder until PR/merge/acceptance state is clear and the user has explicitly asked to close, finish, merge-and-close, or otherwise complete the change.
@@ -263,13 +268,13 @@ When merge-and-closing:
 1. Follow the app's local `AGENTS.md` merge policy for target branch, merge strategy, PR requirements, and whether direct integration-branch commits are allowed.
 2. Perform the non-production merge/integration step before closeout unless project policy explicitly says to close on the source branch first.
 3. After the merge/integration step succeeds, update the closeout record with the actual PR/merge status, target branch, date, commit or PR reference when available, review outcome, manual confirmation status, release-communication status, and remaining accepted risks.
-4. Move the change folder to `docs/changes/closed/` and commit the closeout mutation in the repo and branch required by app policy.
+4. Run `sdd change close <space-id> <change-id> --repo <resolved-repository-path> --workspace <workspace-root>`, then commit the closeout mutation in the repo and branch required by app policy.
 5. Verify the target branch has the closed change path, no active duplicate path, and no contradictory references to the old active path.
 
 When closing:
 
 1. Ensure `tasks.md` has `status: ready_to_close` and its closeout reflects review outcome, review record, manual confirmation status, release-communication status, PR/merge state, remaining accepted risks, and that no contradictory checklist or Resume Here state remains.
-2. Move `docs/changes/yyyy-mm-dd-change-name/` to `docs/changes/closed/yyyy-mm-dd-change-name/`.
+2. Run `sdd change close <space-id> <change-id> --repo <resolved-repository-path> --workspace <workspace-root>`. Use repeated `--repo` selections only for a coordinated close after every selected repository passes its own contextual gates.
 3. Do not write `status: closed`; folder location is the closed state. Verify references to the active path are historical or updated.
 
 ## Stop Conditions
@@ -288,6 +293,7 @@ Stop and report when:
 - duplicate Story labels inside one Epic, duplicate full Story references, or duplicate legacy app-wide Story IDs exist without an explicit migration/blocking note and cannot be safely corrected mechanically during the review pass.
 - new or modified Stories lack stable Epic-scoped labels or documented legacy Story IDs, local Requirement IDs, local Scenario IDs, or concrete non-generic Scenarios.
 - user-facing app changes lack a useful manual UI confirmation walkthrough, the walkthrough is stale relative to the implementation, or the review does not explicitly state which manual UI tests the user should confirm next.
+- a required or claimed `Experience Design` is unconfirmed, identifies its selected direction only through an unstable reference such as “latest,” contradicts accepted Requirements, or is materially absent from the implemented responsive/state/accessibility behavior without an explicit accepted deviation.
 - manual confirmation status, review record, release-communication state, PR/merge state, or closeout state is contradictory.
 - closed or closing change artifacts still contain stale implementation-pending or verification-pending language that contradicts accepted Epic truth.
 - affected existing or locally required project docs under `docs/` contradict implementation, Epic truth, branch/release policy, testing commands, architecture, data/API contracts, deployment behavior, operations, or visual style.

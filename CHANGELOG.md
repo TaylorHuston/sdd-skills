@@ -1,5 +1,5 @@
 ---
-modified: 2026-07-14
+modified: 2026-07-15
 ---
 # Changelog
 
@@ -8,6 +8,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.8.0] - 2026-07-15
+
+### Added
+
+- Added optional `/sdd-design` for converging user flow, responsive composition, component/state behavior, accessibility, and visual direction in existing Change artifacts before UI implementation.
+- Added `sdd change close` for collision-safe, multi-repository transition of `ready_to_close` Changes into configured closed history, with dry-run and JSON output.
+- Added `sdd validate` for deterministic workspace, Space, repository, Change, and Epic artifact checks with scoped filters, structured findings, and automation-friendly exit status.
+- Added `sdd epic create` for atomic canonical Epic scaffolding with immediate structural validation, dry-run support, and JSON output.
+
+### Changed
+
+- Split change intake into `/sdd-change --brief`, `--plan`, and `--replan`, keeping undated intent capture separate from just-in-time technical planning.
+- Integrated scoped CLI validation into planning, implementation, review, and Epic verification, including validation of Epic paths declared by a Change.
+
+### Removed
+
+- Removed `/sdd-propose`; use `/sdd-change --plan` for implementation-ready planning. `sdd update` removes unchanged package-managed copies during upgrade.
+
+### Fixed
+
+- Fixed `sdd change --help` so the Change command group prints its available subcommands.
 
 ## [0.7.0] - 2026-07-14
 

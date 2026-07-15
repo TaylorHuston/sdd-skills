@@ -98,6 +98,7 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
 8. Update SDD artifacts when appropriate.
    - If release readiness changes active `tasks.md` closeout state, update its machine-readable status consistently, using only `proposed`, `in_progress`, `review`, `replanning`, or `ready_to_close`, and only when the release clearly owns that change and the update is safe.
    - Do not close change folders unless the user explicitly asks or the release workflow is authorized to close completed changes.
+   - When closeout is authorized and every release-owned contextual gate passes, use `sdd change close <space-id> <change-id> --repo <resolved-repository-path> --workspace <workspace-root>` instead of moving the folder manually. Do not treat the CLI preflight as a substitute for release or merge readiness.
 9. Report release state.
 
 ## Recommended Gates

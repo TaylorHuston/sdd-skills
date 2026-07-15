@@ -1,0 +1,4 @@
+interface:
+  display_name: "SDD Change"
+  short_description: "Brief, plan, or replan SDD changes"
+  default_prompt: "Use $sdd-change to capture this outcome as a brief, plan it against current project context, or replan an active Change."
