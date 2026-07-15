@@ -9,6 +9,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-07-15
+
+### Changed
+
+- Expanded `/sdd-space-status` direct-Space re-entry with the last three local commits per active repository and deeper reconciliation of `in_progress` Change records against recent code activity.
+
 ## [0.8.1] - 2026-07-15
 
 ### Changed

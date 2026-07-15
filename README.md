@@ -44,6 +44,11 @@ CHANGE_DATE="$(date +%F)"
 CHANGE_ID="${CHANGE_DATE}-invoice-retry"
 
 sdd change create billing invoice-retry --repo services/billing-api --date "$CHANGE_DATE"
+```
+
+Run `/sdd-change --plan` to refine the scaffold and set `status: planned` only when the Change is coherent and implementation-ready. Then, in the same shell where `CHANGE_ID` was set, validate and promote it:
+
+```bash
 sdd validate billing --change "$CHANGE_ID"
 sdd change promote billing "$CHANGE_ID" --repo services/billing-api
 ```
@@ -92,7 +97,7 @@ Available commands:
 | `sdd validate [space-id]` | Check planned and repository Changes plus Epics for deterministic structure, IDs, traceability tables, location collisions, placeholders, and broken SDD artifact links. |
 | `sdd epic create <space-id> <epic-id> <slug>` | Atomically scaffold and structurally validate a canonical Epic in one selected active repository. |
 | `sdd change create <space-id> <slug>` | Scaffold a dated private Change draft under the Space's configured `planned-changes/` directory. |
-| `sdd change promote <space-id> <change-id>` | Move a proposed private draft into one or more selected repositories as an active Change. |
+| `sdd change promote <space-id> <change-id>` | Move a completed `planned` private draft into one or more selected repositories as an active Change. |
 | `sdd change close <space-id> <change-id>` | Move an `in_review` Change into configured closed history after skill-owned closeout gates pass. |
 
 Every operational command supports human-readable and `--json` output. `init`, `configure`, `update`, `change create`, `change promote`, and `change close` also support `--dry-run`. `validate` exits with status 1 when deterministic errors exist while still emitting the complete human or JSON report. Managed skills and `.sdd/story-driven-development.md` are checksum-protected: local modifications produce a conflict instead of being silently overwritten, and `--force` is required to replace them.
@@ -218,7 +223,7 @@ Support workflow:
 | `/sdd-interactive` | Track and implement small concrete changes in one working session. |
 | `/sdd-epic-verify` | Audit an Epic against current implementation and evidence. |
 | `/sdd-pr` | Open or steward SDD-backed pull requests, process review comments/checks, and stop before merge for user approval. |
-| `/sdd-space-status` | Produce a read-only re-entry brief when returning to an app after time away. |
+| `/sdd-space-status` | Produce a read-only re-entry brief; when targeting a Space, include recent local commits and deeper context for in-progress work. |
 | `/sdd-orphan-audit` | Find likely orphaned code, tests, and stale traceability evidence. |
 
 ## Artifact Model
@@ -339,7 +344,7 @@ Common adaptation points:
 - Available skills: `/sdd-apply` discovers relevant capabilities from the consuming runtime instead of requiring named companion skills. Keep that behavior capability-driven if you add local routing preferences, and avoid turning optional skills into package dependencies.
 - Changelog and release records: define whether the project uses Keep a Changelog, generated release notes, changesets, provider releases, another record, or no changelog. The skills follow that policy instead of imposing one.
 - UI and design guidance: optional `/sdd-design` resolves material experience uncertainty before implementation, while `/sdd-review` checks the implemented experience when UI changes are involved. Point them at your design system docs, brand guide, component guidelines, or remove that gate if the project does not need one.
-- Re-entry and audit heuristics: `/sdd-space-status` depends on naming conventions and recent workflow artifacts for orientation, while `/sdd-orphan-audit` depends on traceability evidence. Tune them after you see the first few reports against your codebase.
+- Re-entry and audit heuristics: `/sdd-space-status` uses configured topology, active Change artifacts, recent local history, and working-tree evidence for orientation, while `/sdd-orphan-audit` depends on traceability evidence. Tune their interpretation after you see the first few reports against your codebase.
 
 ### Changing The Idea/Repository Model
 

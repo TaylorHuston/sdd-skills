@@ -1,6 +1,6 @@
 ---
 name: sdd-space-status
-description: Produce a concise read-only re-entry brief for an SDD Space. Use when the user invokes /sdd-space-status or /space-status, says it has been a while since working on an app, asks where work left off, what is active or blocked, which files matter, or what to do next. Wraps the deterministic `sdd status --json` inventory with targeted reading of product context, active Change records, important Epics, review evidence, and git state.
+description: Produce a concise read-only re-entry brief for an SDD Space. Use when the user invokes /sdd-space-status or /space-status, says it has been a while since working on an app, asks where work left off, what is active or blocked, which files matter, or what to do next. Wraps the deterministic `sdd status --json` inventory with targeted reading of product context, active Change records, important Epics, review evidence, Git state, and recent local commits.
 ---
 
 # SDD Space Status
@@ -26,6 +26,8 @@ Accept a Space ID, planning or repository path, SDD artifact path, project name,
 - With no explicit target, resolve from the current directory or recent conversation context.
 - If no Space ID resolves, run `sdd status --json` for active development inventory and ask the user when selection remains ambiguous. Use `sdd status --all --json` only when the user asks for inactive, archived, or complete lifecycle inventory. Do not invent or persist a relationship.
 
+A resolved Space ID or path uses detailed Space mode. A workspace-wide inventory remains lightweight: do not read Change artifacts or repository history for every Space unless the user selects one.
+
 ## Workflow
 
 1. Load deterministic inventory.
@@ -36,13 +38,16 @@ Accept a Space ID, planning or repository path, SDD artifact path, project name,
 2. Read only the context needed for re-entry.
    - Read the Product Brief/PRD and enough planning context to explain what the Space is and which product goal matters.
    - Read mapped repository `AGENTS.md`, README, and `docs/README.md` when present.
+   - In detailed Space mode, read each active repository's last three local commits from its current checked-out history. Capture the commit hash, date, subject, and changed-file summary. Inspect a commit patch only when its subject and file summary do not explain the work or contradict the active Change record. Do not fetch remote history.
    - Read each active Change's `tasks.md`, especially Resume Here, pending tasks, blockers, verification, review, manual confirmation, branch/PR/merge state, and closeout notes.
+   - When a Change is `in_progress`, also read its `proposal.md` and `design.md` when present. Reconcile its declared resume point, current task, implementation and verification ledgers, referenced files, and blockers with the last three commits and current working-tree summary. Inspect only the relevant diff or files needed to identify the exact implementation slice that was underway.
    - Read `review.md` or a recent Epic verification report only when the inventory or active ledger points to it.
    - Read the most relevant Epic files at summary depth: Outcome, Current Scope, Story Index, Open Decisions, Completion Criteria, and obvious Verification Gaps. Do not exhaustively audit every Requirement or Scenario.
    - Read recent closed Changes only when needed to avoid recommending completed work or to explain recent direction.
-   - Use the CLI-provided branch and concise Git status for each mapped repository. Run additional Git inspection only when that metadata is unavailable or a targeted contradiction needs diagnosis. Preserve unrelated dirty state and do not mutate it.
+   - Use the CLI-provided branch and concise Git status for each mapped repository. Beyond the required detailed-Space history above, run additional Git inspection only when metadata is unavailable or a targeted contradiction needs diagnosis. Preserve unrelated dirty state and do not mutate it.
 3. Reconcile obvious re-entry signals.
    - Identify the active Change, most useful resume point, branch, blockers, pending review or acceptance, and important Epic/Story context.
+   - For an `in_progress` Change, distinguish its declared resume point from observed recent work. Summarize the last completed slice, the likely current slice, and relevant uncommitted work when evidence supports them. Do not assume a recent commit or dirty file belongs to the Change solely because it is recent.
    - Mention only contradictions visible from the targeted reads. Do not turn re-entry into a full drift, template, security, or implementation audit.
    - Distinguish declared status from inference. Canonical active Change status is `proposed`, `planned`, `in_progress`, or `in_review`; folder location under `docs/changes/closed/` means closed.
 4. Route the next action.
@@ -59,6 +64,7 @@ Lifecycle: <active / inactive / archived>
 Planning path: <absolute path>
 Repository: <path, lifecycle, and role>
 - Git: <branch or detached head, clean or dirty, and concise change counts>
+- Recent commits: <last three local commits, newest first>
 - Active Changes: <count and current status>
 - Important Epics: <summary for this repository>
 - Recent Changes: <recent closed history for this repository>
@@ -72,7 +78,8 @@ What This Space Is:
 
 Where We Left Off:
 - Active Change and declared status
-- Resume point, review/acceptance state, or recent closed fallback
+- Declared resume point and observed recent work for an in-progress Change
+- Review/acceptance state or recent closed fallback
 
 Important Epics:
 | Epic | Posture | Why It Matters |
@@ -110,6 +117,8 @@ Use absolute clickable file links in user-facing output. Say when a conclusion i
 ## Guardrails
 
 - Stay read-only. Do not edit, implement, verify, replan, close, merge, release, or reconcile artifacts.
+- Do not fetch, checkout, reset, switch branches, or otherwise alter repository state while reading recent history.
+- Do not expand workspace-wide inventory into commit-history or Change-artifact scans across every repository.
 - Do not independently rescan every repository for Epics or Changes when the CLI inventory is healthy.
 - Do not imply that every active Change belongs to the primary application repository. Preserve configured repository roles and call out reference or prototype work separately.
 - Do not merge repository-specific Epics, Changes, branch state, or next actions into an ambiguous Space-wide list when a Space maps to multiple repositories.

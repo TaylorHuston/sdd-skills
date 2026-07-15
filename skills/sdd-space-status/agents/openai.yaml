@@ -1,4 +1,4 @@
 interface:
   display_name: "SDD Space Status"
-  short_description: "Re-entry brief for an SDD app"
-  default_prompt: "Use $sdd-space-status to remind me what this app is, where SDD work left off, what is active or blocked, which files matter, and the likely next action."
+  short_description: "Evidence-based re-entry brief for an SDD app"
+  default_prompt: "Use $sdd-space-status to remind me what this app is, where SDD work left off, what recent commits show, what is active or blocked, which files matter, and the likely next action."
