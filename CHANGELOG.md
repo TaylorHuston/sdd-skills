@@ -9,6 +9,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-15
+
+### Added
+
+- Added `/sdd-design --revise` for reopening an implemented experience direction after comparison, review, or manual feedback while preserving accepted behavior and recording the current contract plus revision history in Change artifacts.
+- Added `sdd change transition` for guarded compare-and-set active Change status updates with multi-repository preflight, dry-run behavior, and JSON output.
+
+### Changed
+
+- Expanded `/sdd-review` supporting-truth review to reconcile the owning Idea's current entry-point documentation with configured repository mappings, active/archive lifecycle, and implementation reality.
+- Updated exploration, planning, and implementation workflows to prefer an available current-documentation capability such as Context7 for version-sensitive external behavior, with primary vendor documentation as the fallback.
+
 ## [0.8.2] - 2026-07-15
 
 ### Changed

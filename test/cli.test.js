@@ -15,6 +15,7 @@ import {
 import { closeChange } from "../src/commands/change-close.js";
 import { createPlannedChange } from "../src/commands/change-create.js";
 import { promotePlannedChange } from "../src/commands/change-promote.js";
+import { transitionChange } from "../src/commands/change-transition.js";
 import { createEpic } from "../src/commands/epic-create.js";
 import { diagnoseWorkspace } from "../src/commands/doctor.js";
 import { initWorkspace } from "../src/commands/init.js";
@@ -327,6 +328,10 @@ test("init creates a local workspace contract and imports one-to-many mappings",
   ]);
   assert.equal(await pathExists(join(root, ".agents", "skills", "sdd-change", "SKILL.md")), true);
   assert.equal(await pathExists(join(root, ".agents", "skills", "sdd-design", "SKILL.md")), true);
+  assert.match(
+    await readFile(join(root, ".agents", "skills", "sdd-design", "SKILL.md"), "utf8"),
+    /\/sdd-design --revise/,
+  );
   assert.equal(
     await pathExists(join(root, ".agents", "skills", "sdd-change", "assets", "brief-template.md")),
     true,
@@ -335,6 +340,17 @@ test("init creates a local workspace contract and imports one-to-many mappings",
   assert.equal(
     await readFile(join(root, ".sdd", "story-driven-development.md"), "utf8"),
     await readFile(WORKFLOW_SOURCE_PATH, "utf8"),
+  );
+  assert.match(
+    await readFile(join(root, ".sdd", "story-driven-development.md"), "utf8"),
+    /sdd change transition/,
+  );
+  assert.match(
+    await readFile(
+      join(root, ".agents", "skills", "sdd-change", "assets", "tasks-template.md"),
+      "utf8",
+    ),
+    /## Design Updates/,
   );
 });
 
@@ -1600,6 +1616,126 @@ test("change close preflights every destination before moving any Change", async
   );
 });
 
+test("change transition updates an active Change with compare-and-set semantics", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-15-design-revision";
+  await writeChange(root, "sample-web", changeId, "in_review");
+
+  const result = await transitionChange(root, "sample", changeId, {
+    repositories: ["sample-web"],
+    from: "in_review",
+    to: "in_progress",
+  });
+
+  assert.equal(result.command, "change-transition");
+  assert.equal(result.repositories[0].tasksPath, `code/sample-web/docs/changes/${changeId}/tasks.md`);
+  assert.match(
+    await readFile(join(root, result.repositories[0].tasksPath), "utf8"),
+    /^status: in_progress$/m,
+  );
+});
+
+test("change transition dry-run reports without updating tasks", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-15-transition-preview";
+  await writeChange(root, "sample-web", changeId, "in_review");
+
+  const result = await transitionChange(root, "sample", changeId, {
+    repositories: ["sample-web"],
+    from: "in_review",
+    to: "in_progress",
+    dryRun: true,
+  });
+
+  assert.equal(result.dryRun, true);
+  assert.match(
+    await readFile(join(root, "code", "sample-web", "docs", "changes", changeId, "tasks.md"), "utf8"),
+    /^status: in_review$/m,
+  );
+});
+
+test("change transition rejects stale or invalid lifecycle requests", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-15-transition-guard";
+  await writeChange(root, "sample-web", changeId, "in_progress");
+
+  await assert.rejects(
+    () => transitionChange(root, "sample", changeId, {
+      repositories: ["sample-web"],
+      from: "in_review",
+      to: "in_progress",
+    }),
+    (error) => error instanceof SddError && error.code === "CHANGE_STATUS_MISMATCH",
+  );
+  await assert.rejects(
+    () => transitionChange(root, "sample", changeId, {
+      repositories: ["sample-web"],
+      from: "in_progress",
+      to: "planned",
+    }),
+    (error) => error instanceof SddError && error.code === "INVALID_CHANGE_TRANSITION",
+  );
+});
+
+test("change transition preflights every selected repository before writing", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-15-coordinated-transition";
+  await writeChange(root, "sample-web", changeId, "in_review");
+  await writeChange(root, "sample-mobile", changeId, "in_progress");
+
+  await assert.rejects(
+    () => transitionChange(root, "sample", changeId, {
+      repositories: ["sample-web", "sample-mobile"],
+      from: "in_review",
+      to: "in_progress",
+    }),
+    (error) => error instanceof SddError && error.code === "CHANGE_STATUS_MISMATCH",
+  );
+  assert.match(
+    await readFile(join(root, "code", "sample-web", "docs", "changes", changeId, "tasks.md"), "utf8"),
+    /^status: in_review$/m,
+  );
+});
+
+test("CLI exposes change transition with JSON output", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-15-cli-transition";
+  await writeChange(root, "sample-web", changeId, "in_review");
+
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "change",
+    "transition",
+    "sample",
+    changeId,
+    "--workspace",
+    root,
+    "--repo",
+    "sample-web",
+    "--from",
+    "in_review",
+    "--to",
+    "in_progress",
+    "--json",
+  ]);
+  const result = JSON.parse(stdout);
+
+  assert.equal(result.command, "change-transition");
+  assert.equal(result.from, "in_review");
+  assert.equal(result.to, "in_progress");
+  assert.equal(result.repositories[0].resolvedPath, "code/sample-web");
+});
+
 test("CLI exposes change close with JSON output", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -1635,6 +1771,7 @@ test("CLI exposes change command-group help", async () => {
 
   assert.match(stdout, /sdd change create/);
   assert.match(stdout, /sdd change promote/);
+  assert.match(stdout, /sdd change transition/);
   assert.match(stdout, /sdd change close/);
 });
 

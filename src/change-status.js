@@ -18,6 +18,31 @@ export const LEGACY_CHANGE_STATUSES = Object.freeze([
   "ready_to_close",
 ]);
 
+export const CHANGE_STATUS_TRANSITIONS = Object.freeze({
+  proposed: Object.freeze(["planned"]),
+  planned: Object.freeze(["proposed", "in_progress"]),
+  in_progress: Object.freeze(["proposed", "in_review"]),
+  in_review: Object.freeze(["proposed", "in_progress"]),
+});
+
+export function canTransitionChangeStatus(from, to) {
+  return CHANGE_STATUS_TRANSITIONS[from]?.includes(to) ?? false;
+}
+
+export function replaceChangeStatus(source, nextStatus) {
+  const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+  if (!match) return null;
+  const statusLines = [...match[1].matchAll(/^status:\s*.*$/gm)];
+  if (statusLines.length !== 1) return null;
+
+  const updatedFrontmatter = match[1].replace(
+    /^status:\s*.*$/m,
+    `status: ${nextStatus}`,
+  );
+  const updatedBlock = match[0].replace(match[1], updatedFrontmatter);
+  return `${updatedBlock}${source.slice(match[0].length)}`;
+}
+
 export function parseChangeStatus(source) {
   const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
   if (!match) return { status: null, error: null };

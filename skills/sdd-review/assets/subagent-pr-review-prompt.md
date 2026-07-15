@@ -6,6 +6,8 @@ You are performing one fresh-context PR-style review pass for a Story-Driven Dev
 
 - App root: `APP_ROOT`
 - Workflow root: `WORKFLOW_ROOT`
+- Idea planning path: `PLANNING_PATH`
+- Workspace topology: `WORKSPACE_CONFIG_PATH`
 - Change folder: `CHANGE_PATH`
 - Proposal: `PROPOSAL_PATH`
 - Design: `DESIGN_PATH`
@@ -34,7 +36,7 @@ Read only the context needed for the assigned pass:
 - `proposal.md`, `design.md`, `tasks.md`, and existing `review.md` when relevant
 - target Epic files when traceability, artifact truth, or coverage is in scope
 - source-vs-target changed files and surrounding code needed to understand the diff
-- tests, docs, config, generated files, release communication, PRD, visual identity, or security docs only when assigned
+- tests, docs, config, generated files, release communication, Idea entry-point docs, PRD, visual identity, or security docs only when assigned
 - specialist guidance named by the orchestrator
 
 Do not broaden into unrelated repo history, unrelated dirty files, production release checks, or unassigned product planning.
@@ -49,7 +51,7 @@ Apply only the assigned `REVIEW_PASS`:
 - `risk-shaped-evidence`: challenge important implementation claims with concrete deterministic failure modes. When relevant to the diff, look for proof or an explicit gap for reset completeness, external state refresh, stable UI/component identity, focus/draft preservation, overlapping async writes, flush/cancel ordering, parser/extractor false positives, negative validation cases, permission/configuration failures, and portable path/environment handling. Treat artifact statements as claims, not evidence.
 - `security`: inspect auth/authz, permissions, data exposure, input/output handling, secrets, dependencies, deployment/config, persistence, migrations, destructive flows, and public attack surface.
 - `ui-ux-visual`: check browser-visible UI for usability, layout resilience, accessibility basics, interaction polish, density, app visual identity, and shared visual-style consistency. Report any manual UI tests the user should confirm when the result depends on subjective polish, interaction feel, browser/device variation, or live play behavior that cannot be fully proven by automation.
-- `supporting-truth`: check README/docs/current-state docs, release communication, PRD alignment, public/private boundary, and whether supporting artifacts contradict Epic truth or implementation.
+- `supporting-truth`: check repository README/docs/current-state docs, release communication, PRD alignment, and the public/private boundary. Also inspect the resolved Idea's current entry-point docs and verify that repository links, active/archived labels, current implementation claims, and current focus agree with `.sdd/config.yaml`, the selected repository, and implementation reality. Do not flag clearly dated exploration, decisions, or historical sections merely for retaining their point-in-time language.
 - `integration-readiness`: check branch policy, source/target refs, merge-base assumptions, conflict-check result, dirty state, source-only commits, target-only invalidation risk, and whether all intended files are present.
 
 ## Constraints

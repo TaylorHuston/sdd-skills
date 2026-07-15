@@ -55,6 +55,8 @@ Orient lightly instead of auditing everything. Read only what can materially inf
 - code and tests when the question depends on implementation reality
 - external sources when the question requires current research
 
+When technical exploration depends on version-sensitive library, framework, SDK, API, CLI, or cloud-platform behavior, prefer an available current-documentation capability such as Context7. Scope the lookup to the exact concept and installed version when known. If no provider is available, use primary vendor documentation; do not treat the missing optional capability as a blocker.
+
 When an idea maps to multiple repositories, identify which repositories are relevant in the exploration record. Do not inspect every related repository by default.
 
 ## Exploration Record

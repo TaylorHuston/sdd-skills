@@ -19,6 +19,7 @@ changes-requested | blocked | ready
 | Visual / UX consistency | TBD | TBD |
 | Security review | TBD | TBD |
 | Documentation | TBD | TBD |
+| Idea repository / current-state truth | TBD | TBD |
 | Release communication | TBD | TBD |
 | Branch and merge readiness | TBD | TBD |
 | PRD alignment | TBD | TBD |
@@ -66,7 +67,7 @@ changes-requested | blocked | ready
 | Verification coverage | TBD | TBD | TBD |
 | Security | TBD | TBD | TBD |
 | UI / visual identity | TBD | TBD | TBD |
-| Docs / release communication / PRD | TBD | TBD | TBD |
+| Docs / Idea truth / release communication / PRD | TBD | TBD | TBD |
 | Integration readiness | TBD | TBD | TBD |
 
 ## Consolidated Remediation

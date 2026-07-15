@@ -14,6 +14,8 @@ Keep `/sdd-apply` as the orchestrator. Project-local instructions remain authori
 6. If no matching skill is available, use project guidance, current framework/platform documentation, and sound engineering judgment. Do not fabricate, install, or require a skill that the user did not provide or authorize.
 7. Stop when selected guidance reveals unapproved product, contract, security, data, migration, deployment, destructive, or external-service scope.
 
+For version-sensitive external behavior, prefer an available current-documentation capability such as Context7 and query the exact concept and installed version when known. Fall back to primary vendor documentation when that capability is unavailable.
+
 ## Capability Signals
 
 | Risk Surface | Guidance To Look For |

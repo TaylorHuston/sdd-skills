@@ -26,6 +26,26 @@ npm link
 
 The CLI manages the workspace-level `.sdd/` contract, installs packaged skills under `.agents/skills/`, resolves idea-to-repository ownership, reports current work, validates artifact structure, and performs deterministic Change-folder transitions without making product decisions on the user's behalf.
 
+## Requirements And Optional Companions
+
+Required for the documented installation and full workflow:
+
+- **Node.js 20 or newer** and npm for the CLI package.
+- **Git** for the checkout-based installation and repository-aware status, review, and release workflows.
+- **An agent runtime that discovers OpenAI/Codex-style `.agents/skills/` folders** to invoke the packaged skills. The deterministic CLI can still be used independently.
+
+The following integrations are optional. They are discovered from the consuming agent runtime or configured in individual application repositories; `npm install` does not install them.
+
+| Companion capability | What it adds |
+|---|---|
+| Storybook or another component-preview system | Controlled UI states and comparable component surfaces for `/sdd-design`, implementation, manual confirmation, and review. SDD does not require Storybook or edit it from the design workflow. |
+| Browser and screenshot automation | Rendered-state inspection, repeatable viewport comparisons, interaction checks, measurements, and visual evidence. Playwright and agent browser tools are common choices, not package dependencies. |
+| Stitch, Penpot, Figma, or another design/prototyping tool | Divergent concepts, reusable visual references, and stable prototype identifiers. External accounts, connectors, or MCP configuration may be required by the selected tool. |
+| Context7 or another current-documentation provider | Current library, framework, SDK, API, CLI, and cloud-platform documentation during exploration, planning, implementation, and debugging. Packaged workflows prefer this capability when version-sensitive external behavior matters, but SDD remains usable without it. |
+| Security, accessibility, architecture, and framework specialist skills | Additional risk-specific guidance and review depth. `/sdd-apply` and related workflows select available capabilities by relevance instead of requiring named companion skills. |
+
+Optional tools provide evidence and specialist guidance; they do not replace Epic/Story truth, Change artifacts, project-local instructions, or user confirmation. If a capability is unavailable, the skills should continue with project context and sound engineering judgment unless the missing capability is a project-defined gate.
+
 ## Quick Start
 
 Initialize and inspect a workspace:
@@ -57,6 +77,15 @@ After promotion, use `/sdd-change --plan` to reconcile repository-specific scope
 
 ```bash
 sdd change close billing "$CHANGE_ID" --repo services/billing-api
+```
+
+When comparison, review, or manual feedback may require an experience revision, start with `/sdd-design --revise`. It classifies the feedback and confirms that accepted behavior remains unchanged. If artifact edits are required, the owning workflow then uses the guarded compare-and-set command immediately before recording the revision contract and returning the Change to implementation:
+
+```bash
+sdd change transition billing "$CHANGE_ID" \
+  --repo services/billing-api \
+  --from in_review \
+  --to in_progress
 ```
 
 On first initialization in an interactive terminal, `sdd init` asks where planning documents and implementation repositories live. Enter paths relative to the workspace root, meaning the directory that will contain `.sdd/`, not relative to the `.sdd/` directory itself. Detected paths are offered as defaults, and multiple repository roots may be entered as a comma-separated list.
@@ -98,9 +127,10 @@ Available commands:
 | `sdd epic create <space-id> <epic-id> <slug>` | Atomically scaffold and structurally validate a canonical Epic in one selected active repository. |
 | `sdd change create <space-id> <slug>` | Scaffold a dated private Change draft under the Space's configured `planned-changes/` directory. |
 | `sdd change promote <space-id> <change-id>` | Move a completed `planned` private draft into one or more selected repositories as an active Change. |
+| `sdd change transition <space-id> <change-id>` | Compare-and-set one allowed active Change status transition across selected repositories. |
 | `sdd change close <space-id> <change-id>` | Move an `in_review` Change into configured closed history after skill-owned closeout gates pass. |
 
-Every operational command supports human-readable and `--json` output. `init`, `configure`, `update`, `change create`, `change promote`, and `change close` also support `--dry-run`. `validate` exits with status 1 when deterministic errors exist while still emitting the complete human or JSON report. Managed skills and `.sdd/story-driven-development.md` are checksum-protected: local modifications produce a conflict instead of being silently overwritten, and `--force` is required to replace them.
+Every operational command supports human-readable and `--json` output. `init`, `configure`, `update`, `change create`, `change promote`, `change transition`, and `change close` also support `--dry-run`. `validate` exits with status 1 when deterministic errors exist while still emitting the complete human or JSON report. Managed skills and `.sdd/story-driven-development.md` are checksum-protected: local modifications produce a conflict instead of being silently overwritten, and `--force` is required to replace them.
 
 An initialized workspace looks like:
 
@@ -159,13 +189,14 @@ Idea and repository `status` use one shared vocabulary: `active`, `inactive`, or
 
 1. `/sdd-change --brief` captures an undated private outcome at `<planning-path>/<plannedChangesDirectory>/<slug>.md`. It contains no technical plan or Change status and does not appear in `sdd status`.
 2. `/sdd-change --plan` confirms that outcome against current project context, invokes `sdd change create <space-id> <slug>` with `status: proposed`, and refines the resulting `proposal.md`, `design.md`, and `tasks.md` under `<planning-path>/<plannedChangesDirectory>/yyyy-mm-dd-<slug>/`. The dated Change ID is assigned when planning begins; status becomes `planned` only when the plan is coherent and implementation-ready.
-3. When a UI-bearing Change still has material experience uncertainty, optional `/sdd-design` converges the flow, responsive composition, state behavior, accessibility, and visual direction in the existing Change artifacts before implementation.
+3. When a UI-bearing Change still has material experience uncertainty, optional `/sdd-design --plan` converges the flow, responsive composition, state behavior, accessibility, and visual direction in the existing Change artifacts before implementation.
 4. After scoped validation passes with `status: planned`, the planned Change supersedes the brief. The private draft remains outside active repository truth and cannot be applied directly.
 5. `sdd change promote <space-id> <change-id>` moves the settled draft into each selected active repository's configured active-Change directory.
 6. `/sdd-change --plan` confirms repository-specific scope after promotion, then `/sdd-apply` may begin implementation.
-7. After implementation sets `in_progress` and review begins at `in_review`, a passing review record plus acceptance and project-specific PR/merge gates allow `sdd change close <space-id> <change-id>` to move the active Change into configured closed history.
+7. After implementation sets `in_progress`, comparison, review, or manual feedback may route experience-only revision through `/sdd-design --revise`. After classifying and confirming a design-only revision, that workflow uses the guarded `sdd change transition` command to return an `in_review` Change to `in_progress` immediately before recording the revision; changed behavior instead routes through `/sdd-change --replan` and `proposed`.
+8. When review begins again at `in_review`, a passing review record plus acceptance and project-specific PR/merge gates allow `sdd change close <space-id> <change-id>` to move the active Change into configured closed history.
 
-All three Change commands infer a sole active mapped repository. When several active repositories are available, use one or more `--repo` options. `change create` may also create a planning-only draft when no active implementation repository exists. `change promote` requires at least one active repository, validates the three required artifacts and `status: planned`, rejects every destination collision before writing, rewrites private planning paths, preserves `status: planned`, and removes the private draft only after all selected destinations succeed. `change close` requires `status: in_review`, preflights every selected source and destination before moving anything, preserves that status, and leaves contextual review, authorization, merge, commit, and Epic-truth decisions to the skills. All three commands support `--dry-run` and `--json`; `change create` also supports `--date`.
+All four Change commands infer a sole active mapped repository. When several active repositories are available, use one or more `--repo` options. `change create` may also create a planning-only draft when no active implementation repository exists. `change promote` requires at least one active repository, validates the three required artifacts and `status: planned`, rejects every destination collision before writing, rewrites private planning paths, preserves `status: planned`, and removes the private draft only after all selected destinations succeed. `change transition` requires explicit `--from` and `--to` statuses, preflights every selected active Change before writing, refuses stale source status or invalid lifecycle edges, and modifies only `tasks.md` frontmatter; the owning skill remains responsible for the contextual record. `change close` requires `status: in_review`, preflights every selected source and destination before moving anything, preserves that status, and leaves contextual review, authorization, merge, commit, and Epic-truth decisions to the skills. All four commands support `--dry-run` and `--json`; `change create` also supports `--date`.
 
 ### Artifact Validation
 
@@ -219,7 +250,7 @@ Support workflow:
 |---|---|
 | `/sdd-adr` | Create, update, or assess ADRs for durable SDD architecture decisions. |
 | `/sdd-explore` | Maintain a durable private exploration while discussing substantial product, business, design, technical, architecture, workflow, or requirement questions about a space. |
-| `/sdd-design` | Converge optional experience-design readiness for a UI-bearing planned or active Change without editing application or Storybook source. |
+| `/sdd-design` | Use `--plan` for initial experience convergence or `--revise` for post-implementation revision within accepted behavior, without editing application or component-preview source. |
 | `/sdd-interactive` | Track and implement small concrete changes in one working session. |
 | `/sdd-epic-verify` | Audit an Epic against current implementation and evidence. |
 | `/sdd-pr` | Open or steward SDD-backed pull requests, process review comments/checks, and stop before merge for user approval. |
@@ -343,7 +374,7 @@ Common adaptation points:
 - Verification commands: `/sdd-apply`, `/sdd-review`, and `/sdd-release` should be aligned with your real test, lint, typecheck, security, build, migration, and manual acceptance gates.
 - Available skills: `/sdd-apply` discovers relevant capabilities from the consuming runtime instead of requiring named companion skills. Keep that behavior capability-driven if you add local routing preferences, and avoid turning optional skills into package dependencies.
 - Changelog and release records: define whether the project uses Keep a Changelog, generated release notes, changesets, provider releases, another record, or no changelog. The skills follow that policy instead of imposing one.
-- UI and design guidance: optional `/sdd-design` resolves material experience uncertainty before implementation, while `/sdd-review` checks the implemented experience when UI changes are involved. Point them at your design system docs, brand guide, component guidelines, or remove that gate if the project does not need one.
+- UI and design guidance: optional `/sdd-design --plan` resolves material experience uncertainty before implementation, while `--revise` turns implementation comparison, review, or manual feedback into an explicit preserve/change/non-goal delta before another `/sdd-apply`. `/sdd-review` checks the implemented experience when UI changes are involved. Point them at your design system docs, brand guide, component guidelines, or remove that gate if the project does not need one.
 - Re-entry and audit heuristics: `/sdd-space-status` uses configured topology, active Change artifacts, recent local history, and working-tree evidence for orientation, while `/sdd-orphan-audit` depends on traceability evidence. Tune their interpretation after you see the first few reports against your codebase.
 
 ### Changing The Idea/Repository Model

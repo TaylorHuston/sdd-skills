@@ -1,6 +1,6 @@
 ---
 name: sdd-design
-description: Resolve experience-design readiness for a UI-bearing planned or active SDD Change before implementation. Use when the user invokes /sdd-design, asks to design or refine a Change's user experience, wants to compare UI directions against accepted Requirements and Scenarios, needs responsive/component/state/accessibility decisions, or wants a durable handoff from visual prototypes into /sdd-apply. Grounds work in current product and implementation context, uses available design tools without requiring a fixed toolchain, records the approved direction in existing Change artifacts, and stops before editing application or Storybook source.
+description: Plan or revise experience-design readiness for a UI-bearing SDD Change. Use `/sdd-design --plan` to converge unresolved flow, responsive, component/state, accessibility, or visual direction before implementation, and `/sdd-design --revise` when implementation, comparison, review, or manual feedback shows that an active Change's accepted experience needs another design pass without changing its accepted behavior. Uses available design and evidence tools without requiring a fixed toolchain, records the approved direction or design delta in existing Change artifacts, and stops before editing application or Storybook source.
 ---
 
 # SDD Design
@@ -13,11 +13,21 @@ This is an optional design-readiness workflow for Changes with meaningful user-i
 
 - `/sdd-explore` owns open-ended visual or product exploration before a Change is ready.
 - `/sdd-change --plan` owns scope, Stories, Requirements, Scenarios, and high-level technical planning.
-- `/sdd-design` owns experience convergence: flow, information architecture, responsive composition, component and state contracts, accessibility, and selected visual direction.
+- `/sdd-design --plan` owns initial experience convergence: flow, information architecture, responsive composition, component and state contracts, accessibility, and selected visual direction.
+- `/sdd-design --revise` owns post-implementation experience revision when accepted behavior remains stable.
 - `/sdd-apply` owns application code, production components, Storybook stories, and implementation evidence.
 - `/sdd-review` independently checks the implemented experience against accepted behavior and the confirmed design direction.
 
 Do not add a Change status or a mandatory `ui-design.md`. Use the existing `design.md` and `tasks.md`, plus app-level visual identity docs when the decision is broader than one Change.
+
+## Modes
+
+Use exactly one mode:
+
+- `--plan`: converge the initial experience direction before implementation or promotion.
+- `--revise`: revise an implemented or partially implemented experience after comparison, review, or manual feedback without changing accepted behavior.
+
+When no flag is supplied, infer the mode only when the Change state and request make it unambiguous. Ask when choosing initial convergence versus post-implementation revision would change status handling or artifact history.
 
 ## Resolve Authority
 
@@ -29,12 +39,16 @@ Do not add a Change status or a mandatory `ui-design.md`. Use the existing `desi
 4. Ask when one idea maps to multiple plausible repositories or multiple Changes could own the design.
 5. Treat a closed Change as history. Create or select a follow-up Change instead of rewriting closed intent.
 
-Preserve the current `tasks.md` status. This skill does not promote, start, replan, review, close, merge, or release a Change.
+This skill does not promote, start implementation, replan behavior, review, close, merge, or release a Change.
 
-- A planned or active `proposed` Change is the normal entry point.
-- An `in_progress` Change may pause for design when accepted behavior remains stable.
-- A `proposed` Change may use this workflow to resolve experience questions, then returns to `/sdd-change --plan` or `--replan` for planning completion.
-- A Change in `in_review` must return through `/sdd-review` or `/sdd-change --replan` before material design edits; do not preserve a review claim while changing its accepted direction.
+- `--plan` preserves the current status. A planned or active `proposed` Change is its normal entry point; `planned` is also valid when experience readiness remains the final pre-implementation gate.
+- `--revise` requires an active repository Change in `in_progress` or `in_review` and an explicit user request, review finding, or recorded manual feedback identifying the experience concern.
+- Keep an `in_review` Change in review while auditing, comparing, classifying feedback, and converging with the user. Do not transition it during setup merely because `--revise` was invoked.
+- After feedback is confirmed as an experience revision within accepted behavior and the user confirms the revised direction, run `sdd change transition <space-id> <change-id> --from in_review --to in_progress` immediately before editing `design.md` or `tasks.md`, with explicit `--repo` selections when needed. Stop and refresh context if the compare-and-set transition fails.
+- Route behavioral discovery from `in_review` directly to `/sdd-change --replan` without first transitioning it to `in_progress`.
+- An active `in_progress` Change already has the correct status for `--revise`; do not perform a no-op transition.
+- A `proposed` Change returns to `/sdd-change --plan` or `--replan` after `--plan` resolves its experience questions.
+- A closed Change is never revised in place.
 
 ## Required Context
 
@@ -72,7 +86,21 @@ Identify what should be retained, reconciled, or replaced:
 
 Use screenshots or browser inspection when visual claims depend on rendered reality. Do not judge a running interface from source alone when direct inspection is practical.
 
-### 3. Resolve Material Questions
+For `--revise`, establish a fair comparison surface before diagnosing the target. Prefer equivalent production-component states, fixtures, viewport dimensions, and component crops. Record which implementation is the reference and which is the target; do not imply that cross-application consistency requires shared runtime components or identical product semantics.
+
+### 3. Diagnose The Revision Delta
+
+In `--revise` mode:
+
+1. Classify the feedback as `experience refinement`, `experience defect`, `accessibility correction`, `responsive correction`, or `behavioral discovery`.
+2. Identify the stable reference: an accepted existing implementation, Storybook story, browser route, prototype, screenshot, design-system artifact, or explicit user direction.
+3. Record what the target must **preserve**, **change**, and treat as an explicit **non-goal**.
+4. Use rendered comparison and measurable evidence when practical: component geometry, hierarchy, wrapping, overflow, focus, contrast, states, and responsive behavior.
+5. Preserve target-specific behavior and semantics even when another application is the visual reference.
+
+If the diagnosis is `behavioral discovery`, stop revision finalization and use the routing rules below. Leave an `in_review` Change in review until the owning replanning workflow performs the justified transition.
+
+### 4. Resolve Material Questions
 
 Ask one consequential question at a time when user judgment is needed. Concentrate on choices that affect workflow, comprehension, responsive behavior, accessibility, identity, or implementation scope.
 
@@ -80,28 +108,31 @@ Compare two or more credible directions when the choice is non-trivial. One dire
 
 Do not ask the user to choose incidental CSS values the design system already resolves. Do not silently choose a product behavior because it makes a composition easier.
 
-### 4. Use Available Design Capabilities
+### 5. Use Available Design Capabilities
 
 Inspect the skills and tools available in the current runtime and use the smallest materially useful set. Possible capabilities include UI/UX review, prompt enhancement, image generation, browser inspection, Stitch, Penpot, screenshots, or other prototyping systems. None is required.
 
 - Use divergent visual generation for meaningfully different concepts, not cosmetic permutations.
 - Use precision design tools when component geometry, reusable patterns, or interaction detail needs refinement.
-- Use existing Storybook only as an implementation reference; do not edit Storybook or application source from this skill.
+- Use existing Storybook or equivalent component previews as implementation references and controlled comparison surfaces; do not edit preview or application source from this skill.
+- Use browser automation or screenshot tooling for repeatable crops, viewports, interaction states, and computed measurements when available. Automated measurements inform design judgment but do not decide whether two products should be visually identical.
 - Follow every selected tool skill's confirmation, external-mutation, and asset-handling rules.
 - Never apply a design system to existing remote screens or overwrite a user's prototype without explicit authorization.
 - Record stable project, file, asset, screen, or prototype identifiers for selected references. Do not identify the approved direction only as “the latest screen.”
 
 If no design tooling is installed, produce a clear text, ASCII, or Markdown experience contract and continue. Missing optional tools are not blockers.
 
-### 5. Converge With The User
+### 6. Converge With The User
 
 Present the strongest direction, meaningful alternatives, and tradeoffs. Refine until the user confirms a direction. The user may explicitly accept an unresolved gap only when it is non-blocking, safely deferrable, and recorded with its implementation or verification consequence.
 
 Confirmation applies to the experience direction, not to implementation details that remain safely reversible. Do not claim design readiness while a material user-flow, responsive, state, accessibility, or visual-identity decision remains unresolved; route that decision through the appropriate planning workflow instead of classifying it as an accepted gap.
 
-### 6. Record The Experience Contract
+For an `in_review` Change, perform the guarded `in_review -> in_progress` transition only after this classification and confirmation pass succeeds, and immediately before recording the revised contract.
 
-Create or update one `## Experience Design` section in the Change's existing `design.md`. Keep it proportional to the Change and use the canonical section in the installed `/sdd-change` `assets/design-template.md` when available. For an older or independently managed Change without that template, record the confirmed direction, user confirmation, stable reference artifacts, user flow and information architecture, responsive composition, component and state contract, accessibility and interaction behavior, visual direction, and open design questions.
+### 7. Record The Experience Contract
+
+Create or update one `## Experience Design` section in the Change's existing `design.md`. It is the canonical current accepted experience contract, not the revision history. Keep it proportional to the Change and use the canonical section in the installed `/sdd-change` `assets/design-template.md` when available. For an older or independently managed Change without that template, record the confirmed direction, user confirmation, stable reference artifacts, user flow and information architecture, responsive composition, component and state contract, accessibility and interaction behavior, visual direction, and open design questions.
 
 Reference Requirements and Scenarios where the design contract clarifies how accepted behavior appears. Do not restate every Requirement or turn visual details into Stories.
 
@@ -113,13 +144,15 @@ Update `tasks.md` only as needed to preserve cold-resume state:
 - expected `/sdd-apply` starting point
 - Storybook states or manual UI checks the implementation should create
 
+For `--revise`, update `Experience Design` to the newly confirmed current contract and append a dated `Design Updates` entry containing the feedback, classification, reference and target, preserve/change/non-goal summary, artifacts changed, and exact `/sdd-apply` restart point. The ledger preserves the superseded direction and why it changed; `design.md` must not leave the old and revised directions competing as simultaneous current truth.
+
 When a decision changes app-wide identity rather than only this Change, update or propose the project-resolved visual-identity document with user authorization and link it from `design.md`. Keep reusable cross-app foundations optional unless the user explicitly promotes a proven pattern.
 
 ## Behavioral Discovery
 
 Design work often exposes missing or changed behavior. Classify it before editing SDD truth:
 
-- **clarification within accepted behavior**: record it in `Experience Design` and the task handoff.
+- **clarification or revision within accepted behavior**: update the current `Experience Design` contract and task handoff; in `--revise`, also append the historical `Design Updates` entry.
 - **missing or changed Requirement/Scenario, scope, Epic ownership, client contract, data/auth rule, or technical constraint**: stop design finalization and route a planned draft back to `/sdd-change --plan` or an active Change to `/sdd-change --replan`.
 - **adjacent future improvement**: recommend `/sdd-change --brief` without expanding the current design.
 - **broader product-direction change**: route to `/sdd-prd` or `/sdd-explore`.
@@ -136,14 +169,17 @@ Before reporting design readiness:
 3. Confirm desktop/mobile composition, required states, accessibility, and design-system deviations are sufficiently resolved for implementation.
 4. Confirm selected references use stable identifiers and their status is not ambiguous.
 5. Run scoped `sdd validate` and resolve deterministic artifact errors caused by this work.
-6. Preserve the Change status and git/branch policy.
+6. Confirm the Change status follows the selected mode and preserve git/branch policy.
+
+In `--revise`, confirm the Change remains `in_progress`. `/sdd-design` does not return it to `in_review`; a fresh `/sdd-apply` must implement the revised contract, reconcile evidence and Epic truth, and perform the implementation handoff.
 
 Choose the handoff from the Change location and status:
 
 - A private planned draft remains ready for promotion and repository-specific reconciliation, not implementation.
-- An active repository Change in `planned` or `in_progress` may hand off to `/sdd-apply` when design readiness passes.
+- An active repository Change in `planned` may hand off to `/sdd-apply` when initial design readiness passes.
+- An active repository Change revised in `in_progress` hands off to a fresh `/sdd-apply` at the exact affected Requirement/Scenario or presentation slice.
 - An active repository Change in `proposed` returns to `/sdd-change --plan` or `--replan`; do not hand it to `/sdd-apply` until planning is complete and its status is `planned`.
-- A Change that remains in `in_review` returns through `/sdd-review` or `/sdd-change --replan` before material design work continues.
+- A Change still in `in_review` has not entered `--revise` correctly; transition it back to `in_progress` or route planning-level discovery through `/sdd-change --replan`.
 
 The `/sdd-apply` handoff should name:
 
@@ -165,7 +201,7 @@ Stop and ask or route appropriately when:
 - an external mutation requires confirmation
 - design work would overwrite user-owned remote artifacts
 - implementing the design would require application or Storybook source edits
-- the Change is in `in_review` and the requested work would materially revise its accepted direction
+- the Change is in `in_review` and no explicit revision request or review/manual-feedback record authorizes returning it to `in_progress`
 - a closed Change would need to be rewritten
 - privacy, accessibility, security, legal, or platform constraints cannot be satisfied safely
 
@@ -174,6 +210,7 @@ Stop and ask or route appropriately when:
 Report:
 
 - selected Change and design-readiness result
+- mode used and, for `--revise`, the feedback classification and status transition
 - confirmed direction and stable reference artifacts
 - major responsive, state, accessibility, and visual decisions
 - files updated and validation result

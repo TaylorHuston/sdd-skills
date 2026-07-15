@@ -95,7 +95,7 @@ Check that:
 
 - `sdd validate <space-id> --change <change-id> --repo <resolved-repository-path> --workspace <workspace-root> --json` has no unresolved deterministic errors. Inspect warnings and classify intentional compatibility exceptions instead of ignoring them. This structural gate does not replace the semantic Discovery checks below.
 - `proposal.md`, `design.md`, and `tasks.md` agree about the change scope.
-- `tasks.md` frontmatter has exactly one valid active `status`: `proposed`, `planned`, `in_progress`, or `in_review`. Start implementation only from `planned`; set it to `in_progress` before implementation or remediation begins. Route `proposed` Changes back to `/sdd-change --plan` or `--replan`, and treat `in_review` as review-owned unless the requested work explicitly returns it to implementation.
+- `tasks.md` frontmatter has exactly one valid active `status`: `proposed`, `planned`, `in_progress`, or `in_review`. Start implementation only from `planned`; run `sdd change transition <space-id> <change-id> --from planned --to in_progress` before implementation begins. Route `proposed` Changes back to `/sdd-change --plan` or `--replan`, and treat `in_review` as review-owned unless the requested work explicitly returns it to implementation through the corresponding guarded transition.
 - `design.md` identifies whether the change creates new Epic directories, edits existing Epic directories, or both.
 - For UI-bearing changes, any required `Experience Design` direction is confirmed, uses stable references, and resolves material responsive, state, accessibility, and visual questions before implementation begins.
 - each targeted Epic path follows `docs/epics/key-###-epic-name/epic.md`.
@@ -145,7 +145,7 @@ Before acting on feedback:
    - For `artifact drift`, update the stale artifact and record the reconciliation in `tasks.md`.
    - For small `requirement refinement`, update `design.md` and the target Epic Story Requirement/Scenario IDs before implementation, then add matching `tasks.md` checklist entries.
    - For `planning discovery`, stop implementation and recommend `/sdd-change --replan` against the active change. Resume with a fresh `/sdd-apply` only after `proposal.md`, `design.md`, and `tasks.md` are updated.
-   - For material experience-design uncertainty that does not yet change accepted behavior, stop the UI slice and recommend `/sdd-design`. If design discovery changes Requirements, Scenarios, scope, ownership, contracts, data, auth, or technical constraints, route through `/sdd-change --replan` before returning to design or implementation.
+   - For material experience-design uncertainty that does not yet change accepted behavior, stop the UI slice and recommend `/sdd-design --plan` before implementation or `/sdd-design --revise` after implementation or manual comparison has begun. If design discovery changes Requirements, Scenarios, scope, ownership, contracts, data, auth, or technical constraints, route through `/sdd-change --replan` before returning to design or implementation.
    - For `scope expansion`, stop unless the user explicitly accepts expanding this change. If accepted and the expansion needs planning, route to `/sdd-change --replan`; otherwise update `proposal.md`, `design.md`, Epic truth, and `tasks.md`. If not accepted, recommend `/sdd-change --brief` for a follow-up change.
    - For `product drift`, stop or recommend `/sdd-prd` unless the user explicitly authorizes product-direction updates in the same run.
 
@@ -211,6 +211,8 @@ Before a non-trivial implementation, verification, or self-check slice:
 4. If delegating, pass selected skills through the tool's supported skill/path/mention mechanism and explicitly require the worker to load and apply them before working.
 5. If no relevant skill is installed, continue with project-local guidance, current framework/platform documentation, and sound engineering judgment. Missing optional skills are not blockers and must not be invented.
 6. Treat guidance that reveals unapproved product, security, data, migration, deployment, destructive, or external-service scope as a stop condition.
+
+When implementation or debugging depends on version-sensitive library, framework, SDK, API, CLI, or cloud-platform behavior, prefer an available current-documentation capability such as Context7 before editing. Scope the lookup to the exact concept and installed version when known. If no provider is available, use primary vendor documentation; the missing optional capability is not a blocker unless project policy makes it a gate.
 
 Do not load every vaguely related skill. Do not claim a skill was used unless its instructions were actually read and applied. Record only concrete consequences that change the approach, verification, a durable artifact, or a stop condition; use the existing Implementation or Verification Ledger instead of a separate specialist-activity table.
 
@@ -315,7 +317,7 @@ Implement one coherent behavior or capability slice at a time.
    - Record any superseded Story/Requirement/Scenario wording and the artifact reconciliation performed.
    - Keep old proposal/design status text from contradicting completed work. If design sections still say `Not implemented yet`, `Not verified yet`, or implementation is pending after implementation has landed, update or clearly mark that text as historical before closeout.
    - Record consequential skill guidance or delegation outcomes only when they changed implementation, verification, artifacts, or stop conditions; also record blockers, departures, and commit hashes or commit candidates.
-   - Keep `status: in_progress` while implementation, verification, remediation, or unresolved blockers remain. Set `status: in_review` only after implementation is complete and the Change is ready for independent `/sdd-review`.
+   - Keep `status: in_progress` while implementation, verification, remediation, or unresolved blockers remain. Run `sdd change transition <space-id> <change-id> --from in_progress --to in_review` only after implementation is complete and the Change is ready for independent `/sdd-review`.
    - Before the implementation commit exists, record the relevant ledger rows as `commit pending`, `uncommitted`, or a clear commit candidate rather than inventing a hash.
 12. Commit locally when authorized, the slice is verified, and changes are commit-shaped.
    - Do not stage unrelated dirty files.

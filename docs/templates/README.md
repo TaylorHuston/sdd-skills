@@ -12,8 +12,8 @@ These examples mirror the canonical template assets shipped inside the packaged 
 | Orphan audit report | [orphan-audit-report.md](orphan-audit-report.md) | `skills/sdd-orphan-audit/assets/orphan-audit-report-template.md` | `/sdd-orphan-audit` |
 | Product Brief / PRD | [prd.md](prd.md) | `skills/sdd-prd/assets/canonical-prd-template.md` | `/sdd-prd` |
 | Proposal | [proposal.md](proposal.md) | `skills/sdd-change/assets/proposal-template.md` | `/sdd-change --plan`, `/sdd-interactive` subset |
-| Design | [design.md](design.md) | `skills/sdd-change/assets/design-template.md` | `/sdd-change --plan`, `/sdd-design`, `/sdd-interactive` subset |
-| Tasks ledger | [tasks.md](tasks.md) | `skills/sdd-change/assets/tasks-template.md` | `/sdd-change --plan`, `/sdd-apply`, `/sdd-interactive` subset |
+| Design | [design.md](design.md) | `skills/sdd-change/assets/design-template.md` | `/sdd-change --plan`, `/sdd-design --plan`, `/sdd-design --revise`, `/sdd-interactive` subset |
+| Tasks ledger | [tasks.md](tasks.md) | `skills/sdd-change/assets/tasks-template.md` | `/sdd-change --plan`, `/sdd-design --revise`, `/sdd-apply`, `/sdd-interactive` subset |
 | Review report | [review.md](review.md) | `skills/sdd-review/assets/review-template.md` | `/sdd-review` |
 | Release PR | [release-pr.md](release-pr.md) | `skills/sdd-release/assets/release-pr-template.md` | `/sdd-release` |
 

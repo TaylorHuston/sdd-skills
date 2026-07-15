@@ -108,6 +108,7 @@ The outcome is a coherent planned Change that is ready to promote or, after prom
 2. Refresh current implementation context.
    - Read project guidance, README, relevant docs, PRD, active and recent closed Changes, relevant Epics, current code, tests, contracts, and dependencies only as needed.
    - Read code when needed to avoid fictional `Implemented By` or `Verified By` plans and to compare viable approaches.
+   - When planning depends on version-sensitive library, framework, SDK, API, CLI, or cloud-platform behavior, prefer an available current-documentation capability such as Context7. Query the exact concept and installed version when known; otherwise use primary vendor documentation rather than relying on model memory.
 3. Create or continue the planned Change.
    - For a new private plan, run `sdd change create <space-id> <slug>` with explicit `--repo` selections when needed.
    - For each new Epic named by the plan, run `sdd epic create <space-id> <epic-id> <slug>` against exactly one selected repository before refining the canonical scaffold. Do not hand-author a substitute Epic shape.
@@ -144,7 +145,7 @@ The outcome is a coherent planned Change that is ready to promote or, after prom
    - Re-read all artifacts and stop for a follow-up question when unresolved ambiguity would make Stories, Requirements, Scenarios, technical choices, or verification misleading.
    - When planning from a private brief, remove the source brief only after the validated `proposal.md` fully preserves its durable intent. Leave it intact if planning stops or fails.
    - A private planned Change is ready for `sdd change promote`, not `/sdd-apply`. A reconciled promoted Change may proceed to `/sdd-apply`.
-   - When a UI-bearing Change still has material experience uncertainty, hand it to `/sdd-design` before promotion or implementation. Design readiness does not add a Change status or authorize code edits.
+   - When a UI-bearing Change still has material experience uncertainty, hand it to `/sdd-design --plan` before promotion or implementation. Use `/sdd-design --revise` only for an active implemented or partially implemented experience whose accepted behavior remains stable. Design readiness does not add a Change status or authorize code edits.
 
 ## Replan Mode
 
@@ -153,12 +154,12 @@ Use `--replan` when implementation, review, or manual feedback discovers a new o
 Do not use it for narrow defects, missing tests, stale evidence indexes, or routine implementation corrections that `/sdd-apply` can safely reconcile.
 
 1. Read the active Change, relevant Epic truth, implementation ledger, review or manual feedback, current code, tests, and failing or passing evidence needed to understand the discovery.
-2. Return `tasks.md` to `status: proposed` and classify the discovery as `in-scope refinement`, `scope expansion`, `product drift`, `Epic ownership change`, `technical constraint`, or `follow-up change`.
+2. For an active Change not already `proposed`, run `sdd change transition <space-id> <change-id> --from <current-status> --to proposed` with explicit repository selection when needed. Classify the discovery as `in-scope refinement`, `scope expansion`, `product drift`, `Epic ownership change`, `technical constraint`, or `follow-up change`.
 3. Preserve the active Change when the discovery is required to achieve its accepted outcome. Recommend a new `/sdd-change --brief` for adjacent future work or `/sdd-prd` for changed product direction.
 4. Ask only the questions needed to resolve the discovery and define what must be true before implementation resumes.
 5. Update `proposal.md`, `design.md`, ADRs, and `tasks.md` wherever scope, behavior, approach, evidence, risks, or resume state changed. Keep existing Story, Requirement, and Scenario IDs stable unless the behavior is genuinely new.
 6. Add a dated `Planning Updates` entry with the discovery, classification, decisions, artifacts changed, and exact `/sdd-apply` restart point.
-7. Set `status: planned` only when the revised plan is coherent, then run scoped `sdd validate`. Otherwise leave `status: proposed` and keep the unresolved planning decision explicit.
+7. Set `status: planned` only when the revised plan is coherent. For an active Change, use `sdd change transition <space-id> <change-id> --from proposed --to planned`; then run scoped `sdd validate`. Otherwise leave `status: proposed` and keep the unresolved planning decision explicit.
 8. Do not edit application code or actual Epic files from this mode unless the user explicitly asks for that additional work.
 
 ## Artifact Rules

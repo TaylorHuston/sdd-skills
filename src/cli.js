@@ -7,6 +7,7 @@ import { getWorkspaceContext } from "./commands/context.js";
 import { closeChange } from "./commands/change-close.js";
 import { createPlannedChange } from "./commands/change-create.js";
 import { promotePlannedChange } from "./commands/change-promote.js";
+import { transitionChange } from "./commands/change-transition.js";
 import { diagnoseWorkspace } from "./commands/doctor.js";
 import { createEpic } from "./commands/epic-create.js";
 import { initWorkspace } from "./commands/init.js";
@@ -30,6 +31,7 @@ Usage:
   sdd epic create [options]       Scaffold a canonical Epic in one repository
   sdd change create [options]     Scaffold a planned Change for a Space
   sdd change promote [options]    Promote a planned Change into repository work
+  sdd change transition [options] Guard one active Change status transition
   sdd change close [options]      Move an in-review Change into closed history
   sdd --version                   Print the package version
 
@@ -95,6 +97,17 @@ Change promote options:
   --dry-run                       Report the promotion without writing files
   --json                          Emit machine-readable JSON
 
+Change transition usage:
+  sdd change transition <space-id> <change-id> --from <status> --to <status> [options]
+
+Change transition options:
+  --workspace <path>              Resolve the initialized workspace (default: current directory)
+  --repo <path>                   Select a mapped repository; may be repeated
+  --from <status>                 Require the current active Change status
+  --to <status>                   Set the next allowed active Change status
+  --dry-run                       Report the transition without writing tasks.md
+  --json                          Emit machine-readable JSON
+
 Change close usage:
   sdd change close <space-id> <change-id> [options]
 
@@ -110,12 +123,14 @@ const CHANGE_HELP = `SDD Change commands
 Usage:
   sdd change create <space-id> <slug> [options]
   sdd change promote <space-id> <change-id> [options]
+  sdd change transition <space-id> <change-id> --from <status> --to <status> [options]
   sdd change close <space-id> <change-id> [options]
 
 Commands:
   create   Scaffold a private planned Change
   promote  Move a proposed draft into repository work
-  close    Move a ready Change into closed history
+  transition  Guard and apply an allowed active Change status transition
+  close    Move an in-review Change into closed history
 
 Shared options:
   --workspace <path>  Resolve the initialized workspace (default: current directory)
@@ -412,6 +427,17 @@ function printHuman(result) {
     console.log(`Files: ${result.files.join(", ")}`);
     return;
   }
+  if (result.command === "change-transition") {
+    console.log(
+      `${result.dryRun ? "Would transition" : "Transitioned"} Change: ${result.changeId} (${result.from} -> ${result.to})`,
+    );
+    console.log(`Space: ${result.spaceId}`);
+    for (const repository of result.repositories) {
+      console.log(`Repository: ${repository.resolvedPath}${repository.role ? ` (${repository.role})` : ""}`);
+      console.log(`  Tasks: ${repository.tasksPath}`);
+    }
+    return;
+  }
   if (result.command === "change-close") {
     console.log(`${result.dryRun ? "Would close" : "Closed"} Change: ${result.changeId}`);
     console.log(`Space: ${result.spaceId}`);
@@ -608,12 +634,12 @@ async function executeCommand(command, args) {
     if (["--help", "-h", "help"].includes(subcommand)) {
       return { help: true, helpText: CHANGE_HELP };
     }
-    if (!["create", "promote", "close"].includes(subcommand)) {
+    if (!["create", "promote", "transition", "close"].includes(subcommand)) {
       throw new SddError(
         subcommand ? `Unknown change command: ${subcommand}` : "change requires a subcommand.",
         {
           code: "USAGE",
-          details: ["Available commands: change create, change promote, change close"],
+          details: ["Available commands: change create, change promote, change transition, change close"],
         },
       );
     }
@@ -623,6 +649,9 @@ async function executeCommand(command, args) {
         workspace: { type: "string" },
         repo: { type: "string", multiple: true },
         ...(subcommand === "create" ? { date: { type: "string" } } : {}),
+        ...(subcommand === "transition"
+          ? { from: { type: "string" }, to: { type: "string" } }
+          : {}),
         "dry-run": { type: "boolean" },
       }),
     );
@@ -655,6 +684,27 @@ async function executeCommand(command, args) {
           positionals[1],
           {
             repositories: values.repo ?? [],
+            dryRun: values["dry-run"] ?? false,
+          },
+        ),
+        json: values.json ?? false,
+      };
+    }
+    if (subcommand === "transition") {
+      if (!values.from || !values.to) {
+        throw new SddError("change transition requires --from <status> and --to <status>.", {
+          code: "USAGE",
+        });
+      }
+      return {
+        result: await transitionChange(
+          resolve(values.workspace ?? process.cwd()),
+          positionals[0],
+          positionals[1],
+          {
+            repositories: values.repo ?? [],
+            from: values.from,
+            to: values.to,
             dryRun: values["dry-run"] ?? false,
           },
         ),

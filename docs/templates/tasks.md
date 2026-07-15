@@ -99,6 +99,14 @@ Record `/sdd-change --replan` updates when implementation or feedback discovers 
 |---|---|---|---|---|
 | YYYY-MM-DD | TBD | in-scope refinement / scope expansion / product drift / Epic ownership change / technical constraint / follow-up change | proposal.md / design.md / tasks.md | `/sdd-apply` TBD |
 
+## Design Updates
+
+Record `/sdd-design --revise` work when implementation, comparison, review, or manual feedback requires another experience-design pass without changing accepted behavior.
+
+| Date | Feedback / Discovery | Classification | Reference / Target | Preserve / Change / Non-Goals | Artifact Updates | Next Apply Starting Point |
+|---|---|---|---|---|---|---|
+| YYYY-MM-DD | TBD | experience refinement / experience defect / accessibility correction / responsive correction | TBD | TBD | design.md / tasks.md | `/sdd-apply` TBD |
+
 ## Manual UI Confirmation
 
 - Status: pending user / user confirmed / accepted gap / not applicable

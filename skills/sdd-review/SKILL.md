@@ -1,6 +1,6 @@
 ---
 name: sdd-review
-description: Review a SDD change as the independent local integration gate after /sdd-apply or before closing. Verifies the source-vs-target diff, proposal, design, task ledger, Epic truth, template adherence, Stories, Requirements, Scenarios, tests, manual confirmation, code quality, security, supporting docs, release communication, branch policy, merge readiness, and closeout consistency. Use when the user invokes /sdd-review, asks to verify a SDD change, run a local PR-style review, prepare integration readiness, address findings, close or finish a change, or perform a policy-defined integration handoff. Use /sdd-release for production-target promotion and release handoff.
+description: Review a SDD change as the independent local integration gate after /sdd-apply or before closing. Verifies the source-vs-target diff, proposal, design, task ledger, Epic truth, template adherence, Stories, Requirements, Scenarios, tests, manual confirmation, code quality, security, Idea-side repository and product truth, supporting docs, release communication, branch policy, merge readiness, and closeout consistency. Use when the user invokes /sdd-review, asks to verify a SDD change, run a local PR-style review, prepare integration readiness, address findings, close or finish a change, or perform a policy-defined integration handoff. Use /sdd-release for production-target promotion and release handoff.
 ---
 
 # SDD Review
@@ -116,13 +116,14 @@ Before reviewing, read:
 - `docs/changes/yyyy-mm-dd-change-name/tasks.md`
 - existing `docs/changes/yyyy-mm-dd-change-name/review.md`, if present
 
-Validate that active `tasks.md` frontmatter uses `proposed`, `planned`, `in_progress`, or `in_review`. In mutating modes, set `status: in_review` when independent review begins. In `--check`, report a stale or invalid status without editing it.
+Validate that active `tasks.md` frontmatter uses `proposed`, `planned`, `in_progress`, or `in_review`. In mutating modes, run `sdd change transition <space-id> <change-id> --from in_progress --to in_review` when independent review begins from completed implementation; retain `in_review` when review is already underway. In `--check`, report a stale or invalid status without editing it.
 - Run `sdd validate <space-id> --change <change-id> --repo <resolved-repository-path> --workspace <workspace-root> --json` before the broad review wave and again after artifact remediation. Treat deterministic errors as review findings and inspect warnings, but continue the independent diff, implementation-truth, evidence-strength, security, docs, and acceptance review even when validation passes.
 - project-defined release communication when the proposal or task ledger says it is affected, or implementation changes public release meaning
 - relevant target Epic files under `docs/epics/*/epic.md`
 - enough of every active `docs/epics/*/epic.md` to detect duplicate Story labels inside an Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs
 - vault, workspace, and app `AGENTS.md`, especially app branch policy
-- planning-root docs or the PRD/Product Brief when product scope changed, the change claims product direction, or PRD drift was flagged
+- the resolved Idea planning path's current entry-point docs, such as its Folder Note, README, current-status note, or equivalent; reconcile their repository links, active/archived labels, current implementation claims, and current focus against `.sdd/config.yaml`, the selected repository, and implementation reality
+- the PRD/Product Brief and other product-direction docs when product scope changed, the change claims product direction, or product drift was flagged
 - project visual/style guidance, design-system notes, or app visual identity docs when the change affects app UI, layout, styling, component density, interaction polish, or visual identity
 - the Change's `Experience Design` section and stable prototype/design references when present or required by `tasks.md`
 - project README and existing or locally required docs under `docs/` when affected, including architecture, testing, security, deployment, style, data/API contracts, operations, and current-state docs
@@ -148,7 +149,7 @@ Use delegated fresh-context passes for:
 - security review
 - UI/UX and visual identity review when the diff affects user-visible UI
 - experience-contract review when a confirmed design direction exists, including flow, responsive composition, required states, accessibility behavior, and accepted deviations
-- documentation, release communication, and PRD alignment
+- documentation, release communication, Idea-side repository/current-state truth, and PRD alignment
 - branch, conflict, and integration readiness
 
 Use the main thread only when:
@@ -198,7 +199,7 @@ Run every gate that applies and record `pass`, `findings`, `blocked`, or `not ap
 4. **Risk-shaped evidence**: important deterministic claims are challenged against plausible failure modes and supported by tests, source inspection, repeatable runtime evidence, or an explicit gap.
 5. **Security and data safety**: use relevant available security guidance and inspect the risk surfaces identified by the diff and project policy.
 6. **Manual acceptance**: user-facing changes have the workflow-defined walkthrough and status when applicable; project policy decides whether confirmation itself blocks readiness.
-7. **Supporting truth**: required project docs, release communication, generated indexes, ADRs, and product direction do not contradict the implementation or Epic map.
+7. **Supporting truth**: required project docs, release communication, generated indexes, ADRs, and product direction do not contradict the implementation or Epic map. The resolved Idea's current entry-point docs must identify the selected repository and repository lifecycle correctly, agree with `.sdd/config.yaml`, and avoid describing implemented replacement work as future or an archived repository as active. Clearly dated exploration, decisions, and historical sections may preserve their original point-in-time language when they are recognizable as history rather than current routing guidance.
 8. **Integration readiness**: source, target, reviewed commit, dirty state, conflict state, required checks, authorization, and the project-defined PR/merge/closeout path are unambiguous.
 
 Before finalizing the discovery wave, explicitly challenge cross-cutting failure classes that commonly escape happy-path tests when they are relevant to the diff: upgrade paths and migration immutability, existing-data compatibility, async focus or draft preservation, responsive interaction targets and accessibility, dependency or CI action validity, generated-contract drift, and fresh-install versus existing-install behavior. Keep this framework-neutral and mark irrelevant classes `not applicable`; do not manufacture work where the diff creates no such risk.
@@ -246,9 +247,9 @@ If the safe-fix diff cannot be isolated from unrelated dirty files, affected ver
 
 If findings require implementation work beyond safe review remediation, leave them in `review.md` and recommend returning to `/sdd-apply`.
 
-If a finding is specifically unresolved experience direction within already accepted behavior, return the Change to `in_progress` and route it through `/sdd-design` before more UI implementation. If resolving the design would change Requirements, Scenarios, scope, ownership, contracts, data, auth, or technical constraints, return it to `proposed` and use `/sdd-change --replan` instead.
+If a finding is specifically unresolved experience direction within already accepted behavior, run `sdd change transition <space-id> <change-id> --from in_review --to in_progress` with explicit repository selection when needed, then route it through `/sdd-design --revise` before more UI implementation. If resolving the design would change Requirements, Scenarios, scope, ownership, contracts, data, auth, or technical constraints, return it to `proposed` and use `/sdd-change --replan` instead.
 
-Set `tasks.md` status from the verdict: use `in_progress` when implementation or ordinary remediation remains, `proposed` when product/Requirement/Scenario/scope/ownership decisions must be revised through `/sdd-change --replan`, and `in_review` while review is incomplete or after the full review and closeout gates pass. The review verdict and closeout record distinguish blocked review from a clean Change; do not invent an additional readiness status.
+Set `tasks.md` status from the verdict using guarded `sdd change transition` calls: use `in_review -> in_progress` when implementation or ordinary remediation remains, `in_review -> proposed` when product/Requirement/Scenario/scope/ownership decisions must be revised through `/sdd-change --replan`, and retain `in_review` while review is incomplete or after the full review and closeout gates pass. The review verdict and closeout record distinguish blocked review from a clean Change; do not invent an additional readiness status.
 
 ## PR, Merge, And Closeout
 
@@ -297,6 +298,7 @@ Stop and report when:
 - manual confirmation status, review record, release-communication state, PR/merge state, or closeout state is contradictory.
 - closed or closing change artifacts still contain stale implementation-pending or verification-pending language that contradicts accepted Epic truth.
 - affected existing or locally required project docs under `docs/` contradict implementation, Epic truth, branch/release policy, testing commands, architecture, data/API contracts, deployment behavior, operations, or visual style.
+- the resolved Idea's current entry-point docs contradict `.sdd/config.yaml` or implementation reality about repository ownership, active/archived status, current architecture, implemented foundation, or where new work belongs; do not flag clearly marked historical records merely for preserving their point-in-time language.
 - required release communication is missing, misleading, private when it should be public, or inconsistent with the project's configured format.
 - PRD/product-direction drift is unresolved when the change depends on it.
 - PR/merge targets the production branch; route to `/sdd-release` instead.
@@ -321,6 +323,7 @@ Include:
 - Change status, closeout readiness, and any contradictory state
 - formal security review result
 - docs result
+- Idea-side repository and current-state truth result
 - release-communication result
 - PRD alignment result when checked
 - branch and merge readiness result
