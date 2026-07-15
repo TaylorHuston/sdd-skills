@@ -21,6 +21,7 @@ status: proposed
 - [ ] 1.4 Record assumptions, open questions, candidate Stories, and deferred scope instead of silently promoting uncertain behavior into accepted Requirements.
 - [ ] 1.5 Confirm the planned `Verified By` sections can become scenario-mapped evidence indexes.
 - [ ] 1.6 For UI-bearing changes with material experience uncertainty, complete `/sdd-design` or record why existing product conventions already make the direction implementation-ready.
+- [ ] 1.7 Set `status: planned` only after the proposal, design, tasks, Epic actions, and verification strategy are coherent and validated.
 
 ### 2. Epic Artifacts
 
@@ -62,9 +63,9 @@ status: proposed
 - [ ] 6.5 Record manual UI confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
 - [ ] 6.6 Confirm proposal/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
 - [ ] 6.7 Confirm machine-readable Change status agrees with Resume Here, checklist, review, manual confirmation, release communication, ADR, PR/merge, deferred-gap, and folder-location claims.
-- [ ] 6.8 Set `status: ready_to_close` only after every required closeout gate passes.
+- [ ] 6.8 Keep `status: in_review` while independent review and closeout gates are underway.
 - [ ] 6.9 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus user authorization allow it.
-- [ ] 6.10 After review/PR/merge/acceptance is complete and `status: ready_to_close` is accurate, run `sdd change close` for this Space and Change instead of writing a `closed` status.
+- [ ] 6.10 After review/PR/merge/acceptance is complete and `status: in_review` remains accurate, run `sdd change close` for this Space and Change instead of writing a `closed` status.
 
 ## Implementation Ledger
 

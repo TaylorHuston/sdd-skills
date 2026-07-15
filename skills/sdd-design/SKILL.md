@@ -33,8 +33,8 @@ Preserve the current `tasks.md` status. This skill does not promote, start, repl
 
 - A planned or active `proposed` Change is the normal entry point.
 - An `in_progress` Change may pause for design when accepted behavior remains stable.
-- A `replanning` Change may use this workflow to resolve experience questions, then returns to `/sdd-change --replan` for planning completion.
-- A Change in `review` or `ready_to_close` must return through `/sdd-review` or `/sdd-change --replan` before material design edits; do not preserve a review-ready claim while changing its accepted direction.
+- A `proposed` Change may use this workflow to resolve experience questions, then returns to `/sdd-change --plan` or `--replan` for planning completion.
+- A Change in `in_review` must return through `/sdd-review` or `/sdd-change --replan` before material design edits; do not preserve a review claim while changing its accepted direction.
 
 ## Required Context
 
@@ -141,9 +141,9 @@ Before reporting design readiness:
 Choose the handoff from the Change location and status:
 
 - A private planned draft remains ready for promotion and repository-specific reconciliation, not implementation.
-- An active repository Change in `proposed` or `in_progress` may hand off to `/sdd-apply` when design readiness passes.
-- An active repository Change in `replanning` returns to `/sdd-change --replan`; do not hand it to `/sdd-apply` until planning is complete and the status is reconciled.
-- A Change that remains in `review` or `ready_to_close` returns through `/sdd-review` or `/sdd-change --replan` before material design work continues.
+- An active repository Change in `planned` or `in_progress` may hand off to `/sdd-apply` when design readiness passes.
+- An active repository Change in `proposed` returns to `/sdd-change --plan` or `--replan`; do not hand it to `/sdd-apply` until planning is complete and its status is `planned`.
+- A Change that remains in `in_review` returns through `/sdd-review` or `/sdd-change --replan` before material design work continues.
 
 The `/sdd-apply` handoff should name:
 
@@ -165,7 +165,7 @@ Stop and ask or route appropriately when:
 - an external mutation requires confirmation
 - design work would overwrite user-owned remote artifacts
 - implementing the design would require application or Storybook source edits
-- the Change is in `review` or `ready_to_close` and the requested work would materially revise its accepted direction
+- the Change is in `in_review` and the requested work would materially revise its accepted direction
 - a closed Change would need to be rewritten
 - privacy, accessibility, security, legal, or platform constraints cannot be satisfied safely
 

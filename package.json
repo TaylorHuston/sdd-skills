@@ -1,6 +1,6 @@
 {
   "name": "@taylorhuston/sdd",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "CLI and agent skills for Story-Driven Development.",
   "type": "module",
   "bin": {

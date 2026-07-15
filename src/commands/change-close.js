@@ -18,7 +18,7 @@ function normalizePath(value) {
   return value.split("\\").join("/");
 }
 
-async function assertReadyToClose(sourcePath, displayPath) {
+async function assertInReview(sourcePath, displayPath) {
   const tasksPath = join(sourcePath, "tasks.md");
   if (!(await pathExists(tasksPath))) {
     throw new SddError(`Active Change is missing tasks.md: ${displayPath}`, {
@@ -32,9 +32,9 @@ async function assertReadyToClose(sourcePath, displayPath) {
       code: "INVALID_CHANGE_STATUS",
     });
   }
-  if (status !== "ready_to_close") {
-    throw new SddError("Only a Change with status ready_to_close can be closed.", {
-      code: "CHANGE_NOT_READY_TO_CLOSE",
+  if (status !== "in_review") {
+    throw new SddError("Only a Change with status in_review can be closed.", {
+      code: "CHANGE_NOT_IN_REVIEW",
       details: [`Current status: ${status ?? "missing"}`],
     });
   }
@@ -94,7 +94,7 @@ export async function closeChange(
         code: "CHANGE_NOT_FOUND",
       });
     }
-    await assertReadyToClose(sourceAbsolutePath, sourcePath);
+    await assertInReview(sourceAbsolutePath, sourcePath);
     transitions.push({
       ...repository,
       sourcePath,

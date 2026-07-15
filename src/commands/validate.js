@@ -2,7 +2,11 @@ import { readFile, readdir } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { parseDocument } from "yaml";
 
-import { CHANGE_STATUSES, parseChangeStatus } from "../change-status.js";
+import {
+  CHANGE_STATUSES,
+  LEGACY_CHANGE_STATUSES,
+  parseChangeStatus,
+} from "../change-status.js";
 import { isValidChangeId } from "../change-id.js";
 import {
   assertValidConfig,
@@ -481,14 +485,16 @@ async function validateChange({
       const { status, error } = parseChangeStatus(source);
       if (error) {
         findings.push(finding("error", "INVALID_CHANGE_STATUS", displayPath, `Cannot parse Change status: ${error}`, context));
+      } else if (historical && LEGACY_CHANGE_STATUSES.includes(status)) {
+        // Closed history keeps the status vocabulary that was valid when it closed.
       } else if (!CHANGE_STATUSES.includes(status)) {
         findings.push(finding("error", "INVALID_CHANGE_STATUS", displayPath, `Expected one of: ${CHANGE_STATUSES.join(", ")}.`, context));
-      } else if (planned && status !== "proposed") {
+      } else if (planned && !["proposed", "planned"].includes(status)) {
         findings.push(finding(
           "error",
           "CHANGE_STATUS_LOCATION_MISMATCH",
           displayPath,
-          `Private planned Changes must use status proposed, found ${status}.`,
+          `Private planned Changes must use status proposed or planned, found ${status}.`,
           context,
         ));
       }

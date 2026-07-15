@@ -116,7 +116,7 @@ Before reviewing, read:
 - `docs/changes/yyyy-mm-dd-change-name/tasks.md`
 - existing `docs/changes/yyyy-mm-dd-change-name/review.md`, if present
 
-Validate that active `tasks.md` frontmatter uses `proposed`, `in_progress`, `review`, `replanning`, or `ready_to_close`. In mutating modes, set `status: review` when independent review begins. In `--check`, report a stale or invalid status without editing it.
+Validate that active `tasks.md` frontmatter uses `proposed`, `planned`, `in_progress`, or `in_review`. In mutating modes, set `status: in_review` when independent review begins. In `--check`, report a stale or invalid status without editing it.
 - Run `sdd validate <space-id> --change <change-id> --repo <resolved-repository-path> --workspace <workspace-root> --json` before the broad review wave and again after artifact remediation. Treat deterministic errors as review findings and inspect warnings, but continue the independent diff, implementation-truth, evidence-strength, security, docs, and acceptance review even when validation passes.
 - project-defined release communication when the proposal or task ledger says it is affected, or implementation changes public release meaning
 - relevant target Epic files under `docs/epics/*/epic.md`
@@ -246,9 +246,9 @@ If the safe-fix diff cannot be isolated from unrelated dirty files, affected ver
 
 If findings require implementation work beyond safe review remediation, leave them in `review.md` and recommend returning to `/sdd-apply`.
 
-If a finding is specifically unresolved experience direction within already accepted behavior, return the Change to `in_progress` and route it through `/sdd-design` before more UI implementation. If resolving the design would change Requirements, Scenarios, scope, ownership, contracts, data, auth, or technical constraints, use `replanning` and `/sdd-change --replan` instead.
+If a finding is specifically unresolved experience direction within already accepted behavior, return the Change to `in_progress` and route it through `/sdd-design` before more UI implementation. If resolving the design would change Requirements, Scenarios, scope, ownership, contracts, data, auth, or technical constraints, return it to `proposed` and use `/sdd-change --replan` instead.
 
-Set `tasks.md` status from the verdict: use `in_progress` when implementation or ordinary remediation remains, `replanning` when product/Requirement/Scenario/scope/ownership decisions must be revised, `review` when review is incomplete or blocked without requiring replanning, and `ready_to_close` only when the full review and closeout gates pass.
+Set `tasks.md` status from the verdict: use `in_progress` when implementation or ordinary remediation remains, `proposed` when product/Requirement/Scenario/scope/ownership decisions must be revised through `/sdd-change --replan`, and `in_review` while review is incomplete or after the full review and closeout gates pass. The review verdict and closeout record distinguish blocked review from a clean Change; do not invent an additional readiness status.
 
 ## PR, Merge, And Closeout
 
@@ -273,7 +273,7 @@ When merge-and-closing:
 
 When closing:
 
-1. Ensure `tasks.md` has `status: ready_to_close` and its closeout reflects review outcome, review record, manual confirmation status, release-communication status, PR/merge state, remaining accepted risks, and that no contradictory checklist or Resume Here state remains.
+1. Ensure `tasks.md` has `status: in_review` and its closeout reflects a passing review outcome, review record, manual confirmation status, release-communication status, PR/merge state, remaining accepted risks, and that no contradictory checklist or Resume Here state remains.
 2. Run `sdd change close <space-id> <change-id> --repo <resolved-repository-path> --workspace <workspace-root>`. Use repeated `--repo` selections only for a coordinated close after every selected repository passes its own contextual gates.
 3. Do not write `status: closed`; folder location is the closed state. Verify references to the active path are historical or updated.
 

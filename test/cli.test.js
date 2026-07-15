@@ -187,6 +187,16 @@ async function writeCanonicalChange(
   );
 }
 
+async function setPlannedChangeStatus(root, created, status = "planned") {
+  const tasksPath = join(root, created.path, "tasks.md");
+  const source = await readFile(tasksPath, "utf8");
+  await writeFile(
+    tasksPath,
+    source.replace(/^status: \S+$/m, `status: ${status}`),
+    "utf8",
+  );
+}
+
 async function writeCanonicalEpic(root, repository, epicId = "SAMPLE-E001") {
   const epicPath = join(root, "code", repository, "docs", "epics", "sample-e001-core");
   await mkdir(epicPath, { recursive: true });
@@ -639,6 +649,11 @@ test("doctor validates active Change status frontmatter", async (t) => {
   diagnosis = await diagnoseWorkspace(root);
   assert.equal(diagnosis.healthy, true);
 
+  await writeFile(join(changePath, "tasks.md"), "---\nstatus: review\n---\n# Tasks\n", "utf8");
+  diagnosis = await diagnoseWorkspace(root);
+  assert.equal(diagnosis.healthy, false);
+  assert.ok(diagnosis.findings.some((finding) => finding.message.includes('"review"')));
+
   await writeFile(join(changePath, "tasks.md"), "---\nstatus: active\n---\n# Tasks\n", "utf8");
   diagnosis = await diagnoseWorkspace(root);
   assert.equal(diagnosis.healthy, false);
@@ -658,7 +673,7 @@ test("doctor validates Changes in unmapped repositories under configured roots",
   assert.ok(diagnosis.findings.some((finding) => finding.message.includes("code/shared-tool")));
 });
 
-test("closed Change state comes from folder location, not a closed status value", async (t) => {
+test("closed Change state comes from folder location and accepts historical statuses", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
@@ -812,7 +827,7 @@ test("status summarizes every Space and prefers its newest active Change", async
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   await writeChange(root, "sample-web", "2026-07-10-older-active", "in_progress");
-  await writeChange(root, "sample-mobile", "2026-07-12-newer-active", "review");
+  await writeChange(root, "sample-mobile", "2026-07-12-newer-active", "in_review");
   await writeChange(root, "sample-web", "2026-07-14-newest-closed", "ready_to_close", {
     closed: true,
   });
@@ -824,7 +839,7 @@ test("status summarizes every Space and prefers its newest active Change", async
   assert.equal(result.spaces[0].status, "active");
   assert.equal(result.spaces[0].activeChangeCount, 2);
   assert.equal(result.spaces[0].change.changeId, "2026-07-12-newer-active");
-  assert.equal(result.spaces[0].change.status, "review");
+  assert.equal(result.spaces[0].change.status, "in_review");
   assert.deepEqual(
     result.spaces[0].repositoryActivity.map((repository) => ({
       repository: repository.resolvedPath,
@@ -852,7 +867,7 @@ test("status summarizes every Space and prefers its newest active Change", async
   );
   assert.deepEqual(statusSummaryRows(result), [
     ["sample", "active", "active", "web", "in_progress", "2026-07-10-older-active", "code/sample-web", 1],
-    ["sample", "active", "active", "mobile", "review", "2026-07-12-newer-active", "code/sample-mobile", 1],
+    ["sample", "active", "active", "mobile", "in_review", "2026-07-12-newer-active", "code/sample-mobile", 1],
   ]);
 });
 
@@ -916,7 +931,7 @@ test("status filters inactive lifecycle entries unless all are requested", async
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   await writeChange(root, "sample-web", "2026-07-10-web-active", "in_progress");
-  await writeChange(root, "sample-mobile", "2026-07-11-mobile-active", "review");
+  await writeChange(root, "sample-mobile", "2026-07-11-mobile-active", "in_review");
 
   const config = await readConfig(root);
   config.ideas.sample.status = "inactive";
@@ -972,7 +987,7 @@ test("status summary retains active ideas and repositories without active Change
   ]);
 });
 
-test("status details one Space with Epics and its five newest Changes", async (t) => {
+test("status details one Space with active Changes and five recent closed Changes", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
@@ -988,7 +1003,7 @@ test("status details one Space with Epics and its five newest Changes", async (t
       root,
       day % 2 === 0 ? "sample-web" : "sample-mobile",
       `2026-07-0${day}-change-${day}`,
-      day === 6 ? "review" : "ready_to_close",
+      "in_review",
       { closed: day !== 6 },
     );
   }
@@ -1017,7 +1032,8 @@ test("status details one Space with Epics and its five newest Changes", async (t
       role: repository.role,
       activeChangeCount: repository.activeChangeCount,
       epicIds: repository.epics.map((epic) => epic.id),
-      changeIds: repository.changes.map((change) => change.changeId),
+      activeChangeIds: repository.activeChanges.map((change) => change.changeId),
+      recentChangeIds: repository.recentChanges.map((change) => change.changeId),
     })),
     [
       {
@@ -1025,14 +1041,16 @@ test("status details one Space with Epics and its five newest Changes", async (t
         role: "web",
         activeChangeCount: 1,
         epicIds: ["SAMPLE-E001"],
-        changeIds: ["2026-07-06-change-6", "2026-07-04-change-4", "2026-07-02-change-2"],
+        activeChangeIds: ["2026-07-06-change-6"],
+        recentChangeIds: ["2026-07-04-change-4", "2026-07-02-change-2"],
       },
       {
         status: "active",
         role: "mobile",
         activeChangeCount: 0,
         epicIds: [],
-        changeIds: ["2026-07-05-change-5", "2026-07-03-change-3", "2026-07-01-change-1"],
+        activeChangeIds: [],
+        recentChangeIds: ["2026-07-05-change-5", "2026-07-03-change-3", "2026-07-01-change-1"],
       },
     ],
   );
@@ -1040,10 +1058,31 @@ test("status details one Space with Epics and its five newest Changes", async (t
     { id: result.epics[0].id, title: result.epics[0].title, status: result.epics[0].status },
     { id: "SAMPLE-E001", title: "Core Experience", status: "active" },
   );
-  assert.equal(result.changes.length, 5);
-  assert.equal(result.changes[0].changeId, "2026-07-06-change-6");
-  assert.equal(result.changes[0].status, "review");
-  assert.equal(result.changes[1].status, "closed");
+  assert.equal(result.activeChanges.length, 1);
+  assert.equal(result.activeChanges[0].changeId, "2026-07-06-change-6");
+  assert.equal(result.activeChanges[0].status, "in_review");
+  assert.equal(result.recentChanges.length, 5);
+  assert.equal(result.recentChanges[0].status, "closed");
+});
+
+test("CLI status counts and prints only closed Changes as recent", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeChange(root, "sample-web", "2026-07-14-active", "planned");
+  await writeChange(root, "sample-web", "2026-07-13-closed", "in_review", { closed: true });
+
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "status",
+    "sample",
+    "--workspace",
+    root,
+  ]);
+
+  assert.match(stdout, /Active Changes \(1\):\n  2026-07-14-active \[planned\]/);
+  assert.match(stdout, /Recent Changes \(1\):\n  2026-07-13-closed \[closed\]/);
+  assert.doesNotMatch(stdout, /Recent Changes \(2\)/);
 });
 
 test("status rejects an unknown Space ID", async (t) => {
@@ -1306,7 +1345,7 @@ test("change create rejects unsafe slugs and impossible dates before writing", a
   assert.equal(await pathExists(join(root, "ideas", "sample", "planned-changes")), false);
 });
 
-test("change promote moves a proposed draft into a selected repository", async (t) => {
+test("change promote moves a planned draft into a selected repository", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
@@ -1314,6 +1353,7 @@ test("change promote moves a proposed draft into a selected repository", async (
     date: "2026-07-14",
     repositories: ["code/sample-mobile"],
   });
+  await setPlannedChangeStatus(root, created);
   await writeFile(
     join(root, created.path, "design.md"),
     `# Design\n\nDraft: \`${created.path}\`\n`,
@@ -1343,7 +1383,7 @@ test("change promote moves a proposed draft into a selected repository", async (
   assert.match(proposal, /Active location: `docs\/changes\/2026-07-14-mobile-notes-access\/`/);
   assert.doesNotMatch(proposal, /code\/sample-mobile/);
   assert.match(design, /Draft: `docs\/changes\/2026-07-14-mobile-notes-access`/);
-  assert.match(tasks, /^---\nstatus: proposed\n---/);
+  assert.match(tasks, /^---\nstatus: planned\n---/);
   assert.match(tasks, /Expected dirty files: `docs\/changes\/2026-07-14-mobile-notes-access\/`/);
 });
 
@@ -1355,6 +1395,7 @@ test("change promote supports coordinated multi-repository promotion", async (t)
     date: "2026-07-14",
     repositories: ["sample-web", "sample-mobile"],
   });
+  await setPlannedChangeStatus(root, created);
 
   const result = await promotePlannedChange(root, "sample", created.changeId, {
     repositories: ["sample-web", "sample-mobile"],
@@ -1379,6 +1420,7 @@ test("change promote dry-run reports destinations without moving the draft", asy
   const created = await createPlannedChange(root, "sample", "dry-run-promotion", {
     date: "2026-07-14",
   });
+  await setPlannedChangeStatus(root, created);
 
   const result = await promotePlannedChange(root, "sample", created.changeId, { dryRun: true });
 
@@ -1396,6 +1438,7 @@ test("change promote preflights every destination before modifying the draft", a
     date: "2026-07-14",
     repositories: ["sample-web", "sample-mobile"],
   });
+  await setPlannedChangeStatus(root, created);
   const collision = join(root, "code", "sample-mobile", "docs", "changes", created.changeId);
   await mkdir(collision, { recursive: true });
 
@@ -1412,7 +1455,7 @@ test("change promote preflights every destination before modifying the draft", a
   );
 });
 
-test("change promote requires complete proposed artifacts", async (t) => {
+test("change promote rejects a proposed draft until planning is complete", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
@@ -1420,13 +1463,11 @@ test("change promote requires complete proposed artifacts", async (t) => {
     date: "2026-07-14",
     repositories: ["sample-web"],
   });
-  await writeFile(join(root, created.path, "tasks.md"), "---\nstatus: in_progress\n---\n", "utf8");
-
   await assert.rejects(
     () => promotePlannedChange(root, "sample", created.changeId, {
       repositories: ["sample-web"],
     }),
-    (error) => error instanceof SddError && error.code === "CHANGE_NOT_PROPOSED",
+    (error) => error instanceof SddError && error.code === "CHANGE_NOT_PLANNED",
   );
   assert.equal(await pathExists(join(root, created.path)), true);
 });
@@ -1439,6 +1480,7 @@ test("CLI exposes change promote with JSON output", async (t) => {
     date: "2026-07-14",
     repositories: ["sample-web"],
   });
+  await setPlannedChangeStatus(root, created);
 
   const { stdout } = await execFileAsync(process.execPath, [
     join(PACKAGE_ROOT, "bin", "sdd.js"),
@@ -1459,12 +1501,12 @@ test("CLI exposes change promote with JSON output", async (t) => {
   assert.equal(result.repositories[0].resolvedPath, "code/sample-web");
 });
 
-test("change close moves a ready Change without writing a closed status", async (t) => {
+test("change close moves an in-review Change without writing a closed status", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   const changeId = "2026-07-14-ready-change";
-  await writeChange(root, "sample-web", changeId, "ready_to_close");
+  await writeChange(root, "sample-web", changeId, "in_review");
 
   const result = await closeChange(root, "sample", changeId, {
     repositories: ["sample-web"],
@@ -1485,7 +1527,7 @@ test("change close moves a ready Change without writing a closed status", async 
   assert.equal(await pathExists(join(root, result.repositories[0].path)), true);
   assert.match(
     await readFile(join(root, result.repositories[0].path, "tasks.md"), "utf8"),
-    /^---\nstatus: ready_to_close\n---/,
+    /^---\nstatus: in_review\n---/,
   );
 });
 
@@ -1494,7 +1536,7 @@ test("change close dry-run validates without moving the Change", async (t) => {
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   const changeId = "2026-07-14-dry-close";
-  await writeChange(root, "sample-web", changeId, "ready_to_close");
+  await writeChange(root, "sample-web", changeId, "in_review");
 
   const result = await closeChange(root, "sample", changeId, {
     repositories: ["sample-web"],
@@ -1512,19 +1554,19 @@ test("change close dry-run validates without moving the Change", async (t) => {
   );
 });
 
-test("change close requires ready_to_close status", async (t) => {
+test("change close requires in_review status", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   const changeId = "2026-07-14-still-reviewing";
-  await writeChange(root, "sample-web", changeId, "review");
+  await writeChange(root, "sample-web", changeId, "in_progress");
 
   await assert.rejects(
     () => closeChange(root, "sample", changeId, { repositories: ["sample-web"] }),
     (error) =>
       error instanceof SddError &&
-      error.code === "CHANGE_NOT_READY_TO_CLOSE" &&
-      error.details.includes("Current status: review"),
+      error.code === "CHANGE_NOT_IN_REVIEW" &&
+      error.details.includes("Current status: in_progress"),
   );
   assert.equal(
     await pathExists(join(root, "code", "sample-web", "docs", "changes", changeId)),
@@ -1537,9 +1579,9 @@ test("change close preflights every destination before moving any Change", async
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   const changeId = "2026-07-14-coordinated-close";
-  await writeChange(root, "sample-web", changeId, "ready_to_close");
-  await writeChange(root, "sample-mobile", changeId, "ready_to_close");
-  await writeChange(root, "sample-mobile", changeId, "ready_to_close", { closed: true });
+  await writeChange(root, "sample-web", changeId, "in_review");
+  await writeChange(root, "sample-mobile", changeId, "in_review");
+  await writeChange(root, "sample-mobile", changeId, "in_review", { closed: true });
 
   await assert.rejects(
     () =>
@@ -1563,7 +1605,7 @@ test("CLI exposes change close with JSON output", async (t) => {
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   const changeId = "2026-07-14-cli-close";
-  await writeChange(root, "sample-web", changeId, "ready_to_close");
+  await writeChange(root, "sample-web", changeId, "in_review");
 
   const { stdout } = await execFileAsync(process.execPath, [
     join(PACKAGE_ROOT, "bin", "sdd.js"),
@@ -1632,7 +1674,7 @@ test("change-scoped validation includes Epic paths declared by the Change", asyn
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   const changeId = "2026-07-14-affected-epic";
-  await writeCanonicalChange(root, "sample-web", changeId, "review");
+  await writeCanonicalChange(root, "sample-web", changeId, "in_review");
   const epicPath = await writeCanonicalEpic(root, "sample-web");
   const changePath = join(root, "code", "sample-web", "docs", "changes", changeId);
   const proposalPath = join(changePath, "proposal.md");
@@ -1665,7 +1707,7 @@ test("change-scoped validation reports a declared Epic path that does not exist"
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   const changeId = "2026-07-14-missing-affected-epic";
-  await writeCanonicalChange(root, "sample-web", changeId, "review");
+  await writeCanonicalChange(root, "sample-web", changeId, "in_review");
   const proposalPath = join(
     root,
     "code",
@@ -1847,8 +1889,8 @@ test("validate reports an active and closed Change collision", async (t) => {
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   const changeId = "2026-07-14-location-collision";
-  await writeCanonicalChange(root, "sample-web", changeId, "ready_to_close");
-  await writeCanonicalChange(root, "sample-web", changeId, "ready_to_close", { closed: true });
+  await writeCanonicalChange(root, "sample-web", changeId, "in_review");
+  await writeCanonicalChange(root, "sample-web", changeId, "in_review", { closed: true });
 
   const result = await validateArtifacts(root, {
     spaceId: "sample",
@@ -2005,7 +2047,7 @@ test("validate reports a Change left in planning after promotion", async (t) => 
     && finding.message.includes("planning and repository")));
 });
 
-test("validate requires planned Changes to remain proposed", async (t) => {
+test("validate accepts pre-implementation planned statuses and rejects later states", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
@@ -2014,13 +2056,21 @@ test("validate requires planned Changes to remain proposed", async (t) => {
     repositories: ["sample-web"],
   });
   const tasksPath = join(root, created.path, "tasks.md");
+  await setPlannedChangeStatus(root, created);
+
+  let result = await validateArtifacts(root, {
+    spaceId: "sample",
+    changeId: created.changeId,
+  });
+  assert.equal(result.valid, true);
+
   await writeFile(
     tasksPath,
-    (await readFile(tasksPath, "utf8")).replace("status: proposed", "status: review"),
+    (await readFile(tasksPath, "utf8")).replace("status: planned", "status: in_review"),
     "utf8",
   );
 
-  const result = await validateArtifacts(root, {
+  result = await validateArtifacts(root, {
     spaceId: "sample",
     changeId: created.changeId,
   });
@@ -2058,7 +2108,7 @@ test("CLI exposes scoped validation with JSON output", async (t) => {
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   const changeId = "2026-07-14-cli-validation";
-  await writeCanonicalChange(root, "sample-web", changeId, "review");
+  await writeCanonicalChange(root, "sample-web", changeId, "in_review");
 
   const { stdout } = await execFileAsync(process.execPath, [
     join(PACKAGE_ROOT, "bin", "sdd.js"),
@@ -2085,7 +2135,7 @@ test("CLI validation returns exit code one with structured findings", async (t) 
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   const changeId = "2026-07-14-invalid-cli-validation";
-  await writeChange(root, "sample-web", changeId, "review");
+  await writeChange(root, "sample-web", changeId, "in_review");
 
   await assert.rejects(
     () => execFileAsync(process.execPath, [

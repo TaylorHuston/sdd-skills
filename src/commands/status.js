@@ -14,7 +14,11 @@ import {
   resolveWorkspaceStatus,
   resolveWorkspacePath,
 } from "../config.js";
-import { CHANGE_STATUSES, parseChangeStatus } from "../change-status.js";
+import {
+  CHANGE_STATUSES,
+  LEGACY_CHANGE_STATUSES,
+  parseChangeStatus,
+} from "../change-status.js";
 import { SddError } from "../errors.js";
 import { isDirectory, pathExists } from "../fs.js";
 
@@ -136,7 +140,8 @@ async function readChange(workspaceRoot, repository, root, changeId, closed) {
   } else {
     statusError = "missing tasks.md";
   }
-  const validStoredStatus = CHANGE_STATUSES.includes(storedStatus);
+  const validStoredStatus = CHANGE_STATUSES.includes(storedStatus) ||
+    (closed && LEGACY_CHANGE_STATUSES.includes(storedStatus));
   return {
     changeId,
     date: changeDate(changeId),
@@ -219,6 +224,7 @@ async function buildSpace(
     repositories.map((repository) => listChanges(workspaceRoot, config, repository)),
   )).flat().sort(compareRecent);
   const activeChanges = changes.filter((change) => !change.closed);
+  const closedChanges = changes.filter((change) => change.closed);
   const repositoryActivity = repositories.map((repository) => {
     const repositoryChanges = changes.filter(
       (change) => change.repository === repository.resolvedPath,
@@ -226,10 +232,14 @@ async function buildSpace(
     const repositoryActiveChanges = activeChanges.filter(
       (change) => change.repository === repository.resolvedPath,
     );
+    const repositoryClosedChanges = closedChanges.filter(
+      (change) => change.repository === repository.resolvedPath,
+    );
     return {
       ...repository,
       activeChangeCount: repositoryActiveChanges.length,
       activeChanges: repositoryActiveChanges,
+      recentChanges: repositoryClosedChanges.slice(0, 5),
       change: (repositoryActiveChanges.length > 0 ? repositoryActiveChanges : repositoryChanges)[0] ?? null,
     };
   });
@@ -240,6 +250,8 @@ async function buildSpace(
     planningPath: resolveIdeaPlanningPath(config, spaceId, space).split("\\").join("/"),
     repositories,
     activeChangeCount: activeChanges.length,
+    activeChanges,
+    recentChanges: closedChanges.slice(0, 5),
     repositoryActivity,
     change: selectedChange,
   };
@@ -251,14 +263,10 @@ async function buildSpace(
   const repositoryDetails = repositoryActivity.map((repository) => ({
     ...repository,
     epics: epics.filter((epic) => epic.repository === repository.resolvedPath),
-    changes: changes
-      .filter((change) => change.repository === repository.resolvedPath)
-      .slice(0, 5),
   }));
   return {
     ...result,
     epics,
-    changes: changes.slice(0, 5),
     repositoryDetails,
   };
 }

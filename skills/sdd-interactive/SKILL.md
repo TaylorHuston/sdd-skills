@@ -93,10 +93,10 @@ Use existing artifacts when the session continues an active change. Keep `tasks.
    - Record that walkthrough in `tasks.md` under `Manual UI Confirmation`. If no manual UI confirmation applies, record why.
    - Record manual confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
    - Refresh `tasks.md` with the final resume state, changed files, verification evidence, manual confirmation status, release-communication status, review record state, PR/merge state, unresolved gaps, accepted deferred gaps, and commit candidates or commits.
-   - Keep status `in_progress` while work or remediation remains; set it to `review` when implementation is ready for independent review.
+   - Keep status `in_progress` while work or remediation remains; set it to `in_review` when implementation is ready for independent review.
    - Recommend `/sdd-review` before merge or closeout when code, user-visible behavior, security, data, or release state changed.
    - Do not run `sdd change close` unless the user explicitly asks or the closeout path is already authorized by the active workflow.
-   - When the user asks to close, finish, merge-and-close, or otherwise complete the change, first confirm `tasks.md` has no contradictory Resume Here, checklist, review, manual confirmation, release communication, PR/merge, deferred-gap, or folder-location claims, and no proposal/design/tasks/review text still says completed work is not implemented, not verified, or pending unless clearly historical. Set `status: ready_to_close`, then use `sdd change close <space-id> <change-id>` with the resolved workspace and repository selections instead of moving the folder manually.
+   - When the user asks to close, finish, merge-and-close, or otherwise complete the change, first confirm `tasks.md` has `status: in_review`, a passing review record, no contradictory Resume Here, checklist, manual confirmation, release communication, PR/merge, deferred-gap, or folder-location claims, and no proposal/design/tasks/review text still says completed work is not implemented, not verified, or pending unless clearly historical. Then use `sdd change close <space-id> <change-id>` with the resolved workspace and repository selections instead of moving the folder manually.
 
 ## Artifact Shape
 

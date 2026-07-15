@@ -99,7 +99,7 @@ Likely repositories may be listed as nonbinding context only. A brief can remain
 
 ## Plan Mode
 
-The outcome is a coherent proposed Change that is ready to promote or, after promotion, ready to hand to `/sdd-apply`.
+The outcome is a coherent planned Change that is ready to promote or, after promotion, ready to hand to `/sdd-apply`.
 
 1. Establish confirmed intent.
    - Prefer an existing Change Brief.
@@ -135,10 +135,11 @@ The outcome is a coherent proposed Change that is ready to promote or, after pro
    - Create an ADR candidate or Proposed ADR for durable architecture, API, client, data, integration, deployment, dependency, auth/security, state, or storage decisions future work should respect.
    - Do not create ADRs for ordinary, reversible implementation details.
 8. Write `tasks.md`.
-   - Start with `status: proposed` and use only `proposed`, `in_progress`, `review`, `replanning`, or `ready_to_close`.
+   - Start with `status: proposed`. Use only `proposed`, `planned`, `in_progress`, or `in_review`; folder location under `closed/` is the terminal state.
    - Keep tasks at artifact, Story/capability, verification, review, and closeout level rather than writing a file-by-file script.
    - Maintain `Resume Here`, implementation and verification ledgers, blockers, manual confirmation, review record, release communication, PR/merge state, ADR state, deferred gaps, truth reconciliation, and closeout tasks.
 9. Validate and hand off.
+   - Set `status: planned` only after the proposal, design, tasks, Epic actions, and verification strategy are coherent and no planning decision remains unresolved.
    - Run `sdd validate <space-id> --change <change-id> --workspace <workspace-root> --json` and resolve deterministic errors. Inspect warnings; structural validity does not prove semantic completeness.
    - Re-read all artifacts and stop for a follow-up question when unresolved ambiguity would make Stories, Requirements, Scenarios, technical choices, or verification misleading.
    - When planning from a private brief, remove the source brief only after the validated `proposal.md` fully preserves its durable intent. Leave it intact if planning stops or fails.
@@ -152,12 +153,12 @@ Use `--replan` when implementation, review, or manual feedback discovers a new o
 Do not use it for narrow defects, missing tests, stale evidence indexes, or routine implementation corrections that `/sdd-apply` can safely reconcile.
 
 1. Read the active Change, relevant Epic truth, implementation ledger, review or manual feedback, current code, tests, and failing or passing evidence needed to understand the discovery.
-2. Set `tasks.md` to `status: replanning` and classify the discovery as `in-scope refinement`, `scope expansion`, `product drift`, `Epic ownership change`, `technical constraint`, or `follow-up change`.
+2. Return `tasks.md` to `status: proposed` and classify the discovery as `in-scope refinement`, `scope expansion`, `product drift`, `Epic ownership change`, `technical constraint`, or `follow-up change`.
 3. Preserve the active Change when the discovery is required to achieve its accepted outcome. Recommend a new `/sdd-change --brief` for adjacent future work or `/sdd-prd` for changed product direction.
 4. Ask only the questions needed to resolve the discovery and define what must be true before implementation resumes.
 5. Update `proposal.md`, `design.md`, ADRs, and `tasks.md` wherever scope, behavior, approach, evidence, risks, or resume state changed. Keep existing Story, Requirement, and Scenario IDs stable unless the behavior is genuinely new.
 6. Add a dated `Planning Updates` entry with the discovery, classification, decisions, artifacts changed, and exact `/sdd-apply` restart point.
-7. Run scoped `sdd validate`. Set status back to `in_progress` only when the revised plan is coherent; otherwise leave `replanning`.
+7. Set `status: planned` only when the revised plan is coherent, then run scoped `sdd validate`. Otherwise leave `status: proposed` and keep the unresolved planning decision explicit.
 8. Do not edit application code or actual Epic files from this mode unless the user explicitly asks for that additional work.
 
 ## Artifact Rules

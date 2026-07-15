@@ -95,7 +95,7 @@ Check that:
 
 - `sdd validate <space-id> --change <change-id> --repo <resolved-repository-path> --workspace <workspace-root> --json` has no unresolved deterministic errors. Inspect warnings and classify intentional compatibility exceptions instead of ignoring them. This structural gate does not replace the semantic Discovery checks below.
 - `proposal.md`, `design.md`, and `tasks.md` agree about the change scope.
-- `tasks.md` frontmatter has exactly one valid `status`: `proposed`, `in_progress`, `review`, `replanning`, or `ready_to_close`. Set it to `in_progress` before implementation or remediation begins. Stop and route to `/sdd-change --replan` when status is `replanning` and planning is not yet resolved.
+- `tasks.md` frontmatter has exactly one valid active `status`: `proposed`, `planned`, `in_progress`, or `in_review`. Start implementation only from `planned`; set it to `in_progress` before implementation or remediation begins. Route `proposed` Changes back to `/sdd-change --plan` or `--replan`, and treat `in_review` as review-owned unless the requested work explicitly returns it to implementation.
 - `design.md` identifies whether the change creates new Epic directories, edits existing Epic directories, or both.
 - For UI-bearing changes, any required `Experience Design` direction is confirmed, uses stable references, and resolves material responsive, state, accessibility, and visual questions before implementation begins.
 - each targeted Epic path follows `docs/epics/key-###-epic-name/epic.md`.
@@ -315,7 +315,7 @@ Implement one coherent behavior or capability slice at a time.
    - Record any superseded Story/Requirement/Scenario wording and the artifact reconciliation performed.
    - Keep old proposal/design status text from contradicting completed work. If design sections still say `Not implemented yet`, `Not verified yet`, or implementation is pending after implementation has landed, update or clearly mark that text as historical before closeout.
    - Record consequential skill guidance or delegation outcomes only when they changed implementation, verification, artifacts, or stop conditions; also record blockers, departures, and commit hashes or commit candidates.
-   - Keep `status: in_progress` while implementation, verification, remediation, or unresolved blockers remain. Set `status: review` only after implementation is complete and the Change is ready for independent `/sdd-review`.
+   - Keep `status: in_progress` while implementation, verification, remediation, or unresolved blockers remain. Set `status: in_review` only after implementation is complete and the Change is ready for independent `/sdd-review`.
    - Before the implementation commit exists, record the relevant ledger rows as `commit pending`, `uncommitted`, or a clear commit candidate rather than inventing a hash.
 12. Commit locally when authorized, the slice is verified, and changes are commit-shaped.
    - Do not stage unrelated dirty files.
@@ -382,7 +382,7 @@ Do not move the change to `docs/changes/closed/` unless the user explicitly asks
 
 When closing:
 
-1. Ensure `tasks.md` has `status: ready_to_close` and its closeout reflects review outcome, review record, manual confirmation status, release-communication status, PR/merge state, remaining accepted risks, and no contradictory checklist or Resume Here state.
+1. Ensure `tasks.md` has `status: in_review` and its closeout reflects a passing review outcome, review record, manual confirmation status, release-communication status, PR/merge state, remaining accepted risks, and no contradictory checklist or Resume Here state.
    - Confirm manual confirmation status uses only `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
    - Confirm related active and closed artifacts no longer contradict the accepted Epic state, including stale `Not implemented yet`, `Not verified yet`, old boundary wording, or obsolete manual status vocabulary.
 2. Run `sdd change close <space-id> <change-id> --repo <resolved-repository-path> --workspace <workspace-root>`. Use repeated `--repo` selections only after every coordinated repository Change is independently ready.

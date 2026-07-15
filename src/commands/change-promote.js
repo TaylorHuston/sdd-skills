@@ -46,9 +46,9 @@ async function validateDraft(sourcePath, displayPath) {
       code: "INVALID_CHANGE_STATUS",
     });
   }
-  if (status !== "proposed") {
-    throw new SddError("Only a Planned Change with status proposed can be promoted.", {
-      code: "CHANGE_NOT_PROPOSED",
+  if (status !== "planned") {
+    throw new SddError("Only a Change with status planned can be promoted.", {
+      code: "CHANGE_NOT_PLANNED",
       details: [`Current status: ${status ?? "missing"}`],
     });
   }

@@ -47,7 +47,7 @@ Evaluate:
 - Requirements and Scenarios are not absorbing implementation-only technical details that belong in design, ADRs, data docs, or tasks.
 - PRD/product direction and public docs do not contradict the Epic.
 - The Epic is usable for future `/sdd-change --plan`, `/sdd-apply`, and `/sdd-review` work.
-- Related Change folders use only `proposed`, `in_progress`, `review`, `replanning`, or `ready_to_close` in `tasks.md`, treat folder location under `closed/` as closed, and do not contradict that status when used as evidence.
+- Related active Change folders use only `proposed`, `planned`, `in_progress`, or `in_review` in `tasks.md`, treat folder location under `closed/` as closed, allow historical closed Changes to retain formerly valid status values, and do not contradict that lifecycle state when used as evidence.
 - Related active or closed change folders do not still claim accepted work is not implemented, not verified, implementation pending, verification pending, or manually accepted under obsolete status vocabulary.
 - Manual confirmation status uses canonical vocabulary: `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
 

@@ -7,7 +7,12 @@ import { isDirectory, pathExists } from "./fs.js";
 
 export const CHANGE_STATUSES = Object.freeze([
   "proposed",
+  "planned",
   "in_progress",
+  "in_review",
+]);
+
+export const LEGACY_CHANGE_STATUSES = Object.freeze([
   "review",
   "replanning",
   "ready_to_close",
@@ -37,7 +42,7 @@ async function listChangeDirectories(root) {
     .sort((left, right) => left.localeCompare(right));
 }
 
-async function inspectTasks(workspaceRoot, changePath) {
+async function inspectTasks(workspaceRoot, changePath, { historical = false } = {}) {
   const tasksPath = join(changePath, "tasks.md");
   const displayPath = relative(workspaceRoot, tasksPath);
   if (!(await pathExists(tasksPath))) {
@@ -52,6 +57,7 @@ async function inspectTasks(workspaceRoot, changePath) {
     return [{ level: "error", message: `Change is missing tasks.md status: ${displayPath}.` }];
   }
   if (!CHANGE_STATUSES.includes(status)) {
+    if (historical && LEGACY_CHANGE_STATUSES.includes(status)) return [];
     return [{
       level: "error",
       message: `Invalid Change status ${JSON.stringify(status)} in ${displayPath}. Expected one of: ${CHANGE_STATUSES.join(", ")}.`,
@@ -97,7 +103,7 @@ export async function inspectChangeStatuses(workspaceRoot, config) {
       findings.push(...(await inspectTasks(workspaceRoot, changePath)));
     }
     for (const changePath of await listChangeDirectories(closedRoot)) {
-      findings.push(...(await inspectTasks(workspaceRoot, changePath)));
+      findings.push(...(await inspectTasks(workspaceRoot, changePath, { historical: true })));
     }
   }
   return findings;

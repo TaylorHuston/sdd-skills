@@ -9,7 +9,7 @@ changes-requested | blocked | ready
 | Gate | Result | Notes |
 |---|---|---|
 | Change artifacts | TBD | TBD |
-| Change status | TBD | `proposed` / `in_progress` / `review` / `replanning` / `ready_to_close`; folder path means closed. |
+| Change status | TBD | `proposed` / `planned` / `in_progress` / `in_review`; folder path means closed. |
 | Epic truth | TBD | TBD |
 | Requirements and Scenarios | TBD | TBD |
 | Story reference traceability | TBD | TBD |

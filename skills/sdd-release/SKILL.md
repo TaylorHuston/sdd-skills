@@ -56,7 +56,7 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
    - Confirm source branch is up to date with target or record why not.
    - Check for merge conflicts with target without performing the merge.
    - Confirm no active SDD change required for this release is missing `/sdd-review` readiness or accepted override.
-   - Confirm each release-relevant active Change has a valid `tasks.md` status and is `ready_to_close` when release handling is the last remaining transition. A folder under `docs/changes/closed/` is closed regardless of its retained active status value.
+   - Confirm each release-relevant active Change has a valid `tasks.md` status and is `in_review` with a passing review record when release handling is the last remaining transition. A folder under `docs/changes/closed/` is closed regardless of its retained active status value.
    - Confirm release-relevant active or closed SDD changes have consistent review records, manual confirmation status, release-communication state, PR/merge state, accepted deferred gaps, and folder location.
    - Perform a cumulative source-vs-target release risk scan. Do not re-run full `/sdd-review`, but check whether the combined release diff contains important deterministic claims that local reviews only asserted, such as reset completeness, stable editable-state identity, async write ordering, parser/extractor rejection, remote/config failure behavior, or portable tooling assumptions. If a release-critical claim lacks proof or an accepted gap, stop or route back to `/sdd-review` or `/sdd-apply`.
    - Stop on duplicate `S#` Story labels inside one Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs unless the release is explicitly carrying the cleanup and it has already passed `/sdd-review`.
@@ -96,7 +96,7 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
    - End new PR creation with a handoff to `/sdd-pr` for later review-thread and status-check stewardship after CI, bots, or humans have had time to respond.
    - Do not merge the PR unless the user explicitly asked for release merge and branch policy allows it.
 8. Update SDD artifacts when appropriate.
-   - If release readiness changes active `tasks.md` closeout state, update its machine-readable status consistently, using only `proposed`, `in_progress`, `review`, `replanning`, or `ready_to_close`, and only when the release clearly owns that change and the update is safe.
+   - If release readiness changes active `tasks.md` closeout state, update its machine-readable status consistently, using only `proposed`, `planned`, `in_progress`, or `in_review`, and only when the release clearly owns that change and the update is safe.
    - Do not close change folders unless the user explicitly asks or the release workflow is authorized to close completed changes.
    - When closeout is authorized and every release-owned contextual gate passes, use `sdd change close <space-id> <change-id> --repo <resolved-repository-path> --workspace <workspace-root>` instead of moving the folder manually. Do not treat the CLI preflight as a substitute for release or merge readiness.
 9. Report release state.

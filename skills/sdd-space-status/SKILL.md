@@ -30,7 +30,7 @@ Accept a Space ID, planning or repository path, SDD artifact path, project name,
 
 1. Load deterministic inventory.
    - Run `sdd status <space-id> --json`.
-   - Use its idea lifecycle status, planning path, mapped repositories, repository lifecycle statuses and roles, repository `git` state, `repositoryDetails`, per-repository activity, Epic paths, recent Changes, effective Change status, stored Change status, and aggregate active Change count.
+   - Use its idea lifecycle status, planning path, mapped repositories, repository lifecycle statuses and roles, repository `git` state, `repositoryDetails`, per-repository `activeChanges` and `recentChanges`, Epic paths, effective Change status, stored Change status, and aggregate active Change count. `recentChanges` contains closed history only.
    - Present every active idea and group its active repositories beneath it, including active ideas without a repository and active repositories without an unclosed Change. Omit inactive and archived lifecycle entries from the default workspace summary; use `--all` when complete lifecycle inventory is requested. Keep official application work distinct from prototypes, references, clients, services, and other mapped repositories; never collapse multiple active repositories into one ambiguous idea-level work state.
    - If status data is missing or invalid, run `sdd doctor` and report the finding instead of silently inferring a replacement value.
 2. Read only the context needed for re-entry.
@@ -44,7 +44,7 @@ Accept a Space ID, planning or repository path, SDD artifact path, project name,
 3. Reconcile obvious re-entry signals.
    - Identify the active Change, most useful resume point, branch, blockers, pending review or acceptance, and important Epic/Story context.
    - Mention only contradictions visible from the targeted reads. Do not turn re-entry into a full drift, template, security, or implementation audit.
-   - Distinguish declared status from inference. Canonical Change status is `proposed`, `in_progress`, `review`, `replanning`, or `ready_to_close`; folder location under `docs/changes/closed/` means closed.
+   - Distinguish declared status from inference. Canonical active Change status is `proposed`, `planned`, `in_progress`, or `in_review`; folder location under `docs/changes/closed/` means closed.
 4. Route the next action.
    - Recommend at most three coherent next moves, with the most likely first.
    - Name the skill that owns deeper work rather than performing it here.
@@ -61,7 +61,7 @@ Repository: <path, lifecycle, and role>
 - Git: <branch or detached head, clean or dirty, and concise change counts>
 - Active Changes: <count and current status>
 - Important Epics: <summary for this repository>
-- Recent Changes: <relevant recent history for this repository>
+- Recent Changes: <recent closed history for this repository>
 
 <repeat the repository section for each mapping; do not merge their Epics or Changes>
 

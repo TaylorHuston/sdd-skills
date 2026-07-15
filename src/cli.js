@@ -30,7 +30,7 @@ Usage:
   sdd epic create [options]       Scaffold a canonical Epic in one repository
   sdd change create [options]     Scaffold a planned Change for a Space
   sdd change promote [options]    Promote a planned Change into repository work
-  sdd change close [options]      Move a ready Change into closed history
+  sdd change close [options]      Move an in-review Change into closed history
   sdd --version                   Print the package version
 
 Init options:
@@ -285,9 +285,9 @@ function printStatus(result) {
     for (const epic of repository.epics) {
       console.log(`  ${epic.id}${epic.status ? ` [${epic.status}]` : ""} ${epic.title}`);
     }
-    console.log(`Recent Changes (${repository.changes.length}):`);
-    if (repository.changes.length === 0) console.log("  none");
-    for (const change of repository.changes) {
+    console.log(`Recent Changes (${repository.recentChanges.length}):`);
+    if (repository.recentChanges.length === 0) console.log("  none");
+    for (const change of repository.recentChanges) {
       console.log(`  ${change.changeId} [${change.status}]`);
     }
   }

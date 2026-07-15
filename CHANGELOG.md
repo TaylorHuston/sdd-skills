@@ -9,6 +9,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-07-15
+
+### Changed
+
+- Simplified the Change lifecycle to `proposed`, `planned`, `in_progress`, `in_review`, and folder-derived `closed`; promotion now requires a completed plan and closeout requires an independently reviewed Change.
+
+### Fixed
+
+- Fixed detailed `sdd status` output and JSON so all `activeChanges` are separate from the five most recent closed `recentChanges`.
+
 ## [0.8.0] - 2026-07-15
 
 ### Added
