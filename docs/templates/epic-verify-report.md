@@ -28,6 +28,7 @@ mode: default
 | Story shape | TBD | TBD |
 | Story requirement completeness | TBD | TBD |
 | Story reference traceability | TBD | TBD |
+| Reverse traceability inventory | TBD | Include the full Epic-scoped current-working-tree inventory command and candidate classifications. |
 | Requirement and Scenario truth | TBD | TBD |
 | Implementation drift | TBD | TBD |
 | Verification strength | TBD | TBD |
@@ -63,6 +64,7 @@ mode: default
 - Implementation drift:
 - Requirement drift:
 - Verification drift:
+- Reverse-traceability drift:
 - Scope drift:
 - Product drift:
 - Lifecycle drift:
@@ -74,7 +76,18 @@ mode: default
 | Command / Scenario | Result | Proves | Notes |
 |---|---|---|---|
 | `sdd validate <space-id> --epic <epic-id> --repo <repository> --json` | TBD | Deterministic Epic shape, IDs, Story Index, traceability tables, evidence references, and artifact links. | Required structural baseline. |
+| `python3 <sdd-orphan-audit-script> <app-root> --epic <epic-id> --format json` | TBD | Full reverse inventory of implementation and test candidates against Epic evidence. | Required; skipping blocks `aligned`. |
 | TBD | TBD | TBD | TBD |
+
+## Reverse Traceability
+
+- Inventory scope:
+- Missing evidence references:
+- Source candidates classified:
+- Test candidates classified:
+- Test-support exclusions reviewed:
+- Framework/configuration/generated exclusions reviewed:
+- Gaps or cleanup routed:
 
 ## Delegated Audits
 
@@ -95,6 +108,7 @@ mode: default
 - Code:
 - Tests:
 - Docs:
+- Project-defined supporting-doc inventory:
 - PRD/Product Brief:
 
 ## Residual Risks

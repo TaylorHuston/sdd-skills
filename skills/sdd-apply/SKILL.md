@@ -1,6 +1,6 @@
 ---
 name: sdd-apply
-description: Apply or continue an active SDD change using a main orchestrator with subagents for non-trivial BDD/TDD implementation, discovery, verification, self-check, and manual UI confirmation. Discovers materially relevant skills available in the current runtime, loads and enforces their guidance without assuming a fixed skill catalog, and passes selected guidance into delegated slices. Reads the change proposal, design, and task ledger, updates application code and Epic truth, reconciles implementation and verification evidence, validates subagent claims, and stops for ambiguity or unsafe changes. Use when the user invokes /sdd-apply, asks to apply, implement, continue, review-only, delegate implementation, use available specialist guidance, walk through UI confirmation, or close a SDD change.
+description: Apply or continue an active SDD change using a main orchestrator with subagents for non-trivial BDD/TDD implementation, discovery, verification, changed-surface reverse traceability, self-check, and manual UI confirmation. Discovers materially relevant skills available in the current runtime, loads and enforces their guidance without assuming a fixed skill catalog, and passes selected guidance into delegated slices. Reads the change proposal, design, and task ledger, updates application code and Epic truth, reconciles implementation and verification evidence, validates subagent claims, and stops for ambiguity or unsafe changes. Use when the user invokes /sdd-apply, asks to apply, implement, continue, review-only, delegate implementation, use available specialist guidance, walk through UI confirmation, or close a SDD change.
 ---
 
 # SDD Apply
@@ -9,7 +9,7 @@ Apply a SDD change from its change folder. This is the implementation-side compa
 
 ## Authority And Project Profile
 
-Resolve the workspace, idea-owned planning path, and target implementation repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before interpreting SDD artifact authority, evidence, reconciliation, or closeout. Use the resolved topology unless project guidance declares an explicit exception, then enforce the canonical `docs/epics/`, `docs/changes/`, and `docs/changes/closed/` layout inside the implementation repository. Project guidance owns branch and commit policy, verification commands, supporting-doc requirements, release conventions, technology constraints, and permissions. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
+Resolve the workspace, idea-owned planning path, and target implementation repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before interpreting SDD artifact authority, evidence, reconciliation, or closeout. Use the resolved topology unless project guidance declares an explicit exception, then enforce the canonical `docs/epics/`, `docs/changes/`, and `docs/changes/closed/` layout inside the implementation repository. Project guidance owns branch and commit policy, verification commands, truth-bearing supporting-doc requirements, release conventions, technology constraints, and permissions. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
 
 Non-negotiable invariant: Epic/Story truth must stay aligned with implementation reality as the work proceeds. If implementation changes behavior, reveals stale Story wording, changes Requirement or Scenario meaning, moves Epic ownership, or changes verification confidence, update the affected Epic/Story truth in the same run or stop before claiming implementation progress.
 
@@ -79,7 +79,7 @@ Before editing, read:
 - `docs/changes/yyyy-mm-dd-change-name/tasks.md`
 - the project-defined release communication when the proposal says release-note impact is required or TBD, or implementation proves the change affects public release meaning
 - relevant `AGENTS.md`, README, project-local branch/merge policy, and PRD/Product Brief under the resolved idea planning root when present; if no project-local policy exists, use documented project or workspace guidance as fallback
-- existing or locally required project docs under `docs/` when the change may affect their truth value, such as architecture, testing, deployment, style, data/API contracts, operations, or current-state docs
+- the project-defined truth-bearing supporting-doc set; when none is declared, inspect the README, changed docs, and documents whose current claims intersect the changed surface rather than inventing a universal inventory
 - target Epic files under `docs/epics/*/epic.md`
 - enough of every active `docs/epics/*/epic.md` to detect duplicate Story labels within an Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs
 - code, tests, docs, and generated artifacts named by `design.md`, `tasks.md`, or current implementation reality
@@ -349,6 +349,8 @@ Before reporting the change as implemented or ready for `/sdd-review`, run an im
 - Review Handoff Readiness: branch, dirty state, commits or commit candidates, remaining gaps, and later `/sdd-review` needs are clear.
 - Closeout Readiness: `tasks.md` has no contradictory Resume Here, checklist, review record, manual confirmation status, release-communication status, PR/merge state, deferred-gap, or folder-location claims.
 - Closed-Artifact Readiness: related proposal/design/tasks/review files do not still claim implemented work is unimplemented, unverified, pending, or accepted under obsolete status vocabulary.
+- Changed-Surface Reverse Traceability: run the packaged `sdd-orphan-audit` script in JSON mode with `--changed-from <integration-target-or-merge-base>` and one `--epic <epic-id>` pass per affected Epic. Classify every behavior-test and source candidate as Epic-owned, supporting/generated/framework infrastructure, an explicit gap, or tracked cleanup before handoff. If the script is unavailable, perform and record an equivalent current-working-tree inventory; do not silently skip the gate.
+- Refactor Stranding: when the change removes, replaces, or relocates implementation, explicitly search for old imports, routes, registrations, constructors/dependencies, tests, migrations, generated bindings, and files left behind by the previous path.
 
 Use fresh-context delegated self-check passes by default for substantial changes and whenever practical for normal implementation. Delegate at least coverage, code, security, and docs/artifact checks when the changed surface is non-trivial. This implementation self-check does not replace `/sdd-review` as the local PR gate. The orchestrator remains responsible for final judgment and verification of important claims.
 
@@ -368,6 +370,7 @@ A change is implementation-complete only when:
 - meaningful verification has passed or gaps are explicit.
 - manual UI confirmation steps are recorded for user-facing app changes, or `tasks.md` explains why no manual confirmation applies.
 - the implementation self-check has no unresolved safe fixes.
+- the changed-surface reverse-traceability inventory ran and every relevant candidate was reconciled or recorded as a gap.
 - scoped `sdd validate` passes after the final Epic and Change reconciliation; warnings are either resolved or explicitly classified.
 - `tasks.md` has an accurate final `Resume Here`, implementation ledger, verification ledger, blockers/open questions, and closeout state.
 - `tasks.md` records the review outcome as a `review.md` path, a clean review recorded in `tasks.md`, or an explicit user-approved review waiver before closeout.

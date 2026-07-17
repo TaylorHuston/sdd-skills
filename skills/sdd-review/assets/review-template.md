@@ -13,6 +13,7 @@ changes-requested | blocked | ready
 | Epic truth | TBD | TBD |
 | Requirements and Scenarios | TBD | TBD |
 | Story reference traceability | TBD | TBD |
+| Reverse traceability | TBD | Diff-scoped source/test candidate inventory and classification. |
 | Tests and verification | TBD | TBD |
 | Manual UI confirmation | TBD | TBD |
 | Code review | TBD | TBD |
@@ -57,12 +58,22 @@ changes-requested | blocked | ready
 - Conflict check:
 - Dirty state:
 - Branch policy:
+- Reverse-traceability command/result:
+
+## Reverse Traceability
+
+- Candidate scope:
+- Epic ownership reconciled:
+- Support/generated/framework classifications:
+- Stranded refactor surfaces checked:
+- Explicit gaps or tracked cleanup:
 
 ## Discovery Wave
 
 | Pass | Reviewer | Result | Notes |
 |---|---|---|---|
 | Artifact truth | TBD | TBD | TBD |
+| Reverse traceability | TBD | TBD | TBD |
 | Code diff | TBD | TBD | TBD |
 | Verification coverage | TBD | TBD | TBD |
 | Security | TBD | TBD | TBD |

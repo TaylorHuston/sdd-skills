@@ -1,5 +1,5 @@
 ---
-modified: 2026-07-15
+modified: 2026-07-16
 ---
 # SDD Toolchain
 
@@ -202,7 +202,7 @@ All four Change commands infer a sole active mapped repository. When several act
 
 `sdd validate` scans every configured repository and idea-owned planned-Change directory. Pass a Space ID to narrow the workspace, repeat `--repo` to select mapped repositories, or use exactly one of `--change <change-id>` and `--epic <epic-id>` for a focused gate. Change-scoped validation also validates Epic paths declared in the Change proposal's `Epic Actions`; a declared path that does not exist is an error rather than a misleading zero-Epic pass. JSON output contains stable finding codes, paths, artifact context, counts, and a top-level `valid` flag.
 
-The command checks only facts derivable from the files: required Change files and core sections, Change status and location consistency, unresolved scaffolding tokens, duplicate locations, Epic frontmatter and section shape, Story Index alignment, Story/Requirement/Scenario identifier shape and uniqueness, canonical `Implemented By` and `Verified By` tables, evidence references to declared Requirements/Scenarios, and local Markdown links to missing Epic or Change artifacts. Legacy Story IDs are warnings unless duplicated; unresolved placeholders in private planned drafts are warnings and become errors after promotion. Closed Changes retain strict file/status/reference checks, while title, section, and placeholder differences from newer templates are compatibility warnings rather than retroactive failures.
+The command checks only facts derivable from the files: required Change files and core sections, Change status and location consistency, unresolved scaffolding tokens, duplicate locations, Epic frontmatter and section shape, Story Index alignment, Story/Requirement/Scenario identifier shape and uniqueness, canonical `Implemented By` and `Verified By` tables, evidence references to declared Requirements/Scenarios, concrete existing repository-relative paths for automated evidence, and local Markdown links to missing Epic or Change artifacts. Generic or missing automated evidence paths are warnings because semantic review must decide whether they are genuinely inadequate. Legacy Story IDs are warnings unless duplicated; unresolved placeholders in private planned drafts are warnings and become errors after promotion. Closed Changes retain strict file/status/reference checks, while title, section, and placeholder differences from newer templates are compatibility warnings rather than retroactive failures.
 
 Validation is not review. A passing result does not prove that requirements are complete, code implements the Epic, evidence is strong, product intent is correct, or manual acceptance has passed. The SDD skills use scoped validation as a deterministic baseline and remain responsible for those contextual judgments.
 
@@ -279,7 +279,9 @@ docs/
     yyyy-mm-dd-orphan-audit.md
 ```
 
-Epics are the durable behavior-to-code map. Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, and `Verification Gaps` live inside each Epic's `epic.md`. `Verified By` is a scenario-mapped evidence index, not a chronological command log; broad gates such as lint, typecheck, build, or full CI are supporting evidence unless tied to a named Requirement or Scenario. If implemented behavior is not represented in an Epic/Story, treat it as undocumented drift until the map is updated or the code is removed through a tracked change.
+Epics are the durable behavior-to-code map. Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, and `Verification Gaps` live inside each Epic's `epic.md`. `Verified By` is a scenario-mapped evidence index, not a chronological command log; automated evidence names repository-relative test paths, while broad gates such as lint, typecheck, build, or full CI are supporting evidence unless tied to a named Requirement or Scenario. If implemented behavior is not represented in an Epic/Story, treat it as undocumented drift until the map is updated or the code is removed through a tracked change.
+
+Reverse traceability is tiered by workflow. `/sdd-apply` checks the changed surface before handoff, `/sdd-review` independently checks the source-vs-target diff, `/sdd-epic-verify` requires a full Epic-scoped inventory before it can report `aligned`, and `/sdd-orphan-audit` remains the repository-wide maintenance pass. The packaged audit script expands evidence globs, reads the current working tree rather than only the Git index, and separates likely behavior candidates from test harness, framework/configuration, and generated files. Its output is conservative candidate data for agent classification, never automatic deletion approval.
 
 An undated Change Brief under the idea's configured `plannedChangesDirectory` captures desired outcome and scope without technical planning or Change status. `/sdd-change --plan` consumes that intent into a dated private planned Change only when implementation planning should begin.
 
@@ -363,7 +365,7 @@ In that example, `ideas/product-one/` is the private planning path, the two mapp
 
 ## Adapting The Skills To Your Shape
 
-Start by defining project-local guidance. A good `AGENTS.md` should identify any exception to the default idea-owned repository mapping, branch and merge policy, required commands and release records, supporting docs, and project constraints. It should not relocate canonical SDD artifacts from an implementation repository's `docs/` tree.
+Start by defining project-local guidance. A good `AGENTS.md` should identify any exception to the default idea-owned repository mapping, branch and merge policy, required commands and release records, truth-bearing supporting docs, generated/framework/test-support conventions, and project constraints. It should not relocate canonical SDD artifacts from an implementation repository's `docs/` tree.
 
 Common adaptation points:
 
@@ -375,7 +377,7 @@ Common adaptation points:
 - Available skills: `/sdd-apply` discovers relevant capabilities from the consuming runtime instead of requiring named companion skills. Keep that behavior capability-driven if you add local routing preferences, and avoid turning optional skills into package dependencies.
 - Changelog and release records: define whether the project uses Keep a Changelog, generated release notes, changesets, provider releases, another record, or no changelog. The skills follow that policy instead of imposing one.
 - UI and design guidance: optional `/sdd-design --plan` resolves material experience uncertainty before implementation, while `--revise` turns implementation comparison, review, or manual feedback into an explicit preserve/change/non-goal delta before another `/sdd-apply`. `/sdd-review` checks the implemented experience when UI changes are involved. Point them at your design system docs, brand guide, component guidelines, or remove that gate if the project does not need one.
-- Re-entry and audit heuristics: `/sdd-space-status` uses configured topology, active Change artifacts, recent local history, and working-tree evidence for orientation, while `/sdd-orphan-audit` depends on traceability evidence. Tune their interpretation after you see the first few reports against your codebase.
+- Re-entry and audit heuristics: `/sdd-space-status` uses configured topology, active Change artifacts, recent local history, and working-tree evidence for orientation, while `/sdd-orphan-audit` depends on traceability evidence. Tune support/generated/test-harness classification after you see the first few reports against your codebase; do not weaken the apply, review, or Epic-verification requirement to classify relevant candidates.
 
 ### Changing The Idea/Repository Model
 

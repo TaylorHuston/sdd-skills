@@ -1,6 +1,6 @@
 ---
 name: sdd-orphan-audit
-description: Run a conservative SDD orphan and traceability audit for an application repo. Use when the user invokes /sdd-orphan-audit, asks to find orphaned tests, unused files, stale functions, dead code candidates, missing Epic references, stale Implemented By or Verified By evidence, files/tests not owned by any Epic, or SDD traceability drift across a project. Starts with universal git and docs/epics evidence, optionally layers stack-specific analyzers when available, writes or prints a report, and never deletes or rewrites code automatically.
+description: Run a conservative SDD orphan and reverse-traceability audit for an application repo, one Epic, or a changed surface. Use when the user invokes /sdd-orphan-audit, asks to find orphaned tests, unused files, stale functions, dead code candidates, missing Epic references, stale Implemented By or Verified By evidence, files/tests not owned by any Epic, or SDD traceability drift across a project. Starts with current-working-tree and docs/epics evidence, optionally layers stack-specific analyzers when available, writes or prints a report, and never deletes or rewrites code automatically.
 ---
 
 # SDD Orphan Audit
@@ -19,6 +19,8 @@ This is a report-first audit. It can identify candidates, confidence levels, and
 - `--check`: read-only terminal output only. Do not write a report.
 - `--json`: emit the universal script JSON when useful for further tooling.
 - `--with-stack-tools`: after the universal pass, run installed stack-specific analyzers that are safe and local.
+- `--epic <id-or-path>`: limit ownership evidence to one Epic while retaining a full current-working-tree candidate inventory.
+- `--changed-from <ref>`: limit candidates to committed, staged, unstaged, and untracked files in the current source working surface since the ref.
 
 ## Output
 
@@ -53,11 +55,13 @@ Check git status before writing a report. Preserve unrelated dirty files. Do not
 2. Run the universal traceability script.
    - Use `scripts/sdd_orphan_audit.py <app-root> --format markdown` for a human summary.
    - Use `--format json` when the result will be post-processed.
-   - The script parses `docs/epics/*/epic.md`, extracts `Implemented By` and `Verified By` path-like references, compares them to `git ls-files` or filesystem fallback inventory, and identifies candidate test files. Human review must still decide whether `Verified By` ownership is scenario-mapped or merely a broad command reference.
+   - The script parses `docs/epics/*/epic.md`, extracts `Implemented By` and `Verified By` path-like references, expands globs, and compares them to the current working tree: tracked plus untracked files minus staged or unstaged deletions. It separates behavior-test/source candidates from likely test harness, framework/configuration, and generated support files. Human review must still decide whether ownership is correct, whether exclusions are project-appropriate, and whether `Verified By` is scenario-mapped rather than a broad command reference.
+   - Use `--epic` for Epic verification and combine `--epic` with `--changed-from` for Change-local apply/review checks. Run one Epic-scoped pass per affected Epic when a Change spans Epics.
 3. Review the script output.
    - Read only suspicious files or artifacts needed to classify findings.
    - Do not read every source file by default.
    - Treat files not referenced by Epic evidence as traceability gaps first, not deletion candidates.
+   - Classify each candidate against project conventions and runtime wiring. The script output is never deletion approval.
 4. Optionally run stack-specific analyzers.
    - Only in `--with-stack-tools` mode or when the user explicitly asks.
    - Prefer installed, local, read-only analyzers. Examples: `knip`, `ts-prune`, `depcheck`, ESLint unused rules, `vulture`, `ruff`, coverage reports, framework route manifests, or language import graph tools.
@@ -70,6 +74,7 @@ Check git status before writing a report. Preserve unrelated dirty files. Do not
    - `stale-test`: a test exists but appears to verify removed, renamed, or unowned behavior.
    - `stale-code`: code exists but appears unused or disconnected from current routes/build/runtime.
    - `inconclusive`: dynamic import, framework convention, generated file, plugin registration, reflection, CLI entrypoint, or insufficient evidence prevents a useful conclusion.
+   - After refactors, explicitly search for stranded routes, registrations, imports, dependencies, tests, migrations, generated bindings, and obsolete files even when static ownership looks complete.
 6. Recommend the next workflow.
    - Use `/sdd-epic-verify` when an Epic may be stale or missing evidence.
    - Use `/sdd-change --brief` for deferred cleanup outcomes and `/sdd-change --plan` for current Story moves, artifact corrections with implementation implications, or broad traceability repair.

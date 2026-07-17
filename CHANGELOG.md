@@ -1,5 +1,5 @@
 ---
-modified: 2026-07-15
+modified: 2026-07-16
 ---
 # Changelog
 
@@ -8,6 +8,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+
+- Added tiered reverse-traceability gates for changed-surface implementation, source-vs-target review, full Epic verification, and repository-wide orphan audits.
+- Added Epic and changed-ref scoping to the conservative orphan-audit inventory, including working-tree awareness, evidence-glob expansion, and separate test-support/framework/generated candidate categories.
+
+### Changed
+
+- Automated `Verified By` evidence now names existing repository-relative test paths; deterministic validation warns on generic suite labels and missing paths.
+- Project guidance now identifies truth-bearing supporting docs and project-specific support/generated/test-harness conventions used during reconciliation.
 
 ## [0.9.0] - 2026-07-15
 

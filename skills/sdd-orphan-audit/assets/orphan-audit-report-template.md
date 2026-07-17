@@ -10,15 +10,20 @@ audit written | check complete | blocked | no SDD evidence found
 - Git root:
 - Audit date:
 - Mode:
+- Epic scope:
+- Changed-from scope:
 - Commands run:
 
 ## Summary
 
 - Epics scanned:
-- Tracked files inventoried:
+- Working-tree files inventoried:
+- Candidate files in scope:
 - Missing Epic references:
 - Tests without scenario-mapped `Verified By` ownership:
 - Source files without `Implemented By` ownership:
+- Test-support files excluded:
+- Framework/configuration/generated files excluded:
 - Stack analyzers used:
 
 ## Findings
@@ -54,6 +59,20 @@ audit written | check complete | blocked | no SDD evidence found
 ### Source Without `Implemented By`
 
 - TBD
+
+### Exclusions Reviewed
+
+- Test support:
+- Framework/configuration:
+- Generated:
+- Project-specific corrections:
+
+## Refactor Stranding Check
+
+- Routes/registrations:
+- Imports/dependencies:
+- Tests/migrations:
+- Generated bindings/obsolete files:
 
 ## Stack Analyzer Findings
 

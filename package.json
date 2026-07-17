@@ -18,7 +18,7 @@
   ],
   "scripts": {
     "check": "npm test && node ./bin/sdd.js --help",
-    "test": "node --test test/cli.test.js"
+    "test": "node --test test/*.test.js"
   },
   "engines": {
     "node": ">=20"

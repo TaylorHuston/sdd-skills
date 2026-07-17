@@ -199,6 +199,10 @@ async function setPlannedChangeStatus(root, created, status = "planned") {
 }
 
 async function writeCanonicalEpic(root, repository, epicId = "SAMPLE-E001") {
+  await mkdir(join(root, "code", repository, "src"), { recursive: true });
+  await mkdir(join(root, "code", repository, "test"), { recursive: true });
+  await writeFile(join(root, "code", repository, "src", "core.js"), "", "utf8");
+  await writeFile(join(root, "code", repository, "test", "core.test.js"), "", "utf8");
   const epicPath = join(root, "code", repository, "docs", "epics", "sample-e001-core");
   await mkdir(epicPath, { recursive: true });
   await writeFile(
@@ -2135,6 +2139,93 @@ test("validate reports a broken Verified By reference", async (t) => {
   assert.ok(result.findings.some((finding) =>
     finding.code === "BROKEN_EVIDENCE_REFERENCE"
     && finding.message.includes("S1/R9-S1")));
+});
+
+test("validate warns when automated Verified By evidence omits a concrete test path", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const epicPath = await writeCanonicalEpic(root, "sample-web");
+  await mkdir(join(root, "code", "sample-web", "test"), { recursive: true });
+  await writeFile(join(root, "code", "sample-web", "test", "core.test.js"), "", "utf8");
+  const preciseResult = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+  assert.equal(
+    preciseResult.findings.some((finding) => finding.code === "GENERIC_AUTOMATED_EVIDENCE"),
+    false,
+  );
+  const source = await readFile(epicPath, "utf8");
+  await writeFile(
+    epicPath,
+    source.replace("`test/core.test.js`", "Backend unit tests"),
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, true);
+  assert.ok(result.findings.some((finding) =>
+    finding.level === "warning"
+    && finding.code === "GENERIC_AUTOMATED_EVIDENCE"
+    && finding.message.includes("repository-relative test path")));
+});
+
+test("validate warns when a Verified By automated test path is missing", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const epicPath = await writeCanonicalEpic(root, "sample-web");
+  const source = await readFile(epicPath, "utf8");
+  await writeFile(
+    epicPath,
+    source.replace("`test/core.test.js`", "`test/missing.test.js`"),
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, true);
+  assert.ok(result.findings.some((finding) =>
+    finding.level === "warning"
+    && finding.code === "MISSING_AUTOMATED_EVIDENCE_PATH"
+    && finding.message.includes("test/missing.test.js")));
+});
+
+test("validate does not require a test path for manual Verified By evidence", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const epicPath = await writeCanonicalEpic(root, "sample-web");
+  const source = await readFile(epicPath, "utf8");
+  await writeFile(
+    epicPath,
+    source.replace("`test/core.test.js`", "Manual browser test at `/day`"),
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(
+    result.findings.some((finding) =>
+      finding.code === "GENERIC_AUTOMATED_EVIDENCE"
+      || finding.code === "MISSING_AUTOMATED_EVIDENCE_PATH"),
+    false,
+  );
 });
 
 test("validate reports unresolved scaffolding in an active Change", async (t) => {

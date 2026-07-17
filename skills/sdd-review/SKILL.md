@@ -1,6 +1,6 @@
 ---
 name: sdd-review
-description: Review a SDD change as the independent local integration gate after /sdd-apply or before closing. Verifies the source-vs-target diff, proposal, design, task ledger, Epic truth, template adherence, Stories, Requirements, Scenarios, tests, manual confirmation, code quality, security, Idea-side repository and product truth, supporting docs, release communication, branch policy, merge readiness, and closeout consistency. Use when the user invokes /sdd-review, asks to verify a SDD change, run a local PR-style review, prepare integration readiness, address findings, close or finish a change, or perform a policy-defined integration handoff. Use /sdd-release for production-target promotion and release handoff.
+description: Review a SDD change as the independent local integration gate after /sdd-apply or before closing. Verifies the source-vs-target diff and reverse traceability, proposal, design, task ledger, Epic truth, template adherence, Stories, Requirements, Scenarios, tests, manual confirmation, code quality, security, Idea-side repository and product truth, supporting docs, release communication, branch policy, merge readiness, and closeout consistency. Use when the user invokes /sdd-review, asks to verify a SDD change, run a local PR-style review, prepare integration readiness, address findings, close or finish a change, or perform a policy-defined integration handoff. Use /sdd-release for production-target promotion and release handoff.
 ---
 
 # SDD Review
@@ -9,7 +9,7 @@ Review a SDD change like a local pull request. This is the final independent gat
 
 ## Authority And Project Profile
 
-Resolve the workspace, idea-owned planning path, and target implementation repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before judging artifact authority, traceability, evidence, reconciliation, or closeout. Use the resolved topology unless project guidance declares an explicit exception, then enforce Epics under `docs/epics/` and active/closed changes under `docs/changes/` inside the implementation repository. Project guidance owns source and target policy, required checks, merge/PR rules, supporting-doc requirements, release conventions, technology constraints, available review skills, and permissions. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
+Resolve the workspace, idea-owned planning path, and target implementation repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before judging artifact authority, traceability, evidence, reconciliation, or closeout. Use the resolved topology unless project guidance declares an explicit exception, then enforce Epics under `docs/epics/` and active/closed changes under `docs/changes/` inside the implementation repository. Project guidance owns source and target policy, required checks, merge/PR rules, truth-bearing supporting-doc requirements, release conventions, technology constraints, available review skills, and permissions. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
 
 Default behavior is deep review. A clean `/sdd-review` means the source branch is ready to integrate into the selected target branch, not merely that the active change folder looks plausible. The primary review surface is the source-vs-target diff plus the SDD artifacts that claim to explain it. When default review returns `ready` for a non-production target and closeout readiness passes, treat merge-and-close as the obvious recommended next action and ask the user to confirm it. Use cheaper or narrower modes only when the user asks for them explicitly.
 
@@ -85,6 +85,7 @@ Capture:
 - conflict check result without performing a merge
 - branch policy and whether the current source/target pair satisfies it
 - active `review.md`, `tasks.md` review state, manual confirmation state, release-communication state, PR/merge state, and closeout state
+- JSON reverse-traceability inventory for the source working tree since the selected target or merge base, produced by the packaged `sdd-orphan-audit` script with `--changed-from`; run one `--epic` pass per affected Epic when ownership needs to be distinguished
 
 Use commands like these when the repo supports them, adjusting refs to the app policy:
 
@@ -126,7 +127,7 @@ Validate that active `tasks.md` frontmatter uses `proposed`, `planned`, `in_prog
 - the PRD/Product Brief and other product-direction docs when product scope changed, the change claims product direction, or product drift was flagged
 - project visual/style guidance, design-system notes, or app visual identity docs when the change affects app UI, layout, styling, component density, interaction polish, or visual identity
 - the Change's `Experience Design` section and stable prototype/design references when present or required by `tasks.md`
-- project README and existing or locally required docs under `docs/` when affected, including architecture, testing, security, deployment, style, data/API contracts, operations, and current-state docs
+- the project-defined truth-bearing supporting-doc set; when none is declared, inspect the README, changed docs, and documents whose current claims intersect the diff, including architecture, testing, security, deployment, style, data/API contracts, operations, and current-state docs
 - source-vs-target diff and changed file list
 - code, tests, generated files, docs, and configuration touched by the change
 
@@ -195,12 +196,13 @@ Run every gate that applies and record `pass`, `findings`, `blocked`, or `not ap
 
 1. **Artifact truth**: proposal, design, task ledger, Epic/Story truth, Requirements, Scenarios, evidence maps, gaps, and Change status agree with implementation reality.
 2. **Source-vs-target code review**: review the actual diff and source-only commits for correctness, regressions, maintainability, accidental scope, project-pattern fit, and user-visible state handling.
-3. **Verification**: scenario-mapped focused evidence exists, broad gates are not substituted for behavior proof, production/mock boundaries are honest, and required project checks pass or have explicit blocking gaps.
-4. **Risk-shaped evidence**: important deterministic claims are challenged against plausible failure modes and supported by tests, source inspection, repeatable runtime evidence, or an explicit gap.
-5. **Security and data safety**: use relevant available security guidance and inspect the risk surfaces identified by the diff and project policy.
-6. **Manual acceptance**: user-facing changes have the workflow-defined walkthrough and status when applicable; project policy decides whether confirmation itself blocks readiness.
-7. **Supporting truth**: required project docs, release communication, generated indexes, ADRs, and product direction do not contradict the implementation or Epic map. The resolved Idea's current entry-point docs must identify the selected repository and repository lifecycle correctly, agree with `.sdd/config.yaml`, and avoid describing implemented replacement work as future or an archived repository as active. Clearly dated exploration, decisions, and historical sections may preserve their original point-in-time language when they are recognizable as history rather than current routing guidance.
-8. **Integration readiness**: source, target, reviewed commit, dirty state, conflict state, required checks, authorization, and the project-defined PR/merge/closeout path are unambiguous.
+3. **Reverse traceability**: classify every behavior-bearing source/test candidate from the diff inventory as Epic-owned, supporting/generated/framework infrastructure, an explicit gap, or tracked cleanup. For refactors, check stranded routes, registrations, imports, dependencies, tests, migrations, generated bindings, and obsolete files. Skipping this inventory blocks `ready`.
+4. **Verification**: scenario-mapped focused evidence exists, broad gates are not substituted for behavior proof, production/mock boundaries are honest, and required project checks pass or have explicit blocking gaps.
+5. **Risk-shaped evidence**: important deterministic claims are challenged against plausible failure modes and supported by tests, source inspection, repeatable runtime evidence, or an explicit gap.
+6. **Security and data safety**: use relevant available security guidance and inspect the risk surfaces identified by the diff and project policy.
+7. **Manual acceptance**: user-facing changes have the workflow-defined walkthrough and status when applicable; project policy decides whether confirmation itself blocks readiness.
+8. **Supporting truth**: required project docs, release communication, generated indexes, ADRs, and product direction do not contradict the implementation or Epic map. The resolved Idea's current entry-point docs must identify the selected repository and repository lifecycle correctly, agree with `.sdd/config.yaml`, and avoid describing implemented replacement work as future or an archived repository as active. Clearly dated exploration, decisions, and historical sections may preserve their original point-in-time language when they are recognizable as history rather than current routing guidance.
+9. **Integration readiness**: source, target, reviewed commit, dirty state, conflict state, required checks, authorization, and the project-defined PR/merge/closeout path are unambiguous.
 
 Before finalizing the discovery wave, explicitly challenge cross-cutting failure classes that commonly escape happy-path tests when they are relevant to the diff: upgrade paths and migration immutability, existing-data compatibility, async focus or draft preservation, responsive interaction targets and accessibility, dependency or CI action validity, generated-contract drift, and fresh-install versus existing-install behavior. Keep this framework-neutral and mark irrelevant classes `not applicable`; do not manufacture work where the diff creates no such risk.
 
