@@ -1,6 +1,6 @@
 ---
 created: 2026-06-13
-modified: 2026-07-15
+modified: 2026-07-17
 ---
 # Story-Driven Development
 

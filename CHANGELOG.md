@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-17
+
 ### Added
 
 - Added a responsive, accessible, framework-free introduction to the SDD process, configured for GitHub Pages deployment.
