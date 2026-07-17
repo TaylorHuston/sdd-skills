@@ -7,7 +7,7 @@ CLI tooling and reusable Codex skills for Story-Driven Development: an LLM-frien
 
 This repository packages the current SDD workflow skills as portable OpenAI/Codex skill folders and includes a CLI that makes workspace topology, skill installation, status reporting, artifact validation, and Change-folder transitions deterministic. SDD remains file-based: normal YAML, JSON, Markdown, and Git repositories stay inspectable without a hosted service.
 
-The framework-free [Story-Driven Development one-page guide](site/) is included in this repository and configured for GitHub Pages deployment from `main`.
+The framework-free [Story-Driven Development one-page guide](https://taylorhuston.me/sdd-skills/) is published with GitHub Pages from the source in [`site/`](site/).
 
 ## What This Workflow Is For
 
@@ -294,6 +294,12 @@ Active Change folders are working records. `proposal.md` defines scope, `design.
 When upgrading active work from the earlier vocabulary, map `review` and `ready_to_close` to `in_review`. Map `replanning` to `proposed` while decisions remain unresolved or to `planned` once the revised plan is coherent. Historical closed Changes do not need to be rewritten.
 
 `/sdd-apply` has no fixed dependency on a catalog of companion skills. It discovers the skills exposed by the current runtime, selects the smallest set materially relevant to the active implementation slice, and enforces the selected guidance in both direct and delegated work. A consuming environment can have a different skill set, or no matching specialist skill at all; project guidance and normal engineering judgment remain the fallback.
+
+### Shared Component References
+
+Shared component or pattern catalogs are optional incubators, not mandatory application dependencies. Material UI decisions use one of five canonical strategies: `existing application component`, `adopted reference`, `application-specific`, `reference candidate`, or `deliberate divergence`.
+
+A reusable pattern may move through `reference candidate -> controlled preview -> application-owned adoption -> consumer validation -> standardized reference`. Promotion requires evidence from an implemented consumer outside the catalog itself. Applications may remain application-specific or deliberately diverge, and foundation-first work should not block application delivery unless the active Change explicitly requires it.
 
 For non-trivial changes, `design.md` should compare viable technical options before selecting an approach. When a change creates a durable architecture, data, dependency, integration, deployment, security, storage, or cross-cutting project decision, record it as an ADR under `docs/adrs/`.
 

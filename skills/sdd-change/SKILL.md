@@ -119,6 +119,7 @@ The outcome is a coherent planned Change that is ready to promote or, after prom
    - Refine observable Requirements and concrete happy-path, empty, failure, permission, recovery, integration, and security-sensitive Scenarios as relevant.
    - Identify current and plausible clients, API or typed-contract boundaries, data, auth/security, migration, rollout, and operational constraints.
    - Identify material user-flow, responsive, component-state, accessibility, or visual-direction uncertainty. Plan observable behavior here, then route experience convergence to `/sdd-design` instead of improvising a detailed UI without user confirmation.
+   - For material component decisions, record the canonical `Component Strategy` labels from the design template even when the experience direction is already clear. Use `/sdd-design --plan` when the strategy needs convergence, not merely to fill a settled classification.
    - Compare viable technical approaches for non-trivial decisions. Usually compare two or three; use one only when the choice is genuinely obvious and say why.
    - Challenge the verification strategy so evidence can map to Story, Requirement, and Scenario IDs rather than becoming a command log.
    - Ask before finalizing when material product, Story, contract, data, security, architecture, or verification choices remain unsettled.

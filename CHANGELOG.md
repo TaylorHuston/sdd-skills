@@ -9,6 +9,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- UI planning, design, apply, and review workflows now classify material component strategies, keep shared catalogs optional, follow project ownership models for adopted references, and require implemented consumer evidence before claiming standardization.
+
 ## [0.10.0] - 2026-07-17
 
 ### Added

@@ -84,6 +84,16 @@ Identify what should be retained, reconciled, or replaced:
 - keyboard, focus, screen-reader, contrast, motion, and content constraints
 - visual identity and design-system alignment
 
+For each materially affected component or pattern, classify the intended strategy:
+
+- `existing application component`: retain or extend an application-owned component
+- `adopted reference`: adopt an existing project or shared reference using the consuming project's ownership model
+- `application-specific`: create or retain a component whose behavior belongs to this application
+- `reference candidate`: record a possible reusable reference without claiming standardization
+- `deliberate divergence`: depart from an existing reference for product-specific reasons
+
+This classification prevents accidental duplication and premature centralization. It does not require a shared catalog, a cross-repository change, or a divergence rationale when the product need is already clear.
+
 Use screenshots or browser inspection when visual claims depend on rendered reality. Do not judge a running interface from source alone when direct inspection is practical.
 
 For `--revise`, establish a fair comparison surface before diagnosing the target. Prefer equivalent production-component states, fixtures, viewport dimensions, and component crops. Record which implementation is the reference and which is the target; do not imply that cross-application consistency requires shared runtime components or identical product semantics.
@@ -115,6 +125,7 @@ Inspect the skills and tools available in the current runtime and use the smalle
 - Use divergent visual generation for meaningfully different concepts, not cosmetic permutations.
 - Use precision design tools when component geometry, reusable patterns, or interaction detail needs refinement.
 - Use existing Storybook or equivalent component previews as implementation references and controlled comparison surfaces; do not edit preview or application source from this skill.
+- Treat configured shared component or pattern catalogs as optional incubators, not mandatory gates. A broadly reusable presentation pattern may begin there when multiple consumers are plausible; domain-specific components normally begin in the owning application. Do not make foundation-first work block the application unless the accepted Change explicitly chooses that dependency.
 - Use browser automation or screenshot tooling for repeatable crops, viewports, interaction states, and computed measurements when available. Automated measurements inform design judgment but do not decide whether two products should be visually identical.
 - Follow every selected tool skill's confirmation, external-mutation, and asset-handling rules.
 - Never apply a design system to existing remote screens or overwrite a user's prototype without explicit authorization.
@@ -132,13 +143,14 @@ For an `in_review` Change, perform the guarded `in_review -> in_progress` transi
 
 ### 7. Record The Experience Contract
 
-Create or update one `## Experience Design` section in the Change's existing `design.md`. It is the canonical current accepted experience contract, not the revision history. Keep it proportional to the Change and use the canonical section in the installed `/sdd-change` `assets/design-template.md` when available. For an older or independently managed Change without that template, record the confirmed direction, user confirmation, stable reference artifacts, user flow and information architecture, responsive composition, component and state contract, accessibility and interaction behavior, visual direction, and open design questions.
+Create or update one `## Experience Design` section in the Change's existing `design.md`. It is the canonical current accepted experience contract, not the revision history. Keep it proportional to the Change and use the canonical section in the installed `/sdd-change` `assets/design-template.md` when available. For an older or independently managed Change without that template, record the confirmed direction, user confirmation, stable reference artifacts, user flow and information architecture, responsive composition, component and state contract, material component strategies, accessibility and interaction behavior, visual direction, and open design questions.
 
 Reference Requirements and Scenarios where the design contract clarifies how accepted behavior appears. Do not restate every Requirement or turn visual details into Stories.
 
 Update `tasks.md` only as needed to preserve cold-resume state:
 
 - selected direction and stable reference IDs
+- material component strategies, initial ownership, and required preview states
 - user-confirmation result
 - unresolved design blockers or accepted gaps
 - expected `/sdd-apply` starting point
@@ -185,6 +197,7 @@ The `/sdd-apply` handoff should name:
 
 - the first Requirement/Scenario implementation slice
 - selected reference artifacts
+- material component strategies and their initial implementation owners
 - required responsive and interaction states
 - Storybook stories or equivalent previews to build
 - accessibility and manual UI confirmation obligations

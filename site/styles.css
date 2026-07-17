@@ -691,6 +691,81 @@ h1 {
   content: "";
 }
 
+.referenceLifecycle {
+  display: grid;
+  gap: var(--space-8);
+  margin-block-start: var(--space-12);
+  padding-block: var(--space-8);
+  border-block: 1px solid var(--border);
+}
+
+.referenceHeading {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.35fr) minmax(0, 1fr);
+  gap: var(--space-8);
+}
+
+.referenceHeading h3 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.referenceHeading div {
+  max-width: var(--reading-width);
+}
+
+.referenceHeading div p {
+  margin: var(--space-2) 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.referenceFlow {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.referenceFlow li {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-height: 116px;
+  padding: var(--space-4);
+  border-inline-start: 1px solid var(--border);
+}
+
+.referenceFlow li:first-child {
+  border-inline-start: 2px solid var(--accent);
+}
+
+.referenceFlow li:last-child {
+  border-inline-start-color: var(--success);
+}
+
+.referenceFlow span {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.referenceFlow strong {
+  font-size: 15px;
+}
+
+.referenceFlow small,
+.referenceNote {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.referenceNote {
+  margin: 0;
+}
+
 .commandBlock {
   margin-block-start: var(--space-12);
   border-radius: var(--radius-panel);
@@ -908,6 +983,20 @@ h1 {
 
   .toolchainGrid {
     grid-template-columns: 1fr;
+  }
+
+  .referenceHeading,
+  .referenceFlow {
+    grid-template-columns: 1fr;
+  }
+
+  .referenceHeading {
+    gap: var(--space-3);
+  }
+
+  .referenceFlow li {
+    min-height: 0;
+    padding-block: var(--space-3);
   }
 
   .closingBand {

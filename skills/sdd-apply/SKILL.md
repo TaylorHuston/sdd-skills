@@ -83,6 +83,7 @@ Before editing, read:
 - target Epic files under `docs/epics/*/epic.md`
 - enough of every active `docs/epics/*/epic.md` to detect duplicate Story labels within an Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs
 - code, tests, docs, and generated artifacts named by `design.md`, `tasks.md`, or current implementation reality
+- the application's component previews and any project-configured shared reference catalog when a UI-bearing Change introduces or materially changes reusable components or patterns
 - routes, commands, seed data, test accounts, browser setup, screenshots, or local dev URLs needed to give the user a useful manual UI confirmation walkthrough when the change is user-facing
 
 Check git status in every repo that may change. Preserve unrelated dirty files. Before code or runtime edits, confirm the current branch satisfies the project-local policy or documented fallback policy. If the change touches an implementation repo associated with the workflow root, read that repo's local guidance before editing.
@@ -98,6 +99,7 @@ Check that:
 - `tasks.md` frontmatter has exactly one valid active `status`: `proposed`, `planned`, `in_progress`, or `in_review`. Start implementation only from `planned`; run `sdd change transition <space-id> <change-id> --from planned --to in_progress` before implementation begins. Route `proposed` Changes back to `/sdd-change --plan` or `--replan`, and treat `in_review` as review-owned unless the requested work explicitly returns it to implementation through the corresponding guarded transition.
 - `design.md` identifies whether the change creates new Epic directories, edits existing Epic directories, or both.
 - For UI-bearing changes, any required `Experience Design` direction is confirmed, uses stable references, and resolves material responsive, state, accessibility, and visual questions before implementation begins.
+- For UI-bearing changes with material component decisions, the `Experience Design` classifies each affected pattern as an existing application component, adopted reference, application-specific component, reference candidate, or deliberate divergence, and names its initial owner plus required preview states. Do not invent a shared-catalog dependency when none is configured.
 - each targeted Epic path follows `docs/epics/key-###-epic-name/epic.md`.
 - Stories stay embedded in Epic `epic.md` files; do not create `docs/stories/`.
 - Epics and Stories are durable but revisable truth; proposed Story moves, splits, merges, renames, and reorders are explicit Epic changes, not accidental implementation cleanup.
@@ -247,6 +249,8 @@ The orchestrator must verify important subagent claims before committing or upda
 
 Implement one coherent behavior or capability slice at a time.
 
+For UI-bearing slices, follow the recorded component strategy. Inspect existing application previews and configured reference catalogs before creating a materially reusable pattern. Adopt references using the consuming project's ownership model; when no shared runtime ownership model is configured, copy and adapt them into application ownership. Keep application-specific behavior in the application. Treat reference candidates as follow-up signals: do not edit another repository, block the application, or claim standardization unless the accepted Change explicitly includes that work and project policy permits it. Satisfy required preview states through configured component previews or equivalent rendered-route, fixture, browser, or manual evidence; do not introduce a preview tool solely to satisfy this workflow.
+
 1. Apply Epic artifact work first when needed.
    - Create or update `docs/epics/key-###-epic-name/epic.md`.
    - Keep Stories embedded in the Epic.
@@ -378,6 +382,7 @@ A change is implementation-complete only when:
 - related proposal/design/tasks/review artifacts do not contain stale implementation-pending language or contradictory manual confirmation status unless clearly marked historical.
 - affected existing or locally required project docs under `docs/` no longer contradict implementation, Epic truth, branch/release policy, testing commands, architecture, data/API contracts, deployment behavior, operations, or visual style.
 - when `design.md` contains a confirmed `Experience Design`, implementation and Storybook/manual evidence reflect its required flow, responsive composition, states, accessibility behavior, and explicitly accepted deviations.
+- when `design.md` records material component strategies, implementation ownership, preview states, and any promotion claims agree with the implemented result; a shared or standardized claim has implemented consumer use outside the catalog itself at the level required by project guidance, or remains explicitly a candidate.
 - project-defined release communication is current when required.
 - commits or commit candidates are recorded.
 

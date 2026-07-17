@@ -386,6 +386,8 @@ Current documentation is capability-driven as well. When exploration, planning, 
 
 Design tooling is also capability-driven. `/sdd-design` may use installed visual-review, browser, prototyping, design-system, component-preview, screenshot, measurement, image, or accessibility capabilities, but portable SDD must not require Stitch, Penpot, Storybook, Playwright, Figma, or any other named product. For revisions, prefer equivalent states, fixtures, viewports, and component crops when comparing implementations. Stable references to selected external artifacts belong in the Change; prototypes and screenshots remain design evidence rather than behavioral or implementation truth.
 
+Shared component and pattern catalogs are optional incubators rather than mandatory dependencies. When a project uses one, design work should classify material components as existing application components, adopted references, application-specific components, reference candidates, or deliberate divergences. Adopted references follow the consuming project's ownership model. Consumer evidence means implemented use outside the catalog artifact itself; project guidance decides how much use justifies promotion or a standardized claim. Required component-state evidence may come from a component preview, rendered route or fixture, browser evidence, or a manual walkthrough. Foundation-first work should not block an application unless the accepted Change explicitly requires it.
+
 If this document and a skill disagree, update the skill or this document so they align rather than treating the disagreement as acceptable drift.
 
 Do not duplicate full canonical templates here. Templates belong in the relevant skill assets.

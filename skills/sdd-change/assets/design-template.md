@@ -159,6 +159,16 @@ Use this section only when the Change has material UI or interaction design. Rem
 
 ### Component And State Contract
 
+#### Component Strategy
+
+Record only materially affected components or patterns. Use `existing application component`, `adopted reference`, `application-specific`, `reference candidate`, or `deliberate divergence`. A reference candidate does not create a cross-repository dependency unless this Change explicitly says so.
+
+`Required Preview States` names the states that need evidence, not a required tool. Evidence may come from component previews, rendered routes or fixtures, browser checks, or a manual walkthrough.
+
+| Component Or Pattern | Strategy | Initial Owner Or Reference | Required Preview States | Follow-Up |
+|---|---|---|---|---|
+| TBD | TBD | TBD | TBD | TBD |
+
 ### Accessibility And Interaction
 
 ### Visual Direction
