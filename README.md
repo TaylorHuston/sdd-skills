@@ -1,11 +1,13 @@
 ---
-modified: 2026-07-15
+modified: 2026-07-17
 ---
 # SDD Toolchain
 
 CLI tooling and reusable Codex skills for Story-Driven Development: an LLM-friendly workflow for planning, implementing, reviewing, and releasing larger application changes without losing traceability between product behavior, code, and verification evidence.
 
 This repository packages the current SDD workflow skills as portable OpenAI/Codex skill folders and includes a CLI that makes workspace topology, skill installation, status reporting, artifact validation, and Change-folder transitions deterministic. SDD remains file-based: normal YAML, JSON, Markdown, and Git repositories stay inspectable without a hosted service.
+
+The framework-free [Story-Driven Development one-page guide](site/) is included in this repository and configured for GitHub Pages deployment from `main`.
 
 ## What This Workflow Is For
 
@@ -74,6 +76,8 @@ sdd change promote billing "$CHANGE_ID" --repo services/billing-api
 ```
 
 After promotion, use `/sdd-change --plan` to reconcile repository-specific scope, `/sdd-apply` to implement it, and `/sdd-review` to run the independent gate. Only after the Change is `in_review`, has a passing review record, and satisfies project-specific acceptance and merge requirements should it be closed:
+
+`/sdd-review` reports technical readiness separately from manual acceptance. A `ready` verdict with manual confirmation `pending user` is not authorization to merge or close; `/sdd-pr` and `/sdd-release` carry that status forward and enforce the consuming project's policy for each requested action.
 
 ```bash
 sdd change close billing "$CHANGE_ID" --repo services/billing-api

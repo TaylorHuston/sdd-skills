@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Story-Driven Development keeps a durable, evidence-backed map from product behavior to implementation and tests.">
+    <meta name="theme-color" content="#09090b">
+    <title>Story-Driven Development</title>
+    <script>
+      document.documentElement.dataset.theme = localStorage.getItem("sdd-theme") || "dark";
+    </script>
+    <link rel="stylesheet" href="./styles.css">
+    <script src="./site.js" defer></script>
+  </head>
+  <body>
+    <a class="skipLink" href="#main-content">Skip to content</a>
+
+    <header class="siteHeader">
+      <a class="brand" href="#top" aria-label="Story-Driven Development home">
+        <span class="brandMark" aria-hidden="true">S</span>
+        <span>Story-Driven Development</span>
+      </a>
+      <nav class="siteNav" aria-label="Primary navigation">
+        <a href="#process">Process</a>
+        <a href="#traceability">Traceability</a>
+        <a href="#toolchain">Toolchain</a>
+      </nav>
+      <div class="headerActions">
+        <a class="githubLink" href="https://github.com/TaylorHuston/sdd-skills">GitHub</a>
+        <button class="iconButton" id="theme-toggle" type="button" aria-label="Switch to light theme" title="Switch theme">
+          <svg class="sunIcon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"></path>
+          </svg>
+          <svg class="moonIcon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <section class="intro" id="top" aria-labelledby="page-title">
+        <div class="introCopy">
+          <p class="eyebrow">A file-based workflow for agent-assisted development</p>
+          <h1 id="page-title">Story-Driven Development</h1>
+          <p class="lede">Keep one durable, evidence-backed map from the behavior you intend to the code and tests that actually exist.</p>
+          <div class="introActions">
+            <a class="primaryAction" href="#process">See the process</a>
+            <a class="textAction" href="https://github.com/TaylorHuston/sdd-skills#quick-start">Install the toolchain</a>
+          </div>
+        </div>
+
+        <figure class="behaviorMap" aria-labelledby="map-caption">
+          <figcaption id="map-caption">The durable behavior map</figcaption>
+          <div class="mapFlow" aria-label="Idea to verified evidence">
+            <div class="mapNode mapNodePrimary">
+              <span>01</span>
+              <strong>Intent</strong>
+              <small>Idea and outcome</small>
+            </div>
+            <div class="mapConnector" aria-hidden="true"></div>
+            <div class="mapNode">
+              <span>02</span>
+              <strong>Behavior</strong>
+              <small>Epic and Story</small>
+            </div>
+            <div class="mapConnector" aria-hidden="true"></div>
+            <div class="mapNode">
+              <span>03</span>
+              <strong>Contract</strong>
+              <small>Requirement and Scenario</small>
+            </div>
+            <div class="mapConnector" aria-hidden="true"></div>
+            <div class="mapNode mapNodeEvidence">
+              <span>04</span>
+              <strong>Evidence</strong>
+              <small>Code and verification</small>
+            </div>
+          </div>
+          <div class="truthBar">
+            <span class="statusIndicator" aria-hidden="true"></span>
+            <span>Current truth lives beside the implementation.</span>
+          </div>
+        </figure>
+      </section>
+
+      <section class="principleBand" aria-label="Core principle">
+        <p>There should never be a question of what is actually implemented.</p>
+        <span>Epics describe durable behavior. Evidence points to the code and tests. Drift is a finding, not folklore.</span>
+      </section>
+
+      <section class="section processSection" id="process" aria-labelledby="process-title">
+        <header class="sectionHeader">
+          <p class="sectionNumber">01 / Process</p>
+          <div>
+            <h2 id="process-title">A workflow that preserves context</h2>
+            <p>Deterministic tools manage structure and state. Agent skills handle the judgment that cannot be reduced to a command.</p>
+          </div>
+        </header>
+
+        <ol class="workflow">
+          <li>
+            <span class="stepIndex">01</span>
+            <div class="stepBody">
+              <h3>Explore</h3>
+              <p>Investigate a substantial product or technical question without prematurely turning it into implementation.</p>
+            </div>
+            <code>/sdd-explore</code>
+          </li>
+          <li>
+            <span class="stepIndex">02</span>
+            <div class="stepBody">
+              <h3>Capture intent</h3>
+              <p>Record the desired outcome now. Delay technical planning until the work is close enough to begin.</p>
+            </div>
+            <code>/sdd-change --brief</code>
+          </li>
+          <li>
+            <span class="stepIndex">03</span>
+            <div class="stepBody">
+              <h3>Plan just in time</h3>
+              <p>Refine Stories, Requirements, Scenarios, technical choices, and verification against current code.</p>
+            </div>
+            <code>/sdd-change --plan</code>
+          </li>
+          <li>
+            <span class="stepIndex">04</span>
+            <div class="stepBody">
+              <h3>Promote the plan</h3>
+              <p>Move the settled private draft into each selected implementation repository before work begins.</p>
+            </div>
+            <code>sdd change promote</code>
+          </li>
+          <li>
+            <span class="stepIndex">05</span>
+            <div class="stepBody">
+              <h3>Converge the experience</h3>
+              <p>For UI-bearing work, settle flow, responsive composition, states, accessibility, and visual direction.</p>
+            </div>
+            <code>/sdd-design --plan</code>
+          </li>
+          <li>
+            <span class="stepIndex">06</span>
+            <div class="stepBody">
+              <h3>Implement in verified slices</h3>
+              <p>Work Requirement by Requirement, prefer BDD/TDD, and keep Epic truth current as implementation changes.</p>
+            </div>
+            <code>/sdd-apply</code>
+          </li>
+          <li>
+            <span class="stepIndex">07</span>
+            <div class="stepBody">
+              <h3>Review independently</h3>
+              <p>Review the complete diff against its target and report technical readiness separately from manual acceptance.</p>
+            </div>
+            <code>/sdd-review</code>
+          </li>
+          <li>
+            <span class="stepIndex">08</span>
+            <div class="stepBody">
+              <h3>Accept, integrate, and release</h3>
+              <p>A technically ready Change may still be <code>pending user</code>. Follow project policy and ask before merging, closing, deploying, or releasing.</p>
+            </div>
+            <div class="stepCommands" aria-label="Pull request and release skills">
+              <code>/sdd-pr</code>
+              <code>/sdd-release</code>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <section class="section traceSection" id="traceability" aria-labelledby="trace-title">
+        <header class="sectionHeader">
+          <p class="sectionNumber">02 / Traceability</p>
+          <div>
+            <h2 id="trace-title">The specification is a code map</h2>
+            <p>Each layer answers a different question, while stable references keep the path inspectable.</p>
+          </div>
+        </header>
+
+        <div class="traceLayout">
+          <div class="traceStack" aria-label="Traceability hierarchy">
+            <div class="traceRow">
+              <span class="traceType">Epic</span>
+              <strong>What durable capability exists?</strong>
+              <code>LC-001</code>
+            </div>
+            <div class="traceRow">
+              <span class="traceType">Story</span>
+              <strong>What can the user accomplish?</strong>
+              <code>LC-001/S2</code>
+            </div>
+            <div class="traceRow">
+              <span class="traceType">Requirement</span>
+              <strong>What behavior must hold?</strong>
+              <code>R2</code>
+            </div>
+            <div class="traceRow">
+              <span class="traceType">Scenario</span>
+              <strong>How is that behavior observed?</strong>
+              <code>R2.1</code>
+            </div>
+          </div>
+
+          <aside class="evidencePanel" aria-labelledby="evidence-title">
+            <div class="panelHeading">
+              <div>
+                <p>Verified By</p>
+                <h3 id="evidence-title">Evidence index</h3>
+              </div>
+              <span class="verifiedState">Verified</span>
+            </div>
+            <dl>
+              <div>
+                <dt>Scenario</dt>
+                <dd><code>LC-001/S2/R2.1</code></dd>
+              </div>
+              <div>
+                <dt>Implementation</dt>
+                <dd><code>src/chat/send-message.ts</code></dd>
+              </div>
+              <div>
+                <dt>Test</dt>
+                <dd><code>test/chat/send-message.test.ts</code></dd>
+              </div>
+            </dl>
+            <p class="panelNote">Evidence indexes point to proof. They are not chronological command logs.</p>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section toolchainSection" id="toolchain" aria-labelledby="toolchain-title">
+        <header class="sectionHeader">
+          <p class="sectionNumber">03 / Toolchain</p>
+          <div>
+            <h2 id="toolchain-title">Judgment where it matters. Automation where it helps.</h2>
+            <p>The CLI owns repeatable mechanics. Skills own exploration, planning, implementation, review, and reconciliation.</p>
+          </div>
+        </header>
+
+        <div class="toolchainGrid">
+          <section class="toolColumn" aria-labelledby="cli-title">
+            <div class="columnLabel">Deterministic layer</div>
+            <h3 id="cli-title">SDD CLI</h3>
+            <ul>
+              <li>Initialize workspace topology</li>
+              <li>Scaffold Changes and Epics</li>
+              <li>Validate artifact structure</li>
+              <li>Report status across repositories</li>
+              <li>Guard lifecycle transitions</li>
+            </ul>
+          </section>
+          <section class="toolColumn" aria-labelledby="skills-title">
+            <div class="columnLabel">Contextual layer</div>
+            <h3 id="skills-title">Agent skills</h3>
+            <ul>
+              <li>Refine outcomes and requirements</li>
+              <li>Compare technical paths</li>
+              <li>Route specialist guidance</li>
+              <li>Implement with evidence</li>
+              <li>Review the integrated diff</li>
+            </ul>
+          </section>
+        </div>
+
+        <div class="commandBlock">
+          <div class="commandHeader">
+            <span>Start in any workspace</span>
+            <button class="copyButton" id="copy-command" type="button" data-copy="git clone https://github.com/TaylorHuston/sdd-skills.git&#10;cd sdd-skills&#10;npm install&#10;npm link" aria-label="Copy installation commands">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
+                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+              </svg>
+              <span>Copy</span>
+            </button>
+          </div>
+          <pre><code><span class="prompt">$</span> git clone https://github.com/TaylorHuston/sdd-skills.git
+<span class="prompt">$</span> cd sdd-skills
+<span class="prompt">$</span> npm install
+<span class="prompt">$</span> npm link</code></pre>
+          <p class="commandNote"><strong>Pre-1.0 distribution:</strong> install from the GitHub checkout for now. A standard npm registry install is targeted for the 1.0 release.</p>
+        </div>
+      </section>
+
+      <section class="closingBand" aria-labelledby="closing-title">
+        <p class="sectionNumber">The North Star</p>
+        <h2 id="closing-title">Keep implemented behavior, code, and evidence in agreement.</h2>
+        <p>No stale planning wiki. No game of telephone. No mystery about where to begin when something breaks.</p>
+        <a class="primaryAction" href="https://github.com/TaylorHuston/sdd-skills">Read the documentation</a>
+      </section>
+    </main>
+
+    <footer class="siteFooter">
+      <span>Story-Driven Development</span>
+      <span>File-based. Agent-friendly. Evidence-backed.</span>
+      <a href="https://github.com/TaylorHuston/sdd-skills">GitHub repository</a>
+    </footer>
+  </body>
+</html>

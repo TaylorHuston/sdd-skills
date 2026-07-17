@@ -1,5 +1,5 @@
 ---
-modified: 2026-07-15
+modified: 2026-07-17
 ---
 # Changelog
 
@@ -8,6 +8,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+
+- Added a responsive, accessible, framework-free introduction to the SDD process, configured for GitHub Pages deployment.
+
+### Changed
+
+- Updated `/sdd-review` to keep a clean technical verdict as `ready` when only the user's manual confirmation remains, while reporting acceptance and closeout readiness separately instead of requesting implementation changes.
+- Updated `/sdd-pr` and `/sdd-release` to carry manual acceptance separately from technical review readiness and prevent acceptance-dependent actions while required confirmation remains pending.
 
 ## [0.9.0] - 2026-07-15
 

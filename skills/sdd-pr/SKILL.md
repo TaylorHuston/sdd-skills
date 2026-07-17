@@ -21,6 +21,8 @@ Treat PR creation and PR stewardship as separate phases. On the activation that 
 
 Non-negotiable invariant: PR feedback must not move implementation beyond the durable Epic/Story map or beyond the commit covered by SDD review without an explicit reconciliation. Track the immutable reviewed source commit and the latest reconciled PR head. Do not return a merge-ready result while the current PR head contains unclassified or unreconciled post-review commits.
 
+A `/sdd-review` verdict of `ready` establishes technical review readiness. It does not by itself prove that required manual acceptance is complete. Resolve the current manual confirmation status from `tasks.md` or the review record and apply project policy separately. PR creation may proceed with `pending user` only when project policy allows review to continue before acceptance; never describe the PR as merge-ready or perform the merge while required confirmation remains pending.
+
 ## Inputs
 
 Infer inputs in this order:
@@ -54,6 +56,7 @@ If the source branch, target branch, provider, or project policy cannot be infer
    - If the PR is for SDD-backed work, also check the workflow repo for related Change folders, machine-readable `tasks.md` status, review reports, project docs, or generated indexes. Commit and push those related workflow files when commits are authorized before treating the PR branch as ready. Never include unrelated dirty files.
    - Use focused commit messages.
    - Resolve the current source commit SHA and the last source commit covered by `/sdd-review` from `review.md`, `tasks.md`, or the PR body. Treat a branch name alone as mutable context, not as the review watermark.
+   - Resolve manual confirmation status and whether project policy requires `user confirmed` or an `accepted gap` before PR creation, merge readiness, or merge. Keep technical review and acceptance state separate.
 5. Push the source branch:
    - Use `git push -u origin <source>` when no upstream exists.
    - Do not force-push unless the user explicitly asks.
@@ -79,6 +82,7 @@ PR body should include:
 - reviewed source commit
 - latest reconciled PR head
 - post-review change classifications, or `none`
+- manual confirmation status and any acceptance step still required before merge
 
 Do not put private planning notes into public PR bodies. Summarize public-safe facts only.
 
@@ -202,13 +206,18 @@ When the existing PR has no actionable comments left:
    - every commit after the reviewed source commit has an impact classification
    - behavior, contract, security, data, API, architecture, or other material risk changes received a fresh `/sdd-review`
    - Epic truth, evidence, supporting docs, and release communication match the current PR head
-3. Post a concise PR comment if useful:
+3. Confirm acceptance readiness:
+   - manual confirmation status uses the canonical vocabulary
+   - any project-required walkthrough remains complete and current for the reviewed PR head
+   - required confirmation is `user confirmed` or an explicitly accepted gap before merge readiness
+   - when required confirmation is still `pending user`, report the technically clean PR and present the walkthrough, but do not call it merge-ready or ask for merge approval
+4. Post a concise PR comment if useful:
    - comments addressed
    - declined comments and reasons
    - verification run
    - reviewed source commit and latest reconciled PR head
    - remaining non-blocking risks
-4. Stop and prompt the user:
+5. Stop and prompt the user only after technical, remote-review, and required acceptance gates pass:
    - Say the PR is ready for their review/approval.
    - Provide the PR URL.
    - Ask them to approve the actual merge.
@@ -228,6 +237,7 @@ Include:
 - reviewed source commit, current PR head, and latest reconciled PR head
 - post-review change classifications and SDD artifacts reconciled
 - verification commands and results
+- manual confirmation status and whether acceptance blocks merge readiness
 - remaining risks or required user decisions
 - if newly created: tell the user to rerun `/sdd-pr` after review comments/checks have had time to appear
 - if existing and clean: clear request for the user to approve the merge when ready

@@ -11,7 +11,7 @@ Review a SDD change like a local pull request. This is the final independent gat
 
 Resolve the workspace, idea-owned planning path, and target implementation repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before judging artifact authority, traceability, evidence, reconciliation, or closeout. Use the resolved topology unless project guidance declares an explicit exception, then enforce Epics under `docs/epics/` and active/closed changes under `docs/changes/` inside the implementation repository. Project guidance owns source and target policy, required checks, merge/PR rules, supporting-doc requirements, release conventions, technology constraints, available review skills, and permissions. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
 
-Default behavior is deep review. A clean `/sdd-review` means the source branch is ready to integrate into the selected target branch, not merely that the active change folder looks plausible. The primary review surface is the source-vs-target diff plus the SDD artifacts that claim to explain it. When default review returns `ready` for a non-production target and closeout readiness passes, treat merge-and-close as the obvious recommended next action and ask the user to confirm it. Use cheaper or narrower modes only when the user asks for them explicitly.
+Default behavior is deep review. A clean `/sdd-review` means the source branch and its evidence are technically ready for the selected target, not merely that the active change folder looks plausible. Required manual acceptance and explicit integration authorization remain separate readiness gates. The primary review surface is the source-vs-target diff plus the SDD artifacts that claim to explain it. When default review returns `ready` for a non-production target and closeout readiness passes, treat merge-and-close as the obvious recommended next action and ask the user to confirm it. Use cheaper or narrower modes only when the user asks for them explicitly.
 
 Use `/sdd-release` instead when the task is production-target promotion, full release checks, release-artifact finalization, or the project-defined release handoff.
 
@@ -31,7 +31,7 @@ Start from an explicit change folder, change name, source branch, target branch,
 
 Supported modes:
 
-- Default: run one complete deep PR-style discovery wave against the selected target branch, consolidate and validate all findings, fix the complete safe in-scope subset as one batch, rerun affected checks, perform one regression-focused rereview, commit only the verified safe-fix batch, and report the resulting verdict. Do not pause after individual findings or require the user to invoke `/sdd-review` again merely to discover the next review category. Do not create a PR, merge, push, or close the change without confirmation. If the verdict is `ready`, the target is non-production, and closeout readiness passes, ask whether to perform the policy-defined merge-and-close next.
+- Default: run one complete deep PR-style discovery wave against the selected target branch, consolidate and validate all findings, fix the complete safe in-scope subset as one batch, rerun affected checks, perform one regression-focused rereview, commit only the verified safe-fix batch, and report the resulting verdict. Do not pause after individual findings or require the user to invoke `/sdd-review` again merely to discover the next review category. Do not create a PR, merge, push, or close the change without confirmation. If the verdict is `ready` but manual confirmation is `pending user`, present the prepared walkthrough and report closeout readiness separately. If the verdict is `ready`, the target is non-production, and closeout readiness passes, ask whether to perform the policy-defined merge-and-close next.
 - `--deep`: explicit alias for default behavior.
 - `--fast`: run a lightweight review on the main thread only. Still check source-vs-target diff, required SDD artifacts, branch policy, dirty state, security, and verification evidence, but skip delegated review passes and broad optional checks unless a risk is obvious.
 - `--artifact-only`: review SDD artifacts, Epic truth, Change status, manual confirmation status, release-communication status, and PRD alignment when applicable. Do not review application code beyond what is necessary to confirm artifact claims. Do not return `ready` for integration from this mode; use `artifact-ready`, `changes-requested`, or `blocked`.
@@ -198,7 +198,7 @@ Run every gate that applies and record `pass`, `findings`, `blocked`, or `not ap
 3. **Verification**: scenario-mapped focused evidence exists, broad gates are not substituted for behavior proof, production/mock boundaries are honest, and required project checks pass or have explicit blocking gaps.
 4. **Risk-shaped evidence**: important deterministic claims are challenged against plausible failure modes and supported by tests, source inspection, repeatable runtime evidence, or an explicit gap.
 5. **Security and data safety**: use relevant available security guidance and inspect the risk surfaces identified by the diff and project policy.
-6. **Manual acceptance**: user-facing changes have the workflow-defined walkthrough and status when applicable; project policy decides whether confirmation itself blocks readiness.
+6. **Manual acceptance**: user-facing changes have the workflow-defined walkthrough and status when applicable. A complete current walkthrough with status `pending user` does not make the review `changes-requested`, though project policy may keep integration or closeout pending until confirmation.
 7. **Supporting truth**: required project docs, release communication, generated indexes, ADRs, and product direction do not contradict the implementation or Epic map. The resolved Idea's current entry-point docs must identify the selected repository and repository lifecycle correctly, agree with `.sdd/config.yaml`, and avoid describing implemented replacement work as future or an archived repository as active. Clearly dated exploration, decisions, and historical sections may preserve their original point-in-time language when they are recognizable as history rather than current routing guidance.
 8. **Integration readiness**: source, target, reviewed commit, dirty state, conflict state, required checks, authorization, and the project-defined PR/merge/closeout path are unambiguous.
 
@@ -206,7 +206,9 @@ Before finalizing the discovery wave, explicitly challenge cross-cutting failure
 
 Select the smallest materially relevant set of available skills for these gates, read them completely, pass them into delegated review work, and validate their consequences. Absence of an optional skill is not a blocker; unresolved risk is.
 
-Do not use verdict `ready` unless the complete review bundle and every required gate pass with no unresolved blocking finding. Narrow modes may report narrower outcomes but must not imply full integration readiness.
+Use verdict `ready` when the independent review is clean: no `BLOCKING` or `REQUIRED` finding remains, required non-manual gates pass, and any required manual walkthrough is complete and current. Manual confirmation may still be `pending user`; record that separately as an acceptance and closeout gate rather than converting a clean technical review into `changes-requested` or `blocked`. A `ready` review with pending required confirmation is not yet ready to merge or close.
+
+Use `changes-requested` when code, artifacts, verification, documentation, or the manual walkthrough itself needs correction. Narrow modes may report narrower outcomes but must not imply full integration readiness.
 
 ## Review Findings
 
@@ -218,7 +220,7 @@ Classify findings as:
 
 When unresolved `BLOCKING` or `REQUIRED` findings remain after consolidated safe remediation and regression rereview, create or update the review artifact at the project-resolved change location using `assets/review-template.md`. Do not duplicate the template in this skill.
 
-If the review is clean, a separate review artifact is optional unless project policy requires one. Record the verdict, date, review scope, source and target, and exact reviewed source commit in the task ledger so later PR stewardship can detect review staleness.
+If the review is clean, a separate review artifact is optional unless project policy requires one. Record the verdict, date, review scope, source and target, exact reviewed source commit, and manual confirmation status in the task ledger so later PR stewardship can detect review staleness.
 
 ## Remediation
 
@@ -249,9 +251,11 @@ If findings require implementation work beyond safe review remediation, leave th
 
 If a finding is specifically unresolved experience direction within already accepted behavior, run `sdd change transition <space-id> <change-id> --from in_review --to in_progress` with explicit repository selection when needed, then route it through `/sdd-design --revise` before more UI implementation. If resolving the design would change Requirements, Scenarios, scope, ownership, contracts, data, auth, or technical constraints, return it to `proposed` and use `/sdd-change --replan` instead.
 
-Set `tasks.md` status from the verdict using guarded `sdd change transition` calls: use `in_review -> in_progress` when implementation or ordinary remediation remains, `in_review -> proposed` when product/Requirement/Scenario/scope/ownership decisions must be revised through `/sdd-change --replan`, and retain `in_review` while review is incomplete or after the full review and closeout gates pass. The review verdict and closeout record distinguish blocked review from a clean Change; do not invent an additional readiness status.
+Set `tasks.md` status from the verdict using guarded `sdd change transition` calls: use `in_review -> in_progress` when implementation or ordinary remediation remains, `in_review -> proposed` when product/Requirement/Scenario/scope/ownership decisions must be revised through `/sdd-change --replan`, and retain `in_review` while review is incomplete, awaits manual confirmation, or has passed the full review and closeout gates. The review verdict, manual confirmation status, and closeout record distinguish technical readiness from full closeout readiness; do not invent an additional Change lifecycle status.
 
 ## PR, Merge, And Closeout
+
+When verdict is `ready` but required manual confirmation is `pending user`, do not offer or perform PR, merge, or closeout actions that require that confirmation. Present the concise manual walkthrough, record the review as technically ready and acceptance as `pending user`, and state that resuming closeout after confirmation must recheck review staleness.
 
 When all gates pass:
 
