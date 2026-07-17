@@ -169,6 +169,26 @@ function tableRows(lines) {
     line.trim().replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim()));
 }
 
+function automatedEvidenceTestPaths(evidence) {
+  const explicitlyAutomated = /\b(?:automated|e2e|end-to-end|integration|japa|jest|playwright|pytest|specs?|unit|vitest)\b/i.test(evidence);
+  const genericTestEvidence = /\btests?\b/i.test(evidence) && !/\bmanual\b/i.test(evidence);
+  if (!explicitlyAutomated && !genericTestEvidence) {
+    return null;
+  }
+  const paths = [...evidence.matchAll(/`([^`]+)`/g)].map((match) =>
+    normalizePath(match[1]).replace(/:\d+$/, ""));
+  return [...new Set(paths.filter((path) => {
+    if (!path || isAbsolute(path) || path.startsWith("../") || /\s/.test(path)) return false;
+    const lowered = path.replace(/^\.\//, "").toLowerCase();
+    return (
+      /(?:^|\/)(?:__tests__|e2e|spec|specs|test|tests)\//.test(lowered)
+      || /\.(?:spec|test)\.[a-z0-9]+$/.test(lowered)
+      || /(?:^|\/)test_[^/]+\.py$/.test(lowered)
+      || /(?:^|\/)[^/]+_test\.py$/.test(lowered)
+    );
+  }))];
+}
+
 async function validateArtifactLinks(
   source,
   absolutePath,
@@ -332,6 +352,7 @@ async function validateEpic(repository, epicPath, repositoryRoot, artifactRoots,
     const knownEvidenceIds = new Set([...requirementIds, ...scenarioIds]);
     for (const row of tableRows(verified)) {
       const reference = row[0] ?? "";
+      const evidence = row[1] ?? "";
       const ids = [...reference.matchAll(/(?:^|\/)R\d+(?:-S\d+)?/g)]
         .map((match) => match[0].replace(/^\//, ""));
       if (ids.length === 0) {
@@ -341,6 +362,29 @@ async function validateEpic(repository, epicPath, repositoryRoot, artifactRoots,
           if (!knownEvidenceIds.has(id)) {
             findings.push(finding("error", "BROKEN_EVIDENCE_REFERENCE", storyPath, `Verified By references unknown ${story.label}/${id}.`, context));
           }
+        }
+      }
+      const automatedTestPaths = automatedEvidenceTestPaths(evidence);
+      if (automatedTestPaths?.length === 0) {
+        findings.push(finding(
+          "warning",
+          "GENERIC_AUTOMATED_EVIDENCE",
+          storyPath,
+          `Verified By automated evidence for ${reference || "(unmapped)"} must name a concrete repository-relative test path: ${evidence || "(empty)"}.`,
+          context,
+        ));
+      }
+      for (const testPath of automatedTestPaths ?? []) {
+        const absoluteTestPath = resolve(repositoryRoot, testPath.replace(/^\.\//, ""));
+        const relativeTestPath = normalizePath(relative(repositoryRoot, absoluteTestPath));
+        if (relativeTestPath.startsWith("../") || !(await pathExists(absoluteTestPath))) {
+          findings.push(finding(
+            "warning",
+            "MISSING_AUTOMATED_EVIDENCE_PATH",
+            storyPath,
+            `Verified By automated test path for ${reference || "(unmapped)"} does not exist in the repository: ${testPath}.`,
+            context,
+          ));
         }
       }
     }

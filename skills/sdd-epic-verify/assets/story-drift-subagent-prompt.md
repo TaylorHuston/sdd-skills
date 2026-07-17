@@ -13,6 +13,7 @@ You are auditing one embedded Story from a SDD Epic for implementation drift.
 - Claimed implementation: `IMPLEMENTED_BY`
 - Claimed verification: `VERIFIED_BY`
 - Relevant docs/code/tests: `RELEVANT_PATHS`
+- Assigned reverse-traceability candidates: `REVERSE_TRACEABILITY_CANDIDATES`
 - Mode: read-only
 
 ## Goal
@@ -46,12 +47,14 @@ Evaluate:
 - Supersession drift: later Stories or implementation changes have not left this Story's Requirements, Scenarios, `Verified By`, or `Verification Gaps` reading as current truth when they are now superseded or narrowed.
 - Implementation drift: current code satisfies each Scenario or the gap is explicit.
 - Verification drift: claimed evidence is current, concrete, and mapped to the right Scenario.
+- Verification drift: automated evidence names a concrete repository-relative test path rather than a generic suite label.
 - Verification drift: `Verified By` is a scenario-mapped evidence index, not a chronological command log or a broad-only gate list.
 - Verification drift: evidence types are not blurred together. Distinguish focused automated tests, broad supporting gates, deterministic E2E, live-provider playtests, manual UI confirmation, and debug/log inspection.
 - Verification drift: stale `AC-#` or `TAC-#` references are mapped to current IDs or explicitly marked legacy.
 - Missing tests: important behavior lacks focused proof.
 - Production-path risk: tests rely on mocks/fakes without enough production-path proof.
 - Security/data risk: auth, permissions, data exposure, secrets, migrations, destructive actions, or external services create unresolved risk.
+- Reverse traceability: candidates assigned by the orchestrator's full Epic inventory are correctly owned, excluded by project convention, recorded as gaps, routed to another Epic, or tracked for cleanup.
 
 Run safe focused read-only checks when useful and authorized by project scripts. Do not mutate production systems, remote services, secrets, deployments, branches, or external data.
 

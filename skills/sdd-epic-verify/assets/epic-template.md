@@ -85,7 +85,7 @@ The system SHALL describe one durable behavior rule.
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
 | S1/R1-S1 | `tests/path.test.ts` - `test name` | Specific behavior assertion. | Passing yyyy-mm-dd |
-| S1/R1-S2 | Manual/browser/review artifact or test name | Specific failure or edge-case proof. | Pending / Passing / Gap |
+| S1/R1-S2 | Manual/browser/review artifact or `tests/path.test.ts` - `test name` | Specific failure or edge-case proof. | Pending / Passing / Gap |
 
 #### Verification Gaps
 
@@ -112,7 +112,7 @@ This Epic is healthy when:
 - Embedded Stories cover the current scope.
 - Requirements and Scenarios describe implemented behavior or intentional gaps.
 - `Implemented By` points to the important starting files.
-- `Verified By` maps concrete evidence to Requirements/Scenarios.
+- `Verified By` maps concrete evidence to Requirements/Scenarios; automated evidence names existing repository-relative test paths.
 - `Verification Gaps` are real, current, and explicit.
 - Related changes, docs, indexes, reviews, and release communication do not contradict this Epic.
 

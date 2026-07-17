@@ -9,6 +9,7 @@ You are auditing SDD Epic-level coherence.
 - Epic file: `EPIC_PATH`
 - Embedded Stories: `STORY_SUMMARY`
 - Related artifacts: `RELATED_ARTIFACTS`
+- Full Epic reverse-traceability inventory: `REVERSE_TRACEABILITY_JSON`
 - Mode: read-only
 
 ## Goal
@@ -24,6 +25,7 @@ Read:
 - canonical Epic template named by the orchestrator, usually `assets/epic-template.md`
 - the Epic file
 - relevant PRD/Product Brief, docs, ADRs, change artifacts, and current-state docs named in scope
+- the full Epic-scoped reverse-traceability inventory and project-specific exclusion conventions
 
 ## Checks
 
@@ -47,6 +49,7 @@ Evaluate:
 - Requirements and Scenarios are not absorbing implementation-only technical details that belong in design, ADRs, data docs, or tasks.
 - PRD/product direction and public docs do not contradict the Epic.
 - The Epic is usable for future `/sdd-change --plan`, `/sdd-apply`, and `/sdd-review` work.
+- The orchestrator's full Epic-scoped reverse inventory accounts for relevant behavior-bearing source/tests and reviews support/framework/generated exclusions; unowned candidates are classified rather than silently ignored or treated as deletion approval.
 - Related active Change folders use only `proposed`, `planned`, `in_progress`, or `in_review` in `tasks.md`, treat folder location under `closed/` as closed, allow historical closed Changes to retain formerly valid status values, and do not contradict that lifecycle state when used as evidence.
 - Related active or closed change folders do not still claim accepted work is not implemented, not verified, implementation pending, verification pending, or manually accepted under obsolete status vocabulary.
 - Manual confirmation status uses canonical vocabulary: `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.

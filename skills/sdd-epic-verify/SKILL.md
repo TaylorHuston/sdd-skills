@@ -1,6 +1,6 @@
 ---
 name: sdd-epic-verify
-description: Audit a SDD Epic end to end against current implementation reality with subagent delegation, systematic Requirement/Scenario testing, Epic coherence review, missing Story/Requirement/Scenario detection, Story label/reference traceability checks, Change-status and evidence drift detection, and an Epic-local verification report. Use when the user invokes /sdd-epic-verify, asks whether an Epic is still accurate, asks to detect implementation drift across an Epic, asks to test every Story/Requirement/Scenario in an Epic, or wants to know what needs a SDD change, artifact fix, verification pass, or PRD update before continuing.
+description: Audit a SDD Epic end to end against current implementation reality with subagent delegation, mandatory full reverse traceability, systematic Requirement/Scenario testing, Epic coherence review, missing Story/Requirement/Scenario detection, Story label/reference traceability checks, Change-status and evidence drift detection, and an Epic-local verification report. Use when the user invokes /sdd-epic-verify, asks whether an Epic is still accurate, asks to detect implementation drift across an Epic, asks to test every Story/Requirement/Scenario in an Epic, or wants to know what needs a SDD change, artifact fix, verification pass, or PRD update before continuing.
 ---
 
 # SDD Epic Verify
@@ -9,7 +9,7 @@ Audit one Epic as a durable capability truth source. It works with embedded Stor
 
 ## Authority And Project Profile
 
-Resolve the workspace, idea-owned planning path, and target implementation repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before judging artifact authority, traceability, evidence, or Change-status drift. Use the resolved topology unless project guidance declares an explicit exception, then enforce Epics and their verification reports under `docs/epics/` and related changes under `docs/changes/` inside the implementation repository. Project guidance owns test, security, and supporting-doc commands and requirements. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
+Resolve the workspace, idea-owned planning path, and target implementation repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before judging artifact authority, traceability, evidence, or Change-status drift. Use the resolved topology unless project guidance declares an explicit exception, then enforce Epics and their verification reports under `docs/epics/` and related changes under `docs/changes/` inside the implementation repository. Project guidance owns test, security, and truth-bearing supporting-doc commands and requirements. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
 
 This skill verifies truth; it does not implement missing behavior and does not replace `/sdd-review` for a specific change. Use `/sdd-review` for change-local PR readiness. Use `/sdd-epic-verify` when the question is whether the whole Epic still matches product intent, current code, tests, docs, and evidence.
 
@@ -55,7 +55,7 @@ Before auditing, read:
 - relevant `docs/changes/**/proposal.md`, `design.md`, `tasks.md`, and `review.md` when they mention the Epic, its Story labels, full Story references, or legacy Story IDs
 - enough of every active `docs/epics/*/epic.md` to detect duplicate Story labels inside an Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs
 - planning-root docs or the PRD/Product Brief when product direction exists or drift is suspected
-- README, testing docs, architecture docs, ADRs, data-model docs, current-state docs, and root `CHANGELOG.md` when they claim behavior owned by the Epic
+- the project-defined truth-bearing supporting-doc set; when none is declared, inspect the README and documents whose current claims intersect the Epic, such as testing, architecture, ADR, data-model, current-state, or release docs
 - source files, tests, configs, generated artifacts, and runtime surfaces listed in Story `Implemented By` and `Verified By`
 
 Check git status in every repo that may be inspected or touched. Preserve unrelated dirty files. In default mode, do not stage or commit.
@@ -77,11 +77,16 @@ Check git status in every repo that may be inspected or touched. Preserve unrela
    - Detect `Verified By` sections that are chronological command logs, broad-only gates, or unmapped evidence lists.
    - Detect `Verified By` sections that blur focused automated tests, broad supporting gates, deterministic E2E, live-provider playtests, manual UI confirmation, and debug/log inspection into one undifferentiated proof bucket.
    - Detect older Stories whose Requirements, Scenarios, evidence, or gaps were superseded by later Stories without being reconciled.
-3. Build a verification matrix.
+3. Run the mandatory reverse-traceability inventory.
+   - Run the packaged `sdd-orphan-audit` script against the current working tree with `--epic <epic-id> --format json` and no changed-surface filter.
+   - Review all `tests_without_verified_by`, `source_without_implemented_by`, missing references, test-support exclusions, and framework/configuration/generated exclusions against project conventions.
+   - Classify relevant candidates as Epic-owned, intentionally shared/supporting/generated/framework infrastructure, an explicit gap, another Epic's responsibility, or tracked cleanup. The script proposes candidates; it does not authorize deletion or artifact edits.
+   - Record the exact command, scope, counts, and classification in the report. If the script cannot run, perform an equivalent full inventory and record why; if neither inventory occurs, the audit is `blocked` and must not report `aligned`.
+4. Build a verification matrix.
    - One row per declared Scenario, with Story label/reference, Requirement ID, Scenario ID, claimed implementation files, claimed verification mapping, current status, and planned check.
    - Add candidate rows for suspected missing Stories, Requirements, or Scenarios when Epic outcome, Story capability, product/docs claims, UI/API/runtime surfaces, tests, or implementation imply behavior that is not represented in the Epic.
    - Include failure, empty, permission, validation, recovery, migration, and security-sensitive paths.
-4. Delegate by default when subagent tooling is available.
+5. Delegate by default when subagent tooling is available.
    - The user's invocation of this skill is standing delegation authorization for bounded Epic audit subagents.
    - Use one Epic coherence audit subagent.
    - Use one Story implementation-drift subagent per Story when practical.
@@ -90,15 +95,16 @@ Check git status in every repo that may be inspected or touched. Preserve unrela
    - Record skipped delegation only when tooling is unavailable, the Epic is tiny, isolation would add risk, or another explicit stop condition applies; do not cite generic lack of subagent permission.
    - Continue independent matrix and evidence work after spawning. Never wait silently for more than 60 seconds; report completed audit work and the delegated passes still pending.
    - After roughly three minutes of cumulative waiting on one agent or audit wave, interrupt or close the slow agent and finish that audit locally, or re-delegate a narrower Story batch. Do not let an optional audit pass prevent a status response, and close completed or abandoned agents promptly.
-5. Systematically test the Epic.
+6. Systematically test the Epic.
    - Run focused tests named in `Verified By` when safe.
+   - Treat automated evidence without a concrete repository-relative test path as verification drift even when `sdd validate` reports it only as a warning.
    - Run broader project checks when changed or claimed surfaces warrant them: unit tests, integration tests, typecheck, lint, build, codegen, migration checks, browser checks, CLI smoke checks, or manual Obsidian/Vercel/Convex checks as appropriate.
    - Do not mutate production services, secrets, remote branches, deployments, or external data without explicit authorization.
    - If a check cannot run, record why, the fallback evidence, and whether the gap blocks alignment.
-6. Verify delegated claims.
+7. Verify delegated claims.
    - Re-read important files, inspect relevant diffs, and rerun or spot-check critical commands when practical.
    - Treat subagent findings as evidence, not final truth.
-7. Classify drift.
+8. Classify drift.
    - `workflow-drift`: Epic truth, artifact authority, Change status, or behavior evidence violates the SDD north star or anti-patterns.
    - `template-drift`: Epic file shape, frontmatter, canonical sections, Story headings, candidate Story handling, or per-Story subsections diverge from the current Epic template without a documented migration reason.
    - `artifact-drift`: Epic/docs are stale but implementation is likely correct.
@@ -110,11 +116,11 @@ Check git status in every repo that may be inspected or touched. Preserve unrela
    - `security-drift`: security, privacy, auth, data, dependency, or destructive-flow risk is unresolved.
    - `status-drift`: related Change `tasks.md` status, folder location, review records, manual confirmation status, release-communication state, PR/merge state, or deferred gaps contradict each other. Active status must be `proposed`, `planned`, `in_progress`, or `in_review`; folder location under `closed/` means closed. Historical closed Changes may retain an older status that was valid when they closed. This also includes completed or closed artifacts that still say work is `Not implemented yet`, `Not verified yet`, pending implementation/verification, or use obsolete manual confirmation status vocabulary.
    - `superseded-truth-drift`: later Stories, Requirements, Scenarios, implementation, or docs changed a boundary but earlier Epic truth still reads as current.
-8. Write or print the report.
+9. Write or print the report.
    - Include the exact scoped `sdd validate` command and result in `Tests And Checks`.
    - Summarize template-shape findings in the Epic template adherence gate and `Template drift` line.
-9. In `--propose-fixes`, create a scoped SDD change for findings that require implementation or risky decisions after the report exists.
-10. After every non-`--check` run, ask the user whether to apply any safe artifact fixes identified by the audit. Do not apply those fixes until the user explicitly agrees.
+10. In `--propose-fixes`, create a scoped SDD change for findings that require implementation or risky decisions after the report exists.
+11. After every non-`--check` run, ask the user whether to apply any safe artifact fixes identified by the audit. Do not apply those fixes until the user explicitly agrees.
 
 ## Gates
 
@@ -123,11 +129,12 @@ Use `pass`, `findings`, `blocked`, or `not applicable`. Apply the managed workfl
 1. **Doctrine and authority**: the Epic remains the durable accepted map from product behavior to implementation and evidence, and no supporting artifact contradicts or outranks it.
 2. **Epic coherence and completeness**: outcome, scope, Story ownership, Story ordering, cross-Story concerns, open decisions, and completion criteria form a coherent capability; missing Stories, Requirements, or Scenarios are findings.
 3. **Canonical shape**: the Epic passes scoped `sdd validate` or every reported warning/deviation is intentional and documented.
-4. **Traceability**: Story references and local Requirement/Scenario IDs are stable and unique, `Implemented By` is a useful code map, and moves or legacy identifiers remain traceable.
-5. **Implementation truth**: observable runtime behavior satisfies, defers, gaps, or exposes drift for every declared and materially missing behavior path.
-6. **Verification strength**: `Verified By` is scenario-mapped, evidence types remain distinct, broad gates are supporting evidence, production/mock boundaries are honest, and gaps state the remaining risk.
-7. **Supporting alignment and status**: project docs, product direction, ADRs, active/closed Changes, machine-readable Change status, manual confirmation, release communication, generated indexes, and review/merge state do not contradict the Epic.
-8. **Security and data safety**: apply relevant available security guidance to auth, permissions, secrets, user data, migrations, destructive actions, dependencies, and external services implicated by the Epic.
+4. **Forward traceability**: Story references and local Requirement/Scenario IDs are stable and unique, `Implemented By` is a useful code map, and moves or legacy identifiers remain traceable.
+5. **Reverse traceability**: a full Epic-scoped working-tree inventory was run and every relevant source/test candidate, missing reference, support exclusion, and generated/framework exclusion was classified. This gate is mandatory and cannot be inferred from declared Epic paths alone.
+6. **Implementation truth**: observable runtime behavior satisfies, defers, gaps, or exposes drift for every declared and materially missing behavior path.
+7. **Verification strength**: `Verified By` is scenario-mapped, automated evidence names repository-relative test paths, evidence types remain distinct, broad gates are supporting evidence, production/mock boundaries are honest, and gaps state the remaining risk.
+8. **Supporting alignment and status**: project docs, product direction, ADRs, active/closed Changes, machine-readable Change status, manual confirmation, release communication, generated indexes, and review/merge state do not contradict the Epic.
+9. **Security and data safety**: apply relevant available security guidance to auth, permissions, secrets, user data, migrations, destructive actions, dependencies, and external services implicated by the Epic.
 
 Do not report `aligned` merely because the declared Scenarios pass. The audit must also look for implemented behavior missing from the Epic and behavior the Epic needs but has not represented.
 
@@ -176,7 +183,7 @@ End every report with one result:
 - `needs product decision`
 - `blocked`
 
-Use `aligned` only when all gates pass or remaining issues are explicitly non-blocking.
+Use `aligned` only when all gates pass or remaining issues are explicitly non-blocking. A skipped full reverse-traceability inventory is always `blocked`, not a non-blocking exception.
 
 ## Final Response
 

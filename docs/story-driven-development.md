@@ -113,7 +113,7 @@ The planning root is not a second implementation source of truth. Product direct
 - **Requirement**: A concrete behavior expectation under a Story. Prefer `SHALL` wording.
 - **Scenario**: A BDD-style example under a Requirement. Prefer `WHEN` / `THEN` wording, including important failure modes.
 - **Implemented By**: A developer starting index for the important files, modules, routes, components, APIs, migrations, or support files that implement or materially support the Story.
-- **Verified By**: A behavior evidence index. It should name concrete tests, assertions, browser/manual scenarios, review artifacts, or other proof tied to the Requirement or Scenario. It is not a chronological command log.
+- **Verified By**: A behavior evidence index. It should name concrete tests, assertions, browser/manual scenarios, review artifacts, or other proof tied to the Requirement or Scenario. Automated evidence names repository-relative test paths so a future developer can rerun and inspect it. It is not a chronological command log.
 - **Verification Gaps**: Known missing, deferred, or accepted gaps. Empty or stale gaps are misleading and should be cleaned up.
 - **Change Brief**: An undated private outcome capture at `<planning-path>/<plannedChangesDirectory>/<change-slug>.md`. It records why a change may matter, the desired observable outcome, scope boundaries, success signals, durable constraints, and open product questions without choosing a technical approach. It has no Change status and does not authorize planning, promotion, or implementation by itself.
 - **Planned Change Draft**: A private implementation-ready scaffold under `<planning-path>/<plannedChangesDirectory>/yyyy-mm-dd-change-name/` containing `proposal.md`, `design.md`, and `tasks.md` with `status: proposed`. It is not an active repository Change, does not authorize implementation, and does not override Epic/Story truth.
@@ -142,13 +142,13 @@ Legacy root-level `changes/`, standalone Story files under `docs/stories/`, old 
 
 Project docs outside the canonical Epic and change artifacts are supporting documentation. They are useful for architecture, testing, deployment, style, data/API contracts, operations, and onboarding, but they must not become a competing source of truth for implemented behavior.
 
-Do not require every app to carry the same `docs/` inventory unless project-local guidance says so. Existing or locally required docs must stay truthful when implementation changes affect them. Missing docs are findings only when project-local `AGENTS.md`, `docs/README.md`, another app-local guide, or workspace guidance explicitly requires them.
+Do not require every app to carry the same `docs/` inventory unless project-local guidance says so. Project-local guidance should identify the supporting documents that make current-state, architecture, API, data, deployment, testing, security, or product-routing claims and therefore must be reconciled by apply and review. Existing or locally required docs must stay truthful when implementation changes affect them. Missing docs are findings only when project-local `AGENTS.md`, `docs/README.md`, another app-local guide, or workspace guidance explicitly requires them. When no inventory is declared, inspect the README, changed docs, and documents whose current claims intersect the changed surface; record the ambiguity instead of inventing a universal doc set.
 
 `/sdd-apply` should update affected project docs as part of implementation. `/sdd-review` should treat stale project docs, or missing locally required docs, as review findings before ready, merge, or closeout.
 
 ## Evidence Discipline
 
-`Verified By` should be scenario-mapped. Prefer entries that say which Story/Requirement/Scenario is proved, what test/check/manual path proves it, and what assertion or observation matters.
+`Verified By` should be scenario-mapped. Prefer entries that say which Story/Requirement/Scenario is proved, what test/check/manual path proves it, and what assertion or observation matters. Automated evidence must include the concrete existing repository-relative test path; labels such as "backend unit tests" and stale bare filenames are not durable evidence indexes.
 
 Keep evidence types distinct:
 
@@ -253,6 +253,15 @@ When implementation or manual feedback discovers a new or meaningfully changed R
 Use `sdd validate` as the machine-readable structural baseline for SDD work. It checks only facts derivable from workspace files: required Change files and core sections, valid status and folder placement, duplicate planned/active/closed locations, unresolved scaffolding, Epic template shape, Story Index alignment, Story/Requirement/Scenario identifier shape and uniqueness, traceability table headers, evidence references to declared Requirements/Scenarios, and broken local Markdown links to Epic or Change artifacts. Scope it by Space, repository, Change, or Epic when a workflow owns a narrower surface. A Change-scoped run also validates Epic paths declared under its proposal's `Epic Actions` and reports a missing affected Epic rather than silently returning `epics: 0`. Closed history still receives strict file, status, collision, and reference checks, but older title, section, and placeholder shape is reported as compatibility warnings so a newer template does not retroactively invalidate completed work.
 
 A passing validation result does not establish product completeness, implementation truth, test strength, manual acceptance, review readiness, or release readiness. Skills remain responsible for those contextual judgments and must not convert a structural pass into a semantic claim. A failing result is actionable workflow drift unless the finding is an intentional compatibility warning that the owning skill explicitly records.
+
+Structural validation is primarily forward traceability: it checks whether declared artifact references are well formed. SDD workflows must also perform reverse traceability so implementation and tests cannot exist outside the durable Epic map:
+
+- `/sdd-apply` inventories the changed implementation surface before handoff and reconciles each candidate with affected Story evidence, an explicit support/generated classification, or a tracked cleanup decision.
+- `/sdd-review` independently inventories the source-vs-target diff and treats unexplained behavior-bearing files, tests, routes, registrations, or stale supporting truth as review findings.
+- `/sdd-epic-verify` inventories the full Epic scope, not only paths already named by the Epic, and cannot report `aligned` when that reverse inventory was skipped.
+- `/sdd-orphan-audit` remains the repository-wide maintenance pass for candidates outside a current Change or Epic audit.
+
+The universal inventory is intentionally conservative. It expands path globs, reads the current working tree rather than only the Git index, and separates likely test harness, framework/configuration, and generated files from behavior candidates. These are candidate classifications, not deletion decisions. The reviewing agent must inspect relevant conventions and runtime connections before updating Epic ownership or proposing removal. After refactors, explicitly check for stranded routes, registrations, imports, constructor dependencies, tests, migrations, and files that the old path left behind.
 
 `/sdd-change --plan` and `--replan` validate the planned or replanned Change before handoff. `/sdd-apply` validates the selected Change and affected Epics during Discovery and again after reconciliation. `/sdd-review` treats scoped validation as one input to its independent diff and truth review. `/sdd-epic-verify` begins with scoped Epic validation before auditing completeness, implementation, and evidence quality.
 
