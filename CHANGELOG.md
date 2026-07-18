@@ -9,10 +9,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-07-18
+
+### Added
+
+- Added `/sdd-code-audit` for read-only repository or subsystem health audits using independent specialist reviewers and evidence-validated improvement planning.
+- Added `sdd setup` for one-time user configuration and global skill installation.
+- Added `sdd setup --from-workspace` to dry-run or apply a non-destructive conversion of pre-1.0 workspace topology into user-level configuration.
+
 ### Changed
 
-- Added `sdd setup` for one-time user configuration and global skill installation, while `sdd init` now creates only the current repository's portable `.sdd/config.yaml`; the package doctrine is resolved through `sdd context` instead of copied into a parent workspace.
-- Added `sdd setup --from-workspace` to dry-run or apply a non-destructive conversion of pre-1.0 workspace topology into user-level configuration.
+- `sdd init` now creates only the current repository's portable `.sdd/config.yaml`; the package doctrine is resolved through `sdd context` instead of copied into a parent workspace.
 - User-level skills default to the cross-agent `~/.agents/skills/` directory; `--skills-dir` remains available for Codex-specific or custom installations.
 - Existing pre-1.0 workspace-local configurations remain readable during migration, with explicit `sdd init --legacy-workspace` support for compatibility testing.
 - Invoking `/sdd-apply` against an explicitly selected private Planned Change now authorizes automatic promotion into its unambiguous implementation repository; Changes that are not `planned` stop with planning guidance instead of being promoted.

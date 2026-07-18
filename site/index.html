@@ -132,18 +132,18 @@
           <li>
             <span class="stepIndex">04</span>
             <div class="stepBody">
-              <h3>Commit to a work scope</h3>
-              <p>Make the implementation-ready plan visible to the people and systems responsible for delivery.</p>
-            </div>
-            <div class="stepMapping"><span>Package</span><code>sdd change promote</code></div>
-          </li>
-          <li>
-            <span class="stepIndex">05</span>
-            <div class="stepBody">
               <h3>Converge the experience</h3>
               <p>For UI-bearing work, settle flow, responsive composition, states, accessibility, and visual direction.</p>
             </div>
             <div class="stepMapping"><span>Package</span><code>/sdd-design --plan</code></div>
+          </li>
+          <li>
+            <span class="stepIndex">05</span>
+            <div class="stepBody">
+              <h3>Commit to a work scope</h3>
+              <p>Make the implementation-ready plan visible to the people and systems responsible for delivery.</p>
+            </div>
+            <div class="stepMapping"><span>Package</span><code>sdd change promote</code></div>
           </li>
           <li>
             <span class="stepIndex">06</span>
@@ -300,6 +300,7 @@
                 <li>Route specialist guidance</li>
                 <li>Implement with evidence</li>
                 <li>Review the integrated diff</li>
+                <li>Audit broader codebase health</li>
               </ul>
             </section>
           </div>
@@ -326,7 +327,7 @@
         <div class="commandBlock">
           <div class="commandHeader">
             <span>Install once, initialize each repository</span>
-            <button class="copyButton" id="copy-command" type="button" data-copy="git clone https://github.com/TaylorHuston/sdd-skills.git&#10;cd sdd-skills&#10;npm install&#10;npm link" aria-label="Copy installation commands">
+            <button class="copyButton" id="copy-command" type="button" data-copy="git clone https://github.com/TaylorHuston/sdd-skills.git&#10;cd sdd-skills&#10;npm install&#10;npm link&#10;sdd setup&#10;cd /path/to/repository&#10;sdd init&#10;sdd doctor" aria-label="Copy installation and initialization commands">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
                 <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
@@ -337,7 +338,11 @@
           <pre><code><span class="prompt">$</span> git clone https://github.com/TaylorHuston/sdd-skills.git
 <span class="prompt">$</span> cd sdd-skills
 <span class="prompt">$</span> npm install
-<span class="prompt">$</span> npm link</code></pre>
+<span class="prompt">$</span> npm link
+<span class="prompt">$</span> sdd setup
+<span class="prompt">$</span> cd /path/to/repository
+<span class="prompt">$</span> sdd init
+<span class="prompt">$</span> sdd doctor</code></pre>
           <p class="commandNote"><strong>Pre-1.0 distribution:</strong> install from the GitHub checkout for now. A standard npm registry install is targeted for the 1.0 release.</p>
         </div>
       </section>

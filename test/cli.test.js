@@ -317,7 +317,7 @@ test("init creates a local workspace contract and imports one-to-many mappings",
   const result = await initWorkspace(root);
   assert.equal(result.created, true);
   assert.equal(result.ideasImported, 1);
-  assert.equal(result.skills.actions.length, 13);
+  assert.equal(result.skills.actions.length, 14);
   assert.ok(result.skills.actions.every((entry) => entry.action === "install"));
   assert.equal(result.workflow.action, "install");
 
@@ -331,6 +331,7 @@ test("init creates a local workspace contract and imports one-to-many mappings",
     { root: "code", path: "sample-mobile", role: "mobile", status: "active" },
   ]);
   assert.equal(await pathExists(join(root, ".agents", "skills", "sdd-change", "SKILL.md")), true);
+  assert.equal(await pathExists(join(root, ".agents", "skills", "sdd-code-audit", "SKILL.md")), true);
   assert.equal(await pathExists(join(root, ".agents", "skills", "sdd-design", "SKILL.md")), true);
   assert.match(
     await readFile(join(root, ".agents", "skills", "sdd-design", "SKILL.md"), "utf8"),

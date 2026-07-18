@@ -1,5 +1,5 @@
 ---
-modified: 2026-07-17
+modified: 2026-07-18
 ---
 # SDD Toolchain
 
@@ -34,7 +34,7 @@ Required for the documented installation and full workflow:
 
 - **Node.js 20 or newer** and npm for the CLI package.
 - **Git** for the checkout-based installation and repository-aware status, review, and release workflows.
-- **An agent runtime that discovers OpenAI/Codex-style skills** to invoke the packaged skills. Codex discovers user skills under `${CODEX_HOME:-$HOME/.codex}/skills`; the deterministic CLI can still be used independently.
+- **An agent runtime that discovers OpenAI/Codex-style skills** to invoke the packaged skills. The CLI installs to the cross-agent `~/.agents/skills/` directory by default; use `sdd setup --skills-dir` when a runtime requires another location. The deterministic CLI can still be used independently.
 
 The following integrations are optional. They are discovered from the consuming agent runtime or configured in individual application repositories; `npm install` does not install them.
 
@@ -113,9 +113,9 @@ After initialization, use `sdd configure` when user-level planning or repository
 
 The pre-1.0 workspace-local configuration remains readable during migration. Use `sdd init --legacy-workspace` only when intentionally creating that deprecated shape; new installations should not create a parent workspace `.sdd/` directory.
 
-### Upgrading From 0.7.x
+### Upgrading From 0.10.1 Or Earlier
 
-Update the package checkout and reconcile its managed workspace files:
+Update the package checkout, inspect the migration from the workspace-local configuration, and then create a portable contract in each participating repository:
 
 ```bash
 cd /path/to/sdd-skills
@@ -124,13 +124,17 @@ npm install
 npm link
 
 cd /path/to/workspace
-sdd update
+sdd setup --from-workspace . --dry-run --json
+sdd setup --from-workspace .
+
+cd /path/to/repository
+sdd init
 sdd doctor
 ```
 
-That historical upgrade installed `/sdd-change` and `/sdd-design`, refreshed the then-workspace-local doctrine copy, and removed an unchanged package-managed `/sdd-propose`. Current installations read doctrine from the package and install skills at user scope.
+Migration creates the private user topology under `~/.sdd/`, installs skills at user scope, and preserves Space IDs, statuses, repository roles, and mappings. It does not modify or remove the source workspace configuration. Run `sdd init` once in each participating repository to add its public-safe identity and artifact paths.
 
-Checksum protection stops the update if a managed skill or workflow file has local modifications. Reconcile those changes first, or use `sdd update --force` only when intentionally replacing them with the packaged versions. Updating does not move or modify existing planned Changes, active Changes, closed Changes, or Epics.
+Checksum protection stops setup or update when a managed skill has local modifications. Reconcile those changes first, or use `--force` only when intentionally replacing them with packaged versions. Migration and update do not move or modify existing planned Changes, active Changes, closed Changes, or Epics.
 
 Available commands:
 
@@ -292,6 +296,7 @@ Support workflow:
 | `/sdd-epic-verify` | Audit an Epic against current implementation and evidence. |
 | `/sdd-pr` | Open or steward SDD-backed pull requests, process review comments/checks, and stop before merge for user approval. |
 | `/sdd-space-status` | Produce a read-only re-entry brief; when targeting a Space, include recent local commits and deeper context for in-progress work. |
+| `/sdd-code-audit` | Audit an entire repository or selected area with independent code quality, testing, security, performance, and relevant specialist reviewers. |
 | `/sdd-orphan-audit` | Find likely orphaned code, tests, and stale traceability evidence. |
 
 ## Artifact Model
@@ -314,11 +319,14 @@ docs/
     yyyy-mm-dd-decision-title.md
   audits/
     yyyy-mm-dd-orphan-audit.md
+    yyyy-mm-dd-code-audit.md
 ```
 
 Epics are the durable behavior-to-code map. Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, and `Verification Gaps` live inside each Epic's `epic.md`. `Verified By` is a scenario-mapped evidence index, not a chronological command log; automated evidence names repository-relative test paths, while broad gates such as lint, typecheck, build, or full CI are supporting evidence unless tied to a named Requirement or Scenario. If implemented behavior is not represented in an Epic/Story, treat it as undocumented drift until the map is updated or the code is removed through a tracked change.
 
 Reverse traceability is tiered by workflow. `/sdd-apply` checks the changed surface before handoff, `/sdd-review` independently checks the source-vs-target diff, `/sdd-epic-verify` requires a full Epic-scoped inventory before it can report `aligned`, and `/sdd-orphan-audit` remains the repository-wide maintenance pass. The packaged audit script expands evidence globs, reads the current working tree rather than only the Git index, and separates likely behavior candidates from test harness, framework/configuration, and generated files. Its output is conservative candidate data for agent classification, never automatic deletion approval.
+
+`/sdd-code-audit` is the broader point-in-time codebase health assessment. It reviews a whole repository or selected area through independent specialist passes, validates their evidence, and groups confirmed findings into candidate improvements. It does not replace the Change-local `/sdd-review` gate, modify application code, or make its report a competing source of implementation truth. Accepted outcomes should move into Epics and Changes before implementation.
 
 An undated Change Brief under the idea's configured `plannedChangesDirectory` captures desired outcome and scope without technical planning or Change status. `/sdd-change --plan` consumes that intent into a dated private planned Change only when implementation planning should begin.
 

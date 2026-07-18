@@ -1,0 +1,4 @@
+interface:
+  display_name: "SDD Code Audit"
+  short_description: "Audit codebase health with specialist reviewers"
+  default_prompt: "Use $sdd-code-audit to audit this repository with independent code quality, testing, security, and performance reviewers."

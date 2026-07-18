@@ -367,6 +367,7 @@ Use the skills to apply this doctrine consistently:
 | `/sdd-review` | Run the local PR-style integration gate after implementation or before closing a change. |
 | `/sdd-epic-verify` | Audit an Epic end to end against current implementation, tests, evidence, Change status, and Story/Requirement/Scenario quality. |
 | `/sdd-space-status` | Produce a read-only re-entry brief for returning to an app after time away. |
+| `/sdd-code-audit` | Audit repository or subsystem health through independent specialist review and synthesize validated findings into candidate improvements. |
 | `/sdd-orphan-audit` | Find likely orphaned code/tests and SDD traceability gaps conservatively. |
 | `/sdd-release` | Prepare the project-defined production release handoff, including release checks and required release communication. |
 | `/sdd-pr` | Steward an existing or non-production SDD-backed PR through comments, checks, accepted fixes, and final merge handoff. |
