@@ -12,6 +12,10 @@ export const INSTALL_LOCK_FILE_NAME = "install-lock.json";
 export const WORKFLOW_RELATIVE_PATH = ".sdd/story-driven-development.md";
 export const CONFIG_VERSION = 2;
 export const SCHEMA_VERSION = "sdd-v2";
+export const USER_CONFIG_VERSION = 1;
+export const USER_SCHEMA_VERSION = "sdd-user-v1";
+export const REPOSITORY_CONFIG_VERSION = 1;
+export const REPOSITORY_SCHEMA_VERSION = "sdd-repository-v1";
 
 export const DEFAULT_ARTIFACT_PATHS = Object.freeze({
   activeChanges: "docs/changes",

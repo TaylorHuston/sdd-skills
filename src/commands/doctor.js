@@ -12,10 +12,11 @@ import { isDirectory } from "../fs.js";
 import { inspectChangeStatuses } from "../change-status.js";
 import { inspectSkillInstallation } from "../skills.js";
 import { inspectWorkflowInstallation } from "../workflow.js";
+import { resolveOperationConfiguration } from "../workspace.js";
 
 export async function diagnoseWorkspace(startPath) {
   const workspaceRoot = await findWorkspaceRoot(startPath);
-  const config = await readConfig(workspaceRoot);
+  let config = await readConfig(workspaceRoot);
   const findings = [...validateConfig(config)];
 
   if (findings.some((finding) => finding.level === "error")) {
@@ -33,6 +34,8 @@ export async function diagnoseWorkspace(startPath) {
       healthy: false,
     };
   }
+
+  config = (await resolveOperationConfiguration(startPath)).config;
 
   const checkDirectory = async (label, configuredPath, level = "warning") => {
     const exists = await isDirectory(resolveWorkspacePath(workspaceRoot, configuredPath));
@@ -54,7 +57,7 @@ export async function diagnoseWorkspace(startPath) {
     );
   }
   for (const [ideaId, idea] of Object.entries(config.ideas ?? {})) {
-    if (planningRootExists || idea.planningPath !== undefined) {
+    if (idea._repositoryOnly !== true && (planningRootExists || idea.planningPath !== undefined)) {
       await checkDirectory(
         `Planning directory for ${ideaId}`,
         resolveIdeaPlanningPath(config, ideaId, idea),
@@ -67,7 +70,9 @@ export async function diagnoseWorkspace(startPath) {
   }
 
   findings.push(...(await inspectSkillInstallation(workspaceRoot, config)));
-  findings.push(...(await inspectWorkflowInstallation(workspaceRoot)));
+  if (config.kind !== "user") {
+    findings.push(...(await inspectWorkflowInstallation(workspaceRoot)));
+  }
   findings.push(...(await inspectChangeStatuses(workspaceRoot, config)));
 
   const counts = {

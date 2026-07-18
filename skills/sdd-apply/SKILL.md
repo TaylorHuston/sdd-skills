@@ -1,6 +1,6 @@
 ---
 name: sdd-apply
-description: Apply or continue an active SDD change using a main orchestrator with subagents for non-trivial BDD/TDD implementation, discovery, verification, changed-surface reverse traceability, self-check, and manual UI confirmation. Discovers materially relevant skills available in the current runtime, loads and enforces their guidance without assuming a fixed skill catalog, and passes selected guidance into delegated slices. Reads the change proposal, design, and task ledger, updates application code and Epic truth, reconciles implementation and verification evidence, validates subagent claims, and stops for ambiguity or unsafe changes. Use when the user invokes /sdd-apply, asks to apply, implement, continue, review-only, delegate implementation, use available specialist guidance, walk through UI confirmation, or close a SDD change.
+description: Apply or continue an SDD change using a main orchestrator with subagents for non-trivial BDD/TDD implementation, discovery, verification, changed-surface reverse traceability, self-check, and manual UI confirmation. May promote an explicitly selected private Planned Change without separate confirmation; Changes that are not planned stop for planning. Discovers materially relevant skills available in the current runtime, loads and enforces their guidance without assuming a fixed skill catalog, and passes selected guidance into delegated slices. Reads the change proposal, design, and task ledger, updates application code and Epic truth, reconciles implementation and verification evidence, validates subagent claims, and stops for ambiguity or unsafe changes. Use when the user invokes /sdd-apply, asks to apply, implement, continue, review-only, delegate implementation, use available specialist guidance, walk through UI confirmation, or close a SDD change.
 ---
 
 # SDD Apply
@@ -9,7 +9,7 @@ Apply a SDD change from its change folder. This is the implementation-side compa
 
 ## Authority And Project Profile
 
-Resolve the workspace, idea-owned planning path, and target implementation repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before interpreting SDD artifact authority, evidence, reconciliation, or closeout. Use the resolved topology unless project guidance declares an explicit exception, then enforce the canonical `docs/epics/`, `docs/changes/`, and `docs/changes/closed/` layout inside the implementation repository. Project guidance owns branch and commit policy, verification commands, truth-bearing supporting-doc requirements, release conventions, technology constraints, and permissions. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
+Resolve the workspace, idea-owned planning path, and target implementation repository with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before interpreting SDD artifact authority, evidence, reconciliation, or closeout. Use the resolved topology unless project guidance declares an explicit exception, then enforce the canonical `docs/epics/`, `docs/changes/`, and `docs/changes/closed/` layout inside the implementation repository. Project guidance owns branch and commit policy, verification commands, truth-bearing supporting-doc requirements, release conventions, technology constraints, and permissions. If user setup is missing, direct the user to `sdd setup`; if the repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
 
 Non-negotiable invariant: Epic/Story truth must stay aligned with implementation reality as the work proceeds. If implementation changes behavior, reveals stale Story wording, changes Requirement or Scenario meaning, moves Epic ownership, or changes verification confidence, update the affected Epic/Story truth in the same run or stop before claiming implementation progress.
 
@@ -22,6 +22,8 @@ Use `/sdd-interactive` instead when no suitable change folder exists yet and the
 Default to an orchestrator-and-subagents model. The main agent owns change selection, artifact truth, branch/git safety, phase selection, subagent scoping, validation of child claims, `tasks.md`, Epic reconciliation, commits, stop conditions, and user-facing decisions. Delegate non-trivial implementation, discovery, verification, and implementation self-check slices to subagents when the tooling is available and safe.
 
 Delegation authorization: invoking `/sdd-apply`, naming `sdd-apply`, or asking to apply/continue an active SDD change is explicit permission to use bounded SDD subagents under this skill's delegation model. If the local tool policy requires an explicit user request before spawning subagents, this skill invocation satisfies that requirement for non-trivial Discovery, implementation, verification, and self-check slices that remain inside the selected change. Do not ask for separate subagent permission unless the user passed `--no-delegate`, the requested delegation would exceed the selected change, the tool requires a more specific approval than normal spawning, or a stop condition applies.
+
+Promotion authorization: invoking `/sdd-apply` against an explicitly selected or unambiguously inferred private Planned Change is permission to run `sdd change promote` without asking for separate confirmation. This authorization applies only when `tasks.md` has exactly `status: planned`, the destination repository is unambiguous, validation passes, no destination collision exists, and project policy permits the operation. It does not authorize planning a Proposed Change, choosing arbitrarily among repositories or drafts, overwriting an existing Change, expanding scope, or bypassing branch and repository policy.
 
 Use `references/specialist-routing.md` to discover and apply materially relevant guidance available in the current runtime. Do not assume particular skills are installed, and do not copy their domain guidance into this skill.
 
@@ -64,11 +66,25 @@ Use the explicit path or name if provided. Otherwise:
 1. Infer from conversation context when a change was just discussed.
 2. List active folders under `docs/changes/`, excluding `docs/changes/closed/`.
 3. If no canonical active change is found, inspect legacy `changes/` only as migration input. Do not apply it in place; stop and require migration into `docs/changes/` before implementation continues.
-4. Do not select a Change Brief or private Planned Change Draft from the idea planning path. Stop and require `/sdd-change --plan` for a brief, or `sdd change promote <space-id> <change-id>` plus repository-specific `/sdd-change --plan` reconciliation for a planned draft, before implementation continues.
-5. Auto-select only when exactly one active change exists.
-6. Ask the user when multiple active changes match or no change can be inferred.
+4. Do not apply a Change Brief. Stop and require `/sdd-change --plan`.
+5. A dated private Change Draft may be selected only when it is explicit in the request or unambiguous from the conversation. Read `tasks.md` before promotion. If its status is not exactly `planned`, stop, report the current status, and direct the user to `/sdd-change --plan` or `--replan` as appropriate. If it is `planned`, promote it under the authorization above.
+6. Auto-select a repository Change only when exactly one active Change exists. Do not arbitrarily auto-select among private drafts.
+7. Ask the user when multiple active Changes or destination repositories match, or no Change can be inferred.
 
 Always announce the selected change and how to override it.
+
+## Promote A Planned Change When Needed
+
+When the selected Change is still in the idea-owned private planning path:
+
+1. Confirm it is a dated Change folder with `proposal.md`, `design.md`, and `tasks.md`, and that `tasks.md` has exactly `status: planned`.
+2. If the status is anything else, stop and tell the user what it is. Do not silently plan, replan, or promote it.
+3. Resolve the active destination repository from workspace configuration. Ask when more than one repository is eligible and the request does not select one.
+4. Read destination repository guidance, inspect Git and branch state, and check for a destination Change collision before writing.
+5. Run focused validation, then `sdd change promote <space-id> <change-id>` with explicit `--repo` selection when needed. The `/sdd-apply` invocation supplies promotion permission; validation, CLI, collision, and policy failures remain stop conditions.
+6. Continue from the promoted repository Change. Discovery must reconcile any repository-specific readiness issue before implementation; route planning-level gaps back to `/sdd-change --replan` instead of inventing scope during apply.
+
+Promotion permission does not authorize push, merge, deploy, rebase, destructive data changes, deleting branches, touching credentials, or any other operation excluded by this skill or project policy.
 
 ## Required Context
 
@@ -96,7 +112,7 @@ Check that:
 
 - `sdd validate <space-id> --change <change-id> --repo <resolved-repository-path> --workspace <workspace-root> --json` has no unresolved deterministic errors. Inspect warnings and classify intentional compatibility exceptions instead of ignoring them. This structural gate does not replace the semantic Discovery checks below.
 - `proposal.md`, `design.md`, and `tasks.md` agree about the change scope.
-- `tasks.md` frontmatter has exactly one valid active `status`: `proposed`, `planned`, `in_progress`, or `in_review`. Start implementation only from `planned`; run `sdd change transition <space-id> <change-id> --from planned --to in_progress` before implementation begins. Route `proposed` Changes back to `/sdd-change --plan` or `--replan`, and treat `in_review` as review-owned unless the requested work explicitly returns it to implementation through the corresponding guarded transition.
+- `tasks.md` frontmatter has exactly one valid active `status`: `proposed`, `planned`, `in_progress`, or `in_review`. Start implementation only from `planned`; run `sdd change transition <space-id> <change-id> --from planned --to in_progress` before implementation begins. Route a private `proposed` Change to `/sdd-change --plan`; route an active repository `proposed` Change to `/sdd-change --replan`; and treat `in_review` as review-owned unless the requested work explicitly returns it to implementation through the corresponding guarded transition.
 - `design.md` identifies whether the change creates new Epic directories, edits existing Epic directories, or both.
 - For UI-bearing changes, any required `Experience Design` direction is confirmed, uses stable references, and resolves material responsive, state, accessibility, and visual questions before implementation begins.
 - For UI-bearing changes with material component decisions, the `Experience Design` classifies each affected pattern as an existing application component, adopted reference, application-specific component, reference candidate, or deliberate divergence, and names its initial owner plus required preview states. Do not invent a shared-catalog dependency when none is configured.

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Story-Driven Development keeps a durable, evidence-backed map from product behavior to implementation and tests.">
+    <meta name="description" content="Story-Driven Development is a methodology for keeping a durable, evidence-backed map from product behavior to implementation and tests.">
     <meta name="theme-color" content="#09090b">
     <title>Story-Driven Development</title>
     <script>
@@ -23,7 +23,7 @@
       <nav class="siteNav" aria-label="Primary navigation">
         <a href="#process">Process</a>
         <a href="#traceability">Traceability</a>
-        <a href="#toolchain">Toolchain</a>
+        <a href="#toolchain">Implementation</a>
       </nav>
       <div class="headerActions">
         <a class="githubLink" href="https://github.com/TaylorHuston/sdd-skills">GitHub</a>
@@ -42,12 +42,12 @@
     <main id="main-content">
       <section class="intro" id="top" aria-labelledby="page-title">
         <div class="introCopy">
-          <p class="eyebrow">A file-based workflow for agent-assisted development</p>
+          <p class="eyebrow">A methodology for human and agent collaboration</p>
           <h1 id="page-title">Story-Driven Development</h1>
           <p class="lede">Keep one durable, evidence-backed map from the behavior you intend to the code and tests that actually exist.</p>
           <div class="introActions">
             <a class="primaryAction" href="#process">See the process</a>
-            <a class="textAction" href="https://github.com/TaylorHuston/sdd-skills#quick-start">Install the toolchain</a>
+            <a class="textAction" href="https://github.com/TaylorHuston/sdd-skills#quick-start">Explore this implementation</a>
           </div>
         </div>
 
@@ -80,7 +80,7 @@
           </div>
           <div class="truthBar">
             <span class="statusIndicator" aria-hidden="true"></span>
-            <span>Current truth lives beside the implementation.</span>
+            <span>Current truth stays connected to implementation and evidence.</span>
           </div>
         </figure>
       </section>
@@ -94,10 +94,15 @@
         <header class="sectionHeader">
           <p class="sectionNumber">01 / Process</p>
           <div>
-            <h2 id="process-title">A workflow that preserves context</h2>
-            <p>Deterministic tools manage structure and state. Agent skills handle the judgment that cannot be reduced to a command.</p>
+            <h2 id="process-title">A tool-neutral lifecycle</h2>
+            <p>SDD defines the outcomes each stage must preserve. Teams can realize them with files, databases, work trackers, agents, or a combination.</p>
           </div>
         </header>
+
+        <div class="methodNote">
+          <strong>The stage describes the method.</strong>
+          <span>The paired command shows how this package maps it into a local-first workflow.</span>
+        </div>
 
         <ol class="workflow">
           <li>
@@ -106,7 +111,7 @@
               <h3>Explore</h3>
               <p>Investigate a substantial product or technical question without prematurely turning it into implementation.</p>
             </div>
-            <code>/sdd-explore</code>
+            <div class="stepMapping"><span>Package</span><code>/sdd-explore</code></div>
           </li>
           <li>
             <span class="stepIndex">02</span>
@@ -114,7 +119,7 @@
               <h3>Capture intent</h3>
               <p>Record the desired outcome now. Delay technical planning until the work is close enough to begin.</p>
             </div>
-            <code>/sdd-change --brief</code>
+            <div class="stepMapping"><span>Package</span><code>/sdd-change --brief</code></div>
           </li>
           <li>
             <span class="stepIndex">03</span>
@@ -122,15 +127,15 @@
               <h3>Plan just in time</h3>
               <p>Refine Stories, Requirements, Scenarios, technical choices, and verification against current code.</p>
             </div>
-            <code>/sdd-change --plan</code>
+            <div class="stepMapping"><span>Package</span><code>/sdd-change --plan</code></div>
           </li>
           <li>
             <span class="stepIndex">04</span>
             <div class="stepBody">
-              <h3>Promote the plan</h3>
-              <p>Move the settled private draft into each selected implementation repository before work begins.</p>
+              <h3>Commit to a work scope</h3>
+              <p>Make the implementation-ready plan visible to the people and systems responsible for delivery.</p>
             </div>
-            <code>sdd change promote</code>
+            <div class="stepMapping"><span>Package</span><code>sdd change promote</code></div>
           </li>
           <li>
             <span class="stepIndex">05</span>
@@ -138,7 +143,7 @@
               <h3>Converge the experience</h3>
               <p>For UI-bearing work, settle flow, responsive composition, states, accessibility, and visual direction.</p>
             </div>
-            <code>/sdd-design --plan</code>
+            <div class="stepMapping"><span>Package</span><code>/sdd-design --plan</code></div>
           </li>
           <li>
             <span class="stepIndex">06</span>
@@ -146,7 +151,7 @@
               <h3>Implement in verified slices</h3>
               <p>Work Requirement by Requirement, prefer BDD/TDD, and keep Epic truth current as implementation changes.</p>
             </div>
-            <code>/sdd-apply</code>
+            <div class="stepMapping"><span>Package</span><code>/sdd-apply</code></div>
           </li>
           <li>
             <span class="stepIndex">07</span>
@@ -154,17 +159,20 @@
               <h3>Review independently</h3>
               <p>Review the complete diff against its target and report technical readiness separately from manual acceptance.</p>
             </div>
-            <code>/sdd-review</code>
+            <div class="stepMapping"><span>Package</span><code>/sdd-review</code></div>
           </li>
           <li>
             <span class="stepIndex">08</span>
             <div class="stepBody">
-              <h3>Accept, integrate, and release</h3>
-              <p>A technically ready Change may still be <code>pending user</code>. Follow project policy and ask before merging, closing, deploying, or releasing.</p>
+              <h3>Reconcile and deliver</h3>
+              <p>Confirm the behavior map reflects what shipped, preserve unresolved gaps, and follow the team's acceptance and release policy.</p>
             </div>
-            <div class="stepCommands" aria-label="Pull request and release skills">
-              <code>/sdd-pr</code>
-              <code>/sdd-release</code>
+            <div class="stepMapping stepCommands" aria-label="Package pull request and release skills">
+              <span>Package</span>
+              <div>
+                <code>/sdd-pr</code>
+                <code>/sdd-release</code>
+              </div>
             </div>
           </li>
         </ol>
@@ -232,36 +240,69 @@
 
       <section class="section toolchainSection" id="toolchain" aria-labelledby="toolchain-title">
         <header class="sectionHeader">
-          <p class="sectionNumber">03 / Toolchain</p>
+          <p class="sectionNumber">03 / Implementation</p>
           <div>
-            <h2 id="toolchain-title">Judgment where it matters. Automation where it helps.</h2>
-            <p>The CLI owns repeatable mechanics. Skills own exploration, planning, implementation, review, and reconciliation.</p>
+            <h2 id="toolchain-title">This package is one implementation of SDD</h2>
+            <p>The methodology does not require this repository, Markdown, a CLI, a particular tracker, or a specific agent runtime.</p>
           </div>
         </header>
 
         <div class="toolchainGrid">
-          <section class="toolColumn" aria-labelledby="cli-title">
-            <div class="columnLabel">Deterministic layer</div>
-            <h3 id="cli-title">SDD CLI</h3>
+          <section class="toolColumn" aria-labelledby="concept-title">
+            <div class="columnLabel">Portable methodology</div>
+            <h3 id="concept-title">Story-Driven Development</h3>
             <ul>
-              <li>Initialize workspace topology</li>
-              <li>Scaffold Changes and Epics</li>
-              <li>Validate artifact structure</li>
-              <li>Report status across repositories</li>
-              <li>Guard lifecycle transitions</li>
+              <li>Describe accepted behavior durably</li>
+              <li>Map behavior to implementation and evidence</li>
+              <li>Plan close enough to implementation to stay useful</li>
+              <li>Reconcile documentation as reality changes</li>
+              <li>Treat unexplained drift as a finding</li>
             </ul>
           </section>
-          <section class="toolColumn" aria-labelledby="skills-title">
-            <div class="columnLabel">Contextual layer</div>
-            <h3 id="skills-title">Agent skills</h3>
+          <section class="toolColumn" aria-labelledby="package-title">
+            <div class="columnLabel">Current reference implementation</div>
+            <h3 id="package-title">Local-first SDD toolchain</h3>
             <ul>
-              <li>Refine outcomes and requirements</li>
-              <li>Compare technical paths</li>
-              <li>Route specialist guidance</li>
-              <li>Implement with evidence</li>
-              <li>Review the integrated diff</li>
+              <li>Markdown Epics, Stories, Changes, and ADRs</li>
+              <li>Repository-local <code>docs/</code> conventions</li>
+              <li>User topology in <code>~/.sdd/</code></li>
+              <li>Portable repository <code>.sdd/</code> contracts</li>
+              <li>A deterministic CLI for structure and state</li>
+              <li>Agent skills for contextual judgment</li>
             </ul>
           </section>
+        </div>
+
+        <div class="packageLayers">
+          <div class="packageLayersHeading">
+            <p class="columnLabel">Inside this implementation</p>
+            <h3>Judgment where it matters. Automation where it helps.</h3>
+          </div>
+          <div class="toolchainGrid">
+            <section class="toolColumn" aria-labelledby="cli-title">
+              <div class="columnLabel">Deterministic layer</div>
+              <h3 id="cli-title">SDD CLI</h3>
+              <ul>
+                <li>Install user skills and map private topology</li>
+                <li>Initialize portable repository contracts</li>
+                <li>Scaffold Changes and Epics</li>
+                <li>Validate artifact structure</li>
+                <li>Report status across repositories</li>
+                <li>Guard lifecycle transitions</li>
+              </ul>
+            </section>
+            <section class="toolColumn" aria-labelledby="skills-title">
+              <div class="columnLabel">Contextual layer</div>
+              <h3 id="skills-title">Agent skills</h3>
+              <ul>
+                <li>Refine outcomes and requirements</li>
+                <li>Compare technical paths</li>
+                <li>Route specialist guidance</li>
+                <li>Implement with evidence</li>
+                <li>Review the integrated diff</li>
+              </ul>
+            </section>
+          </div>
         </div>
 
         <section class="referenceLifecycle" aria-labelledby="reference-lifecycle-title">
@@ -284,7 +325,7 @@
 
         <div class="commandBlock">
           <div class="commandHeader">
-            <span>Start in any workspace</span>
+            <span>Install once, initialize each repository</span>
             <button class="copyButton" id="copy-command" type="button" data-copy="git clone https://github.com/TaylorHuston/sdd-skills.git&#10;cd sdd-skills&#10;npm install&#10;npm link" aria-label="Copy installation commands">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
@@ -311,7 +352,7 @@
 
     <footer class="siteFooter">
       <span>Story-Driven Development</span>
-      <span>File-based. Agent-friendly. Evidence-backed.</span>
+      <span>Methodology first. Tooling optional. Evidence-backed.</span>
       <a href="https://github.com/TaylorHuston/sdd-skills">GitHub repository</a>
     </footer>
   </body>

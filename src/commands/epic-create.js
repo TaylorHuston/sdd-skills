@@ -3,12 +3,12 @@ import { dirname, join } from "node:path";
 
 import {
   assertValidConfig,
-  findWorkspaceRoot,
-  readConfig,
+  resolveRepositoryArtifacts,
   relativeWorkspacePath,
   resolveWorkspacePath,
   resolveWorkspaceStatus,
 } from "../config.js";
+import { resolveOperationConfiguration } from "../workspace.js";
 import { resolvedActiveRepositories, selectRepositories } from "../change-repositories.js";
 import { PACKAGE_ROOT } from "../constants.js";
 import { SddError } from "../errors.js";
@@ -54,8 +54,7 @@ export async function createEpic(
   slug,
   { date = null, repositories = [], dryRun = false } = {},
 ) {
-  const workspaceRoot = await findWorkspaceRoot(startPath);
-  const config = await readConfig(workspaceRoot);
+  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath);
   assertValidConfig(config, "create an Epic");
   const space = config.ideas[spaceId];
   if (!space) {
@@ -97,6 +96,7 @@ export async function createEpic(
     });
   }
   const repository = selected[0];
+  const artifacts = resolveRepositoryArtifacts(config, repository);
   const repositoryRoot = resolveWorkspacePath(workspaceRoot, repository.resolvedPath);
   if (!(await isDirectory(repositoryRoot))) {
     throw new SddError(`Configured repository does not exist: ${repository.resolvedPath}`, {
@@ -107,7 +107,7 @@ export async function createEpic(
   const directory = `${epicId.toLowerCase()}-${slug}`;
   const epicDirectory = join(
     repositoryRoot,
-    config.repositoryArtifacts.epics,
+    artifacts.epics,
     directory,
   );
   const epicPath = join(epicDirectory, "epic.md");
@@ -151,7 +151,7 @@ export async function createEpic(
     );
     await rename(temporaryDirectory, epicDirectory);
     renamed = true;
-    result.validation = await validateArtifacts(workspaceRoot, {
+    result.validation = await validateArtifacts(startPath, {
       spaceId,
       repositories: [repository.resolvedPath],
       epicId,

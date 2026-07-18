@@ -9,7 +9,7 @@ Audit one Epic as a durable capability truth source. It works with embedded Stor
 
 ## Authority And Project Profile
 
-Resolve the workspace, idea-owned planning path, and target implementation repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before judging artifact authority, traceability, evidence, or Change-status drift. Use the resolved topology unless project guidance declares an explicit exception, then enforce Epics and their verification reports under `docs/epics/` and related changes under `docs/changes/` inside the implementation repository. Project guidance owns test, security, and truth-bearing supporting-doc commands and requirements. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
+Resolve the workspace, idea-owned planning path, and target implementation repository with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before judging artifact authority, traceability, evidence, or Change-status drift. Use the resolved topology unless project guidance declares an explicit exception, then enforce Epics and their verification reports under `docs/epics/` and related changes under `docs/changes/` inside the implementation repository. Project guidance owns test, security, and truth-bearing supporting-doc commands and requirements. If user setup is missing, direct the user to `sdd setup`; if the repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
 
 This skill verifies truth; it does not implement missing behavior and does not replace `/sdd-review` for a specific change. Use `/sdd-review` for change-local PR readiness. Use `/sdd-epic-verify` when the question is whether the whole Epic still matches product intent, current code, tests, docs, and evidence.
 
@@ -48,7 +48,7 @@ The report is the durable audit record. Findings are addressed through the workf
 Before auditing, read:
 
 - app/workspace `AGENTS.md`, especially branch policy and test commands
-- the already loaded `.sdd/story-driven-development.md` workflow plus any explicit project SDD overlay
+- the already loaded package workflow at `workflowPath` plus any explicit project SDD overlay
 - parent or workspace guidance when the project points to it
 - this skill's `assets/epic-template.md`, to check the target Epic against the canonical template shape
 - target `docs/epics/<key>-<###>-epic-name>/epic.md`

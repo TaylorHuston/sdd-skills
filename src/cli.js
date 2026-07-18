@@ -10,21 +10,27 @@ import { promotePlannedChange } from "./commands/change-promote.js";
 import { transitionChange } from "./commands/change-transition.js";
 import { diagnoseWorkspace } from "./commands/doctor.js";
 import { createEpic } from "./commands/epic-create.js";
+import { initRepository, setupInstallation } from "./commands/init-installation.js";
 import { initWorkspace } from "./commands/init.js";
 import { getStatus } from "./commands/status.js";
 import { updateWorkspace } from "./commands/update.js";
 import { validateArtifacts } from "./commands/validate.js";
 import { PACKAGE_JSON_PATH } from "./constants.js";
 import { SddError } from "./errors.js";
-import { collectConfigureOptions, collectInitOptions } from "./prompts.js";
+import {
+  collectConfigureOptions,
+  collectInitOptions,
+  collectSetupOptions,
+} from "./prompts.js";
 
 const HELP = `Story-Driven Development CLI
 
 Usage:
-  sdd init [path] [options]       Initialize or reconcile an SDD workspace
-  sdd configure [path] [options]  Repair configured workspace topology paths
-  sdd update [path] [options]     Update the managed workflow and SDD skills
-  sdd doctor [path] [--json]      Validate workspace, installation, and Change statuses
+  sdd setup [options]             Set up user-level configuration and global skills
+  sdd init [path] [options]       Initialize one repository
+  sdd configure [path] [options]  Repair configured user topology paths
+  sdd update [path] [options]     Update user skills or a legacy installation
+  sdd doctor [path] [--json]      Validate SDD installation, topology, repository, and Changes
   sdd context [path] [--json]     Resolve the current planning/repository context
   sdd status [space-id] [options] List Space status or show one Space in detail
   sdd validate [space-id] [options] Validate SDD artifact structure and references
@@ -35,13 +41,20 @@ Usage:
   sdd change close [options]      Move an in-review Change into closed history
   sdd --version                   Print the package version
 
-Init options:
+Setup options:
+  --from-workspace <path>         Migrate an existing pre-1.0 workspace configuration
   --planning-root <path>          Override detected planning root
   --repository-root <path>        Add a repository root; may be repeated
-  --skills-dir <path>             Skill installation directory (default: .agents/skills)
+  --skills-dir <path>             User skill directory (default: ~/.agents/skills)
   --yes                           Accept detected paths without interactive questions
   --dry-run                       Report without writing files
-  --force                         Replace conflicting managed workflow or skills
+  --force                         Replace conflicting managed skills
+  --json                          Emit machine-readable JSON
+
+Init options:
+  --repo-id <id>                  Override the repository ID derived from the directory name
+  --legacy-workspace              Initialize the deprecated pre-1.0 workspace contract
+  --dry-run                       Report without writing files
   --json                          Emit machine-readable JSON
 
 Configure options:
@@ -57,12 +70,12 @@ Update options:
   --json                          Emit machine-readable JSON
 
 Status options:
-  --workspace <path>              Resolve status from this workspace (default: current directory)
+  --workspace <path>              Resolve status from this path (default: current directory)
   --all                           Include inactive and archived ideas and repositories
   --json                          Emit machine-readable JSON
 
 Validate options:
-  --workspace <path>              Resolve the initialized workspace (default: current directory)
+  --workspace <path>              Resolve SDD context from this path (default: current directory)
   --repo <path>                   Select a mapped repository; may be repeated
   --change <change-id>            Validate one planned, active, or closed Change
   --epic <epic-id>                Validate one Epic
@@ -72,7 +85,7 @@ Epic create usage:
   sdd epic create <space-id> <epic-id> <slug> [options]
 
 Epic create options:
-  --workspace <path>              Resolve the initialized workspace (default: current directory)
+  --workspace <path>              Resolve SDD context from this path (default: current directory)
   --repo <path>                   Select the target mapped repository
   --date <yyyy-mm-dd>             Override the local creation date
   --dry-run                       Report the scaffold without writing files
@@ -82,7 +95,7 @@ Change create usage:
   sdd change create <space-id> <slug> [options]
 
 Change create options:
-  --workspace <path>              Resolve the initialized workspace (default: current directory)
+  --workspace <path>              Resolve SDD context from this path (default: current directory)
   --repo <path>                   Select a mapped repository; may be repeated
   --date <yyyy-mm-dd>             Override the local creation date
   --dry-run                       Report the scaffold without writing files
@@ -92,7 +105,7 @@ Change promote usage:
   sdd change promote <space-id> <change-id> [options]
 
 Change promote options:
-  --workspace <path>              Resolve the initialized workspace (default: current directory)
+  --workspace <path>              Resolve SDD context from this path (default: current directory)
   --repo <path>                   Select a mapped repository; may be repeated
   --dry-run                       Report the promotion without writing files
   --json                          Emit machine-readable JSON
@@ -101,7 +114,7 @@ Change transition usage:
   sdd change transition <space-id> <change-id> --from <status> --to <status> [options]
 
 Change transition options:
-  --workspace <path>              Resolve the initialized workspace (default: current directory)
+  --workspace <path>              Resolve SDD context from this path (default: current directory)
   --repo <path>                   Select a mapped repository; may be repeated
   --from <status>                 Require the current active Change status
   --to <status>                   Set the next allowed active Change status
@@ -112,7 +125,7 @@ Change close usage:
   sdd change close <space-id> <change-id> [options]
 
 Change close options:
-  --workspace <path>              Resolve the initialized workspace (default: current directory)
+  --workspace <path>              Resolve SDD context from this path (default: current directory)
   --repo <path>                   Select a mapped repository; may be repeated
   --dry-run                       Report the closeout without moving files
   --json                          Emit machine-readable JSON
@@ -172,6 +185,12 @@ function requireAtMostOnePath(positionals, command) {
     throw new SddError(`${command} accepts at most one path.`, { code: "USAGE" });
   }
   return resolve(positionals[0] ?? process.cwd());
+}
+
+function requireNoPositionals(positionals, command) {
+  if (positionals.length > 0) {
+    throw new SddError(`${command} does not accept a path.`, { code: "USAGE" });
+  }
 }
 
 function parseRepositoryRootOverrides(values = []) {
@@ -309,7 +328,22 @@ function printStatus(result) {
 }
 
 function printHuman(result) {
+  if (result.command === "setup") {
+    console.log(`${result.dryRun ? "Would set up" : result.createdUserConfig ? "Set up" : "Reconciled"} user SDD: ${result.userConfigPath}`);
+    if (result.migratedFromWorkspace) {
+      console.log(`Migration source: ${result.migratedFromWorkspace}`);
+    }
+    console.log(`Doctrine: bundled with @taylorhuston/sdd`);
+    printSkillActions(result.skills.actions);
+    return;
+  }
   if (result.command === "init") {
+    if (result.mode === "repository") {
+      console.log(`${result.dryRun ? "Would initialize" : result.createdRepositoryConfig ? "Initialized" : "Reconciled"} repository SDD: ${result.repositoryConfigPath}`);
+      console.log(`Repository ID: ${result.repositoryConfig.id}`);
+      console.log(`Doctrine: bundled with @taylorhuston/sdd`);
+      return;
+    }
     console.log(`${result.dryRun ? "Would initialize" : result.created ? "Initialized" : "Reconciled"} SDD workspace: ${result.workspaceRoot}`);
     console.log(`Configuration: ${result.configPath}`);
     if (result.migratedFrom) console.log(`Migrated configuration: v${result.migratedFrom} -> v${result.config.version}`);
@@ -325,7 +359,8 @@ function printHuman(result) {
     return;
   }
   if (result.command === "update") {
-    console.log(`${result.dryRun ? "Would update" : "Updated"} SDD workspace: ${result.workspaceRoot}`);
+    const label = result.mode === "user" ? "user SDD installation" : "legacy SDD workspace";
+    console.log(`${result.dryRun ? "Would update" : "Updated"} ${label}: ${result.workspaceRoot}`);
     printWorkflowAction(result.workflow);
     printSkillActions(result.skills.actions);
     return;
@@ -454,10 +489,11 @@ async function packageVersion() {
 }
 
 async function executeCommand(command, args) {
-  if (command === "init") {
+  if (command === "setup") {
     const { values, positionals } = parseCommandArgs(
       args,
       commandOptions({
+        "from-workspace": { type: "string" },
         "planning-root": { type: "string" },
         "repository-root": { type: "string", multiple: true },
         "skills-dir": { type: "string" },
@@ -467,17 +503,82 @@ async function executeCommand(command, args) {
       }),
     );
     if (values.help) return { help: true };
-    const workspaceRoot = requireAtMostOnePath(positionals, command);
-    const initOptions = await collectInitOptions(workspaceRoot, {
-      planningRoot: values["planning-root"],
-      repositoryRoots: values["repository-root"],
-      skillsDirectory: values["skills-dir"],
-      dryRun: values["dry-run"] ?? false,
-      force: values.force ?? false,
-    }, {
-      interactive: !values.yes && Boolean(process.stdin.isTTY && process.stdout.isTTY),
-    });
-    const result = await initWorkspace(workspaceRoot, initOptions);
+    requireNoPositionals(positionals, command);
+    if (
+      values["from-workspace"] &&
+      [values["planning-root"], values["repository-root"]].some((value) => value !== undefined)
+    ) {
+      throw new SddError(
+        "--from-workspace cannot be combined with --planning-root or --repository-root.",
+        { code: "USAGE" },
+      );
+    }
+    const setupOptions = await collectSetupOptions(
+      {
+        fromWorkspace: values["from-workspace"],
+        planningRoot: values["planning-root"],
+        repositoryRoots: values["repository-root"],
+        skillsDirectory: values["skills-dir"],
+        dryRun: values["dry-run"] ?? false,
+        force: values.force ?? false,
+      },
+      { interactive: !values.yes && Boolean(process.stdin.isTTY && process.stdout.isTTY) },
+    );
+    return {
+      result: await setupInstallation(setupOptions),
+      json: values.json ?? false,
+    };
+  }
+
+  if (command === "init") {
+    const { values, positionals } = parseCommandArgs(
+      args,
+      commandOptions({
+        "planning-root": { type: "string" },
+        "repository-root": { type: "string", multiple: true },
+        "skills-dir": { type: "string" },
+        "repo-id": { type: "string" },
+        "legacy-workspace": { type: "boolean" },
+        yes: { type: "boolean", short: "y" },
+        "dry-run": { type: "boolean" },
+        force: { type: "boolean" },
+      }),
+    );
+    if (values.help) return { help: true };
+    const repositoryRoot = requireAtMostOnePath(positionals, command);
+    let result;
+    if (values["legacy-workspace"]) {
+      const initOptions = await collectInitOptions(
+        repositoryRoot,
+        {
+          planningRoot: values["planning-root"],
+          repositoryRoots: values["repository-root"],
+          skillsDirectory: values["skills-dir"],
+          dryRun: values["dry-run"] ?? false,
+          force: values.force ?? false,
+        },
+        { interactive: !values.yes && Boolean(process.stdin.isTTY && process.stdout.isTTY) },
+      );
+      result = await initWorkspace(repositoryRoot, initOptions);
+    } else {
+      const setupOnlyOptions = [
+        values["planning-root"],
+        values["repository-root"],
+        values["skills-dir"],
+        values.yes,
+        values.force,
+      ];
+      if (setupOnlyOptions.some((value) => value !== undefined)) {
+        throw new SddError(
+          "User-level setup options belong to `sdd setup`; repository init accepts only --repo-id, --dry-run, and --json.",
+          { code: "USAGE" },
+        );
+      }
+      result = await initRepository(repositoryRoot, {
+        repositoryId: values["repo-id"],
+        dryRun: values["dry-run"] ?? false,
+      });
+    }
     return { result, json: values.json ?? false };
   }
 

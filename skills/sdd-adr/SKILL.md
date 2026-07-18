@@ -9,7 +9,7 @@ Create or update Architecture Decision Records for durable technical decisions i
 
 ## Authority And Project Profile
 
-Resolve the workspace and repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before interpreting SDD artifact roles or Change status. Use the resolved repository and enforce ADR location under `docs/adrs/`. Project guidance still owns ADR status vocabulary, required links, and write policy. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
+Resolve the workspace and repository with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before interpreting SDD artifact roles or Change status. Use the resolved repository and enforce ADR location under `docs/adrs/`. Project guidance still owns ADR status vocabulary, required links, and write policy. If user setup is missing, direct the user to `sdd setup`; if the repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
 
 Use this skill from `/sdd-explore` when a discussion reaches a durable architecture decision, and from `/sdd-change --plan` or `--replan` when the selected technical approach creates a rule future work should follow. Do not create an ADR from `/sdd-change --brief`; briefs intentionally avoid technical decisions.
 

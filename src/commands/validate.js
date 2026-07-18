@@ -10,12 +10,12 @@ import {
 import { isValidChangeId } from "../change-id.js";
 import {
   assertValidConfig,
-  findWorkspaceRoot,
-  readConfig,
   resolveIdeaPlanningPath,
+  resolveRepositoryArtifacts,
   resolveRepositoryPath,
   resolveWorkspacePath,
 } from "../config.js";
+import { resolveOperationConfiguration } from "../workspace.js";
 import { SddError } from "../errors.js";
 import { isDirectory, pathExists } from "../fs.js";
 
@@ -572,12 +572,13 @@ async function validateRepository(workspaceRoot, config, repository, { changeId,
     };
   }
 
-  const activeRoot = join(repositoryPath, config.repositoryArtifacts.activeChanges);
-  const closedRoot = join(repositoryPath, config.repositoryArtifacts.closedChanges);
+  const artifacts = resolveRepositoryArtifacts(config, repository);
+  const activeRoot = join(repositoryPath, artifacts.activeChanges);
+  const closedRoot = join(repositoryPath, artifacts.closedChanges);
   const artifactRoots = [
-    config.repositoryArtifacts.activeChanges,
-    config.repositoryArtifacts.closedChanges,
-    config.repositoryArtifacts.epics,
+    artifacts.activeChanges,
+    artifacts.closedChanges,
+    artifacts.epics,
   ].map(normalizePath);
   const closedIsNested = dirname(closedRoot) === activeRoot;
   const activeIds = epicId
@@ -590,7 +591,7 @@ async function validateRepository(workspaceRoot, config, repository, { changeId,
       findings.push(finding(
         "error",
         "CHANGE_LOCATION_COLLISION",
-        normalizePath(join(repository.resolvedPath, config.repositoryArtifacts.activeChanges, id)),
+        normalizePath(join(repository.resolvedPath, artifacts.activeChanges, id)),
         "Change exists in both active and closed locations.",
         {
           spaceId: repository.spaceId,
@@ -602,8 +603,8 @@ async function validateRepository(workspaceRoot, config, repository, { changeId,
     }
   }
   const candidates = [
-    ...activeIds.map((id) => ({ id, location: config.repositoryArtifacts.activeChanges, path: join(activeRoot, id) })),
-    ...closedIds.map((id) => ({ id, location: config.repositoryArtifacts.closedChanges, path: join(closedRoot, id) })),
+    ...activeIds.map((id) => ({ id, location: artifacts.activeChanges, path: join(activeRoot, id) })),
+    ...closedIds.map((id) => ({ id, location: artifacts.closedChanges, path: join(closedRoot, id) })),
   ].filter((candidate) => !changeId || candidate.id === changeId);
 
   for (const candidate of candidates) {
@@ -613,7 +614,7 @@ async function validateRepository(workspaceRoot, config, repository, { changeId,
       changeId: candidate.id,
       displayRoot: normalizePath(join(repository.resolvedPath, candidate.location, candidate.id)),
       changePath: candidate.path,
-      historical: candidate.location === config.repositoryArtifacts.closedChanges,
+      historical: candidate.location === artifacts.closedChanges,
       repositoryRoot: repositoryPath,
       artifactRoots,
     }));
@@ -627,7 +628,7 @@ async function validateRepository(workspaceRoot, config, repository, { changeId,
       const proposal = await readFile(proposalPath, "utf8");
       for (const directory of declaredEpicDirectories(
         proposal,
-        config.repositoryArtifacts.epics,
+        artifacts.epics,
       )) {
         affectedEpicDirectories.add(directory);
       }
@@ -637,7 +638,7 @@ async function validateRepository(workspaceRoot, config, repository, { changeId,
   let epics = 0;
   const epicRecords = [];
   if (!changeId || affectedEpicDirectories.size > 0) {
-    const epicRoot = join(repositoryPath, config.repositoryArtifacts.epics);
+    const epicRoot = join(repositoryPath, artifacts.epics);
     const availableEpicDirectories = await listDirectories(epicRoot);
     const epicDirectories = changeId
       ? [...affectedEpicDirectories].filter((directory) => availableEpicDirectories.includes(directory))
@@ -650,7 +651,7 @@ async function validateRepository(workspaceRoot, config, repository, { changeId,
           "AFFECTED_EPIC_NOT_FOUND",
           normalizePath(join(
             repository.resolvedPath,
-            config.repositoryArtifacts.epics,
+            artifacts.epics,
             directory,
             "epic.md",
           )),
@@ -670,7 +671,7 @@ async function validateRepository(workspaceRoot, config, repository, { changeId,
         findings.push(finding(
           "error",
           "MISSING_EPIC_FILE",
-          normalizePath(join(repository.resolvedPath, config.repositoryArtifacts.epics, directory, "epic.md")),
+          normalizePath(join(repository.resolvedPath, artifacts.epics, directory, "epic.md")),
           "Epic directory is missing epic.md.",
           {
             spaceId: repository.spaceId,
@@ -683,7 +684,7 @@ async function validateRepository(workspaceRoot, config, repository, { changeId,
       }
       const displayPath = normalizePath(join(
         repository.resolvedPath,
-        config.repositoryArtifacts.epics,
+        artifacts.epics,
         directory,
         "epic.md",
       ));
@@ -771,8 +772,7 @@ export async function validateArtifacts(
   startPath,
   { spaceId = null, repositories = [], changeId = null, epicId = null } = {},
 ) {
-  const workspaceRoot = await findWorkspaceRoot(startPath);
-  const config = await readConfig(workspaceRoot);
+  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath);
   assertValidConfig(config, "validate SDD artifacts");
   if (changeId && epicId) {
     throw new SddError("Use either --change or --epic, not both.", { code: "USAGE" });

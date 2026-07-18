@@ -86,7 +86,7 @@ export async function inspectWorkspaceConfiguration(startPath) {
   const workspaceRoot = await findWorkspaceRoot(startPath);
   const config = await readConfig(workspaceRoot);
   assertValidConfig(config, "configure workspace paths");
-  const candidates = await collectDirectories(workspaceRoot);
+  const candidates = config.kind === "user" ? [] : await collectDirectories(workspaceRoot);
 
   const planningMissing = !(await isDirectory(
     resolveWorkspacePath(workspaceRoot, config.planning.root),

@@ -6,13 +6,13 @@ import { parseChangeStatus } from "../change-status.js";
 import { resolvedActiveRepositories, selectRepositories } from "../change-repositories.js";
 import {
   assertValidConfig,
-  findWorkspaceRoot,
-  readConfig,
+  resolveRepositoryArtifacts,
   relativeWorkspacePath,
   resolveIdeaPlanningPath,
   resolveWorkspacePath,
   resolveWorkspaceStatus,
 } from "../config.js";
+import { resolveOperationConfiguration } from "../workspace.js";
 import { SddError } from "../errors.js";
 import { isDirectory, pathExists } from "../fs.js";
 
@@ -102,8 +102,7 @@ export async function promotePlannedChange(
   { repositories = [], dryRun = false } = {},
 ) {
   assertValidChangeId(changeId);
-  const workspaceRoot = await findWorkspaceRoot(startPath);
-  const config = await readConfig(workspaceRoot);
+  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath);
   assertValidConfig(config, "promote a planned Change");
   const space = config.ideas[spaceId];
   if (!space) {
@@ -133,14 +132,15 @@ export async function promotePlannedChange(
   );
   const destinations = [];
   for (const repository of selected) {
+    const artifacts = resolveRepositoryArtifacts(config, repository);
     const repositoryPath = resolveWorkspacePath(workspaceRoot, repository.resolvedPath);
     if (!(await isDirectory(repositoryPath))) {
       throw new SddError(`Configured repository does not exist: ${repository.resolvedPath}`, {
         code: "REPOSITORY_NOT_FOUND",
       });
     }
-    const activePath = normalizePath(join(config.repositoryArtifacts.activeChanges, changeId));
-    const absolutePath = join(repositoryPath, config.repositoryArtifacts.activeChanges, changeId);
+    const activePath = normalizePath(join(artifacts.activeChanges, changeId));
+    const absolutePath = join(repositoryPath, artifacts.activeChanges, changeId);
     if (await pathExists(absolutePath)) {
       throw new SddError(`Active Change already exists: ${normalizePath(join(repository.resolvedPath, activePath))}`, {
         code: "CHANGE_EXISTS",

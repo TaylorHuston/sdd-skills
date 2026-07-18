@@ -6,14 +6,14 @@ import { parseDocument } from "yaml";
 
 import {
   assertValidConfig,
-  findWorkspaceRoot,
-  readConfig,
   relativeWorkspacePath,
+  resolveRepositoryArtifacts,
   resolveIdeaPlanningPath,
   resolveRepositoryPath,
   resolveWorkspaceStatus,
   resolveWorkspacePath,
 } from "../config.js";
+import { resolveOperationConfiguration } from "../workspace.js";
 import {
   CHANGE_STATUSES,
   LEGACY_CHANGE_STATUSES,
@@ -159,8 +159,9 @@ async function readChange(workspaceRoot, repository, root, changeId, closed) {
 
 async function listChanges(workspaceRoot, config, repository) {
   const repositoryRoot = resolveWorkspacePath(workspaceRoot, repository.resolvedPath);
-  const activeRoot = join(repositoryRoot, config.repositoryArtifacts.activeChanges);
-  const closedRoot = join(repositoryRoot, config.repositoryArtifacts.closedChanges);
+  const artifacts = resolveRepositoryArtifacts(config, repository);
+  const activeRoot = join(repositoryRoot, artifacts.activeChanges);
+  const closedRoot = join(repositoryRoot, artifacts.closedChanges);
   const active = await Promise.all(
     (await listDirectories(activeRoot))
       .filter((name) => join(activeRoot, name) !== closedRoot)
@@ -194,7 +195,8 @@ async function readEpic(workspaceRoot, repository, epicPath) {
 
 async function listEpics(workspaceRoot, config, repository) {
   const repositoryRoot = resolveWorkspacePath(workspaceRoot, repository.resolvedPath);
-  const epicsRoot = join(repositoryRoot, config.repositoryArtifacts.epics);
+  const artifacts = resolveRepositoryArtifacts(config, repository);
+  const epicsRoot = join(repositoryRoot, artifacts.epics);
   const epics = [];
   for (const directory of await listDirectories(epicsRoot)) {
     const epicPath = join(epicsRoot, directory, "epic.md");
@@ -247,7 +249,9 @@ async function buildSpace(
   const result = {
     spaceId,
     status: resolveWorkspaceStatus(space.status),
-    planningPath: resolveIdeaPlanningPath(config, spaceId, space).split("\\").join("/"),
+    planningPath: space._repositoryOnly === true
+      ? null
+      : resolveIdeaPlanningPath(config, spaceId, space).split("\\").join("/"),
     repositories,
     activeChangeCount: activeChanges.length,
     activeChanges,
@@ -272,8 +276,7 @@ async function buildSpace(
 }
 
 export async function getStatus(startPath, spaceId = null, { includeAll = false } = {}) {
-  const workspaceRoot = await findWorkspaceRoot(startPath);
-  const config = await readConfig(workspaceRoot);
+  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath);
   assertValidConfig(config, "read SDD status");
 
   if (spaceId !== null) {
@@ -293,6 +296,7 @@ export async function getStatus(startPath, spaceId = null, { includeAll = false 
 
   const spaces = [];
   for (const [id, space] of Object.entries(config.ideas).sort(([left], [right]) => left.localeCompare(right))) {
+    if (space._repositoryOnly === true) continue;
     if (!includeAll && resolveWorkspaceStatus(space.status) !== "active") continue;
     spaces.push(await buildSpace(workspaceRoot, config, id, space, {
       includeInactiveRepositories: includeAll,

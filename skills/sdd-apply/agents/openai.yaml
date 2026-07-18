@@ -1,4 +1,4 @@
 interface:
   display_name: "SDD Apply"
-  short_description: "Apply SDD changes with available guidance"
-  default_prompt: "Use $sdd-apply to implement the active SDD change with relevant available skills, delegated Requirement slices, verification, and durable Epic reconciliation."
+  short_description: "Promote and apply SDD changes with available guidance"
+  default_prompt: "Use $sdd-apply to promote a selected private Planned Change when needed, then implement it with relevant available skills, delegated Requirement slices, verification, and durable Epic reconciliation. Stop if the selected private Change is not planned."

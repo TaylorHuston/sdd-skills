@@ -2,7 +2,11 @@ import { readFile, readdir } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import { parseDocument } from "yaml";
 
-import { resolveRepositoryPath } from "./config.js";
+import {
+  resolveRepositoryArtifacts,
+  resolveRepositoryPath,
+  resolveWorkspacePath,
+} from "./config.js";
 import { isDirectory, pathExists } from "./fs.js";
 
 export const CHANGE_STATUSES = Object.freeze([
@@ -92,34 +96,35 @@ async function inspectTasks(workspaceRoot, changePath, { historical = false } = 
 }
 
 async function workspaceRepositoryPaths(workspaceRoot, config) {
-  const paths = new Set();
+  const repositories = new Map();
   for (const idea of Object.values(config.ideas ?? {})) {
     for (const repository of idea.repositories ?? []) {
-      paths.add(resolve(workspaceRoot, resolveRepositoryPath(config, repository)));
+      const path = resolveWorkspacePath(workspaceRoot, resolveRepositoryPath(config, repository));
+      repositories.set(path, { path, artifacts: resolveRepositoryArtifacts(config, repository) });
     }
   }
   for (const repositoryRoot of Object.values(config.repositories?.roots ?? {})) {
-    const rootPath = resolve(workspaceRoot, repositoryRoot);
+    const rootPath = resolveWorkspacePath(workspaceRoot, repositoryRoot);
     if (!(await isDirectory(rootPath))) continue;
     const entries = await readdir(rootPath, { withFileTypes: true });
     for (const entry of entries) {
       if (entry.isDirectory() && !entry.name.startsWith(".")) {
-        paths.add(join(rootPath, entry.name));
+        const path = join(rootPath, entry.name);
+        if (!repositories.has(path)) {
+          repositories.set(path, { path, artifacts: config.repositoryArtifacts });
+        }
       }
     }
   }
-  return [...paths].sort((left, right) => left.localeCompare(right));
+  return [...repositories.values()].sort((left, right) => left.path.localeCompare(right.path));
 }
 
 export async function inspectChangeStatuses(workspaceRoot, config) {
   const findings = [];
-  const activeRelative = config.repositoryArtifacts.activeChanges;
-  const closedRelative = config.repositoryArtifacts.closedChanges;
-
-  for (const repositoryPath of await workspaceRepositoryPaths(workspaceRoot, config)) {
+  for (const { path: repositoryPath, artifacts } of await workspaceRepositoryPaths(workspaceRoot, config)) {
     if (!(await isDirectory(repositoryPath))) continue;
-    const activeRoot = join(repositoryPath, activeRelative);
-    const closedRoot = join(repositoryPath, closedRelative);
+    const activeRoot = join(repositoryPath, artifacts.activeChanges);
+    const closedRoot = join(repositoryPath, artifacts.closedChanges);
 
     for (const changePath of await listChangeDirectories(activeRoot)) {
       if (resolve(changePath) === resolve(closedRoot)) {

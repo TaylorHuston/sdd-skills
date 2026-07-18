@@ -9,7 +9,7 @@ Open and steward a pull request for SDD-backed work from one branch into another
 
 ## Authority And Project Profile
 
-Resolve the workspace and repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before judging reconciliation, evidence, review freshness, or merge readiness. Resolve source and target policy, hosting provider, required checks, comment workflow, merge strategy, release communication, and permissions from project guidance. SDD artifacts remain under the resolved repository's canonical `docs/` tree. GitHub commands below apply only when GitHub is the configured provider. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
+Resolve the workspace and repository with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before judging reconciliation, evidence, review freshness, or merge readiness. Resolve source and target policy, hosting provider, required checks, comment workflow, merge strategy, release communication, and permissions from project guidance. SDD artifacts remain under the resolved repository's canonical `docs/` tree. GitHub commands below apply only when GitHub is the configured provider. If user setup is missing, direct the user to `sdd setup`; if the repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
 
 Use `/sdd-release` for production-branch release PR preparation. Use `/sdd-pr` for ongoing PR stewardship after a PR exists, or for non-production PRs that are part of the project's normal branch policy.
 

@@ -3,13 +3,12 @@ import { dirname, join } from "node:path";
 
 import {
   assertValidConfig,
-  findWorkspaceRoot,
-  readConfig,
   relativeWorkspacePath,
   resolveIdeaPlanningPath,
   resolveWorkspaceStatus,
   resolveWorkspacePath,
 } from "../config.js";
+import { resolveOperationConfiguration } from "../workspace.js";
 import { resolvedActiveRepositories, selectRepositories } from "../change-repositories.js";
 import { PACKAGE_ROOT } from "../constants.js";
 import { SddError } from "../errors.js";
@@ -81,8 +80,7 @@ export async function createPlannedChange(
   slug,
   { date = null, repositories = [], dryRun = false } = {},
 ) {
-  const workspaceRoot = await findWorkspaceRoot(startPath);
-  const config = await readConfig(workspaceRoot);
+  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath);
   assertValidConfig(config, "create a planned Change");
   const space = config.ideas[spaceId];
   if (!space) {

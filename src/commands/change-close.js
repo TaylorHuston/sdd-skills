@@ -6,11 +6,11 @@ import { resolvedActiveRepositories, selectRepositories } from "../change-reposi
 import { parseChangeStatus } from "../change-status.js";
 import {
   assertValidConfig,
-  findWorkspaceRoot,
-  readConfig,
+  resolveRepositoryArtifacts,
   resolveWorkspacePath,
   resolveWorkspaceStatus,
 } from "../config.js";
+import { resolveOperationConfiguration } from "../workspace.js";
 import { SddError } from "../errors.js";
 import { isDirectory, pathExists } from "../fs.js";
 
@@ -47,8 +47,7 @@ export async function closeChange(
   { repositories = [], dryRun = false } = {},
 ) {
   assertValidChangeId(changeId);
-  const workspaceRoot = await findWorkspaceRoot(startPath);
-  const config = await readConfig(workspaceRoot);
+  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath);
   assertValidConfig(config, "close a Change");
   const space = config.ideas[spaceId];
   if (!space) {
@@ -70,6 +69,7 @@ export async function closeChange(
   );
   const transitions = [];
   for (const repository of selected) {
+    const artifacts = resolveRepositoryArtifacts(config, repository);
     const repositoryPath = resolveWorkspacePath(workspaceRoot, repository.resolvedPath);
     if (!(await isDirectory(repositoryPath))) {
       throw new SddError(`Configured repository does not exist: ${repository.resolvedPath}`, {
@@ -77,8 +77,8 @@ export async function closeChange(
       });
     }
 
-    const activePath = normalizePath(join(config.repositoryArtifacts.activeChanges, changeId));
-    const closedPath = normalizePath(join(config.repositoryArtifacts.closedChanges, changeId));
+    const activePath = normalizePath(join(artifacts.activeChanges, changeId));
+    const closedPath = normalizePath(join(artifacts.closedChanges, changeId));
     const sourceAbsolutePath = join(repositoryPath, activePath);
     const destinationAbsolutePath = join(repositoryPath, closedPath);
     const sourcePath = normalizePath(join(repository.resolvedPath, activePath));

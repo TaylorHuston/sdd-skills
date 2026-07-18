@@ -14,7 +14,7 @@ The packaged skills follow the `.agents/` skill-folder convention and should be 
 ## Read First
 
 - Read `README.md` for package purpose, artifact model, installation, and validation guidance.
-- Read `docs/story-driven-development.md` before changing SDD artifact semantics or workflow behavior. It is the canonical package source installed at `.sdd/story-driven-development.md`.
+- Read `docs/story-driven-development.md` before changing SDD artifact semantics or workflow behavior. It is the canonical package source exposed to installed skills through `sdd context`.
 - Check `CHANGELOG.md` when changing public package behavior, the packaged skill set, or release-facing docs.
 - Prefer package-local files and public workflow doctrine over assumptions from any surrounding workspace.
 
@@ -36,12 +36,12 @@ src/
   commands/
 schemas/
   workspace.schema.json
+  user.schema.json
+  repository.schema.json
 skills/
   sdd-*/
 docs/
   story-driven-development.md  # canonical managed workflow source
-scripts/
-  sync-skills.sh
 test/
 ```
 
@@ -49,7 +49,7 @@ test/
 
 - Keep skills self-contained and compliant with the OpenAI/Codex skill format.
 - Keep CLI behavior deterministic and expose machine-readable JSON for agent-facing commands.
-- Treat `.sdd/config.yaml` as the CLI workspace topology, `.sdd/story-driven-development.md` as the managed portable workflow, and `.sdd/install-lock.json` as generated installation evidence.
+- Treat `~/.sdd/config.yaml` as private user topology, `<repo>/.sdd/config.yaml` as the portable repository contract, the package doctrine as the canonical workflow, and `~/.sdd/install-lock.json` as generated installation evidence.
 - Never overwrite locally modified managed skills or workflow guidance without an explicit `--force` operation.
 - Keep the checked workspace schema, runtime validation, README examples, and generated configuration shape aligned.
 - Keep package docs public-safe. Do not add private vault notes, local paths, credentials, or project-specific secrets.

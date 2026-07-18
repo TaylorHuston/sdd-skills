@@ -32,7 +32,7 @@ When no flag is supplied, infer the mode only when the Change state and request 
 ## Resolve Authority
 
 1. Resolve the workspace, idea, repository, and Change from explicit user input or `sdd context <relevant-path> --json`.
-2. Read `<workspace-root>/.sdd/story-driven-development.md` completely. If it is missing, direct the user to `sdd init` or `sdd doctor`.
+2. Read the `workflowPath` returned by `sdd context` completely. If user setup is missing, direct the user to `sdd setup`; if the repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
 3. Require one selected planned or active Change:
    - planned draft: `<planning-path>/<plannedChangesDirectory>/<change-id>/`
    - active Change: the repository's configured active-Change path, normally `docs/changes/<change-id>/`

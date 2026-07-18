@@ -9,7 +9,7 @@ Manage a change from durable intent through implementation-ready planning. Keep 
 
 ## Authority And Project Profile
 
-Resolve the workspace, idea planning path, and target repositories with `sdd context <relevant-path> --json`. Read `<workspaceRoot>/.sdd/story-driven-development.md` completely before defining Change status, Stories, Requirements, Scenarios, evidence, or promotion state. If the managed workflow is missing, stop and direct the user to `sdd init` or `sdd doctor`.
+Resolve the workspace, idea planning path, and target repositories with `sdd context <relevant-path> --json`. Read the `workflowPath` returned by `sdd context` completely before defining Change status, Stories, Requirements, Scenarios, evidence, or promotion state. If user setup is missing, direct the user to `sdd setup`; if a repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
 
 Project guidance owns branch and write policy, release conventions, supporting docs, technology constraints, and specialist guidance. Canonical repository artifacts remain under `docs/changes/`, `docs/epics/`, and `docs/adrs/` unless the managed workflow explicitly changes that package-wide contract.
 

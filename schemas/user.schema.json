@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/TaylorHuston/sdd-skills/schemas/user.schema.json",
+  "title": "SDD User Configuration",
+  "type": "object",
+  "required": ["kind", "version", "schema", "skills", "planning", "repositories", "repositoryArtifacts", "ideas"],
+  "properties": {
+    "kind": { "const": "user" },
+    "version": { "const": 1 },
+    "schema": { "const": "sdd-user-v1" },
+    "skills": {
+      "type": "object",
+      "required": ["directory"],
+      "properties": { "directory": { "type": "string", "minLength": 1 } },
+      "additionalProperties": false
+    },
+    "planning": {
+      "type": "object",
+      "required": ["root", "plannedChangesDirectory"],
+      "properties": {
+        "root": { "type": "string", "minLength": 1 },
+        "plannedChangesDirectory": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "repositories": {
+      "type": "object",
+      "required": ["roots"],
+      "properties": {
+        "roots": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "repositoryArtifacts": { "$ref": "./workspace.schema.json#/$defs/repositoryArtifacts" },
+    "ideas": { "$ref": "./workspace.schema.json#/$defs/ideas" }
+  },
+  "additionalProperties": false
+}

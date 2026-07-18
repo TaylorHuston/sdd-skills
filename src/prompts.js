@@ -1,7 +1,6 @@
 import { createInterface } from "node:readline/promises";
-
 import { inspectWorkspaceConfiguration } from "./commands/configure.js";
-import { createInitialConfig, getConfigPath } from "./config.js";
+import { createInitialConfig, getConfigPath, getUserRoot } from "./config.js";
 import { pathExists } from "./fs.js";
 
 function parseRepositoryRoots(value) {
@@ -9,6 +8,42 @@ function parseRepositoryRoots(value) {
     .split(",")
     .map((entry) => entry.trim())
     .filter(Boolean);
+}
+
+export async function collectSetupOptions(
+  options,
+  {
+    interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY),
+    ask,
+  } = {},
+) {
+  const userRoot = getUserRoot();
+  if (options.fromWorkspace) return options;
+  if (!interactive || (await pathExists(getConfigPath(userRoot)))) return options;
+
+  let prompt = ask;
+  let interfaceInstance;
+  if (!prompt) {
+    interfaceInstance = createInterface({ input: process.stdin, output: process.stdout });
+    prompt = (question) => interfaceInstance.question(question);
+  }
+  try {
+    const defaultPlanning = options.planningRoot ?? "planning";
+    const planningRoot = options.planningRoot ?? (
+      (await prompt(`Private planning root (absolute, ~/..., or relative to home) [${defaultPlanning}]: `)).trim()
+      || defaultPlanning
+    );
+    let repositoryRoots = options.repositoryRoots;
+    if (!repositoryRoots?.length) {
+      const response = (
+        await prompt("Repository roots (comma-separated, absolute, ~/..., or relative to home) [none]: ")
+      ).trim();
+      repositoryRoots = response ? parseRepositoryRoots(response) : [];
+    }
+    return { ...options, planningRoot, repositoryRoots };
+  } finally {
+    interfaceInstance?.close();
+  }
 }
 
 export async function collectInitOptions(

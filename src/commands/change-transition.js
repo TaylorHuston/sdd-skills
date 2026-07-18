@@ -11,11 +11,11 @@ import {
 } from "../change-status.js";
 import {
   assertValidConfig,
-  findWorkspaceRoot,
-  readConfig,
+  resolveRepositoryArtifacts,
   resolveWorkspacePath,
   resolveWorkspaceStatus,
 } from "../config.js";
+import { resolveOperationConfiguration } from "../workspace.js";
 import { SddError } from "../errors.js";
 import { isDirectory, pathExists } from "../fs.js";
 
@@ -49,8 +49,7 @@ export async function transitionChange(
 ) {
   assertValidChangeId(changeId);
   assertTransition(from, to);
-  const workspaceRoot = await findWorkspaceRoot(startPath);
-  const config = await readConfig(workspaceRoot);
+  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath);
   assertValidConfig(config, "transition a Change");
   const space = config.ideas[spaceId];
   if (!space) {
@@ -73,6 +72,7 @@ export async function transitionChange(
   );
   const transitions = [];
   for (const repository of selected) {
+    const artifacts = resolveRepositoryArtifacts(config, repository);
     const repositoryPath = resolveWorkspacePath(workspaceRoot, repository.resolvedPath);
     if (!(await isDirectory(repositoryPath))) {
       throw new SddError(`Configured repository does not exist: ${repository.resolvedPath}`, {
@@ -81,7 +81,7 @@ export async function transitionChange(
     }
 
     const changeRelativePath = normalizePath(
-      join(config.repositoryArtifacts.activeChanges, changeId),
+      join(artifacts.activeChanges, changeId),
     );
     const changeAbsolutePath = join(repositoryPath, changeRelativePath);
     const changePath = normalizePath(join(repository.resolvedPath, changeRelativePath));

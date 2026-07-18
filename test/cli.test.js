@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -366,6 +366,232 @@ test("init dry-run reports work without writing workspace files", async (t) => {
   assert.equal(result.dryRun, true);
   assert.equal(await pathExists(join(root, ".sdd")), false);
   assert.equal(await pathExists(join(root, ".agents")), false);
+});
+
+test("CLI setup installs user-level skills without initializing a repository", async (t) => {
+  const root = await createWorkspace("sdd-user-init-");
+  const userRoot = join(root, "home");
+  const repositoryRoot = join(root, "repos", "sample-app");
+  await mkdir(repositoryRoot, { recursive: true });
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const env = { ...process.env, SDD_USER_HOME: userRoot };
+  const first = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "setup",
+    "--planning-root",
+    "product/ideas",
+    "--yes",
+    "--json",
+  ], { env });
+  const result = JSON.parse(first.stdout);
+
+  assert.equal(result.mode, "user");
+  assert.equal(result.createdUserConfig, true);
+  assert.equal(
+    await pathExists(join(userRoot, ".agents", "skills", "sdd-apply", "SKILL.md")),
+    true,
+  );
+  assert.equal(await pathExists(join(userRoot, ".sdd", "install-lock.json")), true);
+  assert.equal(await pathExists(join(userRoot, ".sdd", "story-driven-development.md")), false);
+  assert.equal(await pathExists(join(repositoryRoot, ".sdd")), false);
+
+  const userConfig = parse(await readFile(join(userRoot, ".sdd", "config.yaml"), "utf8"));
+  assert.equal(userConfig.kind, "user");
+  assert.equal(userConfig.skills.directory, ".agents/skills");
+  assert.equal(userConfig.planning.root, "product/ideas");
+  assert.deepEqual(userConfig.repositories.roots, {});
+
+  const second = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "setup",
+    "--yes",
+    "--json",
+  ], { env });
+  const repeated = JSON.parse(second.stdout);
+  assert.equal(repeated.createdUserConfig, false);
+  assert.ok(repeated.skills.actions.every((entry) => entry.action === "unchanged"));
+});
+
+test("CLI setup adopts matching preinstalled global skills", async (t) => {
+  const root = await createWorkspace("sdd-user-adopt-");
+  const userRoot = join(root, "home");
+  const targetSkill = join(userRoot, ".agents", "skills", "sdd-apply");
+  await mkdir(join(userRoot, ".agents", "skills"), { recursive: true });
+  await cp(join(PACKAGE_ROOT, "skills", "sdd-apply"), targetSkill, { recursive: true });
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const output = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "setup",
+    "--yes",
+    "--json",
+  ], { env: { ...process.env, SDD_USER_HOME: userRoot } });
+  const result = JSON.parse(output.stdout);
+  const adopted = result.skills.actions.find((entry) => entry.skillName === "sdd-apply");
+
+  assert.equal(adopted.action, "adopt");
+  const lock = JSON.parse(await readFile(join(userRoot, ".sdd", "install-lock.json"), "utf8"));
+  assert.equal(lock.managedSkills["sdd-apply"], adopted.hash);
+});
+
+test("CLI setup migrates a legacy workspace without modifying its source configuration", async (t) => {
+  const legacyRoot = await createMappedWorkspace();
+  const userRoot = join(await createWorkspace("sdd-user-migrate-"), "home");
+  t.after(() => rm(legacyRoot, { recursive: true, force: true }));
+  t.after(() => rm(join(userRoot, ".."), { recursive: true, force: true }));
+  await initWorkspace(legacyRoot);
+  const legacyConfigPath = join(legacyRoot, ".sdd", "config.yaml");
+  const legacySource = await readFile(legacyConfigPath, "utf8");
+  const env = { ...process.env, SDD_USER_HOME: userRoot };
+
+  const dryRunOutput = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "setup",
+    "--from-workspace",
+    legacyRoot,
+    "--dry-run",
+    "--json",
+  ], { env });
+  const dryRun = JSON.parse(dryRunOutput.stdout);
+  assert.equal(dryRun.dryRun, true);
+  assert.equal(dryRun.migratedFromWorkspace, legacyRoot);
+  assert.equal(dryRun.config.planning.root, join(legacyRoot, "ideas"));
+  assert.equal(dryRun.config.repositories.roots.code, join(legacyRoot, "code"));
+  assert.equal(dryRun.config.ideas.sample.repositories[0].root, "code");
+  assert.equal(dryRun.config.ideas.sample.repositories[0].path, "sample-web");
+  assert.equal(await pathExists(join(userRoot, ".sdd")), false);
+
+  await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "setup",
+    "--from-workspace",
+    legacyRoot,
+    "--json",
+  ], { env });
+  const migrated = parse(await readFile(join(userRoot, ".sdd", "config.yaml"), "utf8"));
+  assert.equal(migrated.kind, "user");
+  assert.equal(migrated.skills.directory, ".agents/skills");
+  assert.equal(await readFile(legacyConfigPath, "utf8"), legacySource);
+});
+
+test("CLI init requires setup and creates only a portable repository contract", async (t) => {
+  const root = await createWorkspace("sdd-repository-init-");
+  const userRoot = join(root, "home");
+  const repositoryRoot = join(root, "repos", "sample-app");
+  await mkdir(repositoryRoot, { recursive: true });
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const env = { ...process.env, SDD_USER_HOME: userRoot };
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      join(PACKAGE_ROOT, "bin", "sdd.js"),
+      "init",
+      repositoryRoot,
+      "--json",
+    ], { env }),
+    (error) => {
+      assert.match(error.stderr, /Run `sdd setup` first/);
+      return true;
+    },
+  );
+
+  await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "setup",
+    "--planning-root",
+    "product/ideas",
+    "--repository-root",
+    "repos",
+    "--yes",
+    "--json",
+  ], { env });
+
+  const first = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "init",
+    repositoryRoot,
+    "--json",
+  ], { env });
+  const result = JSON.parse(first.stdout);
+  assert.equal(result.mode, "repository");
+  assert.equal(result.createdRepositoryConfig, true);
+
+  const repositoryConfig = parse(
+    await readFile(join(repositoryRoot, ".sdd", "config.yaml"), "utf8"),
+  );
+  assert.equal(repositoryConfig.kind, "repository");
+  assert.equal(repositoryConfig.id, "sample-app");
+  assert.equal(repositoryConfig.artifacts.epics, "docs/epics");
+  repositoryConfig.artifacts.epics = "specs/epics";
+  await writeFile(
+    join(repositoryRoot, ".sdd", "config.yaml"),
+    `${JSON.stringify(repositoryConfig, null, 2)}\n`,
+    "utf8",
+  );
+
+  const contextOutput = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "context",
+    repositoryRoot,
+    "--json",
+  ], { env });
+  const context = JSON.parse(contextOutput.stdout);
+  assert.equal(context.kind, "repository");
+  assert.equal(context.idea, null);
+  assert.equal(context.spaceId, "sample-app");
+  assert.equal(context.planningPath, null);
+  assert.equal(context.repository.id, "sample-app");
+  assert.equal(context.repository.artifacts.epics, "specs/epics");
+  assert.equal(context.workflowPath, WORKFLOW_SOURCE_PATH);
+
+  const epicOutput = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "epic",
+    "create",
+    "sample-app",
+    "APP-001",
+    "first-capability",
+    "--workspace",
+    repositoryRoot,
+    "--json",
+  ], { env });
+  assert.equal(JSON.parse(epicOutput.stdout).epicId, "APP-001");
+  assert.equal(
+    await pathExists(join(repositoryRoot, "specs", "epics", "app-001-first-capability", "epic.md")),
+    true,
+  );
+
+  const doctorOutput = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "doctor",
+    repositoryRoot,
+    "--json",
+  ], { env });
+  const doctor = JSON.parse(doctorOutput.stdout);
+  assert.equal(
+    doctor.findings.some((finding) => finding.message.includes("Planning directory for sample-app")),
+    false,
+  );
+
+  const second = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "init",
+    repositoryRoot,
+    "--json",
+  ], { env });
+  const repeated = JSON.parse(second.stdout);
+  assert.equal(repeated.createdRepositoryConfig, false);
+
+  const updateOutput = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "update",
+    repositoryRoot,
+    "--json",
+  ], { env });
+  const updated = JSON.parse(updateOutput.stdout);
+  assert.equal(updated.workflow.action, "bundled");
+  assert.equal(await pathExists(join(userRoot, ".sdd", "story-driven-development.md")), false);
 });
 
 test("interactive init asks for planning and repository roots", async (t) => {

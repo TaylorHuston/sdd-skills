@@ -2,40 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/TaylorHuston/sdd-skills/schemas/workspace.schema.json",
   "title": "SDD Workspace Configuration",
-  "type": "object",
-  "required": ["version", "schema", "skills", "planning", "repositories", "repositoryArtifacts", "ideas"],
-  "properties": {
-    "version": { "const": 2 },
-    "schema": { "const": "sdd-v2" },
-    "skills": {
-      "type": "object",
-      "required": ["directory"],
-      "properties": {
-        "directory": { "type": "string", "minLength": 1 }
-      },
-      "additionalProperties": false
-    },
-    "planning": {
-      "type": "object",
-      "required": ["root", "plannedChangesDirectory"],
-      "properties": {
-        "root": { "type": "string", "minLength": 1 },
-        "plannedChangesDirectory": { "type": "string", "minLength": 1 }
-      },
-      "additionalProperties": false
-    },
-    "repositories": {
-      "type": "object",
-      "required": ["roots"],
-      "properties": {
-        "roots": {
-          "type": "object",
-          "minProperties": 1,
-          "additionalProperties": { "type": "string", "minLength": 1 }
-        }
-      },
-      "additionalProperties": false
-    },
+  "$defs": {
     "repositoryArtifacts": {
       "type": "object",
       "required": ["activeChanges", "closedChanges", "epics", "adrs", "audits"],
@@ -78,6 +45,43 @@
         "additionalProperties": false
       }
     }
+  },
+  "type": "object",
+  "required": ["version", "schema", "skills", "planning", "repositories", "repositoryArtifacts", "ideas"],
+  "properties": {
+    "version": { "const": 2 },
+    "schema": { "const": "sdd-v2" },
+    "skills": {
+      "type": "object",
+      "required": ["directory"],
+      "properties": {
+        "directory": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "planning": {
+      "type": "object",
+      "required": ["root", "plannedChangesDirectory"],
+      "properties": {
+        "root": { "type": "string", "minLength": 1 },
+        "plannedChangesDirectory": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "repositories": {
+      "type": "object",
+      "required": ["roots"],
+      "properties": {
+        "roots": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "repositoryArtifacts": { "$ref": "#/$defs/repositoryArtifacts" },
+    "ideas": { "$ref": "#/$defs/ideas" }
   },
   "additionalProperties": false
 }

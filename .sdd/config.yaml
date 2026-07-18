@@ -1,0 +1,10 @@
+kind: repository
+version: 1
+schema: sdd-repository-v1
+id: sdd-skills
+artifacts:
+  activeChanges: docs/changes
+  closedChanges: docs/changes/closed
+  epics: docs/epics
+  adrs: docs/adrs
+  audits: docs/audits

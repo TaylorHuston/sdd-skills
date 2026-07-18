@@ -47,30 +47,32 @@ Each skill must read the project profile before acting and apply this workflow t
 
 ### Default Idea-To-Repository Relationship
 
-Private product direction is idea-owned, and an idea may map to zero, one, or many implementation repositories. Workspace topology is defined in `.sdd/config.yaml`:
+Private product direction is idea-owned, and an idea may map to zero, one, or many implementation repositories. User-specific topology and portable repository configuration are separate:
 
 ```text
-<workspace-root>/
+~/.sdd/
+  config.yaml
+  install-lock.json
+<repository>/
   .sdd/
     config.yaml
-    story-driven-development.md
-  <planning-root>/
-    <idea>/
-  <repository-root>/
-    <repo-a>/
-    <repo-b>/
+<planning-root>/
+  <idea>/
+<repository-root>/
+  <repo-a>/
+  <repo-b>/
 ```
 
-- **Planning root**: `planning.root` in `.sdd/config.yaml`. An idea defaults to `<planning.root>/<idea-key>` and may declare `planning` relative to that root or exceptional workspace-relative `planningPath`. This is the private product surface, including `prd.md`, Feature/Capability Briefs, exploration summaries, visual identity, research, private navigation, Change Briefs, and planned Change drafts under the configured `plannedChangesDirectory`.
-- **Repository roots**: named entries under `repositories.roots` in `.sdd/config.yaml`. Each points to a workspace-relative directory containing implementation repositories.
-- **Canonical relationship**: each `ideas.<idea>` entry declares lifecycle `status`, and each repository entry declares a `path`, lifecycle `status`, optional named `root`, and optional concise `role`. A rooted path resolves relative to that named repository root; an entry without `root` is an explicit workspace-relative exception.
+- **User configuration**: `~/.sdd/config.yaml` contains private planning roots, named repository roots, idea-to-repository mappings, roles, and lifecycle status. Paths may be absolute, home-relative, or relative to the user's home.
+- **Repository configuration**: each participating repository commits `.sdd/config.yaml` with `kind: repository`, a stable repository ID, and repository-relative artifact paths. It contains no private planning path or reverse workspace link.
+- **Canonical relationship**: each user-level `ideas.<idea>` entry declares lifecycle `status`, and each mapped repository declares a `path`, lifecycle `status`, optional named `root`, and optional concise `role`. The private mapper may associate one idea with many repositories; the repository contract remains independently cloneable.
 
 ```yaml
 planning:
-  root: ideas
+  root: ~/product/ideas
 repositories:
   roots:
-    code: code
+    code: ~/src/products
 ideas:
   product:
     status: active
@@ -85,28 +87,28 @@ ideas:
         status: inactive
 ```
 
-The mapping is intentionally private-workspace-owned. Do not require public code repositories to contain reverse links to private idea paths.
+The relationship map is intentionally user-owned. Do not put private planning paths or user-machine topology into public repository configuration.
 
-Idea and repository lifecycle status uses exactly `active`, `inactive`, or `archived`. `active` means current development and is included in default workspace status and new Change targeting. `inactive` retains a potential or paused mapping without surfacing it as current work. `archived` is historical/read-only reference. Missing status in an older v2 config is treated as `active` for backward compatibility, but new and maintained configurations should write it explicitly. An idea and each mapped repository have independent status: an active replacement effort may retain an archived predecessor repository.
+Idea and mapped-repository lifecycle status uses exactly `active`, `inactive`, or `archived`. `active` means current development and is included in default user status and new Change targeting. `inactive` retains paused or potential work; `archived` is historical/read-only reference. The portable repository contract does not prescribe a user's lifecycle state.
 
 Resolve roots in this order:
 
-1. Run `sdd context <relevant-path> --json` and use its workspace, idea, idea status, `planningPath`, repository, repository status, role, resolved path, and related repositories.
+1. Run `sdd context <relevant-path> --json` and use its user topology, repository contract, idea, idea status, `planningPath`, repository status, role, resolved path, related repositories, and package `workflowPath`.
 2. Prefer an explicit user-selected repository when more than one mapped repository is relevant.
 3. Apply declared project guidance only when it intentionally overrides the configured topology for the active operation.
 4. Ask when multiple target repositories remain plausible or ownership cannot be resolved safely. Do not infer or persist an undeclared relationship silently.
 
 One idea may map to many repositories. Under the current model, one repository should be claimed by at most one idea, and shared tooling repositories may remain unlinked. If real usage requires one repository to support multiple ideas, evolve the config schema and resolver deliberately into a many-to-many model rather than adding ad hoc reverse links.
 
-Idea Folder Note metadata may be imported by `sdd init`, but `.sdd/config.yaml` is authoritative afterward. Do not create a missing idea directory during read-only work. When a configured planning or repository root moves, use `sdd configure` to repair the root while preserving Space IDs, statuses, roles, mappings, and artifact settings. Change configured relationships only when the active workflow is authorized to modify workspace topology. To change the packaged model, update this section, the config schema, CLI resolution behavior, and affected skills together.
+`~/.sdd/config.yaml` is authoritative for the user's private relationship map; `<repository>/.sdd/config.yaml` is authoritative for portable repository identity and artifact locations. Do not create a missing idea directory during read-only work. When a user root moves, use `sdd configure` to repair it while preserving Space IDs, statuses, roles, and mappings. Change configured relationships only when the active workflow is authorized to modify user topology.
 
-Default inventory commands include only active ideas and active repositories. Use `sdd status --all` for lifecycle auditing and historical inventory. Explicit `sdd status <space-id>` remains able to show every repository mapped to that Space. Do not create or apply new work against an inactive idea or inactive/archived repository; update the workspace lifecycle status first when work intentionally resumes.
+Default inventory commands include only active ideas and active mapped repositories. Use `sdd status --all` for lifecycle auditing and historical inventory. Explicit `sdd status <space-id>` remains able to show every repository mapped to that Space. Do not create or apply new work against an inactive idea or inactive/archived mapping; update the user lifecycle status first when work intentionally resumes.
 
 The planning root is not a second implementation source of truth. Product direction and private context live there; accepted implemented behavior, code maps, and verification maps remain in Epics and Stories under the implementation repository's `docs/` tree.
 
 ## Core Terms
 
-- **Space / Space ID**: A planning-owned product or work area represented by one key under `.sdd/config.yaml` `ideas`. That exact, case-sensitive key is the stable Space ID used by CLI commands and may map to zero, one, or many implementation repositories. Treat it as an opaque identifier, not a display title.
+- **Space / Space ID**: A planning-owned product or work area represented by one key under `~/.sdd/config.yaml` `ideas`. That exact, case-sensitive key is the stable Space ID used by cross-repository CLI commands and may map to zero, one, or many implementation repositories. A standalone repository defaults to its repository ID when no private mapping exists.
 - **Product Brief/PRD**: Private product context stored by default at `<planning-root>/prd.md`. It describes product purpose, audience, scope, principles, market context when useful, and open product questions. It guides SDD work but is not an implementation checklist.
 - **Epic**: The durable capability file. It lives at `docs/epics/<key>-<###>-epic-name>/epic.md` and contains the capability narrative, embedded Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, and known gaps.
 - **Story**: A durable user-path contract embedded inside an Epic. New Epics should use Epic-scoped Story labels such as `S1`, `S2`, and full references such as `EPIC-ID/S1`; legacy app-wide Story IDs may remain when existing tests, reports, or history depend on them. Stories should usually use "As a <actor>, I want to <action/path>, so that <user-facing value/outcome>." A Story should describe a meaningful user action or outcome, not a tiny UI requirement.
@@ -194,9 +196,9 @@ Use just-in-time elaboration instead of making early technical assumptions durab
 1. `/sdd-change --brief` captures an undated private Change Brief containing durable product intent only. Briefs are not Changes, do not use the Change status vocabulary, and may wait in the backlog without technical plans becoming stale.
 2. `/sdd-change --plan` confirms the brief's outcome, refreshes current project and implementation context, and uses `sdd change create <space-id> <slug>` to scaffold the dated Planned Change Draft with `status: proposed`. When the Change introduces an Epic, use `sdd epic create <space-id> <epic-id> <slug>` so the repository artifact starts from the canonical validated shape rather than an agent-authored approximation. The skill then refines `proposal.md`, `design.md`, and `tasks.md` through product and technical planning and sets `status: planned` only when the Change is coherent and implementation-ready. Assign the dated Change ID at this point, not when the brief is first captured.
 3. When a UI-bearing Change has material experience uncertainty, `/sdd-design --plan` may converge user flow, responsive composition, component/state behavior, accessibility, and visual direction into the existing `design.md` and `tasks.md`. After implementation begins, `/sdd-design --revise` may reopen an accepted experience direction when comparison, review, or manual feedback shows that its visual or interaction expression needs another pass without changing accepted behavior. Classify and confirm the revision before moving an `in_review` Change back to `in_progress`; behavioral discovery routes directly through `/sdd-change --plan` or `--replan` instead. Neither mode authorizes application or component-preview edits.
-4. Once the planned artifacts validate and `proposal.md` preserves the brief's durable intent, the brief is consumed so there is no duplicate live planning truth. Planned drafts are not included in active repository status and must not be passed to `/sdd-apply` in place.
-5. `sdd change promote <space-id> <change-id>` promotes the settled draft with explicit `--repo` selections when needed. Promotion requires `status: planned`, creates each selected repository Change under its configured active-Change path, removes private planning-path references, and removes the planning draft only after every selected destination succeeds.
-6. `/sdd-change --plan` reconciles repository-specific scope after promotion before handing the Change to `/sdd-apply`. There must be only one active truth for each repository Change.
+4. Once the planned artifacts validate and `proposal.md` preserves the brief's durable intent, the brief is consumed so there is no duplicate live planning truth. Planned drafts are not included in active repository status until promoted.
+5. `sdd change promote <space-id> <change-id>` promotes the settled draft with explicit `--repo` selections when needed. Promotion requires `status: planned`, creates each selected repository Change under its configured active-Change path, removes private planning-path references, and removes the planning draft only after every selected destination succeeds. Invoking `/sdd-apply` against an explicitly selected or unambiguously inferred private Planned Change authorizes that skill to perform this deterministic promotion without separate confirmation. Any other Change status is a stop condition and must be reported to the user; apply does not silently plan or replan it.
+6. After promotion, `/sdd-apply` reconciles repository-specific readiness before implementation. Planning-level gaps return to `/sdd-change --replan`. There must be only one active truth for each repository Change.
 
 When implementation is expected immediately, `--plan` may capture and confirm the brief-level outcome in the same invocation before technical planning. It must not silently skip the intent boundary merely because the brief is short-lived.
 
@@ -245,6 +247,8 @@ Closeout must reconcile both forward and backward. Updating the current Story is
 Changes may be small or large. Small fixes still deserve enough tracking to keep Epic truth accurate. Large changes should remain adaptable rather than pretending every implementation phase is knowable up front.
 
 Planning artifacts are documentation, but their allowed branch and commit behavior belongs to project policy. Before writing them, follow the consuming project's documentation policy. Before changing application code, tests, schemas, configuration, generated project artifacts, or runtime behavior, follow its implementation branch and authorization policy.
+
+The implicit promotion permission granted by `/sdd-apply` does not waive validation, destination disambiguation, collision checks, repository guidance, branch policy, or any separate permission required for commits, pushes, merges, deployments, or destructive operations.
 
 When implementation or manual feedback discovers a new or meaningfully changed Requirement, Scenario, constraint, or Epic ownership question that needs planning before more code changes, use `/sdd-change --replan` against the active change. That mode returns `tasks.md` to `status: proposed`, updates `proposal.md`, `design.md`, and `tasks.md`, records the planning update, sets `status: planned` when the revised plan is coherent, and then hands back to a fresh `/sdd-apply`.
 
@@ -366,15 +370,13 @@ Use the skills to apply this doctrine consistently:
 | `/sdd-orphan-audit` | Find likely orphaned code/tests and SDD traceability gaps conservatively. |
 | `/sdd-release` | Prepare the project-defined production release handoff, including release checks and required release communication. |
 | `/sdd-pr` | Steward an existing or non-production SDD-backed PR through comments, checks, accepted fixes, and final merge handoff. |
-| `/sdd-skills-promote` | Promote local SDD workflow changes into the public reusable `sdd-skills` package with public-safe reconciliation. |
-
 Do not create separate compatibility-wrapper skills for older command names. Canonical new work should use the current `/sdd-*` skill names directly.
 
 ## Skill Enforcement Boundary
 
 This document defines the durable doctrine for Story-Driven Development. Skills operationalize the doctrine for specific workflows.
 
-Keep SDD skills focused on workflow procedure: what to read, what decisions to make, what artifacts to update, what verification to run, and what to report. Put portable SDD semantics, the default idea-to-repository relationship, and the canonical `docs/` repository layout in this doctrine. Put explicit relationship exceptions and user, technology, branch, command, release, and reporting preferences in project or workspace guidance instead of repeating them in skills or treating them as SDD requirements.
+Keep SDD skills focused on workflow procedure: what to read, what decisions to make, what artifacts to update, what verification to run, and what to report. Put portable SDD semantics, the default idea-to-repository relationship, and the canonical `docs/` repository layout in this doctrine. Put private relationships in `~/.sdd/config.yaml`, portable repository facts in `<repository>/.sdd/config.yaml`, and technology, branch, command, release, and reporting preferences in project guidance instead of repeating them in skills or treating them as SDD requirements.
 
 Put project-specific branch, merge, release, deployment, and repository rules in the app repo's local `AGENTS.md` or equivalent project guidance. SDD skills should read and enforce those rules, falling back to documented workspace guidance when local policy is absent, instead of restating a branch model inside each workflow.
 

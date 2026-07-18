@@ -1,12 +1,7 @@
 import { readFile, readdir, rm } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 
-import {
-  BUNDLED_SKILLS_DIRECTORY,
-  CONFIG_VERSION,
-  PACKAGE_JSON_PATH,
-  SCHEMA_VERSION,
-} from "./constants.js";
+import { BUNDLED_SKILLS_DIRECTORY, PACKAGE_JSON_PATH } from "./constants.js";
 import { getInstallLockPath, resolveWorkspacePath } from "./config.js";
 import { SddError } from "./errors.js";
 import {
@@ -49,7 +44,7 @@ function assertSkillDirectoryInsideWorkspace(workspaceRoot, configuredDirectory)
   const target = resolveWorkspacePath(workspaceRoot, configuredDirectory);
   if (!isPathInside(workspaceRoot, target)) {
     throw new SddError(
-      `Skill directory ${configuredDirectory} resolves outside the workspace. The MVP only manages workspace-local skills.`,
+      `Skill directory ${configuredDirectory} resolves outside the configured user or legacy workspace root.`,
       { code: "UNSAFE_SKILL_DIRECTORY" },
     );
   }
@@ -123,9 +118,9 @@ export async function planSkillSync(workspaceRoot, config, { force = false } = {
     skillsDirectory,
     actions,
     lock: {
-      version: CONFIG_VERSION,
+      version: config.version,
       packageVersion: await readPackageVersion(),
-      schemaVersion: SCHEMA_VERSION,
+      schemaVersion: config.schema,
       skillsDirectory: config.skills.directory,
       managedSkills: Object.fromEntries(
         actions

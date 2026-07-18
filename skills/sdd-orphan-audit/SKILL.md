@@ -9,7 +9,7 @@ Find likely orphaned code/tests and SDD traceability gaps without brute-force re
 
 ## Authority And Project Profile
 
-Resolve the workspace and repository with `sdd context <relevant-path> --json`, then read `<workspaceRoot>/.sdd/story-driven-development.md` completely before classifying traceability or artifact-authority gaps. Enforce Epics under `docs/epics/`, changes under `docs/changes/`, and audit reports under `docs/audits/` inside the resolved repository. Project guidance owns source, generated-file, test, and analyzer conventions. If the managed workflow document is missing, stop and direct the user to `sdd init` or `sdd doctor`.
+Resolve the workspace and repository with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before classifying traceability or artifact-authority gaps. Enforce Epics under `docs/epics/`, changes under `docs/changes/`, and audit reports under `docs/audits/` inside the resolved repository. Project guidance owns source, generated-file, test, and analyzer conventions. If user setup is missing, direct the user to `sdd setup`; if the repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
 
 This is a report-first audit. It can identify candidates, confidence levels, and recommended follow-up workflows, but it must not delete code, remove tests, rewrite Epics, or make cleanup commits unless the user explicitly asks for a separate follow-up change.
 

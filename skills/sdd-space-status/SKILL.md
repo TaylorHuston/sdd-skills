@@ -11,11 +11,11 @@ This skill is a semantic wrapper around `sdd status`, not a second discovery eng
 
 ## Authority
 
-Use `sdd context <relevant-path> --json` to resolve the workspace and Space ID, then use `sdd status <space-id> --json` as the inventory. Read `<workspaceRoot>/.sdd/story-driven-development.md` before interpreting artifact authority, Epic truth, Change status, or workflow routing.
+Use `sdd context <relevant-path> --json` to resolve the workspace and Space ID, then use `sdd status <space-id> --json` as the inventory. Read the `workflowPath` returned by `sdd context` before interpreting artifact authority, Epic truth, Change status, or workflow routing.
 
 The CLI output is navigation, not durable product truth. Epics remain the accepted capability map, active Change artifacts remain working records, and implementation/tests reveal runtime reality. Project guidance owns branch policy, required supporting docs, release conventions, and technology-specific constraints.
 
-If the workspace is not initialized or the managed workflow is missing, stop and direct the user to `sdd init` or `sdd doctor`.
+If the user installation is missing, direct the user to `sdd setup`; if the repository contract is missing, direct them to `sdd init` in that repository. Use `sdd doctor` to diagnose an existing installation.
 
 ## Inputs
 
