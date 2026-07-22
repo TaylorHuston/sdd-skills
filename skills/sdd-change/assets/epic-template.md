@@ -1,4 +1,5 @@
 ---
+schema: sdd-epic-v2
 id: EPIC-ID
 status: draft
 created: yyyy-mm-dd
@@ -20,7 +21,7 @@ Briefly explain why this capability exists and what product direction constrains
 
 ## Outcome
 
-Users can... [one concise paragraph describing the accepted capability outcome].
+Describe current product truth: use present tense for implemented behavior, future tense only for wholly unimplemented behavior, and explicit current-plus-gap wording for partial behavior.
 
 ## Current Scope
 
@@ -42,15 +43,16 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 
 ## Story Index
 
-| Story | Status | Capability | Last Verified | Notes |
-|---|---|---|---|---|
-| S1 | draft | Short user-path summary. |  |  |
+| Story | Implementation | Verification | Capability | Last Verified | Notes |
+|---|---|---|---|---|---|
+| S1 | not implemented | unverified | Short user-path summary. |  |  |
 
 ## Stories
 
 ### Story S1: Story Title
 
-Status: draft
+Implementation: not implemented
+Verification: unverified
 Created: yyyy-mm-dd
 Modified: yyyy-mm-dd
 Last verified:
@@ -76,21 +78,29 @@ The system SHALL describe one durable behavior rule.
 
 #### Implemented By
 
-| Path | Role | Recheck Trigger |
-|---|---|---|
-| `src/path/file.ts` | Primary/supporting/test/support | Recheck when... |
+This is the Story's only authoritative current implementation map. Consolidate any still-current legacy or detailed maps here; keep historical explanation in `Story Notes`, never in a competing map.
+
+Map every Requirement to its primary governing location after implementation. `primary` describes behavior ownership, not a physical layer; use narrower multiple primary rows when ownership genuinely splits across layers or Scenarios. Add supporting rows only for distinct adapter, persistence, presentation, configuration, migration, or support responsibilities. Prefer stable symbols, exports, routes, classes, or searchable anchors over line numbers. Point to the definition, registration, or configuration that owns the behavior—not merely an import, call site, incidental UI handler, broad file token, or a symbol cited because the same file owns something else.
+
+| Requirement / Scenario | Location / Anchor | Kind | Responsibility |
+|---|---|---|---|
+| S1/R1 | Not implemented yet. | primary | Durable behavior owner after implementation. |
+
+#### Implementation Gaps
+
+- `S1/R1`: Not implemented yet.
 
 #### Verified By
 
+This is the Story's only authoritative current verification map. For automated evidence, use `path#exact test title or stable named test anchor` and name the important assertion, route, selector, injected failure, or observation. Never use a framework token such as `#it(`, `#test(`, or `#describe(`. Aggregate Scenarios only when the named proof explicitly exercises each one.
+
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
-| S1/R1-S1 | `tests/path.test.ts` - `test name` | Specific behavior assertion. | Passing yyyy-mm-dd |
-| S1/R1-S2 | Manual/browser/review artifact or `tests/path.test.ts` - `test name` | Specific failure or edge-case proof. | Pending / Passing / Gap |
 
 #### Verification Gaps
 
-- None remaining.
-- Or: `S1/R1-S2` lacks production-path proof because...
+- `S1/R1-S1`: Not verified yet.
+- `S1/R1-S2`: Not verified yet.
 
 #### Story Notes
 
@@ -111,8 +121,13 @@ This Epic is healthy when:
 
 - Embedded Stories cover the current scope.
 - Requirements and Scenarios describe implemented behavior or intentional gaps.
-- `Implemented By` points to the important starting files.
-- `Verified By` maps concrete evidence to Requirements/Scenarios; automated evidence names existing repository-relative test paths.
+- Story implementation and verification state match the Story Index and their respective gap sections.
+- `Implemented By` maps every implemented Requirement to a concrete repository-relative location and stable code anchor.
+- Each Story has only one current `Implemented By` map and one current `Verified By` map; historical detail is consolidated or moved to notes.
+- Primary anchors identify the behavior-owning definition, registration, or configuration, and distinct governing boundaries use narrower Requirement/Scenario rows.
+- `Implementation Gaps` names accepted behavior that does not exist yet.
+- `Verified By` maps concrete evidence to Requirements/Scenarios; automated evidence uses an existing repository-relative `path#exact test title or stable anchor`, and `Proves` names the important assertion or observation.
+- Automated evidence does not use generic framework syntax anchors, and the cited proof actually asserts every mapped Scenario.
 - `Verification Gaps` are real, current, and explicit.
 - Related changes, docs, indexes, reviews, and release communication do not contradict this Epic.
 

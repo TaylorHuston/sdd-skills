@@ -7,6 +7,8 @@ description: Capture, plan, or replan an SDD change. Use when the user invokes /
 
 Manage a change from durable intent through implementation-ready planning. Keep outcome capture separate from technical planning so implementation choices are made against current code, dependencies, and project constraints.
 
+Planning invariant: describe the accepted end state, observable behavior, durable constraints, important risks, and the checks or confirmations that must eventually support the result. Do not predict a fixed implementation sequence, exhaustive file list, or every failure mode up front. Seed only the obligations already knowable; keep `tasks.md` as a living Apply ledger that can be revised as current implementation reality reveals better slices, new risks, decision fan-out, and evidence needs.
+
 ## Authority And Project Profile
 
 Resolve the workspace, idea planning path, and target repositories with `sdd context <relevant-path> --json`. Read the `workflowPath` returned by `sdd context` completely before defining Change status, Stories, Requirements, Scenarios, evidence, or promotion state. If user setup is missing, direct the user to `sdd setup`; if a repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
@@ -122,24 +124,28 @@ The outcome is a coherent planned Change that is ready to promote or, after prom
    - For material component decisions, record the canonical `Component Strategy` labels from the design template even when the experience direction is already clear. Use `/sdd-design --plan` when the strategy needs convergence, not merely to fill a settled classification.
    - Compare viable technical approaches for non-trivial decisions. Usually compare two or three; use one only when the choice is genuinely obvious and say why.
    - Challenge the verification strategy so evidence can map to Story, Requirement, and Scenario IDs rather than becoming a command log.
+   - Identify behavior that will have distinct governing owners across route/auth, application policy, persistence, provider/runtime configuration, deployment, and presentation boundaries. Plan narrower Requirement/Scenario ownership instead of one umbrella map row.
+   - Seed known end-state invariants, risk/confirmation obligations, decision fan-out concerns, and verification-environment needs without pretending they form an exhaustive upfront implementation plan. When already knowable, note that a new sibling implementation or stateful surface will trigger Pattern Parity or Stateful Transition rows, but leave the concrete comparison and edges for `/sdd-apply` to derive from real code and evidence.
    - Ask before finalizing when material product, Story, contract, data, security, architecture, or verification choices remain unsettled.
 5. Write `proposal.md`.
    - Preserve the brief's why, desired outcome, scope boundaries, success signals, durable constraints, and open questions.
    - Record target repositories, new or updated Epic directories, Story moves or replacements, impact, deferred scope, assumptions, and release-communication impact.
 6. Write `design.md`.
    - Record the selected technical approach, alternatives, reconsideration triggers, client and application boundaries, important constraints, risks, and verification strategy.
-   - Define each new or modified Epic's Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, and `Verification Gaps` using the canonical template.
+   - Define each new or modified Epic's Stories, Requirements, Scenarios, independent implementation and verification state, behavior-mapped `Implemented By`, `Implementation Gaps`, scenario-mapped `Verified By`, and `Verification Gaps` using the canonical template.
+   - Preserve exactly one canonical `Implemented By` and one canonical `Verified By` section per Story. Plan consolidation of any `Prior`, `Detailed`, `Legacy`, or migration-era maps into those sections; retain only non-competing history in `Story Notes`.
    - Use Epic-scoped Story labels such as `S1`; preserve legacy app-wide Story IDs only when existing references depend on them.
    - Use local Requirement and Scenario IDs such as `R1` and `R1-S1`. Use `The system SHALL ...`, `WHEN`, and `THEN` for observable behavior.
-   - Write `Not implemented yet.` and `Not verified yet.` instead of inventing future files or evidence.
+   - Default each Story to one primary user path to an action or outcome. When a Story has several actors, independently valuable outcomes, separately releasable workflows, behavior its title does not predict, more than six Requirements, or more than twelve Scenarios, split it or record why one coherent path still requires the larger boundary.
+   - Write `Not implemented yet.` under `Implementation Gaps` and `Not verified yet.` under `Verification Gaps` instead of inventing future files, symbols, or evidence. Planned technical ownership may remain in `design.md`; do not present it as an implemented Epic map.
    - Plan explicit reconciliation for existing Epic truth the Change may supersede.
 7. Route durable decisions through `/sdd-adr`.
    - Create an ADR candidate or Proposed ADR for durable architecture, API, client, data, integration, deployment, dependency, auth/security, state, or storage decisions future work should respect.
    - Do not create ADRs for ordinary, reversible implementation details.
 8. Write `tasks.md`.
    - Start with `status: proposed`. Use only `proposed`, `planned`, `in_progress`, or `in_review`; folder location under `closed/` is the terminal state.
-   - Keep tasks at artifact, Story/capability, verification, review, and closeout level rather than writing a file-by-file script.
-   - Maintain `Resume Here`, implementation and verification ledgers, blockers, manual confirmation, review record, release communication, PR/merge state, ADR state, deferred gaps, truth reconciliation, and closeout tasks.
+   - Keep tasks at end-state, artifact, Story/capability, verification, review, and closeout level rather than writing a file-by-file sequence or freezing an implementation order.
+   - Seed the living Implementation Risk And Confirmation Matrix, Decision Fan-Out Ledger, and Verification Environment table with only the obligations currently knowable. Treat Pattern Parity and Stateful Transition matrices as triggered Apply artifacts: mark known applicability when useful, but do not predict exhaustive sibling concerns or state edges before implementation. Maintain `Resume Here`, implementation and verification ledgers, blockers, manual confirmation, review record, release communication, PR/merge state, ADR state, deferred gaps, truth reconciliation, and closeout tasks.
 9. Validate and hand off.
    - Set `status: planned` only after the proposal, design, tasks, Epic actions, and verification strategy are coherent and no planning decision remains unresolved.
    - Run `sdd validate <space-id> --change <change-id> --workspace <workspace-root> --json` and resolve deterministic errors. Inspect warnings; structural validity does not prove semantic completeness.
@@ -158,7 +164,7 @@ Do not use it for narrow defects, missing tests, stale evidence indexes, or rout
 2. For an active Change not already `proposed`, run `sdd change transition <space-id> <change-id> --from <current-status> --to proposed` with explicit repository selection when needed. Classify the discovery as `in-scope refinement`, `scope expansion`, `product drift`, `Epic ownership change`, `technical constraint`, or `follow-up change`.
 3. Preserve the active Change when the discovery is required to achieve its accepted outcome. Recommend a new `/sdd-change --brief` for adjacent future work or `/sdd-prd` for changed product direction.
 4. Ask only the questions needed to resolve the discovery and define what must be true before implementation resumes.
-5. Update `proposal.md`, `design.md`, ADRs, and `tasks.md` wherever scope, behavior, approach, evidence, risks, or resume state changed. Keep existing Story, Requirement, and Scenario IDs stable unless the behavior is genuinely new.
+5. Update `proposal.md`, `design.md`, ADRs, and `tasks.md` wherever scope, behavior, approach, evidence, risks, decision fan-out, verification-environment obligations, or resume state changed. Keep existing Story, Requirement, and Scenario IDs stable unless the behavior is genuinely new; do not replace adaptive Apply work with a newly rigid implementation script.
 6. Add a dated `Planning Updates` entry with the discovery, classification, decisions, artifacts changed, and exact `/sdd-apply` restart point.
 7. Set `status: planned` only when the revised plan is coherent. For an active Change, use `sdd change transition <space-id> <change-id> --from proposed --to planned`; then run scoped `sdd validate`. Otherwise leave `status: proposed` and keep the unresolved planning decision explicit.
 8. Do not edit application code or actual Epic files from this mode unless the user explicitly asks for that additional work.
@@ -166,9 +172,15 @@ Do not use it for narrow defects, missing tests, stale evidence indexes, or rout
 ## Artifact Rules
 
 - Change artifacts describe proposed behavior and approach; they do not authorize code or Epic edits.
+- Planning records what must be true and confirmed at the end. Apply owns adapting phases, risk rows, triggered parity and transition rows, fan-out, and evidence from current implementation reality.
 - Epics and embedded Stories are durable but revisable truth. Name Story moves, splits, merges, renames, and superseded Requirements explicitly.
 - Requirements stay user-visible or externally observable. Technical constraints belong in `design.md` unless they affect observable behavior.
+- Story `Implementation` uses `not implemented`, `partial`, or `implemented`; Story `Verification` independently uses `unverified`, `partial`, or `verified`. Neither field is a Change task state.
+- `Implemented By` maps every implemented Requirement, and distinct Scenarios when needed, to concrete repository-relative locations plus stable symbols or searchable anchors. `primary` identifies governing behavior regardless of physical layer; genuine split ownership may use multiple narrower primary rows. Separate supporting adapters, persistence, presentation, configuration, migrations, and support by responsibility.
+- An implementation anchor must identify the definition, registration, or configuration that owns the claimed behavior. Do not accept an import, call site, incidental UI handler, broad file token, or a file already cited for another symbol as semantic ownership.
+- A material edit to behavior, state, ownership, gaps, or evidence in a legacy Epic requires whole-file normalization to `sdd-epic-v2`. Derive implementation and verification independently from current code, evidence, and gaps rather than copying a legacy status into both.
 - `Verified By` is a scenario-mapped evidence index. Chronological checks and progress belong in `tasks.md`.
+- Automated evidence uses an exact test title or stable named test anchor, never a generic framework token such as `#it(`, `#test(`, or `#describe(`.
 - Keep deferred or scope-expanding ideas out of current Stories, Requirements, Scenarios, and tasks.
 - Keep public release communication free of private planning context, raw SDD ledgers, secrets, and speculative roadmap claims.
 - Do not edit application code, actual Epic files, or implementation records from this skill unless the user explicitly asks for that extra work.

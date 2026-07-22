@@ -64,12 +64,15 @@ function resolvedRepositories(config, space) {
   return [...repositories.values()];
 }
 
-async function readGitStatus(repositoryRoot) {
+export async function readGitStatus(
+  repositoryRoot,
+  { command = "git", timeoutMs = 10_000 } = {},
+) {
   try {
     const { stdout } = await execFileAsync(
-      "git",
+      command,
       ["-C", repositoryRoot, "status", "--porcelain=v2", "--branch", "--untracked-files=normal"],
-      { encoding: "utf8", maxBuffer: 10 * 1024 * 1024 },
+      { encoding: "utf8", maxBuffer: 10 * 1024 * 1024, timeout: timeoutMs, killSignal: "SIGTERM" },
     );
     let branch = null;
     let head = null;
@@ -121,7 +124,9 @@ async function readGitStatus(repositoryRoot) {
       unstaged: 0,
       untracked: 0,
       conflicted: 0,
-      error: detail.includes("not a git repository")
+      error: error?.killed || error?.signal === "SIGTERM"
+        ? "Git status timed out"
+        : detail.includes("not a git repository")
         ? "not a Git worktree"
         : "Git status unavailable",
     };
@@ -212,15 +217,26 @@ async function buildSpace(
   config,
   spaceId,
   space,
-  { detail = false, includeInactiveRepositories = true } = {},
+  {
+    detail = false,
+    includeInactiveRepositories = true,
+    gitCommand = "git",
+    gitTimeoutMs = 10_000,
+    gitConcurrency = 4,
+  } = {},
 ) {
-  const repositories = await Promise.all(
-    resolvedRepositories(config, space)
-      .filter((repository) => includeInactiveRepositories || repository.status === "active")
-      .map(async (repository) => {
+  const selectedRepositories = resolvedRepositories(config, space)
+    .filter((repository) => includeInactiveRepositories || repository.status === "active");
+  const repositories = await mapWithConcurrency(
+    selectedRepositories,
+    gitConcurrency,
+    async (repository) => {
         const repositoryRoot = resolveWorkspacePath(workspaceRoot, repository.resolvedPath);
-        return { ...repository, git: await readGitStatus(repositoryRoot) };
-      }),
+        return {
+          ...repository,
+          git: await readGitStatus(repositoryRoot, { command: gitCommand, timeoutMs: gitTimeoutMs }),
+        };
+      },
   );
   const changes = (await Promise.all(
     repositories.map((repository) => listChanges(workspaceRoot, config, repository)),
@@ -275,7 +291,25 @@ async function buildSpace(
   };
 }
 
-export async function getStatus(startPath, spaceId = null, { includeAll = false } = {}) {
+async function mapWithConcurrency(items, limit, worker) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  const run = async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await worker(items[index], index);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(Math.max(1, limit), items.length) }, run));
+  return results;
+}
+
+export async function getStatus(
+  startPath,
+  spaceId = null,
+  { includeAll = false, gitCommand = "git", gitTimeoutMs = 10_000, gitConcurrency = 4 } = {},
+) {
   const { workspaceRoot, config } = await resolveOperationConfiguration(startPath);
   assertValidConfig(config, "read SDD status");
 
@@ -290,7 +324,12 @@ export async function getStatus(startPath, spaceId = null, { includeAll = false 
       command: "status",
       mode: "space",
       workspaceRoot,
-      ...(await buildSpace(workspaceRoot, config, spaceId, config.ideas[spaceId], { detail: true })),
+      ...(await buildSpace(workspaceRoot, config, spaceId, config.ideas[spaceId], {
+        detail: true,
+        gitCommand,
+        gitTimeoutMs,
+        gitConcurrency,
+      })),
     };
   }
 
@@ -300,6 +339,9 @@ export async function getStatus(startPath, spaceId = null, { includeAll = false 
     if (!includeAll && resolveWorkspaceStatus(space.status) !== "active") continue;
     spaces.push(await buildSpace(workspaceRoot, config, id, space, {
       includeInactiveRepositories: includeAll,
+      gitCommand,
+      gitTimeoutMs,
+      gitConcurrency,
     }));
   }
   return {

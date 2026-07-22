@@ -55,7 +55,7 @@ Check git status before writing a report. Preserve unrelated dirty files. Do not
 2. Run the universal traceability script.
    - Use `scripts/sdd_orphan_audit.py <app-root> --format markdown` for a human summary.
    - Use `--format json` when the result will be post-processed.
-   - The script parses `docs/epics/*/epic.md`, extracts `Implemented By` and `Verified By` path-like references, expands globs, and compares them to the current working tree: tracked plus untracked files minus staged or unstaged deletions. It separates behavior-test/source candidates from likely test harness, framework/configuration, and generated support files. Human review must still decide whether ownership is correct, whether exclusions are project-appropriate, and whether `Verified By` is scenario-mapped rather than a broad command reference.
+   - The script parses `docs/epics/*/epic.md`, extracts `Implemented By` and `Verified By` path-like references, preserves v2 implementation kinds such as `primary`, `adapter`, and `support`, expands globs, and compares them to the current working tree: tracked plus untracked files minus staged or unstaged deletions. It separates behavior-test/source candidates from likely test harness, framework/configuration, and generated support files. Human review must still decide whether every Requirement has the right primary owner, whether exclusions are project-appropriate, and whether `Verified By` is scenario-mapped rather than a broad command reference. File-level ownership is not symbol-level coverage: a file already cited for one behavior can still contain an unmapped governing symbol for another behavior.
    - Use `--epic` for Epic verification and combine `--epic` with `--changed-from` for Change-local apply/review checks. Run one Epic-scoped pass per affected Epic when a Change spans Epics.
 3. Review the script output.
    - Read only suspicious files or artifacts needed to classify findings.
@@ -70,6 +70,7 @@ Check git status before writing a report. Preserve unrelated dirty files. Do not
 5. Classify findings.
    - `missing-reference`: Epic evidence points to a file/test that does not exist.
    - `traceability-gap`: a real file/test appears relevant but no Epic owns it in `Implemented By` or scenario-mapped `Verified By`.
+   - `navigation-gap`: the Epic names participating files but does not identify a usable primary application-logic owner and stable symbol/searchable anchor for the Requirement.
    - `likely-orphan`: SDD evidence is absent and a stack analyzer or repo-native inventory suggests the item is unused.
    - `stale-test`: a test exists but appears to verify removed, renamed, or unowned behavior.
    - `stale-code`: code exists but appears unused or disconnected from current routes/build/runtime.
@@ -112,6 +113,7 @@ Include:
 - missing Epic references
 - tests without scenario-mapped `Verified By` ownership
 - source files without `Implemented By` ownership
+- implementation ownership by kind, including whether primary behavior owners are distinguishable from adapters and support
 - stack analyzer findings, if any
 - confidence-classified candidates
 - false-positive risks

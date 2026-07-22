@@ -17,7 +17,7 @@ import {
 } from "../config.js";
 import { resolveOperationConfiguration } from "../workspace.js";
 import { SddError } from "../errors.js";
-import { isDirectory, pathExists } from "../fs.js";
+import { isDirectory, isPathPhysicallyInside, pathExists } from "../fs.js";
 
 function normalizePath(value) {
   return value.split("\\").join("/");
@@ -45,7 +45,14 @@ export async function transitionChange(
   startPath,
   spaceId,
   changeId,
-  { repositories = [], from, to, dryRun = false } = {},
+  {
+    repositories = [],
+    from,
+    to,
+    dryRun = false,
+    beforeCommit = null,
+    beforeRepositoryCommit = null,
+  } = {},
 ) {
   assertValidChangeId(changeId);
   assertTransition(from, to);
@@ -88,6 +95,11 @@ export async function transitionChange(
     const tasksAbsolutePath = join(changeAbsolutePath, "tasks.md");
     const tasksPath = normalizePath(join(changePath, "tasks.md"));
 
+    if (!(await isPathPhysicallyInside(repositoryPath, changeAbsolutePath))) {
+      throw new SddError(`Active Change resolves outside its repository: ${changePath}`, {
+        code: "UNSAFE_ARTIFACT_PATH",
+      });
+    }
     if (!(await isDirectory(changeAbsolutePath))) {
       throw new SddError(`Active Change does not exist: ${changePath}`, {
         code: "CHANGE_NOT_FOUND",
@@ -134,6 +146,7 @@ export async function transitionChange(
     const nonce = `${process.pid}-${Date.now()}`;
     const staged = [];
     const committed = [];
+    let succeeded = false;
     try {
       for (const transition of transitions) {
         const temporaryPath = join(
@@ -147,8 +160,31 @@ export async function transitionChange(
         await writeFile(temporaryPath, transition.updatedSource, "utf8");
         staged.push({ ...transition, temporaryPath, backupPath });
       }
-      for (const transition of staged) {
+      if (beforeCommit) await beforeCommit({ transitions: staged });
+      for (const [index, transition] of staged.entries()) {
+        if (beforeRepositoryCommit) {
+          await beforeRepositoryCommit({ transition, index, transitions: staged });
+        }
+        const repositoryPath = resolveWorkspacePath(workspaceRoot, transition.resolvedPath);
+        if (!(await isPathPhysicallyInside(repositoryPath, transition.tasksAbsolutePath))) {
+          throw new SddError(`Active Change resolves outside its repository: ${transition.tasksPath}`, {
+            code: "UNSAFE_ARTIFACT_PATH",
+          });
+        }
         await rename(transition.tasksAbsolutePath, transition.backupPath);
+        const commitSource = await readFile(transition.backupPath, "utf8");
+        if (commitSource !== transition.source) {
+          await rename(transition.backupPath, transition.tasksAbsolutePath);
+          throw new SddError(`Change changed during transition: ${transition.tasksPath}`, {
+            code: "CONCURRENT_CHANGE",
+          });
+        }
+        if (await pathExists(transition.tasksAbsolutePath)) {
+          throw new SddError(`Change was replaced during transition: ${transition.tasksPath}`, {
+            code: "CONCURRENT_CHANGE",
+            details: [`Original content retained at ${transition.backupPath}.`],
+          });
+        }
         try {
           await rename(transition.temporaryPath, transition.tasksAbsolutePath);
           committed.push(transition);
@@ -157,16 +193,45 @@ export async function transitionChange(
           throw error;
         }
       }
+      succeeded = true;
     } catch (error) {
+      const recoveryFailures = [];
       for (const transition of committed.reverse()) {
-        await rm(transition.tasksAbsolutePath, { force: true });
-        await rename(transition.backupPath, transition.tasksAbsolutePath).catch(() => {});
+        try {
+          const currentSource = await readFile(transition.tasksAbsolutePath, "utf8");
+          if (currentSource !== transition.updatedSource) {
+            recoveryFailures.push(
+              `${transition.tasksPath}: newer content preserved; original retained at ${transition.backupPath}.`,
+            );
+            continue;
+          }
+          await rm(transition.tasksAbsolutePath, { force: true });
+          await rename(transition.backupPath, transition.tasksAbsolutePath);
+        } catch (recoveryError) {
+          recoveryFailures.push(`${transition.tasksPath}: ${recoveryError.message}`);
+        }
+      }
+      for (const transition of staged) {
+        if (!(await pathExists(transition.backupPath)) || await pathExists(transition.tasksAbsolutePath)) {
+          continue;
+        }
+        try {
+          await rename(transition.backupPath, transition.tasksAbsolutePath);
+        } catch (recoveryError) {
+          recoveryFailures.push(`${transition.tasksPath}: ${recoveryError.message}`);
+        }
+      }
+      if (recoveryFailures.length > 0) {
+        throw new SddError("Change transition failed and recovery was incomplete.", {
+          code: "MUTATION_RECOVERY_FAILED",
+          details: [`Original error: ${error.message}`, ...recoveryFailures],
+        });
       }
       throw error;
     } finally {
       for (const transition of staged) {
         await rm(transition.temporaryPath, { force: true }).catch(() => {});
-        if (await pathExists(transition.tasksAbsolutePath)) {
+        if (succeeded && await pathExists(transition.tasksAbsolutePath)) {
           await rm(transition.backupPath, { force: true }).catch(() => {});
         }
       }

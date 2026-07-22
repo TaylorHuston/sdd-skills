@@ -17,7 +17,14 @@ import {
 } from "../config.js";
 import { resolveOperationConfiguration } from "../workspace.js";
 import { SddError } from "../errors.js";
-import { isDirectory, pathExists } from "../fs.js";
+import { isDirectory, isPathPhysicallyInside, pathExists } from "../fs.js";
+import {
+  behaviorReferences,
+  implementationLocationPaths,
+  orderedValuesEqual,
+  readRegularText,
+  validateVerifiedEvidenceRow,
+} from "../epic-evidence.js";
 
 const CHANGE_FILES = Object.freeze({
   "proposal.md": [
@@ -49,6 +56,7 @@ const EPIC_FRONTMATTER = Object.freeze([
   "last_verified",
   "stories",
 ]);
+const EPIC_V2_SCHEMA = "sdd-epic-v2";
 const EPIC_SECTIONS = Object.freeze([
   "Product Context",
   "Outcome",
@@ -62,17 +70,45 @@ const EPIC_SECTIONS = Object.freeze([
   "Completion Criteria",
   "Notes",
 ]);
-const STORY_METADATA = Object.freeze(["Status:", "Created:", "Modified:", "Last verified:"]);
-const STORY_SECTIONS = Object.freeze([
+const LEGACY_STORY_METADATA = Object.freeze(["Status:", "Created:", "Modified:", "Last verified:"]);
+const V2_STORY_METADATA = Object.freeze([
+  "Implementation:",
+  "Verification:",
+  "Created:",
+  "Modified:",
+  "Last verified:",
+]);
+const LEGACY_STORY_SECTIONS = Object.freeze([
   "Requirements And Scenarios",
   "Implemented By",
   "Verified By",
   "Verification Gaps",
   "Story Notes",
 ]);
-const IMPLEMENTED_HEADER = "| Path | Role | Recheck Trigger |";
+const V2_STORY_SECTIONS = Object.freeze([
+  "Requirements And Scenarios",
+  "Implemented By",
+  "Implementation Gaps",
+  "Verified By",
+  "Verification Gaps",
+  "Story Notes",
+]);
+const LEGACY_IMPLEMENTED_HEADER = "| Path | Role | Recheck Trigger |";
+const V2_IMPLEMENTED_HEADER = "| Requirement / Scenario | Location / Anchor | Kind | Responsibility |";
 const VERIFIED_HEADER = "| Requirement / Scenario | Evidence | Proves | Status |";
-const STORY_INDEX_HEADER = "| Story | Status | Capability | Last Verified | Notes |";
+const LEGACY_STORY_INDEX_HEADER = "| Story | Status | Capability | Last Verified | Notes |";
+const V2_STORY_INDEX_HEADER = "| Story | Implementation | Verification | Capability | Last Verified | Notes |";
+const IMPLEMENTATION_STATES = Object.freeze(["not implemented", "partial", "implemented"]);
+const VERIFICATION_STATES = Object.freeze(["unverified", "partial", "verified"]);
+const IMPLEMENTATION_KINDS = Object.freeze([
+  "primary",
+  "adapter",
+  "persistence",
+  "presentation",
+  "configuration",
+  "migration",
+  "support",
+]);
 const TEMPLATE_PLACEHOLDERS = Object.freeze([
   "CHANGE TITLE",
   "EPIC TITLE",
@@ -169,24 +205,21 @@ function tableRows(lines) {
     line.trim().replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim()));
 }
 
-function automatedEvidenceTestPaths(evidence) {
-  const explicitlyAutomated = /\b(?:automated|e2e|end-to-end|integration|japa|jest|playwright|pytest|specs?|unit|vitest)\b/i.test(evidence);
-  const genericTestEvidence = /\btests?\b/i.test(evidence) && !/\bmanual\b/i.test(evidence);
-  if (!explicitlyAutomated && !genericTestEvidence) {
-    return null;
-  }
-  const paths = [...evidence.matchAll(/`([^`]+)`/g)].map((match) =>
-    normalizePath(match[1]).replace(/:\d+$/, ""));
-  return [...new Set(paths.filter((path) => {
-    if (!path || isAbsolute(path) || path.startsWith("../") || /\s/.test(path)) return false;
-    const lowered = path.replace(/^\.\//, "").toLowerCase();
-    return (
-      /(?:^|\/)(?:__tests__|e2e|spec|specs|test|tests)\//.test(lowered)
-      || /\.(?:spec|test)\.[a-z0-9]+$/.test(lowered)
-      || /(?:^|\/)test_[^/]+\.py$/.test(lowered)
-      || /(?:^|\/)[^/]+_test\.py$/.test(lowered)
-    );
-  }))];
+function metadataValue(lines, label) {
+  const line = lines.slice(1, 16).find((entry) => entry.startsWith(`${label}:`));
+  return line ? line.slice(label.length + 1).trim() : null;
+}
+
+function gapReferences(lines) {
+  return lines.flatMap((line) => behaviorReferences(line));
+}
+
+function requirementCovered(requirementId, scenarioIds, references) {
+  if (references.has(requirementId)) return true;
+  const requirementScenarios = scenarioIds.filter((scenarioId) =>
+    scenarioId.startsWith(`${requirementId}-S`));
+  return requirementScenarios.length > 0
+    && requirementScenarios.every((scenarioId) => references.has(scenarioId));
 }
 
 async function validateArtifactLinks(
@@ -244,6 +277,7 @@ async function validateEpic(repository, epicPath, repositoryRoot, artifactRoots,
   const { data: frontmatter, error } = parseFrontmatter(source);
   const epicId = frontmatter?.id ?? basename(dirname(epicPath));
   const context = epicContext(repository, epicId);
+  const isV2 = frontmatter?.schema === EPIC_V2_SCHEMA;
 
   if (error) {
     findings.push(finding("error", "INVALID_EPIC_FRONTMATTER", displayPath, `Cannot parse Epic frontmatter: ${error}`, context));
@@ -251,6 +285,23 @@ async function validateEpic(repository, epicPath, repositoryRoot, artifactRoots,
     const missing = EPIC_FRONTMATTER.filter((key) => !Object.hasOwn(frontmatter ?? {}, key));
     if (missing.length > 0) {
       findings.push(finding("error", "MISSING_EPIC_FRONTMATTER", displayPath, `Missing frontmatter keys: ${missing.join(", ")}.`, context));
+    }
+    if (!frontmatter?.schema) {
+      findings.push(finding(
+        "warning",
+        "LEGACY_EPIC_SCHEMA",
+        displayPath,
+        `Epic uses the legacy unversioned shape; normalize to ${EPIC_V2_SCHEMA} when materially editing it.`,
+        context,
+      ));
+    } else if (!isV2) {
+      findings.push(finding(
+        "error",
+        "UNKNOWN_EPIC_SCHEMA",
+        displayPath,
+        `Unsupported Epic schema: ${frontmatter.schema}.`,
+        context,
+      ));
     }
   }
 
@@ -293,8 +344,9 @@ async function validateEpic(repository, epicPath, repositoryRoot, artifactRoots,
       ));
     }
 
-    const metadataWindow = story.lines.slice(1, 14);
-    const missingMetadata = STORY_METADATA.filter((key) =>
+    const metadataWindow = story.lines.slice(1, 16);
+    const requiredMetadata = isV2 ? V2_STORY_METADATA : LEGACY_STORY_METADATA;
+    const missingMetadata = requiredMetadata.filter((key) =>
       !metadataWindow.some((line) => line.startsWith(key)));
     if (missingMetadata.length > 0) {
       findings.push(finding("error", "MISSING_STORY_METADATA", storyPath, `Missing Story metadata: ${missingMetadata.join(", ")}.`, context));
@@ -302,14 +354,37 @@ async function validateEpic(repository, epicPath, repositoryRoot, artifactRoots,
     const storyHeadings = new Set(
       story.lines.filter((line) => line.startsWith("#### ")).map((line) => line.slice(5).trim()),
     );
-    const missingStorySections = STORY_SECTIONS.filter((heading) => !storyHeadings.has(heading));
+    const requiredStorySections = isV2 ? V2_STORY_SECTIONS : LEGACY_STORY_SECTIONS;
+    const missingStorySections = requiredStorySections.filter((heading) => !storyHeadings.has(heading));
     if (missingStorySections.length > 0) {
       findings.push(finding("error", "MISSING_STORY_SECTION", storyPath, `Missing Story sections: ${missingStorySections.join(", ")}.`, context));
     }
+    if (isV2) {
+      const competingTraceabilityHeadings = story.lines
+        .flatMap((line) => {
+          const match = line.match(/^####\s+(.+)$/);
+          return match ? [match[1].trim()] : [];
+        })
+        .filter((heading) => !V2_STORY_SECTIONS.includes(heading))
+        .filter((heading) => (
+          /(?:implementation|verification).*(?:map|evidence)/i.test(heading)
+          || /(?:map|evidence).*(?:implementation|verification)/i.test(heading)
+        ));
+      for (const heading of competingTraceabilityHeadings) {
+        findings.push(finding(
+          "error",
+          "COMPETING_TRACEABILITY_SECTION",
+          storyPath,
+          `Story traceability must have one canonical Implemented By map and one canonical Verified By map; consolidate competing section: ${heading}.`,
+          context,
+        ));
+      }
+    }
 
     const implemented = sectionLines(story.lines, "Implemented By");
-    if (firstTableHeader(implemented) !== IMPLEMENTED_HEADER) {
-      findings.push(finding("error", "INVALID_IMPLEMENTED_BY_TABLE", storyPath, `Implemented By must use ${IMPLEMENTED_HEADER}.`, context));
+    const implementedHeader = isV2 ? V2_IMPLEMENTED_HEADER : LEGACY_IMPLEMENTED_HEADER;
+    if (firstTableHeader(implemented) !== implementedHeader) {
+      findings.push(finding("error", "INVALID_IMPLEMENTED_BY_TABLE", storyPath, `Implemented By must use ${implementedHeader}.`, context));
     }
     const verified = sectionLines(story.lines, "Verified By");
     if (firstTableHeader(verified) !== VERIFIED_HEADER) {
@@ -324,6 +399,28 @@ async function validateEpic(repository, epicPath, repositoryRoot, artifactRoots,
       const match = line.match(/^###### Scenario (R\d+-S\d+):\s+.+$/);
       return match ? [match[1]] : [];
     });
+    if (isV2 && requirementIds.length === 0) {
+      findings.push(finding(
+        "error",
+        "MISSING_STORY_REQUIREMENTS",
+        storyPath,
+        `Story ${story.label} must declare at least one Requirement.`,
+        context,
+      ));
+    }
+    if (isV2) {
+      for (const requirementId of requirementIds) {
+        if (!scenarioIds.some((scenarioId) => scenarioId.startsWith(`${requirementId}-S`))) {
+          findings.push(finding(
+            "error",
+            "MISSING_REQUIREMENT_SCENARIOS",
+            storyPath,
+            `Requirement ${story.label}/${requirementId} must declare at least one Scenario.`,
+            context,
+          ));
+        }
+      }
+    }
     for (const line of story.lines.filter((entry) => entry.startsWith("##### Requirement "))) {
       if (!/^##### Requirement R\d+:\s+.+$/.test(line)) {
         findings.push(finding("error", "INVALID_REQUIREMENT_ID", storyPath, `Malformed Requirement heading: ${line}.`, context));
@@ -350,65 +447,319 @@ async function validateEpic(repository, epicPath, repositoryRoot, artifactRoots,
       }
     }
     const knownEvidenceIds = new Set([...requirementIds, ...scenarioIds]);
-    for (const row of tableRows(verified)) {
-      const reference = row[0] ?? "";
-      const evidence = row[1] ?? "";
-      const ids = [...reference.matchAll(/(?:^|\/)R\d+(?:-S\d+)?/g)]
-        .map((match) => match[0].replace(/^\//, ""));
-      if (ids.length === 0) {
-        findings.push(finding("error", "INVALID_EVIDENCE_REFERENCE", storyPath, `Verified By row has no Requirement or Scenario reference: ${reference || "(empty)"}.`, context));
-      } else {
-        for (const id of ids) {
-          if (!knownEvidenceIds.has(id)) {
-            findings.push(finding("error", "BROKEN_EVIDENCE_REFERENCE", storyPath, `Verified By references unknown ${story.label}/${id}.`, context));
-          }
-        }
-      }
-      const automatedTestPaths = automatedEvidenceTestPaths(evidence);
-      if (automatedTestPaths?.length === 0) {
+    const implementedReferences = new Set();
+    const primaryImplementedReferences = new Set();
+    const implementationGapReferences = new Set();
+    if (isV2) {
+      const implementationState = metadataValue(story.lines, "Implementation");
+      const verificationState = metadataValue(story.lines, "Verification");
+      if (implementationState && !IMPLEMENTATION_STATES.includes(implementationState)) {
         findings.push(finding(
-          "warning",
-          "GENERIC_AUTOMATED_EVIDENCE",
+          "error",
+          "INVALID_STORY_IMPLEMENTATION_STATE",
           storyPath,
-          `Verified By automated evidence for ${reference || "(unmapped)"} must name a concrete repository-relative test path: ${evidence || "(empty)"}.`,
+          `Implementation must be one of: ${IMPLEMENTATION_STATES.join(", ")}.`,
           context,
         ));
       }
-      for (const testPath of automatedTestPaths ?? []) {
-        const absoluteTestPath = resolve(repositoryRoot, testPath.replace(/^\.\//, ""));
-        const relativeTestPath = normalizePath(relative(repositoryRoot, absoluteTestPath));
-        if (relativeTestPath.startsWith("../") || !(await pathExists(absoluteTestPath))) {
+      if (verificationState && !VERIFICATION_STATES.includes(verificationState)) {
+        findings.push(finding(
+          "error",
+          "INVALID_STORY_VERIFICATION_STATE",
+          storyPath,
+          `Verification must be one of: ${VERIFICATION_STATES.join(", ")}.`,
+          context,
+        ));
+      }
+
+      for (const row of tableRows(implemented)) {
+        const reference = row[0] ?? "";
+        const location = row[1] ?? "";
+        const kind = (row[2] ?? "").toLowerCase();
+        const references = behaviorReferences(reference);
+        let rowUsable = true;
+        if (references.length === 0) {
+          rowUsable = false;
           findings.push(finding(
-            "warning",
-            "MISSING_AUTOMATED_EVIDENCE_PATH",
+            "error",
+            "INVALID_IMPLEMENTATION_REFERENCE",
             storyPath,
-            `Verified By automated test path for ${reference || "(unmapped)"} does not exist in the repository: ${testPath}.`,
+            `Implemented By row has no Requirement or Scenario reference: ${reference || "(empty)"}.`,
             context,
           ));
         }
+        for (const item of references) {
+          if (item.story !== story.label || !knownEvidenceIds.has(item.behavior)) {
+            rowUsable = false;
+            findings.push(finding(
+              "error",
+              "BROKEN_IMPLEMENTATION_REFERENCE",
+              storyPath,
+              `Implemented By references unknown ${item.story}/${item.behavior}.`,
+              context,
+            ));
+          }
+        }
+        if (!IMPLEMENTATION_KINDS.includes(kind)) {
+          rowUsable = false;
+          findings.push(finding(
+            "error",
+            "INVALID_IMPLEMENTATION_KIND",
+            storyPath,
+            `Implemented By kind must be one of: ${IMPLEMENTATION_KINDS.join(", ")}.`,
+            context,
+          ));
+        }
+        const locations = implementationLocationPaths(location);
+        if (locations.length === 0 && !/not implemented yet/i.test(location)) {
+          rowUsable = false;
+          findings.push(finding(
+            "error",
+            "MISSING_IMPLEMENTATION_LOCATION",
+            storyPath,
+            `Implemented By must name a repository-relative location or say Not implemented yet: ${reference || "(unmapped)"}.`,
+            context,
+          ));
+        }
+        for (const locationPath of locations) {
+          if (isAbsolute(locationPath.path) || locationPath.path.startsWith("../") || /\s/.test(locationPath.path)) {
+            rowUsable = false;
+            findings.push(finding(
+              "error",
+              "INVALID_IMPLEMENTATION_PATH",
+              storyPath,
+              `Implemented By path must be repository-relative: ${locationPath.raw}.`,
+              context,
+            ));
+            continue;
+          }
+          const absoluteImplementationPath = resolve(repositoryRoot, locationPath.path);
+          const relativeImplementationPath = normalizePath(relative(repositoryRoot, absoluteImplementationPath));
+          const physicallyContained = !relativeImplementationPath.startsWith("../")
+            && await isPathPhysicallyInside(repositoryRoot, absoluteImplementationPath);
+          if (!physicallyContained) {
+            rowUsable = false;
+            findings.push(finding(
+              "error",
+              "IMPLEMENTATION_PATH_OUTSIDE_REPOSITORY",
+              storyPath,
+              `Implemented By path resolves outside the repository: ${locationPath.path}.`,
+              context,
+            ));
+          } else if (!(await pathExists(absoluteImplementationPath))) {
+            rowUsable = false;
+            findings.push(finding(
+              "error",
+              "MISSING_IMPLEMENTATION_PATH",
+              storyPath,
+              `Implemented By path does not exist in the repository: ${locationPath.path}.`,
+              context,
+            ));
+          } else if (!locationPath.anchor) {
+            rowUsable = false;
+            findings.push(finding(
+              "error",
+              "MISSING_IMPLEMENTATION_ANCHOR",
+              storyPath,
+              `Implementation for ${reference || "(unmapped)"} must name a stable symbol or searchable anchor after #: ${locationPath.path}.`,
+              context,
+            ));
+          } else {
+            const implementationSource = await readRegularText(absoluteImplementationPath);
+            if (implementationSource.error) {
+              rowUsable = false;
+              findings.push(finding(
+                "error",
+                "INVALID_IMPLEMENTATION_PATH",
+                storyPath,
+                `Implemented By path is not a readable regular file: ${locationPath.path} (${implementationSource.error}).`,
+                context,
+              ));
+            } else if (!implementationSource.source.includes(locationPath.anchor)) {
+              rowUsable = false;
+              findings.push(finding(
+                "error",
+                "MISSING_IMPLEMENTATION_ANCHOR",
+                storyPath,
+                `Implemented By anchor was not found in ${locationPath.path}: ${locationPath.anchor}.`,
+                context,
+              ));
+            }
+          }
+        }
+        if (locations.length > 0 && rowUsable) {
+          for (const item of references) {
+            implementedReferences.add(item.behavior);
+            if (kind === "primary") primaryImplementedReferences.add(item.behavior);
+          }
+        }
+      }
+
+      const implementationGaps = sectionLines(story.lines, "Implementation Gaps");
+      for (const item of gapReferences(implementationGaps)) {
+        if (item.story !== story.label || !knownEvidenceIds.has(item.behavior)) {
+          findings.push(finding(
+            "error",
+            "BROKEN_IMPLEMENTATION_GAP_REFERENCE",
+            storyPath,
+            `Implementation Gaps references unknown ${item.story}/${item.behavior}.`,
+            context,
+          ));
+        } else {
+          implementationGapReferences.add(item.behavior);
+        }
+      }
+      for (const requirementId of requirementIds) {
+        const mapped = requirementCovered(requirementId, scenarioIds, implementedReferences);
+        const primaryMapped = requirementCovered(requirementId, scenarioIds, primaryImplementedReferences);
+        const gapped = requirementCovered(requirementId, scenarioIds, implementationGapReferences);
+        if (!mapped && !gapped) {
+          findings.push(finding(
+            "error",
+            "MISSING_IMPLEMENTATION_COVERAGE",
+            storyPath,
+            `Requirement ${story.label}/${requirementId} must have an Implemented By location or an Implementation Gap.`,
+            context,
+          ));
+        } else if (mapped && !primaryMapped) {
+          findings.push(finding(
+            "error",
+            "MISSING_PRIMARY_IMPLEMENTATION",
+            storyPath,
+            `Requirement ${story.label}/${requirementId} has implementation paths but no primary owner.`,
+            context,
+          ));
+        }
+      }
+      const hasImplementation = implementedReferences.size > 0;
+      const hasImplementationGaps = implementationGapReferences.size > 0;
+      const expectedImplementationState = hasImplementation
+        ? (hasImplementationGaps ? "partial" : "implemented")
+        : "not implemented";
+      if (implementationState && implementationState !== expectedImplementationState) {
+        findings.push(finding(
+          "error",
+          "STORY_IMPLEMENTATION_STATE_CONTRADICTION",
+          storyPath,
+          `Implementation is ${implementationState}, but the implementation map and gaps imply ${expectedImplementationState}.`,
+          context,
+        ));
+      }
+      if (requirementIds.length > 6 || scenarioIds.length > 12) {
+        findings.push(finding(
+          "warning",
+          "LARGE_STORY_SCOPE",
+          storyPath,
+          `Story has ${requirementIds.length} Requirements and ${scenarioIds.length} Scenarios; confirm it still represents one primary user path.`,
+          context,
+        ));
+      }
+    }
+
+    const passingEvidenceReferences = new Set();
+    const verifiedReferences = new Set();
+    for (const row of tableRows(verified)) {
+      const result = await validateVerifiedEvidenceRow({
+        row,
+        isV2,
+        storyLabel: story.label,
+        knownEvidenceIds,
+        storyPath,
+        context,
+        repositoryRoot,
+        createFinding: finding,
+      });
+      findings.push(...result.findings);
+      for (const behavior of result.verifiedBehaviors) verifiedReferences.add(behavior);
+      for (const behavior of result.passingBehaviors) passingEvidenceReferences.add(behavior);
+    }
+    if (isV2) {
+      const verificationGapReferences = new Set();
+      for (const item of gapReferences(sectionLines(story.lines, "Verification Gaps"))) {
+        if (item.story !== story.label || !knownEvidenceIds.has(item.behavior)) {
+          findings.push(finding(
+            "error",
+            "BROKEN_VERIFICATION_GAP_REFERENCE",
+            storyPath,
+            `Verification Gaps references unknown ${item.story}/${item.behavior}.`,
+            context,
+          ));
+        } else {
+          verificationGapReferences.add(item.behavior);
+        }
+      }
+      for (const scenarioId of scenarioIds) {
+        if (!verifiedReferences.has(scenarioId) && !verificationGapReferences.has(scenarioId)) {
+          findings.push(finding(
+            "error",
+            "MISSING_VERIFICATION_COVERAGE",
+            storyPath,
+            `Scenario ${story.label}/${scenarioId} must have Verified By evidence or a Verification Gap.`,
+            context,
+          ));
+        }
+      }
+      const verificationState = metadataValue(story.lines, "Verification");
+      const allScenariosPassing = scenarioIds.length > 0
+        && scenarioIds.every((scenarioId) => passingEvidenceReferences.has(scenarioId));
+      const expectedVerificationState = allScenariosPassing && verificationGapReferences.size === 0
+        ? "verified"
+        : passingEvidenceReferences.size > 0
+          ? "partial"
+          : "unverified";
+      if (verificationState && verificationState !== expectedVerificationState) {
+        findings.push(finding(
+          "error",
+          "STORY_VERIFICATION_STATE_CONTRADICTION",
+          storyPath,
+          `Verification is ${verificationState}, but the evidence map and gaps imply ${expectedVerificationState}.`,
+          context,
+        ));
       }
     }
   }
 
   const declaredStories = Array.isArray(frontmatter?.stories) ? frontmatter.stories.map(String) : [];
   const actualStories = stories.map((story) => story.label);
-  if (declaredStories.length > 0 && (
-    declaredStories.length !== actualStories.length
-    || declaredStories.some((label) => !actualStories.includes(label))
-  )) {
+  if (isV2 && !orderedValuesEqual(declaredStories, actualStories)) {
     findings.push(finding("error", "EPIC_STORY_INDEX_DRIFT", displayPath, "Frontmatter stories do not match promoted Story sections.", context));
   }
   const storyIndex = headingSection(lines, 2, "Story Index");
-  if (firstTableHeader(storyIndex) !== STORY_INDEX_HEADER) {
-    findings.push(finding("error", "INVALID_STORY_INDEX_TABLE", displayPath, `Story Index must use ${STORY_INDEX_HEADER}.`, context));
+  const storyIndexHeader = isV2 ? V2_STORY_INDEX_HEADER : LEGACY_STORY_INDEX_HEADER;
+  if (firstTableHeader(storyIndex) !== storyIndexHeader) {
+    findings.push(finding("error", "INVALID_STORY_INDEX_TABLE", displayPath, `Story Index must use ${storyIndexHeader}.`, context));
   } else {
-    const indexedStories = tableRows(storyIndex).map((row) =>
+    const storyIndexRows = tableRows(storyIndex);
+    const indexedStories = storyIndexRows.map((row) =>
       (row[0] ?? "").replaceAll("`", "").trim());
-    if (
-      indexedStories.length !== actualStories.length
-      || indexedStories.some((label) => !actualStories.includes(label))
-    ) {
-      findings.push(finding("error", "EPIC_STORY_INDEX_DRIFT", displayPath, "Story Index rows do not match promoted Story sections.", context));
+    if (!orderedValuesEqual(indexedStories, actualStories)) {
+        findings.push(finding("error", "EPIC_STORY_INDEX_DRIFT", displayPath, "Story Index rows do not match promoted Story sections.", context));
+    }
+    if (isV2) {
+      for (const story of stories) {
+        const indexRow = storyIndexRows.find((row) =>
+          (row[0] ?? "").replaceAll("`", "").trim() === story.label);
+        if (!indexRow) continue;
+        const bodyImplementation = metadataValue(story.lines, "Implementation") ?? "";
+        const bodyVerification = metadataValue(story.lines, "Verification") ?? "";
+        const bodyLastVerified = metadataValue(story.lines, "Last verified") ?? "";
+        const indexImplementation = indexRow[1] ?? "";
+        const indexVerification = indexRow[2] ?? "";
+        const indexLastVerified = indexRow[4] ?? "";
+        if (
+          indexImplementation !== bodyImplementation
+          || indexVerification !== bodyVerification
+          || indexLastVerified !== bodyLastVerified
+        ) {
+          findings.push(finding(
+            "error",
+            "EPIC_STORY_INDEX_DRIFT",
+            displayPath,
+            `Story Index state for ${story.label} does not match its Story body.`,
+            context,
+          ));
+        }
+      }
     }
   }
   findings.push(...await validateArtifactLinks(
@@ -640,9 +991,16 @@ async function validateRepository(workspaceRoot, config, repository, { changeId,
   if (!changeId || affectedEpicDirectories.size > 0) {
     const epicRoot = join(repositoryPath, artifacts.epics);
     const availableEpicDirectories = await listDirectories(epicRoot);
+    const normalizedEpicId = epicId?.toLowerCase();
     const epicDirectories = changeId
       ? [...affectedEpicDirectories].filter((directory) => availableEpicDirectories.includes(directory))
-      : availableEpicDirectories;
+      : epicId
+        ? availableEpicDirectories.filter((directory) => {
+          const normalizedDirectory = directory.toLowerCase();
+          return normalizedDirectory === normalizedEpicId
+            || normalizedDirectory.startsWith(`${normalizedEpicId}-`);
+        })
+        : availableEpicDirectories;
     if (changeId) {
       for (const directory of affectedEpicDirectories) {
         if (availableEpicDirectories.includes(directory)) continue;

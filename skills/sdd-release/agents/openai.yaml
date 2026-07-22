@@ -1,4 +1,4 @@
 interface:
   display_name: "SDD Release"
   short_description: "Prepare SDD release handoffs"
-  default_prompt: "Use $sdd-release to run the project-defined release checks, update required release communication, and prepare the configured production handoff."
+  default_prompt: "Use $sdd-release to review the changelog, confirm version intent, run release gates, push the resolved source branch, and open the configured release PR."

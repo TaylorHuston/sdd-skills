@@ -21,8 +21,9 @@ The packaged skills follow the `.agents/` skill-folder convention and should be 
 ## Branch Policy
 
 - `main` is the stable release branch.
-- Use short-lived branches for scoped package work when branch work is requested.
-- Prefer `change/<short-slug>` for planned package behavior changes, `fix/<short-slug>` for defects, and `misc/<short-slug>` for docs, chores, tooling, and low-risk maintenance.
+- `develop` is the active integration and day-to-day development branch.
+- Work directly on `develop` by default. Do not create routine `change/*`, `fix/*`, or `misc/*` branches unless the user explicitly requests an isolated branch for exceptional work.
+- Release through a pull request from `develop` into `main`; do not use `main` for ordinary package development.
 - Do not commit, push, amend, rebase, tag, publish, or open PRs unless the user explicitly asks in the current conversation.
 - Inspect `git status` before editing, staging, committing, publishing, or release work. Keep unrelated dirty files out of the change.
 

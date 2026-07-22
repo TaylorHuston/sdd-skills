@@ -1,4 +1,4 @@
-import { readFile, readdir, rm } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, rm } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 
 import { BUNDLED_SKILLS_DIRECTORY, PACKAGE_JSON_PATH } from "./constants.js";
@@ -8,6 +8,7 @@ import {
   hashDirectory,
   isDirectory,
   isPathInside,
+  isPathPhysicallyInside,
   pathExists,
   readJson,
   replaceDirectoryAtomically,
@@ -40,9 +41,9 @@ export async function readInstallLock(workspaceRoot) {
   }
 }
 
-function assertSkillDirectoryInsideWorkspace(workspaceRoot, configuredDirectory) {
+async function assertSkillDirectoryInsideWorkspace(workspaceRoot, configuredDirectory) {
   const target = resolveWorkspacePath(workspaceRoot, configuredDirectory);
-  if (!isPathInside(workspaceRoot, target)) {
+  if (!isPathInside(workspaceRoot, target) || !(await isPathPhysicallyInside(workspaceRoot, target))) {
     throw new SddError(
       `Skill directory ${configuredDirectory} resolves outside the configured user or legacy workspace root.`,
       { code: "UNSAFE_SKILL_DIRECTORY" },
@@ -52,7 +53,7 @@ function assertSkillDirectoryInsideWorkspace(workspaceRoot, configuredDirectory)
 }
 
 export async function planSkillSync(workspaceRoot, config, { force = false } = {}) {
-  const skillsDirectory = assertSkillDirectoryInsideWorkspace(
+  const skillsDirectory = await assertSkillDirectoryInsideWorkspace(
     workspaceRoot,
     config.skills.directory,
   );
@@ -131,18 +132,117 @@ export async function planSkillSync(workspaceRoot, config, { force = false } = {
   };
 }
 
-export async function applySkillSync(workspaceRoot, plan, { dryRun = false } = {}) {
-  if (!dryRun) {
-    for (const entry of plan.actions) {
-      if (["install", "update", "update-forced", "replace-forced"].includes(entry.action)) {
-        await replaceDirectoryAtomically(entry.source, entry.target);
-      } else if (["remove", "remove-forced"].includes(entry.action)) {
-        await rm(entry.target, { recursive: true, force: true });
+export async function applySkillSync(
+  workspaceRoot,
+  plan,
+  { dryRun = false, replaceDirectory = replaceDirectoryAtomically } = {},
+) {
+  const mutatingActions = new Set([
+    "install",
+    "update",
+    "update-forced",
+    "replace-forced",
+    "remove",
+    "remove-forced",
+  ]);
+  const candidates = plan.actions.filter((entry) => mutatingActions.has(entry.action));
+  const nonce = `${process.pid}-${Date.now()}`;
+  const backupRoot = join(plan.skillsDirectory, `.sdd-sync-backup-${nonce}`);
+  const snapshots = [];
+  const applied = [];
+
+  const rollback = async (originalError = null) => {
+    const failures = [];
+    for (const snapshot of [...applied].reverse()) {
+      try {
+        const currentExists = await isDirectory(snapshot.entry.target);
+        const expectedHash = snapshot.entry.sourceHash;
+        const currentHash = currentExists ? await hashDirectory(snapshot.entry.target) : null;
+        if (currentHash === snapshot.entry.targetHash) continue;
+        if (currentExists && expectedHash && currentHash !== expectedHash) {
+          failures.push(`${snapshot.entry.skillName}: newer target content preserved.`);
+          continue;
+        }
+        if (currentExists && !expectedHash) {
+          failures.push(`${snapshot.entry.skillName}: unexpected target content preserved.`);
+          continue;
+        }
+        if (snapshot.existed) {
+          await replaceDirectoryAtomically(snapshot.backupPath, snapshot.entry.target);
+        } else {
+          await rm(snapshot.entry.target, { recursive: true, force: true });
+        }
+      } catch (error) {
+        failures.push(`${snapshot.entry.skillName}: ${error.message}`);
       }
+    }
+    if (failures.length > 0) {
+      throw new SddError("Managed skill update failed and recovery was incomplete.", {
+        code: "MUTATION_RECOVERY_FAILED",
+        details: [
+          ...(originalError ? [`Original error: ${originalError.message}`] : []),
+          ...failures,
+          `Recovery snapshots: ${backupRoot}`,
+        ],
+      });
+    }
+    await rm(backupRoot, { recursive: true, force: true });
+  };
+
+  if (!dryRun) {
+    for (const entry of candidates) {
+      if (!(await isPathPhysicallyInside(workspaceRoot, entry.target))) {
+        throw new SddError(
+          `Managed skill target resolves outside the configured user or legacy workspace root: ${entry.target}`,
+          { code: "UNSAFE_SKILL_DIRECTORY" },
+        );
+      }
+      const currentExists = await isDirectory(entry.target);
+      const currentHash = currentExists ? await hashDirectory(entry.target) : null;
+      if (currentHash !== entry.targetHash) {
+        throw new SddError(
+          `Managed skill changed after update planning: ${entry.skillName}`,
+          { code: "SKILL_CONFLICT" },
+        );
+      }
+    }
+    if (candidates.length > 0) await mkdir(backupRoot, { recursive: true });
+    for (const entry of candidates) {
+      const existed = await isDirectory(entry.target);
+      const backupPath = join(backupRoot, entry.skillName);
+      if (existed) await cp(entry.target, backupPath, { recursive: true, verbatimSymlinks: true });
+      snapshots.push({ entry, existed, backupPath });
+    }
+    try {
+      for (const snapshot of snapshots) {
+        const { entry } = snapshot;
+        try {
+          const currentExists = await isDirectory(entry.target);
+          const currentHash = currentExists ? await hashDirectory(entry.target) : null;
+          if (currentHash !== entry.targetHash) {
+            throw new SddError(
+              `Managed skill changed immediately before update: ${entry.skillName}`,
+              { code: "SKILL_CONFLICT" },
+            );
+          }
+          applied.push(snapshot);
+          if (["install", "update", "update-forced", "replace-forced"].includes(entry.action)) {
+            await replaceDirectory(entry.source, entry.target, { expectedHash: entry.targetHash });
+          } else if (["remove", "remove-forced"].includes(entry.action)) {
+            await rm(entry.target, { recursive: true, force: true });
+          }
+        } catch (error) {
+          throw error;
+        }
+      }
+      await verifySkillSyncPlan(plan);
+    } catch (error) {
+      await rollback(error);
+      throw error;
     }
   }
 
-  return {
+  const result = {
     skillsDirectory: plan.skillsDirectory,
     actions: plan.actions.map(({ skillName, action, sourceHash }) => ({
       skillName,
@@ -150,6 +250,31 @@ export async function applySkillSync(workspaceRoot, plan, { dryRun = false } = {
       hash: sourceHash,
     })),
   };
+  Object.defineProperties(result, {
+    rollback: { value: rollback, enumerable: false },
+    finalize: {
+      value: () => rm(backupRoot, { recursive: true, force: true }),
+      enumerable: false,
+    },
+    verify: {
+      value: () => verifySkillSyncPlan(plan),
+      enumerable: false,
+    },
+  });
+  return result;
+}
+
+async function verifySkillSyncPlan(plan) {
+  for (const entry of plan.actions) {
+    const currentExists = await isDirectory(entry.target);
+    const expectedHash = entry.sourceHash;
+    const currentHash = currentExists ? await hashDirectory(entry.target) : null;
+    if (currentHash !== expectedHash) {
+      throw new SddError(`Managed skill changed before installation lock commit: ${entry.skillName}`, {
+        code: "SKILL_CONFLICT",
+      });
+    }
+  }
 }
 
 export async function inspectSkillInstallation(workspaceRoot, config) {

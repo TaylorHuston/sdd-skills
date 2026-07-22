@@ -78,10 +78,10 @@ Use existing artifacts when the session continues an active change. Keep `tasks.
    - Record only concrete consequences that changed implementation, verification, artifacts, or stop conditions; do not maintain a skills-considered inventory.
    - Validate important subagent claims before updating durable truth or committing.
 8. Reconcile durable truth.
-   - Update affected Epic `Implemented By`, `Verified By`, and `Verification Gaps` when implementation or verification reality changes.
+   - Update affected Epic `Implementation`, behavior-mapped `Implemented By`, `Implementation Gaps`, `Verification`, scenario-mapped `Verified By`, and `Verification Gaps` when implementation or verification reality changes. Every implemented Requirement needs a concrete repository-relative primary code location and stable symbol or searchable anchor.
    - Keep Epic `Verified By` as a scenario-mapped evidence index. Record chronological command output in `tasks.md` instead; broad gates are supporting evidence unless mapped to named behavior.
    - Distinguish evidence types where useful: focused automated tests, broad supporting gates, deterministic E2E, live-provider playtests, manual UI confirmation, and debug/log inspection.
-   - Search affected Epic Stories for older Requirements, Scenarios, `Verified By`, or `Verification Gaps` this quick change supersedes, and reconcile them before claiming completion.
+   - Search affected Epic Stories for older Requirements, Scenarios, implementation/verification state, `Implemented By`, `Implementation Gaps`, `Verified By`, or `Verification Gaps` this quick change supersedes, and reconcile them before claiming completion.
    - Keep Story labels or documented legacy Story IDs stable. Preserve local Requirement and Scenario IDs when editing existing truth; add new IDs only for genuinely new behavior.
    - Keep `S#` Story labels unique within each Epic, full Story references traceable, and legacy app-wide Story IDs unique across active Epics in the app. Stop on duplicates unless the session is explicitly resolving the duplicate.
    - Update the project-defined release communication when project policy requires it.

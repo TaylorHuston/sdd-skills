@@ -1,6 +1,6 @@
 ---
 name: sdd-release
-description: Prepare a SDD application release handoff to the project-defined production target. Use when the user invokes /sdd-release, asks to release, promote, cut a release, run release checks, prepare required release communication or version metadata, or open the policy-defined production PR or equivalent handoff. Runs branch-policy and dirty-state preflight, verifies SDD review/readiness and closeout consistency, follows project-local release gates and release-record conventions, commits authorized release metadata, and opens or prepares the configured handoff. Does not merge, deploy, tag, publish, or mutate production state without explicit authorization.
+description: Prepare a SDD application release handoff to the project-defined production target. Use when the user invokes /sdd-release, asks to release, promote, cut a release, run release checks, review a changelog, prepare required release communication or version metadata, suggest a version increment, or open the policy-defined production PR or equivalent handoff. Runs branch-policy and dirty-state preflight, verifies SDD review/readiness and closeout consistency, reviews current changelog contents, confirms version-update intent with the user, follows project-local release gates and release-record conventions, commits authorized release metadata, and opens the configured handoff. Default/full invocation grants scoped authorization for one normal push of the resolved source branch and creation of the configured release PR after all gates pass. Does not force-push, push the production target directly, merge, deploy, tag, publish, or mutate production state without separate explicit authorization.
 ---
 
 # SDD Release
@@ -19,14 +19,16 @@ After `/sdd-release` opens a PR, use `/sdd-pr` for ongoing PR stewardship: check
 
 ## Modes
 
-- Default: run release preflight, run the project-defined release gate, update required release artifacts, commit authorized release metadata, and perform the configured handoff.
+- Default: run release preflight, run the project-defined release gate, update and commit required release artifacts, make one normal push of the resolved source branch, and create the configured release PR or equivalent non-production handoff after all gates pass.
 - `--check`: run preflight and release checks only. Do not edit, commit, push, or open a PR.
 - `--no-pr`: run release checks and update release artifacts, but stop before pushing or opening a PR.
 - `--no-commit`: keep `CHANGELOG.md` and related release artifacts unstaged; report a commit candidate.
 - `--target <branch>`: override the target resolved from project policy.
 - `--source <branch>`: override source branch. Default to the current branch when it is allowed by project branch policy.
 
-Push, PR creation, tags, merge, deployment, package publish, production migrations, destructive data operations, and release announcements require explicit user authorization through the request or mode. A request to open a PR authorizes the push required to create that PR, but not merge or deploy.
+A default or explicit full `/sdd-release` invocation, or an unqualified request to release, promote, or cut a release, is explicit scoped authorization for policy-compliant release-metadata commits, one non-force push of the resolved source branch to its configured remote, and creation of the configured release PR or equivalent handoff once release, acceptance, and version-decision gates pass. This workflow authorization satisfies a project rule requiring user authorization for the ordinary source push and PR unless project-local policy explicitly requires a separate just-in-time confirmation. Do not ask again merely because the source branch has not been pushed yet.
+
+`--check`, `--no-pr`, an explicitly checks-only request, an explicit no-push/no-PR instruction, or stricter project-local policy removes that handoff authorization. Default authorization never permits a force-push, pushing a different branch or the production target directly, merge, tag, deployment, package publish, production migration, destructive data operation, release announcement, or branch deletion. Those actions require separate explicit authorization.
 
 ## Required Context
 
@@ -36,7 +38,7 @@ Before release work, read:
 - parent/workspace guidance when the project points to it
 - root `README.md`, package scripts, test docs, deployment docs, and CI docs when present
 - remote review, branch-protection, or release-provider configuration when present
-- the project-defined changelog, release notes, version metadata, or release manifest when required
+- the repository `CHANGELOG.md` when present, plus the project-defined changelog, release notes, version metadata, or release manifest when different or otherwise required
 - active and recently completed `docs/changes/**/{proposal.md,design.md,tasks.md,review.md}` relevant to the release
 - `docs/epics/*/epic.md` when release notes, changelog entries, or readiness depend on Epic truth
 - project PRD/Product Brief when product scope changed or release contents are ambiguous
@@ -73,22 +75,32 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
    - If no project-local release guidance exists and no meaningful local release gate can be identified, stop or explicitly record why release confidence cannot be established.
    - If project-local release guidance exists and says e2e or browser/provider checks are optional or not yet part of the required gate, do not stop solely because no e2e command exists; report the skipped optional gate and its documented reason.
    - If any required release check fails, stop before release-artifact edits unless the failure is caused by stale release metadata and project policy permits fixing it first.
-4. Prepare release communication and version metadata.
-   - Follow the project's configured release-record and versioning policy. Do not impose a changelog format or version scheme when none is configured.
-   - Use an explicit user-provided version first, then project-owned version tooling or documented inference rules. Stop when the version is ambiguous; do not invent a scheme.
+4. Review the changelog and confirm version intent.
+   - Read the complete unreleased section and the latest released entry in `CHANGELOG.md` when present. Compare them with the source-vs-target diff, release-relevant SDD Changes, and the project's configured release record so omissions, duplicate claims, stale entries, internal bookkeeping, and unverified claims are visible before release metadata changes.
+   - Resolve the current version and the project's versioning policy from manifests, version files, documented tooling, release records, and tags as project policy permits. Do not infer a scheme the project has not adopted.
+   - Suggest the next version under the configured policy. For Semantic Versioning, normally suggest `major` for breaking public behavior or compatibility requirements, `minor` for backward-compatible user-facing capabilities, and `patch` for backward-compatible fixes, security hardening, or public operational/documentation corrections. Account for explicit pre-1.0 or project-specific rules. If the changelog contains no version-worthy public change, recommend no bump instead of manufacturing one.
+   - Present the current version, suggested next version and increment class, concise changelog summary, rationale, and any ambiguity. Then explicitly ask whether the user wants this release to be a version update before changing a version, converting an unreleased section into a released version, planning a tag/package release, or describing the handoff as versioned.
+   - Offer the suggested version, a different version, or no version update when project policy permits. An explicit version supplied by the user, or an explicit instruction to release as that version, already satisfies this confirmation; a general request to run `/sdd-release` does not.
+   - In `--check`, do not pause for confirmation or mutate artifacts. Report the recommendation, whether a version update appears appropriate, and the confirmation that a later non-check run would require.
+   - If no changelog exists, record that fact and follow the configured release-record policy. Do not create a changelog or invent versioning merely to satisfy this workflow.
+5. Prepare release communication and version metadata.
+   - Follow the project's configured release-record and the user's confirmed version decision. Do not impose a changelog format or version scheme when none is configured.
+   - Use the confirmed user-provided or user-approved version, then apply project-owned version tooling or documented rules. Stop when the chosen version is incompatible with project policy or required version metadata remains ambiguous.
    - Update the configured manifest, lockfile, changelog, release note, changeset, tag plan, or equivalent artifacts together when project policy requires them.
    - When the project uses Keep a Changelog, apply that format through `assets/changelog-template.md`; otherwise preserve the project's native structure.
    - Keep public release communication user-facing and public-safe. Exclude private planning context, SDD ledger detail, secrets, internal task IDs, speculative roadmap promises, and implementation bookkeeping unless project policy explicitly requires technical release notes.
    - Verify release communication matches the SDD changes intended for this release and does not claim unverified behavior.
-5. Rerun release checks affected by release-artifact edits.
+6. Rerun release checks affected by release-artifact edits.
    - At minimum, rerun any release-record or documentation validation if present.
    - Rerun full e2e only when release-artifact edits can affect runtime, build, packaged assets, or the project policy requires it after any commit.
-6. Commit release metadata when allowed.
+7. Commit release metadata when allowed.
    - Stage only the explicit release artifacts resolved from project policy.
    - Use a concise commit message such as `Prepare release notes`.
    - Skip committing in `--check` and `--no-commit`.
-7. Open the release PR.
-   - Push the source branch only when PR creation is authorized.
+8. Open the release PR.
+   - In default/full mode, treat the invoked workflow as authorization to push the resolved source branch normally and create the configured release PR. Do not pause for a second authorization after the version decision and release gates are complete unless project-local policy explicitly requires it.
+   - Immediately before pushing, confirm the current source `HEAD` is the exact reconciled release candidate, required post-metadata checks passed against it, the worktree contains no intended uncommitted release work, the remote and upstream are the resolved ones, and the push is non-force. Stop on drift instead of pushing a different candidate.
+   - Push only the resolved source branch; never use this authorization to push the production target, another branch, tags, or rewritten history.
    - Open or prepare the project-defined release handoff using the configured provider and available tools.
    - Use `assets/release-pr-template.md` for the PR body.
    - Include release scope, release-communication summary, SDD reviews checked, the exact reviewed source commit, the initial reconciled PR head, post-review change classifications or `none`, commands run, relevant end-to-end results, security/data notes, manual acceptance notes, and known risks.
@@ -96,11 +108,11 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
    - Record remote AI-assisted review as `triggered`, `not configured`, `unavailable`, or `not checked`; do not block PR creation solely because an optional remote review has not completed.
    - End new PR creation with a handoff to `/sdd-pr` for later review-thread and status-check stewardship after CI, bots, or humans have had time to respond.
    - Do not merge the PR unless the user explicitly asked for release merge and branch policy allows it.
-8. Update SDD artifacts when appropriate.
+9. Update SDD artifacts when appropriate.
    - If release readiness changes active `tasks.md` closeout state, update its machine-readable status consistently, using only `proposed`, `planned`, `in_progress`, or `in_review`, and only when the release clearly owns that change and the update is safe.
    - Do not close change folders unless the user explicitly asks or the release workflow is authorized to close completed changes.
    - When closeout is authorized and every release-owned contextual gate passes, use `sdd change close <space-id> <change-id> --repo <resolved-repository-path> --workspace <workspace-root>` instead of moving the folder manually. Do not treat the CLI preflight as a substitute for release or merge readiness.
-9. Report release state.
+10. Report release state.
 
 ## Recommended Gates
 
@@ -126,6 +138,8 @@ Scale to the app. A small static app may only have build. A local MVP may intent
 - Treat the project-defined release record as public communication unless local guidance says it is private.
 - Do not reuse an already released version or release identifier for new content.
 - Do not infer a versioning scheme that the project has not adopted.
+- Review unreleased changelog content against the actual release scope before recommending a version.
+- Do not convert unreleased content into a numbered release or modify version metadata until the user confirms the version-update decision.
 - Include only the content required by project policy, and keep every behavior claim aligned with current Epic truth and evidence.
 - If there are no public-facing changes, say so in the configured handoff instead of fabricating release notes.
 
@@ -144,8 +158,9 @@ Stop and report when:
 - release-relevant SDD closeout state is contradictory, duplicate Story labels/references make Epic traceability unreliable, or conflicting legacy app-wide Story IDs are unresolved.
 - a required release record is missing and the user or project policy has not authorized creating one.
 - release communication or version metadata requires an unresolved product or release decision.
+- the version-update decision or exact version remains unconfirmed after the changelog review and the next action would mutate versioned release artifacts or describe the handoff as a versioned release.
 - release requires secrets, production data, migrations, deploys, tags, package publishing, or external service changes not explicitly authorized.
-- push or PR creation is not authorized by the request or mode.
+- the request is checks-only, `--no-pr`, explicitly forbids push/PR creation, or project-local policy explicitly requires separate confirmation for the ordinary source push or PR.
 
 ## Final Response
 
@@ -158,6 +173,7 @@ Include:
 - PR URL when created
 - release checks run and results, with full e2e called out
 - release-communication action taken
+- changelog review summary, current version, suggested increment and version, user-confirmed version decision, and rationale
 - release commit hash or commit candidate
 - SDD review/readiness status
 - manual confirmation status and whether acceptance permits the configured handoff and any later merge, deployment, or closeout

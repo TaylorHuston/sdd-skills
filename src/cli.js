@@ -30,7 +30,7 @@ Usage:
   sdd init [path] [options]       Initialize one repository
   sdd configure [path] [options]  Repair configured user topology paths
   sdd update [path] [options]     Update user skills or a legacy installation
-  sdd doctor [path] [--json]      Validate SDD installation, topology, repository, and Changes
+  sdd doctor [path] [--json]      Validate SDD installation, topology, guidance, repository, and Changes
   sdd context [path] [--json]     Resolve the current planning/repository context
   sdd status [space-id] [options] List Space status or show one Space in detail
   sdd validate [space-id] [options] Validate SDD artifact structure and references

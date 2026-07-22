@@ -131,3 +131,88 @@ test("orphan audit supports Epic and changed-surface scopes", async (t) => {
   assert.equal(report.scope.changed_from, "HEAD");
   assert.deepEqual(report.source_without_implemented_by, ["src/changed.ts"]);
 });
+
+test("orphan audit preserves primary and supporting implementation ownership", async (t) => {
+  const root = await createRepository();
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  await write(root, "src/core.ts");
+  await write(root, "src/adapter.ts");
+  await write(
+    root,
+    "docs/epics/app-e001-core/epic.md",
+    [
+      "---",
+      "id: APP-E001",
+      "---",
+      "# APP-E001",
+      "",
+      "#### Implemented By",
+      "",
+      "| Requirement / Scenario | Location / Anchor | Kind | Responsibility |",
+      "|---|---|---|---|",
+      "| S1/R1 | `src/core.ts#runCore` | primary | Owns behavior. |",
+      "| S1/R1 | `src/adapter.ts#handleCore` | adapter | Delivers behavior. |",
+      "",
+      "#### Verified By",
+      "",
+    ].join("\n"),
+  );
+  await git(root, "add", ".");
+  await git(root, "commit", "-m", "fixture");
+
+  const report = await audit(root);
+
+  assert.deepEqual(report.implementation_ownership, {
+    "src/adapter.ts": {
+      epics: ["docs/epics/app-e001-core/epic.md"],
+      kinds: ["adapter"],
+    },
+    "src/core.ts": {
+      epics: ["docs/epics/app-e001-core/epic.md"],
+      kinds: ["primary"],
+    },
+  });
+  assert.equal(report.counts.primary_implemented_refs, 1);
+});
+
+test("orphan audit parses canonical test anchors and ignores prose filenames", async (t) => {
+  const root = await createRepository();
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  await write(root, "src/core.ts");
+  await write(root, "test/core.test.ts");
+  await write(root, "tasks.md", "supporting prose only\n");
+  await write(
+    root,
+    "docs/epics/app-e001-core/epic.md",
+    [
+      "---",
+      "id: APP-E001",
+      "---",
+      "# APP-E001",
+      "",
+      "#### Implemented By",
+      "",
+      "| Requirement / Scenario | Location / Anchor | Kind | Responsibility |",
+      "|---|---|---|---|",
+      "| S1/R1 | `src/core.ts#runCore` | primary | Owns behavior described in tasks.md. |",
+      "",
+      "#### Verified By",
+      "",
+      "| Requirement / Scenario | Evidence | Proves | Status |",
+      "|---|---|---|---|",
+      "| S1/R1-S1 | Automated test `test/core.test.ts#runs the core journey` | Confirms tasks.md behavior. | Passing |",
+      "",
+    ].join("\n"),
+  );
+  await git(root, "add", ".");
+  await git(root, "commit", "-m", "fixture");
+
+  const report = await audit(root);
+
+  assert.deepEqual(report.missing_implemented_refs, {});
+  assert.deepEqual(report.missing_verified_refs, {});
+  assert.deepEqual(report.tests_without_verified_by, []);
+  assert.equal(report.counts.verified_refs, 1);
+});

@@ -4,7 +4,11 @@
 
 - Source branch:
 - Target branch:
-- Release version/date:
+- Changelog reviewed:
+- Version decision: version update / no version update
+- Current version:
+- Suggested version and increment:
+- User-confirmed release version/date:
 - Included SDD changes:
 
 ## Release Communication

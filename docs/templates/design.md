@@ -87,7 +87,7 @@ Use this section only when the change proposes edits to an existing Epic.
 #### Supersedes / Reconciles
 
 - Earlier Story, Requirement, Scenario, or boundary wording this change supersedes:
-- `Verified By` or `Verification Gaps` entries that must be rewritten or reclassified:
+- Story implementation/verification state, `Implemented By`, `Implementation Gaps`, `Verified By`, or `Verification Gaps` entries that must be rewritten or reclassified:
 - Closed or active Change artifacts likely to need status cleanup:
 - Manual confirmation status updates expected:
 
@@ -105,6 +105,10 @@ Use this section only when the change proposes edits to an existing Epic.
 - Restart Requirement IDs inside each Story: `R1`, `R2`, `R3`.
 - Scope Scenario IDs to their Requirement: `R1-S1`, `R1-S2`, `R2-S1`.
 - Do not use generic Scenarios such as "WHEN this Story's workflow is exercised"; name the real trigger, state, failure mode, or observable condition.
+- Keep exactly one canonical `Implemented By` and one canonical `Verified By` section per Story. Consolidate still-current rows from prior/detailed/legacy maps; retain historical explanation only in `Story Notes`.
+- Plan narrower Requirement/Scenario rows when route/auth, application policy, persistence, provider/runtime configuration, deployment, or presentation have distinct governing owners.
+- Require implementation anchors to identify behavior-owning definitions, registrations, or configuration rather than imports, call sites, incidental handlers, or broad file tokens.
+- Require automated evidence anchors to name an exact test title or stable named test anchor, never generic syntax such as `#it(`, `#test(`, or `#describe(`.
 
 ## Technical Options
 

@@ -10,6 +10,7 @@ import {
 } from "../config.js";
 import { isDirectory } from "../fs.js";
 import { inspectChangeStatuses } from "../change-status.js";
+import { inspectProjectGuidance } from "../guidance.js";
 import { inspectSkillInstallation } from "../skills.js";
 import { inspectWorkflowInstallation } from "../workflow.js";
 import { resolveOperationConfiguration } from "../workspace.js";
@@ -73,6 +74,7 @@ export async function diagnoseWorkspace(startPath) {
   if (config.kind !== "user") {
     findings.push(...(await inspectWorkflowInstallation(workspaceRoot)));
   }
+  findings.push(...(await inspectProjectGuidance(workspaceRoot, config)));
   findings.push(...(await inspectChangeStatuses(workspaceRoot, config)));
 
   const counts = {

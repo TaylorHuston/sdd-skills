@@ -28,19 +28,23 @@ mode: default
 | Story shape | TBD | TBD |
 | Story requirement completeness | TBD | TBD |
 | Story reference traceability | TBD | TBD |
+| Canonical map authority | TBD | Confirm exactly one current implementation map and one current verification map per Story. |
+| Cold code navigation | TBD | Confirm primary source locations and stable anchors are usable from the Epic alone. |
+| Semantic anchor ownership | TBD | Confirm anchors resolve to governing definitions/registrations, not imports, call sites, incidental handlers, or generic tokens. |
 | Reverse traceability inventory | TBD | Include the full Epic-scoped current-working-tree inventory command and candidate classifications. |
 | Requirement and Scenario truth | TBD | TBD |
 | Implementation drift | TBD | TBD |
 | Verification strength | TBD | TBD |
+| Supporting truth freshness | TBD | Check Outcome tense, README/current-state docs, and active/closed Change claims. |
 | Change status traceability | TBD | TBD |
 | Docs and product alignment | TBD | TBD |
 | Security and data safety | TBD | TBD |
 
-## Verification Matrix
+## Behavior And Verification Matrix
 
-| Story | Requirement | Scenario | Current Evidence | Evidence Type | Evidence Mapping | Check Run | Result | Gap |
-|---|---|---|---|---|---|---|---|---|
-| EPIC-ID/S1 | R1 | R1-S1 | TBD | focused automated test / broad supporting gate / deterministic E2E / live-provider playtest / manual UI confirmation / debug-log inspection / TBD | TBD | TBD | TBD | TBD |
+| Story | Requirement | Scenario | Implementation State | Primary Location / Anchor | Implementation Gap | Verification State | Current Evidence | Evidence Type | Check Run | Result | Verification Gap |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| EPIC-ID/S1 | R1 | R1-S1 | TBD | TBD | TBD | TBD | TBD | focused automated test / broad supporting gate / deterministic E2E / live-provider playtest / manual UI confirmation / debug-log inspection / TBD | TBD | TBD | TBD |
 
 ## Findings
 
@@ -64,6 +68,8 @@ mode: default
 - Implementation drift:
 - Requirement drift:
 - Verification drift:
+- Canonical-map drift:
+- Semantic-anchor drift:
 - Reverse-traceability drift:
 - Scope drift:
 - Product drift:
@@ -107,6 +113,7 @@ mode: default
 - Change artifacts:
 - Code:
 - Tests:
+- Anchor definitions/registrations and exact assertions opened:
 - Docs:
 - Project-defined supporting-doc inventory:
 - PRD/Product Brief:
