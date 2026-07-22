@@ -22,7 +22,7 @@ status: proposed
 - [ ] 1.5 Confirm the planned `Verified By` sections can become scenario-mapped evidence indexes.
 - [ ] 1.6 For UI-bearing changes with material experience uncertainty, complete `/sdd-design` or record why existing product conventions already make the direction implementation-ready.
 - [ ] 1.7 For UI-bearing changes, define a proportional Visual Verification Matrix with affected surfaces, routes or fixtures, representative desktop/mobile viewports, relevant states/interactions, expected rendered behavior, and preferred tooling or fallback.
-- [ ] 1.8 Seed the living risk, decision fan-out, and verification-environment sections with end-state obligations already known. Do not turn them into an exhaustive implementation sequence; `/sdd-apply` must refine them from real implementation evidence.
+- [ ] 1.8 Seed the living risk, decision fan-out, verification-environment, and Verification Scope Decision sections with end-state obligations already known. Include any known project-defined aggregate or prospective-integration gate. Do not turn them into an exhaustive implementation sequence; `/sdd-apply` must refine them from real implementation evidence.
 - [ ] 1.9 Set `status: planned` only after the proposal, design, tasks, Epic actions, and verification strategy are coherent and validated.
 
 ### 2. Epic Artifacts
@@ -62,7 +62,8 @@ status: proposed
 - [ ] 5.5 Verify ADR assumptions or record the remaining decision risk.
 - [ ] 5.6 Confirm every required database, migration, browser, provider, generated-contract, platform, or production-path environment actually ran before treating its behavior as verified.
 - [ ] 5.7 Reopen any checklist or verification claim whose cited proof is missing, too broad, skipped, undiscovered, or weaker than the behavior claimed.
-- [ ] 5.8 Run scoped `sdd validate` and resolve deterministic artifact errors before handoff.
+- [ ] 5.8 Resolve the Verification Scope Decision and run every required aggregate candidate gate freshly on the exact final committed candidate; record meaningful execution/count and cache/freshness evidence.
+- [ ] 5.9 Run scoped `sdd validate` and resolve deterministic artifact errors before handoff.
 
 ### 6. Review And Closeout
 
@@ -74,9 +75,10 @@ status: proposed
 - [ ] 6.6 Confirm proposal/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
 - [ ] 6.7 Confirm machine-readable Change status agrees with Resume Here, checklist, review, manual confirmation, release communication, ADR, PR/merge, deferred-gap, and folder-location claims.
 - [ ] 6.8 Keep `status: in_review` while independent review and closeout gates are underway.
-- [ ] 6.9 Before `in_review`, record an immutable candidate commit, confirm intended implementation is committed, pass commit-sensitive contract/diff checks, and leave no required risk, fan-out, environment, or verification obligation silently pending.
-- [ ] 6.10 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus user authorization allow it.
-- [ ] 6.11 After review/PR/merge/acceptance is complete and `status: in_review` remains accurate, run `sdd change close` for this Space and Change instead of writing a `closed` status.
+- [ ] 6.9 Before `in_review`, record an immutable candidate commit, confirm intended implementation is committed, pass commit-sensitive contract/diff checks and every required aggregate candidate gate on that exact commit, and leave no required risk, fan-out, environment, or verification obligation silently pending.
+- [ ] 6.10 Before integration or closeout, resolve whether the current target produces a materially different prospective integration tree. When required, run the aggregate gate against that exact tree; after integration, confirm the actual tree matches or rerun before closing.
+- [ ] 6.11 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus user authorization allow it.
+- [ ] 6.12 After review/PR/merge/acceptance and required integration-candidate proof are complete and `status: in_review` remains accurate, run `sdd change close` for this Space and Change instead of writing a `closed` status.
 
 ## Implementation Ledger
 
@@ -92,7 +94,7 @@ Record proof as it happens. Keep chronological command output here; summarize on
 
 | Date | Check | Evidence Type | What It Proves | Result |
 |---|---|---|---|---|
-| YYYY-MM-DD | TBD | focused automated test / broad supporting gate / deterministic E2E / live-provider playtest / manual UI confirmation / debug-log inspection | EPIC-ID/S1 R1/R1-S1 TBD | TBD |
+| YYYY-MM-DD | TBD | focused automated test / aggregate candidate gate / integration-candidate gate / broad supporting gate / deterministic E2E / live-provider playtest / manual UI confirmation / debug-log inspection | EPIC-ID/S1 R1/R1-S1 or candidate scope | TBD |
 
 ## Manual Feedback
 
@@ -158,6 +160,22 @@ Track environment readiness continuously. Missing setup may allow unrelated safe
 |---|---|---|---|---|
 | TBD | disposable database / existing-data fixture / browser runtime / provider / account / platform / committed generated-contract comparison | EPIC-ID/S1 R1/R1-S1 TBD | ready / pending / blocked / not applicable | TBD |
 
+## Verification Scope Decision
+
+Keep focused behavior proof distinct from aggregate and integration-candidate proof. Resolve command names and required constituents from project guidance rather than imposing one universal stack.
+
+- Project-defined aggregate command or authoritative constituent source:
+- Aggregate gate required before `in_review`: yes / no / pending
+- Trigger or project-policy reason:
+- Exact committed source candidate:
+- Freshness and cache treatment:
+- Aggregate result and meaningful execution/count evidence:
+- Post-gate evidence-record-only changes and affected checks rerun:
+- Prospective integration gate required: yes / no / pending
+- Current target and prospective integration tree/ref:
+- Integration-candidate result or reason source proof is reusable:
+- Remote CI role: required / corroborating / unavailable / not applicable
+
 ## Manual UI Confirmation
 
 - Status: pending user / user confirmed / accepted gap / not applicable
@@ -187,6 +205,9 @@ Required for UI-bearing changes. If not applicable, record why.
 - Intended implementation fully committed: yes / no / commits disabled with reason
 - Unrelated dirty state preserved:
 - Commit-sensitive generated-contract / diff / integration checks:
+- Verification Scope Decision and aggregate candidate evidence:
+- Post-gate evidence-only changes classified and affected checks rerun:
+- Prospective integration tree and required gate evidence:
 - Required risk, fan-out, environment, or verification rows still pending or blocked:
 - Pattern parity and stateful transition matrices reconciled or not applicable with reason:
 - Evidence claims falsified against exact tests, assertions, routes, or observations:
@@ -214,7 +235,9 @@ Required for UI-bearing changes. If not applicable, record why.
 - Evidence-claim integrity checked:
 - Decision fan-out reconciled:
 - Verification environment obligations resolved:
+- Verification Scope Decision current and required candidate gates passed:
 - Immutable review handoff candidate:
+- Tested integration candidate matches actual integrated tree, or rerun recorded:
 - Manual UI confirmation status:
 - Rendered UI verification status:
 - PR / merge state:

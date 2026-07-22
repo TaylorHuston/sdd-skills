@@ -79,6 +79,7 @@ Validate options:
   --repo <path>                   Select a mapped repository; may be repeated
   --change <change-id>            Validate one planned, active, or closed Change
   --epic <epic-id>                Validate one Epic
+  --changed-from <commit-ish>     Check Epic modified metadata against a Git baseline
   --json                          Emit machine-readable JSON
 
 Epic create usage:
@@ -671,6 +672,7 @@ async function executeCommand(command, args) {
         repo: { type: "string", multiple: true },
         change: { type: "string" },
         epic: { type: "string" },
+        "changed-from": { type: "string" },
       }),
     );
     if (values.help) return { help: true };
@@ -683,6 +685,7 @@ async function executeCommand(command, args) {
         repositories: values.repo ?? [],
         changeId: values.change ?? null,
         epicId: values.epic ?? null,
+        changedFrom: values["changed-from"] ?? null,
       }),
       json: values.json ?? false,
     };

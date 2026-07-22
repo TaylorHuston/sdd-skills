@@ -3,16 +3,17 @@ schema: sdd-epic-v2
 id: SDD-E001
 status: active
 created: 2026-07-20
-modified: 2026-07-20
-last_verified: 2026-07-20
+modified: 2026-07-22
+last_verified: 2026-07-22
 stories:
   - S1
   - S2
   - S3
   - S4
+  - S5
 ---
 
-# SDD-E001 Reliable CLI Operations
+# SDD-E001 Reliable Toolchain Operations
 
 ## Product Context
 
@@ -20,11 +21,11 @@ stories:
 - Related docs: `README.md`, `docs/story-driven-development.md`, `docs/audits/2026-07-20-code-audit.md`
 - Related ADRs: none.
 
-Developers and agents rely on the CLI as the deterministic boundary beneath the SDD skills. Its successful results must be trustworthy, its mutations must remain inside declared ownership, and its diagnostics must fail safely without inventing private topology.
+Developers and agents rely on the CLI and packaged skills as one toolchain. Deterministic results must be trustworthy, mutations must remain inside declared ownership, audit reports must distinguish current from historical state, and review/release handoffs must contain only classified scope.
 
 ## Outcome
 
-Developers will be able to validate SDD artifacts, mutate lifecycle state, resolve topology, and diagnose repositories with explicit evidence, physical containment, recoverable transitions, and bounded diagnostics.
+Developers can validate SDD artifacts, mutate lifecycle state, resolve topology, audit Epics, and prepare review/release handoffs with explicit evidence, physical containment, recoverable transitions, current-state reporting, exact diff scope, and bounded diagnostics.
 
 ## Current Scope
 
@@ -32,6 +33,7 @@ Developers will be able to validate SDD artifacts, mutate lifecycle state, resol
 - Physically contained and recoverable local filesystem mutation.
 - Unambiguous configuration, topology, and Change lifecycle routing.
 - Bounded, context-aware `doctor` and `status` diagnostics.
+- Current-state Epic audit reports and exact-diff PR/release handoffs.
 
 ## Deferred Scope
 
@@ -51,10 +53,11 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 
 | Story | Implementation | Verification | Capability | Last Verified | Notes |
 |---|---|---|---|---|---|
-| S1 | implemented | verified | Validate navigable behavior and real evidence. | 2026-07-20 | Structure, anchors, containment, and focused reads are enforced. |
+| S1 | implemented | verified | Validate navigable behavior and real evidence. | 2026-07-22 | Structure, anchors, report coherence, metadata freshness, and focused reads are enforced. |
 | S2 | implemented | verified | Mutate only inside physical owner boundaries and recover safely. | 2026-07-20 | Atomic state, locking, commit checks, and recovery reporting are enforced. |
 | S3 | implemented | verified | Reject ambiguous topology and lifecycle routing. | 2026-07-20 | Shape, physical ownership, planning, and collision ambiguity are rejected. |
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
+| S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-22 | Reports are versioned; PR/release paths are classified and rechecked. |
 
 ## Stories
 
@@ -63,8 +66,8 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 Implementation: implemented
 Verification: verified
 Created: 2026-07-20
-Modified: 2026-07-20
-Last verified: 2026-07-20
+Modified: 2026-07-22
+Last verified: 2026-07-22
 
 As a developer, I want successful Epic validation to point to real behavior, implementation, and tests, so that I can navigate and trust the durable SDD map.
 
@@ -112,6 +115,44 @@ The CLI SHALL count scenario coverage only from complete evidence rows whose aut
 - WHEN validation is scoped to one Epic
 - THEN unrelated Epics are not opened or allowed to abort the focused result.
 
+##### Requirement R4: Coherent Epic Verification Reports
+
+The CLI SHALL validate versioned Epic verification reports as current-state audit records whose verdict, gates, findings, checks, identity, and predecessor link agree.
+
+###### Scenario R4-S1: Contradictory Aligned Result
+
+- WHEN a versioned report declares `aligned` while a current gate still contains findings
+- THEN validation rejects the report instead of accepting the frontmatter result alone.
+
+###### Scenario R4-S2: Broken Report Lineage
+
+- WHEN a versioned report names a missing, external, self, or non-versioned predecessor
+- THEN validation reports a broken `supersedes` link.
+
+##### Requirement R5: Git-Relative Epic Metadata Freshness
+
+When the caller supplies `--changed-from`, the CLI SHALL compare substantive baseline Epic content with the current working tree and reject a changed Epic whose top-level `modified` value is stale, while avoiding a false failure when both edits share the current local date.
+
+###### Scenario R5-S1: Stale Modified Metadata
+
+- WHEN substantive Epic content differs from the selected Git baseline while `modified` is unchanged
+- THEN validation returns `STALE_EPIC_MODIFIED_DATE`.
+
+###### Scenario R5-S2: Verification-Only Metadata Update
+
+- WHEN only top-level verification metadata differs from the selected Git baseline
+- THEN validation does not report stale substantive-change metadata.
+
+###### Scenario R5-S3: Invalid Git Baseline
+
+- WHEN the requested commit-ish cannot be resolved in a selected repository
+- THEN validation returns a deterministic repository finding instead of crashing or silently skipping the check.
+
+###### Scenario R5-S4: Same-Day Substantive Edit
+
+- WHEN the selected baseline already has today's `modified` date and the Epic changes again that day
+- THEN validation accepts the date-granularity limitation instead of requiring a future date.
+
 #### Implemented By
 
 Map every Requirement to its primary governing location after implementation. `primary` describes behavior ownership, not a physical layer; use narrower multiple primary rows when ownership genuinely splits across layers or Scenarios. Add supporting rows only for distinct adapter, persistence, presentation, configuration, migration, or support responsibilities. Prefer stable symbols, exports, routes, classes, or searchable anchors over line numbers.
@@ -126,6 +167,10 @@ Map every Requirement to its primary governing location after implementation. `p
 | S1/R3 | `src/commands/validate.js#validateEpic` | support | Orchestrates Story coverage and merges the focused evidence validator result. |
 | S1/R3-S3 | `src/commands/validate.js#validateRepository` | support | Narrows focused Epic directories before opening artifacts. |
 | S1/R3 | `skills/sdd-orphan-audit/scripts/sdd_orphan_audit.py#parse_epic_refs` | support | Keeps reverse traceability aligned with canonical path-plus-anchor evidence rows. |
+| S1/R4 | `src/epic-verify-report.js#validateEpicVerifyReports` | primary | Validates versioned report identity, current-result coherence, remediation sections, and predecessor containment. |
+| S1/R4 | `src/commands/validate.js#validateRepository` | support | Discovers and merges report findings only for selected Epics. |
+| S1/R5 | `src/epic-history.js#validateEpicHistory` | primary | Compares substantive baseline and working-tree Epic content while excluding top-level freshness metadata. |
+| S1/R5 | `src/epic-history.js#resolveChangedFrom` | support | Resolves the requested commit-ish without shell evaluation before repository validation. |
 
 #### Implementation Gaps
 
@@ -154,6 +199,18 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 | S1/R3-S2 | Automated test `test/cli.test.js#validate rejects implementation and test evidence that resolve outside the repository` | External symlink test evidence is rejected. | Passing 2026-07-20 |
 | S1/R3-S3 | Automated test `test/cli.test.js#focused Epic validation does not open unrelated Epic artifacts` | An unrelated unreadable Epic cannot abort a focused result. | Passing 2026-07-20 |
 | S1/R3-S3 | Automated test `test/orphan-audit.test.js#orphan audit parses canonical test anchors and ignores prose filenames` | Reverse traceability recognizes spaced test anchors and reads only the evidence column. | Passing 2026-07-20 |
+| S1/R4-S1 | Automated test `test/cli.test.js#validate rejects an aligned Epic verification report with current findings` | An aligned frontmatter result cannot override contradictory current gate state. | Passing 2026-07-22 |
+| S1/R4-S1 | Automated test `test/cli.test.js#validate rejects an aligned Epic verification report with incomplete gate coverage` | A partial scorecard cannot be certified as aligned. | Passing 2026-07-22 |
+| S1/R4-S1 | Automated test `test/cli.test.js#validate rejects Epic verification Verdict metadata drift` | Initial/current results and audited/verified refs cannot contradict frontmatter. | Passing 2026-07-22 |
+| S1/R4-S1 | Automated test `test/cli.test.js#validate rejects mutable Epic verification refs` | Branch names and symbolic refs cannot serve as immutable audit watermarks. | Passing 2026-07-22 |
+| S1/R4-S1 | Automated test `test/cli.test.js#validate rejects an aligned Epic verification report without its audited baseline check` | Alignment requires scoped structural validation against the report's immutable audited ref. | Passing 2026-07-22 |
+| S1/R4 | Automated test `test/cli.test.js#validate rejects malformed versioned Epic verification report frontmatter` | A report cannot evade versioned validation through malformed YAML. | Passing 2026-07-22 |
+| S1/R4-S2 | Automated test `test/cli.test.js#validate rejects a missing superseded Epic verification report` | A missing predecessor cannot establish report lineage. | Passing 2026-07-22 |
+| S1/R4-S2 | Automated test `test/cli.test.js#validate rejects an absolute Epic verification report predecessor` | Report lineage must remain repository-relative even when an absolute target points into the same reviews directory. | Passing 2026-07-22 |
+| S1/R5-S1 | Automated test `test/cli.test.js#validate changed-from rejects substantive Epic edits with stale modified metadata` | Working-tree Epic changes require advanced `modified` metadata relative to the selected baseline. | Passing 2026-07-22 |
+| S1/R5-S2 | Automated test `test/cli.test.js#validate changed-from accepts verification-only metadata changes` | Top-level verification freshness updates do not create a false substantive-change finding. | Passing 2026-07-22 |
+| S1/R5-S3 | Automated test `test/cli.test.js#validate changed-from reports an invalid Git baseline as a finding` | Invalid commit-ish input becomes a deterministic validation error. | Passing 2026-07-22 |
+| S1/R5-S4 | Automated test `test/cli.test.js#validate changed-from accepts a second substantive Epic edit on the same day` | Date-only metadata does not force an impossible future date for a same-day edit. | Passing 2026-07-22 |
 
 #### Verification Gaps
 
@@ -426,6 +483,78 @@ The CLI SHALL time out a stalled Git status process, return degraded metadata fo
 
 - Doctor remains deterministic and does not attempt general natural-language interpretation.
 
+### Story S5: Trustworthy Audit And Handoff Guidance
+
+Implementation: implemented
+Verification: verified
+Created: 2026-07-22
+Modified: 2026-07-22
+Last verified: 2026-07-22
+
+As a developer, I want Epic audits and PR/release handoffs to describe the final verified source and exact changed-file scope, so that historical failures or unrelated files cannot be mistaken for a clean candidate.
+
+#### Requirements And Scenarios
+
+##### Requirement R1: Current-State Epic Audit Records
+
+The Epic verification workflow SHALL write versioned immutable reports that separate historical findings from current gates/findings/checks, link later remediation reports to their predecessor, and reconcile multi-Epic report batches before assigning the final result.
+
+###### Scenario R1-S1: Historical Failure After Remediation
+
+- WHEN remediation changes the initial audit result
+- THEN the final report keeps the initial failure in an explicitly historical section and derives its verdict only from rerun current gates.
+
+###### Scenario R1-S2: Later Remediation Run
+
+- WHEN a later run changes a previously written report result
+- THEN it writes a successor with `supersedes` instead of rewriting the prior audit snapshot.
+
+##### Requirement R2: Exact Publication Scope
+
+The PR and release workflows SHALL classify the complete source-to-target changed-file inventory and recheck it after remediation or release-metadata commits before publication.
+
+###### Scenario R2-S1: Accepted PR Remediation
+
+- WHEN review feedback adds or changes files after the reviewed commit
+- THEN `/sdd-pr` recomputes the diff, classifies every path, and stops on unexplained scope before pushing.
+
+###### Scenario R2-S2: Release Candidate Handoff
+
+- WHEN release metadata is committed before the production handoff
+- THEN `/sdd-release` compares the final diff path-for-path with the recorded allowlist and reports the reconciliation in the release PR.
+
+#### Implemented By
+
+| Requirement / Scenario | Location / Anchor | Kind | Responsibility |
+|---|---|---|---|
+| S5/R1 | `skills/sdd-epic-verify/SKILL.md#immutable audit snapshot` | primary | Governs immutable report lifecycle, current/historical separation, reruns, successor creation, and final multi-Epic batch coherence. |
+| S5/R1 | `skills/sdd-epic-verify/assets/epic-verify-report-template.md#Current Gate Scorecard` | support | Makes current verdict inputs and historical/remediation sections explicit in every new report. |
+| S5/R2-S1 | `skills/sdd-pr/SKILL.md#exact source-to-target changed-file inventory` | primary | Requires full PR path classification before creation, remediation commits, and merge readiness. |
+| S5/R2-S2 | `skills/sdd-release/SKILL.md#exact source-to-target changed-file inventory` | primary | Establishes and rechecks the release allowlist before commit and publication. |
+| S5/R2-S2 | `skills/sdd-release/assets/release-pr-template.md#File Scope Reconciliation` | support | Carries file-scope and documentation/SDD integrity evidence into the handoff. |
+| S5/R1, S5/R2 | `docs/story-driven-development.md#Epic verification reports use` | support | Defines the shared package doctrine for report integrity and exact publication scope. |
+
+#### Implementation Gaps
+
+- None.
+
+#### Verified By
+
+| Requirement / Scenario | Evidence | Proves | Status |
+|---|---|---|---|
+| S5/R1-S1, S5/R1-S2 | Automated test `test/cli.test.js#packaged audit and handoff skills preserve current-state and file-scope gates` | The packaged Epic verification skill retains immutable/current-state and successor requirements. | Passing 2026-07-22 |
+| S5/R1-S1 | Automated test `test/cli.test.js#packaged workflow templates preserve parity, transition, and evidence-integrity contracts` | The canonical report template is versioned, defaults blocked, exposes current findings, and matches the skill asset. | Passing 2026-07-22 |
+| S5/R2-S1, S5/R2-S2 | Automated test `test/cli.test.js#packaged audit and handoff skills preserve current-state and file-scope gates` | Both handoff skills retain exact diff inventory gates and the PR skill has no separate `--fix` mode. | Passing 2026-07-22 |
+| S5/R2-S2 | Automated test `test/cli.test.js#packaged workflow templates preserve parity, transition, and evidence-integrity contracts` | The release template mirrors its skill asset and includes file-scope plus SDD-integrity sections. | Passing 2026-07-22 |
+
+#### Verification Gaps
+
+- None.
+
+#### Story Notes
+
+- Workflow skills are implemented package behavior, not incidental documentation; their source files must remain traceable from this Epic.
+
 ## Cross-Story Concerns
 
 - Structured JSON errors/results remain stable enough for agent and future Dashboard/plugin clients.
@@ -451,4 +580,4 @@ This Epic is healthy when:
 
 ## Notes
 
-- The active implementation record is `docs/changes/2026-07-20-harden-cli-trust-boundaries/`.
+- Active implementation records are `docs/changes/2026-07-20-harden-cli-trust-boundaries/` and `docs/changes/2026-07-22-harden-audit-report-integrity/`.

@@ -87,6 +87,11 @@ Capture:
 - untracked files relevant to the app/source repo
 - conflict check result without performing a merge
 - branch policy and whether the current source/target pair satisfies it
+- available PR description, linked issue, review discussion, relevant source-only commit history, and related-repository context; record material context that is unavailable rather than silently assuming it does not exist
+- project-configured linters, typecheckers, static/security/dependency analyzers, generated-contract checks, and CI commands relevant to the changed surface
+- the project-defined aggregate gate or authoritative constituent commands, their source of truth, and any documented optional checks
+- the Verification Scope Decision, including risk or policy triggers, exact candidate ref, freshness/cache treatment, and recorded result
+- the prospective integration tree and whether it materially differs from the reviewed source candidate
 - active `review.md`, `tasks.md` review state, manual confirmation state, release-communication state, PR/merge state, and closeout state
 - JSON reverse-traceability inventory for the source working tree since the selected target or merge base, produced by the packaged `sdd-orphan-audit` script with `--changed-from`; run one `--epic` pass per affected Epic when ownership needs to be distinguished
 
@@ -110,6 +115,16 @@ Prefer `git merge-tree --write-tree TARGET SOURCE` for conflict checks. Treat ex
 Treat `TARGET...SOURCE` as the primary PR-style review diff. Use the working tree diff only to understand uncommitted review fixes, local artifact edits, generated files, or blockers. Do not allow unrelated dirty files outside the source repo to obscure the source-vs-target review.
 
 Record the bundle summary, including the immutable reviewed source commit, in `review.md` when findings exist, or in `tasks.md` when the review is clean and no `review.md` is required. A branch name alone is not a sufficient review watermark because it can advance after review.
+
+## Resolve Verification Scope
+
+Keep focused behavior proof, aggregate candidate proof, and integration-candidate proof distinct. Focused tests establish individual Requirements and Scenarios; broad gates support them but do not replace their exact evidence.
+
+Resolve the project-defined aggregate command from project guidance, testing/CI docs, workflow files, and package scripts. Require aggregate proof when project policy requires it or when the reviewed diff crosses multiple capabilities, persistence or migrations, auth/security/privacy boundaries, process-global state, shared contracts, concurrency/workers/recovery, or another surface where isolated checks can conceal integration failures. Do not impose one universal command name or constituent list. Prefer one project-owned command; otherwise record and run the authoritative equivalent constituents. If materially required proof cannot be identified or run safely, block `ready` unless the user explicitly accepts the gap.
+
+Run every required aggregate gate freshly against the exact committed source candidate after the final review remediation. Bypass caches or prove meaningful fresh execution, and record the command, commit, constituent/test counts or equivalent execution evidence, and result. A later evidence-record-only commit may reuse that result only after its diff is classified and every gate that observes the changed artifacts is rerun; any behavior, test, dependency, configuration, migration, generated, executable, or gate-observed change invalidates the prior result. An earlier behavior candidate, a green command that skipped meaningful work, remote CI for another ref, focused suites, or structural SDD validation cannot satisfy this gate.
+
+Require integration-candidate proof when the target has advanced, contains accumulated Changes, requires conflict resolution, or produces a materially different prospective tree. Materialize that result through a safe disposable worktree or equivalent non-destructive project mechanism, record its tree/ref, and run the required aggregate gate there. Recheck source and target refs immediately before integration. Reuse source-candidate proof only when the prospective integration content is demonstrably identical; otherwise a changed tree requires fresh proof. After integration, confirm the actual integrated tree matches the tested tree or rerun the gate before closeout.
 
 ## Required Context
 
@@ -138,6 +153,19 @@ Validate that active `tasks.md` frontmatter uses `proposed`, `planned`, `in_prog
 Check git status in every repo that may change. Preserve unrelated dirty files. Treat app/source repo changes separately from vault/workflow artifact changes unless they live in the same repository.
 
 For review readiness, uncommitted files outside the implementation/source repo do not block review, PR, or merge readiness unless they are explicitly part of the requested change, target repo, or branch operation. Report related workflow-artifact or adjacent-repo dirty state clearly, but do not classify it as blocking merely because it is uncommitted. Source-repo dirty state still blocks readiness when it is part of the change and not committed or explicitly deferred.
+
+## Systematic Review Search
+
+Default and deep review must generate candidates through distinct passes instead of relying on one salience-driven reading of the diff. Scale the work to the change, but complete every applicable pass before consolidating findings:
+
+1. **Intent and history**: derive promised behavior and constraints from the Change artifacts, diff, source-only commits, and available PR description, linked issue, review discussion, or related-repository context. Treat missing external context as a blind spot, not evidence that no constraint exists.
+2. **Complete diff coverage**: inspect every changed path and behavior-bearing hunk, including deleted and renamed code, tests, configuration, schemas, migrations, generated contracts, and supporting docs. Classify generated or mechanical changes explicitly rather than skipping them implicitly.
+3. **Dependency and contract propagation**: for every changed public or behavior-owning symbol, trace materially relevant callers, consumers, registrations, imports, routes, persistence, schemas, configuration, generated boundaries, and downstream tests. Check both upstream inputs and downstream effects; existing Epic paths and search/index results are starting points, not complete coverage.
+4. **Deterministic tool pass**: discover relevant configured tools from project guidance, package scripts, CI workflows, and checked-in configuration, then run the applicable lint, typecheck, static/security/dependency, generated-contract, and test checks. Do not install or impose a new scanner merely to make the review look broader. Treat tool output as finding candidates that still require impact and diff validation.
+5. **Risk-shaped reasoning passes**: separately challenge correctness and regressions; security and data safety; concurrency, async timing, retry, cancellation, and recovery; API/schema/configuration compatibility and migrations; test/evidence strength; and rendered UI behavior when applicable. A green aggregate command does not replace these passes.
+6. **Blind-spot accounting**: record unavailable metadata, providers, related repositories, external contracts, runtime environments, scanners, or rendered surfaces that could materially change confidence. Mark the affected gate `blocked` or record an explicit accepted gap when the missing surface is required.
+
+Keep the union of candidates until the discovery wave is complete. Validate each candidate against the actual source-vs-target diff, concrete code path, executable reproduction, deterministic tool result, or artifact contract before promoting it to a finding. Record inspected surfaces and rejected material candidates in reviewer output when that is necessary to show coverage; do not inflate the final report with preference-only or disproved concerns.
 
 ## Delegated Review Model
 
@@ -191,6 +219,8 @@ Use `assets/subagent-pr-review-prompt.md` for delegated passes when structured p
 - assigned review pass
 - relevant Story, Requirement, and Scenario IDs when known
 - branch policy summary
+- available PR/issue/review-history and related-repository context, or an explicit note that it is unavailable
+- configured deterministic review tools relevant to the assigned pass
 - selected available skills and guidance to load, with selection reasons
 - explicit instruction not to edit, commit, push, merge, close, or update Change status
 - required report shape
@@ -206,14 +236,14 @@ Run every gate that applies and record `pass`, `findings`, `blocked`, or `not ap
 3. **Source-vs-target code review**: review the actual diff and source-only commits for correctness, regressions, maintainability, accidental scope, project-pattern fit, and user-visible state handling.
 4. **Pattern conformance**: when the diff adds or changes a surface parallel to an established adapter, client, route, workspace, worker, migration, command, or similar implementation, identify the closest current reference and compare applicable auth/session/CSRF, retry, timeout/cancel, error/conflict, recovery, pending-write, identity, route-context, configuration, generated-contract, accessibility, and visual-token behavior plus focused tests. Unexplained divergence or copied defects are findings.
 5. **Reverse traceability**: classify every behavior-bearing source/test candidate from the diff inventory as Epic-owned, supporting/generated/framework infrastructure, an explicit gap, or tracked cleanup. For refactors, check stranded routes, registrations, imports, dependencies, tests, migrations, generated bindings, and obsolete files. Skipping this inventory blocks `ready`.
-6. **Verification**: scenario-mapped focused evidence exists, broad gates are not substituted for behavior proof, production/mock boundaries are honest, and required project checks pass or have explicit blocking gaps.
+6. **Verification**: scenario-mapped focused evidence exists, broad gates are not substituted for behavior proof, production/mock boundaries are honest, the Verification Scope Decision is explicit, and required aggregate candidate checks pass freshly on the exact reviewed commit or have explicit blocking gaps.
 7. **Evidence falsification**: for every new or high-risk completion, `Verified By`, E2E, security, recovery, or production-path claim, open the cited proof and confirm its exact test title or stable named anchor, important assertion/observation, and discovery by the command that passed. Reject generic framework anchors such as `#it(`, unsupported Scenario aggregation, missing/skipped/undiscovered evidence, and server-side proof used to imply untested client retry, redirect, timeout, draft, navigation, or recovery behavior.
 8. **Risk-shaped evidence and stateful transitions**: challenge important deterministic claims against plausible failure modes. For editable, autosaving, cached, routed, asynchronous, or identity-sensitive surfaces, inspect applicable entity changes, pending-write navigation, failed/conflicted save recovery, return context, browser history, session expiry/sign-out, authoritative refresh, and slow or hung requests. Require tests, controlled runtime evidence, source inspection that directly establishes the property, or an explicit gap.
 9. **Security and data safety**: use relevant available security guidance and inspect the risk surfaces identified by the diff and project policy.
 10. **Rendered UI verification**: for every UI-bearing change, independently render current source, open the affected surfaces, exercise changed interactions, directly inspect screenshots or rendered results, and inspect relevant console and network failures. Cover the proportional Visual Verification Matrix, including representative desktop/mobile viewports and applicable default, loading, empty, error, populated, long-content, focus, selected, disabled, permission, and recovery states. Prefer project-owned browser, screenshot, or preview tooling, then an available runtime browser capability, rendered preview or fixture, or manual browser capture. A green build, passing non-visual tests, apply-side screenshots alone, or generated-but-uninspected images cannot pass this gate. If no available path can render a required surface, mark the gate `blocked` unless the user explicitly accepts the gap.
 11. **Manual acceptance**: user-facing changes have the workflow-defined walkthrough and status when applicable. A complete current walkthrough with status `pending user` does not make the review `changes-requested`, though project policy may keep integration or closeout pending until confirmation. Owner manual acceptance is distinct from the reviewer's rendered UI verification and does not substitute for it.
 12. **Supporting truth**: required project docs, release communication, generated indexes, ADRs, and product direction do not contradict the implementation or Epic map. The resolved Idea's current entry-point docs must identify the selected repository and repository lifecycle correctly, agree with `.sdd/config.yaml`, and avoid describing implemented replacement work as future or an archived repository as active. Clearly dated exploration, decisions, and historical sections may preserve their original point-in-time language when they are recognizable as history rather than current routing guidance.
-13. **Integration readiness**: source, target, reviewed commit, dirty state, conflict state, required checks, authorization, and the project-defined PR/merge/closeout path are unambiguous.
+13. **Integration readiness**: source, target, reviewed commit, prospective integration tree, dirty state, conflict state, required checks, authorization, and the project-defined PR/merge/closeout path are unambiguous; required integration-candidate proof passes for the exact tree that will be integrated.
 
 For UI-bearing changes with a recorded component strategy, verify that required component-state evidence exists through configured previews or equivalent rendered-route, fixture, browser, or manual evidence; adopted source follows the project's ownership model; application-specific behavior did not leak into a generic reference; deliberate divergences preserve accepted product behavior; and anything described as shared or standardized has implemented consumer use outside the catalog itself at the level required by project guidance. A candidate that remains explicitly experimental is not a finding merely because it has not yet been promoted. Use apply-side visual evidence to target the independent review, but reproduce and directly inspect representative current rendering rather than accepting that evidence on trust.
 
@@ -221,7 +251,7 @@ Before finalizing the discovery wave, explicitly challenge cross-cutting failure
 
 Select the smallest materially relevant set of available skills for these gates, read them completely, pass them into delegated review work, and validate their consequences. Absence of an optional skill is not a blocker; unresolved risk is.
 
-Use verdict `ready` when the independent review is clean: no `BLOCKING` or `REQUIRED` finding remains, required non-manual gates pass, and any required manual walkthrough is complete and current. Manual confirmation may still be `pending user`; record that separately as an acceptance and closeout gate rather than converting a clean technical review into `changes-requested` or `blocked`. A `ready` review with pending required confirmation is not yet ready to merge or close.
+Use verdict `ready` when the independent review is clean: no `BLOCKING` or `REQUIRED` finding remains, required non-manual gates—including applicable aggregate and integration-candidate gates—pass for the recorded exact candidate, and any required manual walkthrough is complete and current. Manual confirmation may still be `pending user`; record that separately as an acceptance and closeout gate rather than converting a clean technical review into `changes-requested` or `blocked`. A `ready` review with pending required confirmation is not yet ready to merge or close.
 
 Do not classify required live-provider, production-path, deterministic E2E, integration, or other non-manual verification as manual acceptance merely because a person must trigger or observe it. Pending required non-manual evidence blocks `ready` unless project policy explicitly marks it optional or the user explicitly accepts it as a gap. State whether each pending live-provider check is required verification, optional confidence evidence, or manual acceptance, and make the verdict agree.
 
@@ -289,7 +319,7 @@ When merge-and-closing:
 
 1. Follow the app's local `AGENTS.md` merge policy for target branch, merge strategy, PR requirements, and whether direct integration-branch commits are allowed.
 2. Perform the non-production merge/integration step before closeout unless project policy explicitly says to close on the source branch first.
-3. After the merge/integration step succeeds, update the closeout record with the actual PR/merge status, target branch, date, commit or PR reference when available, review outcome, manual confirmation status, release-communication status, and remaining accepted risks.
+3. After the merge/integration step succeeds, confirm the actual integrated tree matches the reviewed integration candidate. If it differs, rerun every required integration-candidate gate before closeout. Update the closeout record with the tested and actual tree/commit, aggregate result, PR/merge status, target branch, date, review outcome, manual confirmation status, release-communication status, and remaining accepted risks.
 4. Run `sdd change close <space-id> <change-id> --repo <resolved-repository-path> --workspace <workspace-root>`, then commit the closeout mutation in the repo and branch required by app policy.
 5. Verify the target branch has the closed change path, no active duplicate path, and no contradictory references to the old active path.
 
@@ -310,6 +340,7 @@ Stop and report when:
 - branch policy is missing with no documented fallback, violated for implementation changes, or unclear for a requested PR/merge/closeout.
 - unrelated app/source-repo dirty files block safe review, fixes, PR, or merge.
 - required checks fail without a safe in-scope fix.
+- the Verification Scope Decision is absent or understates an applicable project-policy or cross-cutting trigger; a required aggregate or integration-candidate gate is missing, stale, cached without freshness proof, ran against a different commit/tree, skipped meaningful constituents, or failed.
 - security review finds unresolved risk.
 - Epic truth or Requirement/Scenario evidence is stale, incomplete, or unmapped.
 - a deterministic implementation claim is important to readiness but is only asserted in artifacts, not supported by concrete source inspection, automated verification, manual/browser evidence, or an explicit accepted gap.

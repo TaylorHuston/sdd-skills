@@ -16,6 +16,7 @@ changes-requested | blocked | ready
 | Story reference traceability | TBD | TBD |
 | Reverse traceability | TBD | Diff-scoped source/test candidate inventory and classification. |
 | Tests and verification | TBD | TBD |
+| Verification scope and aggregate candidate | TBD | Focused proof remains distinct; required aggregate proof is fresh on the exact reviewed commit. |
 | Semantic anchor ownership | TBD | Primary anchors identify governing definitions/registrations rather than incidental occurrences. |
 | Evidence falsification | TBD | Exact named test/anchor, assertion/observation, discovery path, and boundary match for new or high-risk claims; generic framework anchors rejected. |
 | Pattern conformance | TBD | New sibling surfaces compared with the closest established behavior contract and focused tests. |
@@ -29,6 +30,7 @@ changes-requested | blocked | ready
 | Idea repository / current-state truth | TBD | TBD |
 | Release communication | TBD | TBD |
 | Branch and merge readiness | TBD | TBD |
+| Prospective integration candidate | TBD | Exact tree/ref and required aggregate result, or why source-candidate proof is reusable. |
 | PRD alignment | TBD | TBD |
 
 ## Findings
@@ -49,7 +51,21 @@ changes-requested | blocked | ready
 
 | Command / Scenario | Evidence Type | Requirement / Scenario | Result | What It Proves |
 |---|---|---|---|---|
-| TBD | focused automated test / broad supporting gate / deterministic E2E / live-provider playtest / manual UI confirmation / debug-log inspection | EPIC-ID/S1 R1/R1-S1 | TBD | TBD |
+| TBD | focused automated test / aggregate candidate gate / integration-candidate gate / broad supporting gate / deterministic E2E / live-provider playtest / manual UI confirmation / debug-log inspection | EPIC-ID/S1 R1/R1-S1 or candidate scope | TBD | TBD |
+
+## Verification Scope And Candidate Gates
+
+- Project-defined aggregate command or authoritative constituent source:
+- Aggregate gate required: yes / no
+- Trigger or project-policy reason:
+- Cache/freshness policy:
+- Post-gate evidence-record-only changes and affected checks rerun:
+
+| Stage | Exact Commit / Tree | Command | Meaningful Execution / Counts | Result |
+|---|---|---|---|---|
+| Reviewed source candidate | TBD | TBD | TBD | pass / findings / blocked / not applicable |
+| Prospective integration candidate | TBD | TBD | TBD | pass / findings / blocked / reusable source proof |
+| Actual integrated result | TBD | TBD | matches tested tree / rerun evidence / pending | pass / findings / blocked / not applicable |
 
 ## Rendered UI Verification
 
@@ -68,6 +84,8 @@ changes-requested | blocked | ready
 - Changed files:
 - Diff stat:
 - Conflict check:
+- Prospective integration tree:
+- Source and target refs used for candidate proof:
 - Dirty state:
 - Branch policy:
 - Reverse-traceability command/result:
@@ -110,6 +128,10 @@ changes-requested | blocked | ready
 - Source branch:
 - Reviewed source commit:
 - Target branch:
+- Tested integration tree/ref:
+- Source/target refs rechecked immediately before integration:
+- Actual integrated tree matches tested tree:
+- Required aggregate rerun after drift:
 - Conflict check:
 - Commit state:
 - PR status:

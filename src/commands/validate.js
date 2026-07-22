@@ -25,6 +25,8 @@ import {
   readRegularText,
   validateVerifiedEvidenceRow,
 } from "../epic-evidence.js";
+import { resolveChangedFrom, validateEpicHistory } from "../epic-history.js";
+import { validateEpicVerifyReports } from "../epic-verify-report.js";
 
 const CHANGE_FILES = Object.freeze({
   "proposal.md": [
@@ -908,7 +910,12 @@ async function validateChange({
   return findings;
 }
 
-async function validateRepository(workspaceRoot, config, repository, { changeId, epicId } = {}) {
+async function validateRepository(
+  workspaceRoot,
+  config,
+  repository,
+  { changeId, epicId, changedFrom } = {},
+) {
   const findings = [];
   const repositoryPath = resolveWorkspacePath(workspaceRoot, repository.resolvedPath);
   if (!(await isDirectory(repositoryPath))) {
@@ -919,6 +926,7 @@ async function validateRepository(workspaceRoot, config, repository, { changeId,
       })],
       changes: 0,
       epics: 0,
+      epicVerificationReports: 0,
       changeLocations: [],
     };
   }
@@ -987,7 +995,22 @@ async function validateRepository(workspaceRoot, config, repository, { changeId,
   }
 
   let epics = 0;
+  let epicVerificationReports = 0;
   const epicRecords = [];
+  let changedFromCommit = null;
+  if (changedFrom) {
+    const resolved = await resolveChangedFrom(repositoryPath, changedFrom);
+    changedFromCommit = resolved.commit;
+    if (resolved.error) {
+      findings.push(finding(
+        "error",
+        resolved.error,
+        repository.resolvedPath,
+        `Cannot resolve --changed-from ${changedFrom} in this repository.`,
+        { spaceId: repository.spaceId, repository: repository.resolvedPath },
+      ));
+    }
+  }
   if (!changeId || affectedEpicDirectories.size > 0) {
     const epicRoot = join(repositoryPath, artifacts.epics);
     const availableEpicDirectories = await listDirectories(epicRoot);
@@ -1057,6 +1080,22 @@ async function validateRepository(workspaceRoot, config, repository, { changeId,
         continue;
       }
       findings.push(...result.findings);
+      findings.push(...await validateEpicHistory({
+        repository,
+        repositoryRoot: repositoryPath,
+        epicPath,
+        displayPath,
+        epicId: result.epicId,
+        changedFromCommit,
+      }));
+      const reportResult = await validateEpicVerifyReports({
+        repository,
+        repositoryRoot: repositoryPath,
+        epicPath,
+        epicId: result.epicId,
+      });
+      findings.push(...reportResult.findings);
+      epicVerificationReports += reportResult.reports;
       epicRecords.push(result);
       epics += 1;
     }
@@ -1093,6 +1132,7 @@ async function validateRepository(workspaceRoot, config, repository, { changeId,
     findings,
     changes: candidates.length,
     epics,
+    epicVerificationReports,
     changeLocations: candidates.map((candidate) => ({
       spaceId: repository.spaceId,
       repository: repository.resolvedPath,
@@ -1128,7 +1168,13 @@ async function validatePlannedChanges(workspaceRoot, config, selectedSpaces, { c
 
 export async function validateArtifacts(
   startPath,
-  { spaceId = null, repositories = [], changeId = null, epicId = null } = {},
+  {
+    spaceId = null,
+    repositories = [],
+    changeId = null,
+    epicId = null,
+    changedFrom = null,
+  } = {},
 ) {
   const { workspaceRoot, config } = await resolveOperationConfiguration(startPath);
   assertValidConfig(config, "validate SDD artifacts");
@@ -1156,12 +1202,18 @@ export async function validateArtifacts(
   findings.push(...planned.findings);
   let changes = 0;
   let epics = 0;
+  let epicVerificationReports = 0;
   const repositoryChangeLocations = [];
   for (const repository of selectedRepositories) {
-    const result = await validateRepository(workspaceRoot, config, repository, { changeId, epicId });
+    const result = await validateRepository(workspaceRoot, config, repository, {
+      changeId,
+      epicId,
+      changedFrom,
+    });
     findings.push(...result.findings);
     changes += result.changes;
     epics += result.epics;
+    epicVerificationReports += result.epicVerificationReports;
     repositoryChangeLocations.push(...result.changeLocations);
   }
 
@@ -1207,6 +1259,7 @@ export async function validateArtifacts(
       spaceId,
       changeId,
       epicId,
+      changedFrom,
       repositories: selectedRepositories.map((repository) => repository.resolvedPath),
     },
     valid: errors === 0,
@@ -1215,6 +1268,7 @@ export async function validateArtifacts(
       plannedChanges: planned.plannedChanges,
       changes,
       epics,
+      epicVerificationReports,
       errors,
       warnings,
     },

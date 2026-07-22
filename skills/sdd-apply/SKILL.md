@@ -31,7 +31,7 @@ Promotion authorization: invoking `/sdd-apply` against an explicitly selected or
 
 Use `references/specialist-routing.md` to discover and apply materially relevant guidance available in the current runtime. Do not assume particular skills are installed, and do not copy their domain guidance into this skill.
 
-Use `references/risk-closure.md` for every non-trivial Change and whenever work crosses state, persistence, security, configuration, migration, provider, publication, or UI/application boundaries. Maintain its living risk, decision fan-out, verification-environment, phase-closure, and immutable-handoff records in the existing `tasks.md`; planning seeds what is knowable, and Apply adds or revises rows from current implementation evidence.
+Use `references/risk-closure.md` for every non-trivial Change and whenever work crosses state, persistence, security, configuration, migration, provider, publication, or UI/application boundaries. Maintain its living risk, decision fan-out, verification-environment, verification-scope, phase-closure, and immutable-handoff records in the existing `tasks.md`; planning seeds what is knowable, and Apply adds or revises rows from current implementation evidence.
 
 Use `assets/changelog-template.md` only when project policy calls for a Keep a Changelog-style release record and no compatible file exists yet.
 
@@ -365,7 +365,7 @@ For every UI-bearing slice, rendered UI verification is required before review h
    - Mark completed Requirement and Scenario checklist items.
    - Add a short implementation ledger entry.
    - Add verification ledger entries.
-   - Update the Implementation Risk And Confirmation Matrix, triggered Pattern Parity Matrix, triggered Stateful Transition Matrix, Decision Fan-Out Ledger, Verification Environment, and Review Handoff Candidate from the slice's discoveries and evidence.
+   - Update the Implementation Risk And Confirmation Matrix, triggered Pattern Parity Matrix, triggered Stateful Transition Matrix, Decision Fan-Out Ledger, Verification Environment, Verification Scope Decision, and Review Handoff Candidate from the slice's discoveries and evidence.
    - Add or refresh the Visual Verification Matrix and rendered-verification status.
    - Add or refresh manual UI confirmation steps and status.
    - Keep closeout fields consistent with reality: review record, manual confirmation status, release-communication status, PR/merge state, deferred gaps, and folder location.
@@ -387,6 +387,16 @@ For every UI-bearing slice, rendered UI verification is required before review h
 
 In default/full mode, loop back to the next pending Requirement or Scenario after every completed phase. Do not end the run while safe in-scope tasks, verification, artifact reconciliation, self-check findings, or the final guarded transition to `in_review` remain. Continue until the Change is ready for independent `/sdd-review` or a genuine stop condition is hit. In `--step`, stop after the requested bounded slice.
 
+## Verification Scope And Candidate Gates
+
+Keep three proof layers distinct:
+
+- **Focused proof** establishes individual Requirements and Scenarios and remains the basis of Epic `Verified By` maps.
+- **Aggregate candidate proof** establishes that the complete committed source candidate passes the project-required combined gate. Resolve the command from project guidance, testing/CI docs, workflow files, and package scripts. Require it when project policy says so or when the final diff crosses multiple capabilities, persistence or migrations, auth/security/privacy boundaries, process-global state, shared contracts, concurrency/workers/recovery, or another surface where isolated checks can conceal integration failures.
+- **Integration-candidate proof** establishes the prospective source-plus-current-target result when the target has advanced, contains accumulated Changes, requires conflict resolution, or otherwise produces a materially different tree. `/sdd-review` owns final integration-candidate judgment, but Apply must record the known obligation and target baseline.
+
+Do not require every project to expose the same command name or constituent list. Prefer one project-defined aggregate command when available; otherwise record the authoritative constituent commands and why they are equivalent. Run required aggregate proof after the final implementation commit, against that exact commit, with caches bypassed or freshness proved. Record the command, commit, meaningful execution/count evidence, cache/freshness treatment, and result in `tasks.md`. A later evidence-record-only commit may reuse that result only after its diff is classified and every gate that observes the changed artifacts is rerun; any behavior, test, dependency, configuration, migration, generated, executable, or gate-observed change invalidates the prior result. A focused pass, a green command that skipped meaningful work, an earlier behavior candidate's result, structural SDD validation, or unavailable remote CI does not satisfy a required aggregate gate.
+
 ## Verification And Implementation Self-Check
 
 Before reporting the change as implemented or ready for `/sdd-review`, run an implementation self-check. This is the apply-side sanity check that the implementation slice is complete, reconciled, and ready for independent review; it is not the local PR-style `/sdd-review` gate. Cover:
@@ -399,7 +409,7 @@ Before reporting the change as implemented or ready for `/sdd-review`, run an im
 - Supersession Reconciliation: later work has not left earlier Stories, Requirements, Scenarios, implementation/verification state, `Implemented By`, `Implementation Gaps`, `Verified By`, or `Verification Gaps` with stale assumptions.
 - Story Reference Traceability: new or modified Stories keep stable Epic-scoped labels or documented legacy Story IDs; Requirements use local `R#` IDs; Scenarios use local `R#-S#` IDs; verification evidence does not rely on stale `AC-#` labels unless they are explicitly marked as legacy references.
 - Story Reference Uniqueness: no duplicate `S#` labels exist within a single Epic, no duplicate full Story references exist, and no duplicate legacy app-wide Story IDs exist unless an explicit migration note blocks relying on the duplicate.
-- Test And Coverage: user-visible behavior has concrete proof, and risky fake/mock/helper boundaries have production-path proof or explicit gaps.
+- Test And Coverage: user-visible behavior has concrete proof, risky fake/mock/helper boundaries have production-path proof or explicit gaps, and the Verification Scope Decision correctly distinguishes focused, aggregate-candidate, and integration-candidate obligations.
 - Pattern Parity And Stateful Transitions: every triggered matrix has an inspected reference or starting state, applicable concern or edge, focused proof, and explicit divergence or gap. Similar source shape, static rendering, or a broad green suite is not enough.
 - Risk-Shaped Evidence: the living risk matrix covers the actual changed boundaries and every row is proved, explicitly accepted, or blocking. Do not treat an artifact claim such as "reset works", "stable identity", "autosave flushes", "validation rejects bad output", or "remote configuration fails clearly" as verified unless a test, browser/manual check, or source inspection directly supports that exact property.
 - Evidence Claim Integrity And Typing: important claims were falsified against the cited source, exact test/anchor, assertion or observation, discovery path, and implementation boundary; generic framework anchors such as `#it(` are rejected; deterministic E2E, live-provider, manual, broad-gate, and debug evidence remain distinct. Missing, skipped, broad, or boundary-mismatched proof is a gap, not a pass.
@@ -409,7 +419,7 @@ Before reporting the change as implemented or ready for `/sdd-review`, run an im
 - Security And Data Safety: auth, permissions, untrusted-output publication, persistence, existing-data migrations and rollback, secrets, and destructive paths are handled or explicitly out of scope.
 - Docs And Artifacts: the decision fan-out ledger reconciles affected runtime defaults, configuration examples, generated contracts, project docs under `docs/`, README/current-state docs, and change artifacts without inventing a fixed docs inventory.
 - Release Communication: the project-defined release record is updated when required, or `tasks.md` records why no entry is needed.
-- Review Handoff Readiness: the exact committed candidate differs from its integration target, intended implementation is committed, unrelated dirty state is identified, required environments actually ran, commit-sensitive checks pass, and remaining gaps plus later `/sdd-review` needs are clear.
+- Review Handoff Readiness: the exact committed candidate differs from its integration target, intended implementation is committed, unrelated dirty state is identified, required environments actually ran, commit-sensitive checks and any required aggregate candidate gate pass on that exact commit, and remaining integration-candidate obligations plus later `/sdd-review` needs are clear.
 - Commit Cadence: every completed verified phase has its own coherent local commit, or `tasks.md` records the exact `--no-commit`, user-policy, repository-policy, or isolation reason it remains a commit candidate. Multiple independently reviewable phases have not been accumulated into one undifferentiated commit.
 - Closeout Readiness: `tasks.md` has no contradictory Resume Here, checklist, review record, manual confirmation status, release-communication status, PR/merge state, deferred-gap, or folder-location claims.
 - Closed-Artifact Readiness: related proposal/design/tasks/review files do not still claim implemented work is unimplemented, unverified, pending, or accepted under obsolete status vocabulary.
@@ -448,6 +458,7 @@ A change is implementation-complete only when:
 - project-defined release communication is current when required.
 - every completed verified phase has been committed at a coherent boundary, or its commit candidate and exact blocking/opt-out reason are recorded.
 - every living risk row and decision fan-out row is resolved, explicitly accepted, or blocking; every required verification environment actually ran or has an explicit accepted gap.
+- the Verification Scope Decision is current; every required aggregate candidate gate passed freshly on the exact final committed candidate, with meaningful execution evidence, or remains an explicit blocker rather than an implied focused-test substitution.
 - the review handoff names an immutable committed candidate, its integration target/merge base, unrelated dirty state, and passing commit-sensitive checks; intended implementation is not stranded only in the working tree.
 
 Implementation-complete means ready for `/sdd-review`. Do not treat implementation completion as local PR readiness.
@@ -476,6 +487,7 @@ Stop and report when:
 - branch policy is missing with no documented fallback, or violated.
 - unrelated dirty files block safe edits.
 - verification fails without a safe in-scope fix.
+- a required aggregate candidate gate is missing, stale, cached without freshness proof, ran against a different commit, skipped meaningful constituents, or fails without a safe in-scope fix.
 - duplicate Story labels inside one Epic, duplicate full Story references, or duplicate legacy app-wide Story IDs exist without an explicit migration/blocking note.
 - a later Story or implementation slice supersedes earlier Epic truth that has not been reconciled.
 - risky production-path behavior is only covered by mocks/helpers and no explicit gap is acceptable.

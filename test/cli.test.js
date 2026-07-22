@@ -331,6 +331,132 @@ async function writeCanonicalEpic(root, repository, epicId = "SAMPLE-E001") {
   return join(epicPath, "epic.md");
 }
 
+async function writeEpicVerificationReport(
+  root,
+  repository,
+  {
+    epicId = "SAMPLE-E001",
+    fileName = "2026-07-22-1200-epic-verify.md",
+    initialResult = "aligned",
+    result = "aligned",
+    gateResult = "pass",
+    supersedes = null,
+    omitGate = null,
+    includeChangedFrom = true,
+    auditedRef = "a".repeat(40),
+    verifiedRef = "b".repeat(40),
+    verdictInitialResult = initialResult,
+    verdictAuditedRef = auditedRef,
+    verdictVerifiedRef = verifiedRef,
+  } = {},
+) {
+  const gateNames = [
+    "SDD workflow adherence",
+    "Epic coherence",
+    "Epic template adherence",
+    "Story shape",
+    "Story requirement completeness",
+    "Story reference traceability",
+    "Canonical map authority",
+    "Cold code navigation",
+    "Semantic anchor ownership",
+    "Reverse traceability inventory",
+    "Requirement and Scenario truth",
+    "Implementation drift",
+    "Verification strength",
+    "Supporting truth freshness",
+    "Change status traceability",
+    "Docs and product alignment",
+    "Security and data safety",
+  ];
+  const reviewsPath = join(
+    root,
+    "code",
+    repository,
+    "docs",
+    "epics",
+    "sample-e001-core",
+    "reviews",
+  );
+  await mkdir(reviewsPath, { recursive: true });
+  const reportPath = join(reviewsPath, fileName);
+  await writeFile(
+    reportPath,
+    [
+      "---",
+      "schema: sdd-epic-verify-report-v1",
+      "kind: sdd-epic-verify-report",
+      `epic: ${epicId}`,
+      "epic_path: docs/epics/sample-e001-core/epic.md",
+      "created: 2026-07-22",
+      `initial_result: ${initialResult}`,
+      `result: ${result}`,
+      "mode: default",
+      `audited_ref: ${auditedRef}`,
+      `verified_ref: ${verifiedRef}`,
+      `supersedes: ${supersedes ?? "null"}`,
+      "---",
+      "",
+      `# Epic Verify: ${epicId} Core Experience`,
+      "",
+      "## Verdict",
+      "",
+      `- Initial result: \`${verdictInitialResult}\``,
+      `- Current result: \`${result}\``,
+      "- App root: repository",
+      "- Epic: `docs/epics/sample-e001-core/epic.md`",
+      `- Audited ref: \`${verdictAuditedRef}\``,
+      `- Verified ref: \`${verdictVerifiedRef}\``,
+      "- Delegation: none",
+      "- Report mode: default",
+      "",
+      "## Current Gate Scorecard",
+      "",
+      "| Gate | Result | Notes |",
+      "|---|---|---|",
+      ...gateNames
+        .filter((gate) => gate !== omitGate)
+        .map((gate) => `| ${gate} | ${gateResult} | Current result. |`),
+      "",
+      "## Current Findings",
+      "",
+      "### BLOCKING",
+      "",
+      "- None.",
+      "",
+      "### REQUIRED",
+      "",
+      "- None.",
+      "",
+      "### SUGGESTION",
+      "",
+      "- None.",
+      "",
+      "## Initial Findings (Historical)",
+      "",
+      initialResult === result ? "- Same as the current result." : "- Initial artifact drift was remediated.",
+      "",
+      "## Remediation And Recheck",
+      "",
+      initialResult === result ? "- No remediation was required." : "- Reconciled the artifact and reran validation.",
+      "",
+      "## Current Tests And Checks",
+      "",
+      "| Command / Scenario | Result | Proves | Notes |",
+      "|---|---|---|---|",
+      `| \`sdd validate sample --epic SAMPLE-E001${includeChangedFrom ? ` --changed-from ${auditedRef}` : ""}\` | pass | Current artifact shape. | Required baseline. |`,
+      "| `python3 sdd_orphan_audit.py . --epic SAMPLE-E001 --format json` | pass | Current reverse inventory. | Required baseline. |",
+      "",
+      "## Next Action",
+      "",
+      "- None.",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  return reportPath;
+}
+
 test("init creates a local workspace contract and imports one-to-many mappings", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -1657,6 +1783,7 @@ test("packaged workflow templates preserve parity, transition, and evidence-inte
   );
   assert.match(tasksTemplate, /^## Pattern Parity Matrix$/m);
   assert.match(tasksTemplate, /^## Stateful Transition Matrix$/m);
+  assert.match(tasksTemplate, /^## Verification Scope Decision$/m);
   assert.match(tasksTemplate, /exact test title or stable named test anchor/);
 
   const reviewTemplate = await readFile(
@@ -1674,6 +1801,39 @@ test("packaged workflow templates preserve parity, transition, and evidence-inte
   assert.match(reviewTemplate, /^\| Evidence falsification \|/m);
   assert.match(reviewTemplate, /^\| Pattern conformance \|/m);
   assert.match(reviewTemplate, /^\| Stateful transitions \|/m);
+  assert.match(reviewTemplate, /^## Verification Scope And Candidate Gates$/m);
+
+  const epicVerifyTemplate = await readFile(
+    join(PACKAGE_ROOT, "docs", "templates", "epic-verify-report.md"),
+    "utf8",
+  );
+  assert.equal(
+    await readFile(
+      join(PACKAGE_ROOT, "skills", "sdd-epic-verify", "assets", "epic-verify-report-template.md"),
+      "utf8",
+    ),
+    epicVerifyTemplate,
+    "sdd-epic-verify report template must match the canonical package template",
+  );
+  assert.match(epicVerifyTemplate, /^schema: sdd-epic-verify-report-v1$/m);
+  assert.match(epicVerifyTemplate, /^result: blocked$/m);
+  assert.match(epicVerifyTemplate, /^## Current Findings$/m);
+  assert.match(epicVerifyTemplate, /^\| Aggregate\/runtime verification scope \|/m);
+
+  const releaseTemplate = await readFile(
+    join(PACKAGE_ROOT, "docs", "templates", "release-pr.md"),
+    "utf8",
+  );
+  assert.equal(
+    await readFile(
+      join(PACKAGE_ROOT, "skills", "sdd-release", "assets", "release-pr-template.md"),
+      "utf8",
+    ),
+    releaseTemplate,
+    "sdd-release PR template must match the canonical package template",
+  );
+  assert.match(releaseTemplate, /^## File Scope Reconciliation$/m);
+  assert.match(releaseTemplate, /^## Documentation And SDD Integrity$/m);
 
   const applySkill = await readFile(
     join(PACKAGE_ROOT, "skills", "sdd-apply", "SKILL.md"),
@@ -1686,9 +1846,37 @@ test("packaged workflow templates preserve parity, transition, and evidence-inte
   assert.match(applySkill, /Pattern Parity Matrix/);
   assert.match(applySkill, /Stateful Transition Matrix/);
   assert.match(applySkill, /Evidence Claim Integrity/);
+  assert.match(applySkill, /Keep three proof layers distinct/);
   assert.match(reviewSkill, /\*\*Evidence falsification\*\*/);
   assert.match(reviewSkill, /\*\*Pattern conformance\*\*/);
   assert.match(reviewSkill, /\*\*Risk-shaped evidence and stateful transitions\*\*/);
+  assert.match(reviewSkill, /Require integration-candidate proof/);
+});
+
+test("packaged audit and handoff skills preserve current-state and file-scope gates", async () => {
+  const epicVerifySkill = await readFile(
+    join(PACKAGE_ROOT, "skills", "sdd-epic-verify", "SKILL.md"),
+    "utf8",
+  );
+  assert.match(epicVerifySkill, /immutable audit snapshot/);
+  assert.match(epicVerifySkill, /Current Tests And Checks/);
+  assert.match(epicVerifySkill, /supersedes/);
+  assert.match(epicVerifySkill, /final batch-coherence pass/);
+
+  const prSkill = await readFile(
+    join(PACKAGE_ROOT, "skills", "sdd-pr", "SKILL.md"),
+    "utf8",
+  );
+  assert.doesNotMatch(prSkill, /^\s*- `--fix`:/m);
+  assert.match(prSkill, /exact source-to-target changed-file inventory/);
+
+  const releaseSkill = await readFile(
+    join(PACKAGE_ROOT, "skills", "sdd-release", "SKILL.md"),
+    "utf8",
+  );
+  assert.match(releaseSkill, /exact source-to-target changed-file inventory/);
+  assert.match(releaseSkill, /compare it path-for-path with the recorded release allowlist/);
+  assert.match(releaseSkill, /Per-Change focused evidence/);
 });
 
 test("epic create refuses ambiguous repositories, collisions, and dry-run writes", async (t) => {
@@ -2601,6 +2789,15 @@ test("CLI exposes epic command-group help", async () => {
   assert.match(stdout, /structurally validate a canonical Epic/i);
 });
 
+test("CLI exposes changed-from validation help", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "--help",
+  ]);
+
+  assert.match(stdout, /--changed-from <commit-ish>/);
+});
+
 test("validate accepts a canonical active Change", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -2870,6 +3067,403 @@ test("validate accepts a canonical Epic by ID", async (t) => {
   assert.equal(result.valid, true);
   assert.equal(result.summary.epics, 1);
   assert.deepEqual(result.findings, []);
+});
+
+test("validate accepts a coherent current Epic verification report", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  await writeEpicVerificationReport(root, "sample-web", {
+    initialResult: "needs artifact fix",
+    result: "aligned",
+    gateResult: "pass",
+  });
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, true);
+  assert.equal(result.summary.epicVerificationReports, 1);
+  assert.deepEqual(result.findings, []);
+});
+
+test("validate rejects an aligned Epic verification report with current findings", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  await writeEpicVerificationReport(root, "sample-web", {
+    initialResult: "needs artifact fix",
+    result: "aligned",
+    gateResult: "findings",
+  });
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "EPIC_VERIFY_RESULT_CONTRADICTION"
+    && finding.message.includes("Current Gate Scorecard")));
+});
+
+test("validate rejects an aligned Epic verification report with incomplete gate coverage", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  await writeEpicVerificationReport(root, "sample-web", {
+    omitGate: "Security and data safety",
+  });
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "EPIC_VERIFY_RESULT_CONTRADICTION"));
+});
+
+test("validate rejects Epic verification Verdict metadata drift", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  await writeEpicVerificationReport(root, "sample-web", {
+    initialResult: "needs artifact fix",
+    result: "aligned",
+    verdictInitialResult: "blocked",
+    verdictAuditedRef: "c".repeat(40),
+    verdictVerifiedRef: "d".repeat(40),
+  });
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "EPIC_VERIFY_VERDICT_MISMATCH"));
+});
+
+test("validate rejects mutable Epic verification refs", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  await writeEpicVerificationReport(root, "sample-web", {
+    auditedRef: "HEAD",
+    verifiedRef: "develop",
+  });
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "INVALID_EPIC_VERIFY_REPORT_METADATA"));
+});
+
+test("validate rejects an aligned Epic verification report without its audited baseline check", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  await writeEpicVerificationReport(root, "sample-web", {
+    includeChangedFrom: false,
+  });
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "EPIC_VERIFY_RESULT_CONTRADICTION"));
+});
+
+test("validate rejects malformed versioned Epic verification report frontmatter", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  const reportPath = await writeEpicVerificationReport(root, "sample-web");
+  await writeFile(
+    reportPath,
+    (await readFile(reportPath, "utf8")).replace(
+      "kind: sdd-epic-verify-report",
+      "kind: [invalid",
+    ),
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "INVALID_EPIC_VERIFY_REPORT_FRONTMATTER"));
+});
+
+test("validate rejects a missing superseded Epic verification report", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  await writeEpicVerificationReport(root, "sample-web", {
+    supersedes: "docs/epics/sample-e001-core/reviews/missing-epic-verify.md",
+  });
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "BROKEN_EPIC_VERIFY_SUPERSEDES"));
+});
+
+test("validate accepts one explicit Epic verification report successor", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  await writeEpicVerificationReport(root, "sample-web", {
+    fileName: "2026-07-22-1200-epic-verify.md",
+    initialResult: "needs artifact fix",
+    result: "needs artifact fix",
+    gateResult: "findings",
+  });
+  await writeEpicVerificationReport(root, "sample-web", {
+    fileName: "2026-07-22-1300-epic-verify.md",
+    initialResult: "needs artifact fix",
+    result: "aligned",
+    supersedes: "docs/epics/sample-e001-core/reviews/2026-07-22-1200-epic-verify.md",
+  });
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, true);
+  assert.equal(result.summary.epicVerificationReports, 2);
+});
+
+test("validate rejects an absolute Epic verification report predecessor", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  const predecessor = await writeEpicVerificationReport(root, "sample-web", {
+    fileName: "2026-07-22-1200-epic-verify.md",
+  });
+  await writeEpicVerificationReport(root, "sample-web", {
+    fileName: "2026-07-22-1300-epic-verify.md",
+    supersedes: predecessor,
+  });
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "BROKEN_EPIC_VERIFY_SUPERSEDES"));
+});
+
+test("validate rejects ambiguous Epic verification report tips", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  await writeEpicVerificationReport(root, "sample-web", {
+    fileName: "2026-07-22-1200-epic-verify.md",
+  });
+  await writeEpicVerificationReport(root, "sample-web", {
+    fileName: "2026-07-22-1300-epic-verify.md",
+  });
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "AMBIGUOUS_EPIC_VERIFY_TIP"));
+});
+
+test("validate changed-from rejects substantive Epic edits with stale modified metadata", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const repositoryRoot = join(root, "code", "sample-web");
+  const epicPath = await writeCanonicalEpic(root, "sample-web");
+  await execFileAsync("git", ["init", "-b", "develop", repositoryRoot]);
+  await execFileAsync("git", ["-C", repositoryRoot, "add", "."]);
+  await execFileAsync("git", [
+    "-C",
+    repositoryRoot,
+    "-c",
+    "user.name=SDD Test",
+    "-c",
+    "user.email=sdd@example.invalid",
+    "commit",
+    "-m",
+    "baseline",
+  ]);
+  await writeFile(
+    epicPath,
+    (await readFile(epicPath, "utf8")).replace("- Core behavior.", "- Core behavior with recovery."),
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+    changedFrom: "HEAD",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "STALE_EPIC_MODIFIED_DATE"));
+});
+
+test("validate changed-from accepts verification-only metadata changes", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const repositoryRoot = join(root, "code", "sample-web");
+  const epicPath = await writeCanonicalEpic(root, "sample-web");
+  await execFileAsync("git", ["init", "-b", "develop", repositoryRoot]);
+  await execFileAsync("git", ["-C", repositoryRoot, "add", "."]);
+  await execFileAsync("git", [
+    "-C",
+    repositoryRoot,
+    "-c",
+    "user.name=SDD Test",
+    "-c",
+    "user.email=sdd@example.invalid",
+    "commit",
+    "-m",
+    "baseline",
+  ]);
+  await writeFile(
+    epicPath,
+    (await readFile(epicPath, "utf8")).replace(
+      "last_verified: 2026-07-14",
+      "last_verified: 2026-07-22",
+    ),
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+    changedFrom: "HEAD",
+  });
+
+  assert.equal(result.valid, true);
+  assert.ok(!result.findings.some((finding) =>
+    finding.code === "STALE_EPIC_MODIFIED_DATE"));
+});
+
+test("validate changed-from accepts a second substantive Epic edit on the same day", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const repositoryRoot = join(root, "code", "sample-web");
+  const epicPath = await writeCanonicalEpic(root, "sample-web");
+  const now = new Date();
+  const today = [now.getFullYear(), now.getMonth() + 1, now.getDate()]
+    .map((value, index) => String(value).padStart(index === 0 ? 4 : 2, "0"))
+    .join("-");
+  await writeFile(
+    epicPath,
+    (await readFile(epicPath, "utf8")).replace(
+      "modified: 2026-07-14",
+      `modified: ${today}`,
+    ),
+    "utf8",
+  );
+  await execFileAsync("git", ["init", "-b", "develop", repositoryRoot]);
+  await execFileAsync("git", ["-C", repositoryRoot, "add", "."]);
+  await execFileAsync("git", [
+    "-C",
+    repositoryRoot,
+    "-c",
+    "user.name=SDD Test",
+    "-c",
+    "user.email=sdd@example.invalid",
+    "commit",
+    "-m",
+    "baseline",
+  ]);
+  await writeFile(
+    epicPath,
+    (await readFile(epicPath, "utf8")).replace("- Core behavior.", "- Core behavior with same-day recovery."),
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+    changedFrom: "HEAD",
+  });
+
+  assert.equal(result.valid, true);
+  assert.ok(!result.findings.some((finding) =>
+    finding.code === "STALE_EPIC_MODIFIED_DATE"));
+});
+
+test("validate changed-from reports an invalid Git baseline as a finding", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const repositoryRoot = join(root, "code", "sample-web");
+  await writeCanonicalEpic(root, "sample-web");
+  await execFileAsync("git", ["init", "-b", "develop", repositoryRoot]);
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+    changedFrom: "missing-baseline",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "CHANGED_FROM_REF_NOT_FOUND"));
 });
 
 test("validate rejects an empty v2 Story declaration when a promoted Story exists", async (t) => {

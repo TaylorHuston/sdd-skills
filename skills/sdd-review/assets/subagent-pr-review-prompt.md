@@ -22,6 +22,8 @@ You are performing one fresh-context PR-style review pass for a Story-Driven Dev
 - Review pass: `REVIEW_PASS`
 - Relevant Story/Requirement/Scenario IDs: `TRACEABILITY_SCOPE`
 - Branch policy summary: `BRANCH_POLICY`
+- PR/issue/review-history and related-repository context: `REVIEW_INTENT_CONTEXT`
+- Configured deterministic review tools: `REVIEW_TOOLS`
 - Specialist guidance to load: `SPECIALIST_GUIDANCE`
 - Specialist routing reason: `SPECIALIST_ROUTING_REASON`
 
@@ -37,11 +39,16 @@ Read only the context needed for the assigned pass:
 - `proposal.md`, `design.md`, `tasks.md`, and existing `review.md` when relevant
 - target Epic files when traceability, artifact truth, or coverage is in scope
 - source-vs-target changed files and surrounding code needed to understand the diff
+- materially relevant callers, consumers, registrations, schemas, configuration, generated boundaries, and downstream tests for changed public or behavior-owning symbols
 - tests, docs, config, generated files, release communication, Idea entry-point docs, PRD, visual identity, or security docs only when assigned
 - the reverse-traceability inventory when the assigned pass needs candidate classification
 - specialist guidance named by the orchestrator
 
 Do not broaden into unrelated repo history, unrelated dirty files, production release checks, or unassigned product planning.
+
+## Systematic Search Protocol
+
+Within the assigned pass, do not rely on one salience-driven reading. Derive relevant intent from the available Change and PR context, inspect every assigned changed path and behavior-bearing hunk, trace materially relevant upstream inputs and downstream effects, run applicable configured deterministic tools, and challenge the pass-specific failure classes before reporting. Treat search indexes, Epic paths, aggregate green commands, and analyzer output as inputs rather than proof of complete coverage or a valid finding. Keep candidate concerns until the assigned surface is complete, then reject preferences, disproved concerns, and findings without concrete impact.
 
 ## Review Passes
 
@@ -49,7 +56,7 @@ Apply only the assigned `REVIEW_PASS`:
 
 - `artifact-truth`: check proposal, design, tasks, Epic truth, Epic template adherence, Story labels/references, Requirement IDs, Scenario IDs, independent implementation/verification state, behavior-mapped `Implemented By`, `Implementation Gaps`, scenario-mapped `Verified By`, `Verification Gaps`, machine-readable Change status, review state, manual confirmation status, release-communication state, PR/merge state, and closeout state. Require exactly one current implementation map and one current verification map per Story; flag competing prior/detailed/legacy maps. Valid active status values are `proposed`, `planned`, `in_progress`, and `in_review`; folder location under `closed/` is the closed state, and historical closed Changes may retain formerly valid status values. Flag `Verified By` sections that are only command logs or unmapped broad gates. Flag completed or closing changes whose proposal/design/tasks/review artifacts still say work is not implemented, not verified, pending, or use obsolete manual confirmation status vocabulary. For user-facing UI changes, check whether the review artifacts name any remaining manual UI tests the user should confirm, or explicitly say none are useful.
 - `cold-navigation`: begin from each changed Requirement and any Scenario with a distinct implementation owner. Confirm the Epic names the concrete repository-relative primary code location, a stable symbol or searchable anchor, its responsibility, and concrete verification evidence without a repository-wide rediscovery search. Open the anchor and reject imports, call sites, incidental handlers, broad tokens, or files cited for another symbol as governing ownership. Flag missing paths, missing anchors, undifferentiated file dumps, and maps that stop at UI/tests while hiding application logic.
-- `code-diff`: review `TARGET_REF...SOURCE_REF` for correctness, regressions, maintainability, accidental scope, error/loading/empty states, generated-file drift, and consistency with project patterns.
+- `code-diff`: review every changed path and behavior-bearing hunk in `TARGET_REF...SOURCE_REF` for correctness, regressions, maintainability, accidental scope, error/loading/empty states, generated-file drift, and consistency with project patterns. For changed public or behavior-owning symbols, trace materially relevant callers, consumers, registrations, imports, routes, schemas, persistence, configuration, generated contracts, and downstream tests. Run applicable configured linters, typecheckers, static analyzers, and focused tests; validate their output against the diff before reporting it.
 - `verification-coverage`: check whether tests, browser checks, manual checks, mocks/fakes, verification ledgers, and Epic `Verified By` entries prove the changed Requirements and Scenarios well enough for the risk. Distinguish focused automated tests, broad supporting gates, deterministic E2E, live-provider playtests, manual UI confirmation, and debug/log inspection instead of treating them as interchangeable.
 - `evidence-falsification`: treat new or high-risk completion checkboxes, `Verified By` rows, E2E/security/recovery claims, and review-handoff statements as falsifiable. Open the cited proof; identify the exact test title or stable named anchor and important assertion, route, selector, injected failure, or observation; reject generic framework tokens such as `#it(`; confirm the passing command discovers it; reject unsupported Scenario aggregation; and distinguish server-side enforcement from client-side retry, redirect, timeout, draft, navigation, and recovery behavior.
 - `pattern-conformance`: for each new or changed adapter, client, route, workspace, worker, migration, command, or other sibling surface, identify the closest current reference and compare applicable auth/session/CSRF, retry, timeout/cancel, error/conflict, recovery, pending-write, identity, route-context, configuration, generated-contract, accessibility, and visual-token behavior plus focused tests. Flag unexplained divergence or a defect copied from the reference.
@@ -105,5 +112,6 @@ Return:
 - suggested manual UI testing the user should confirm, or `none`
 - specialist guidance loaded, skipped, unavailable, or newly recommended
 - assumptions and blind spots
+- material candidate concerns rejected after validation when needed to demonstrate review coverage
 - recommended safe remediation slices, if any
 - residual risks

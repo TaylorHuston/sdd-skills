@@ -31,9 +31,8 @@ Infer inputs in this order:
 - Target branch: explicit user branch, otherwise the app branch policy's PR, review, integration, or stable target.
 - Repository root: current git repo, or the app repo implied by the conversation.
 - PR mode:
-  - default: create the PR if missing; otherwise check and address review comments, then stop before merge.
+  - default: create the PR if missing; otherwise check and address accepted review comments with narrow fixes, then stop before merge.
   - `--check`: inspect and report only; do not edit code, comment, resolve, push, or create a PR.
-  - `--fix`: allow narrow code, test, and documentation changes for accepted PR comments.
   - `--until-clean`: keep looping until no actionable comments remain or a stop condition is reached.
   - `--check-now`: after creating a PR, immediately perform a best-effort comment/check pass anyway. Use only when the user explicitly asks for an immediate check.
 
@@ -57,6 +56,8 @@ If the source branch, target branch, provider, or project policy cannot be infer
    - Use focused commit messages.
    - Resolve the current source commit SHA and the last source commit covered by `/sdd-review` from `review.md`, `tasks.md`, or the PR body. Treat a branch name alone as mutable context, not as the review watermark.
    - Resolve manual confirmation status and whether project policy requires `user confirmed` or an `accepted gap` before PR creation, merge readiness, or merge. Keep technical review and acceptance state separate.
+   - Build the exact source-to-target changed-file inventory and classify every path against the intended Change, required Epic/supporting truth, review remediation, or generated output required by project policy. Stop on unexplained or unrelated paths before creating or updating the PR.
+   - For any commit made by this workflow, derive the exact per-commit path allowlist from the accepted comment plus required tests, Epic reconciliation, supporting docs, and release communication. Stage only those explicit paths; compare the staged name-status list to the allowlist and inspect the staged diff before committing. After commit, compare the committed name-status list to the same allowlist before pushing.
 5. Push the source branch:
    - Use `git push -u origin <source>` when no upstream exists.
    - Do not force-push unless the user explicitly asks.
@@ -100,6 +101,7 @@ For an existing PR:
 
 1. Continue to `Collect Comments And Checks`.
 2. Treat each activation as a fresh review loop over the current PR state.
+3. Recompute the PR diff and classify every changed path before addressing comments; do not trust a prior allowlist after new commits arrive.
 
 ## Collect Comments And Checks
 
@@ -132,11 +134,13 @@ For each actionable comment:
 4. Add or update tests when the risk warrants it.
 5. Reconcile Epic truth, evidence, supporting docs, release communication, and active task state required by the classification.
 6. Run focused verification first, then broader checks or a fresh `/sdd-review` as required.
-7. Commit accepted fixes with a clear message.
-8. Push the source branch.
-9. Record the new commit as the latest reconciled PR head in the PR body or a durable PR summary comment, including the impact classification and verification result.
-10. Reply to the comment with what changed and the verification run.
-11. Resolve the review thread when the provider exposes a resolvable thread and the issue is actually handled.
+7. Recompute the changed-file inventory and confirm every new or modified path remains inside the accepted remediation and SDD reconciliation scope.
+8. Stage only the explicit remediation allowlist, compare the staged paths to it, and inspect the staged diff.
+9. Commit accepted fixes with a clear message, then compare the committed paths to the same allowlist.
+10. Push the source branch.
+11. Record the new commit as the latest reconciled PR head in the PR body or a durable PR summary comment, including the impact classification and verification result.
+12. Reply to the comment with what changed and the verification run.
+13. Resolve the review thread when the provider exposes a resolvable thread and the issue is actually handled.
 
 For answer-only, declined, or stale comments:
 
@@ -206,6 +210,7 @@ When the existing PR has no actionable comments left:
    - every commit after the reviewed source commit has an impact classification
    - behavior, contract, security, data, API, architecture, or other material risk changes received a fresh `/sdd-review`
    - Epic truth, evidence, supporting docs, and release communication match the current PR head
+   - the final source-to-target file inventory is identical to the classified PR scope, with no unexplained path
 3. Confirm acceptance readiness:
    - manual confirmation status uses the canonical vocabulary
    - any project-required walkthrough remains complete and current for the reviewed PR head

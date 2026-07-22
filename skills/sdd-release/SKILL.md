@@ -65,12 +65,14 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
    - Stop on duplicate `S#` Story labels inside one Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs unless the release is explicitly carrying the cleanup and it has already passed `/sdd-review`.
    - Confirm every project-required release record exists. Create a missing record from a compatible template only when project policy or the user authorizes that format.
    - Confirm secrets, env files, generated caches, build artifacts, and local-only files will not be staged.
+   - Build an exact source-to-target changed-file inventory before editing release metadata. Classify every path as intended product scope, required SDD/supporting truth, authorized release metadata, generated output required by project policy, or unrelated. Record the expected release allowlist; stop on any unexplained path.
 3. Resolve and run release checks before release-artifact edits.
    - First defer to project-local release guidance when it exists, in this order: project-local `AGENTS.md`, `docs/ci-cd.md`, `docs/testing.md`, `docs/deployment.md`, workflow files under `.github/workflows/`, then package scripts.
    - Treat the project-local documented required release gate as authoritative when it clearly names required commands or explicitly marks browser, provider-backed, deployment, or e2e checks as optional, risk-triggered, or not required yet.
    - Run the full e2e test suite first only when project-local docs or scripts expose it as required for release, or when release risk makes browser/provider-backed verification materially necessary.
    - Also run required or best-available release checks from project docs or package scripts, such as lint, typecheck, unit tests, integration tests, build, codegen check, migration dry-run/check, formatting check, docs validation, or risk-triggered e2e.
    - Prefer project-defined aggregate commands such as `ci:required`, `ci`, `check`, `test`, `test:e2e`, `e2e`, `lint`, `typecheck`, and `build`; do not invent destructive commands.
+   - Run the required release gate freshly on the exact current committed source candidate and record meaningful constituent/test counts or equivalent execution evidence plus cache treatment. Per-Change focused evidence, a closed Change, structural SDD validation, or CI for another ref never substitutes for current release-candidate proof.
    - If no project-local release guidance exists, derive the strongest available local release gate from package scripts, workflow files, README/testing docs, and the changed risk surface. Do not require e2e solely because the project exposes an e2e command.
    - If no project-local release guidance exists and no meaningful local release gate can be identified, stop or explicitly record why release confidence cannot be established.
    - If project-local release guidance exists and says e2e or browser/provider checks are optional or not yet part of the required gate, do not stop solely because no e2e command exists; report the skipped optional gate and its documented reason.
@@ -95,15 +97,18 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
    - Rerun full e2e only when release-artifact edits can affect runtime, build, packaged assets, or the project policy requires it after any commit.
 7. Commit release metadata when allowed.
    - Stage only the explicit release artifacts resolved from project policy.
+   - Compare the staged file list to the release-metadata allowlist immediately before committing. Unstage and classify any unexpected path; never rely on an earlier clean-status observation.
    - Use a concise commit message such as `Prepare release notes`.
+   - After committing, compare the committed name-status list to the same release-metadata allowlist before any push.
    - Skip committing in `--check` and `--no-commit`.
 8. Open the release PR.
    - In default/full mode, treat the invoked workflow as authorization to push the resolved source branch normally and create the configured release PR. Do not pause for a second authorization after the version decision and release gates are complete unless project-local policy explicitly requires it.
-   - Immediately before pushing, confirm the current source `HEAD` is the exact reconciled release candidate, required post-metadata checks passed against it, the worktree contains no intended uncommitted release work, the remote and upstream are the resolved ones, and the push is non-force. Stop on drift instead of pushing a different candidate.
+   - Immediately before pushing, recompute the complete source-to-target diff and compare it path-for-path with the recorded release allowlist. Confirm every addition, deletion, rename, and modification has one current classification; stop on an unexpected or reclassified path.
+   - Confirm the current source `HEAD` is the exact reconciled release candidate, required post-metadata checks passed against it, the worktree contains no intended uncommitted release work, the remote and upstream are the resolved ones, and the push is non-force. Stop on drift instead of pushing a different candidate.
    - Push only the resolved source branch; never use this authorization to push the production target, another branch, tags, or rewritten history.
    - Open or prepare the project-defined release handoff using the configured provider and available tools.
    - Use `assets/release-pr-template.md` for the PR body.
-   - Include release scope, release-communication summary, SDD reviews checked, the exact reviewed source commit, the initial reconciled PR head, post-review change classifications or `none`, commands run, relevant end-to-end results, security/data notes, manual acceptance notes, and known risks.
+   - Include release scope, the reconciled changed-file classifications, any excluded/unrelated paths, release-communication summary, SDD reviews checked, the exact reviewed source commit, the initial reconciled PR head, post-review change classifications or `none`, commands run, relevant end-to-end results, security/data notes, manual acceptance notes, and known risks.
    - Treat the remote PR as the handoff to hosted CI and remote AI-assisted review when configured. Add required labels, reviewers, or context only when project docs or the user's request calls for them.
    - Record remote AI-assisted review as `triggered`, `not configured`, `unavailable`, or `not checked`; do not block PR creation solely because an optional remote review has not completed.
    - End new PR creation with a handoff to `/sdd-pr` for later review-thread and status-check stewardship after CI, bots, or humans have had time to respond.

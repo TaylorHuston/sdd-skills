@@ -33,6 +33,8 @@ Default output is a report under the Epic directory:
 
 Use `assets/epic-verify-report-template.md` for the report and `assets/epic-template.md` as the canonical Epic shape reference. Create `reviews/` only when writing a report.
 
+Every new report must use `schema: sdd-epic-verify-report-v1` and distinguish initial/historical state from the current verified state. Treat a written report as an immutable audit snapshot. When later remediation changes the result, write a successor report whose repository-relative `supersedes` value names the prior report; do not rewrite a failed report to look as though it was always aligned. Record the immutable audited and verified commits, or explicitly report a blocked result when no stable commit can represent the audited source.
+
 Use `sdd validate <space-id> --epic <epic-id> --repo <resolved-repository-path> --workspace <workspace-root> --json` for the repeatable Epic structure and traceability scan. Use `sdd validate <space-id> --repo <resolved-repository-path> --workspace <workspace-root> --json` when the user asks for an app-wide artifact assessment.
 
 The report is the durable audit record. Findings are addressed through the workflow named in the report:
@@ -68,7 +70,7 @@ Check git status in every repo that may be inspected or touched. Preserve unrela
 2. Parse the Epic.
    - Identify Epic ID and schema, current status, Story labels or documented legacy Story IDs, Story titles, independent implementation and verification state, Requirements, Scenarios, behavior-mapped `Implemented By`, `Implementation Gaps`, scenario-mapped `Verified By`, and `Verification Gaps`.
    - Compare the Epic to the canonical template shape: frontmatter, Product Context, Outcome, Current Scope, Deferred Scope, Candidate Stories, Story Index, Stories, Cross-Story Concerns, Open Decisions, Completion Criteria, and Notes.
-   - Run scoped `sdd validate` and treat deterministic errors as `template-drift`, `status-drift`, or `verification-drift` findings according to their code and affected artifact. Inspect warnings rather than silently discarding them. For app-wide assessments, run Space/repository-scoped validation and summarize every Epic with findings.
+   - Run scoped `sdd validate`, using `--changed-from <audited-ref>` whenever a stable Git baseline exists, and treat deterministic errors as `template-drift`, `status-drift`, or `verification-drift` findings according to their code and affected artifact. Inspect warnings rather than silently discarding them. For app-wide assessments, run Space/repository-scoped validation and summarize every Epic with findings.
    - The CLI baseline checks top-level section spine, required frontmatter keys, Epic schema compatibility, Story Index state alignment, promoted Story metadata lines, Story subsection presence, Story/Requirement/Scenario ID shape and duplicates, competing traceability sections, behavior-mapped `Implemented By`, `Implementation Gaps`, scenario-mapped `Verified By`, `Verification Gaps`, implementation/evidence path existence, generic framework evidence anchors, coverage and state contradictions, Story-size review signals, evidence-reference integrity, broken SDD artifact links, and legacy/migration Story label warnings. Continue the semantic audit even when it passes.
    - Summarize the intended Epic behavior from outcome, current scope, completion criteria, PRD/product docs, public docs, and known runtime surfaces.
    - Confirm Story labels or documented legacy Story IDs are stable, Requirements use local `R#`, and Scenarios use local `R#-S#`.
@@ -106,7 +108,8 @@ Check git status in every repo that may be inspected or touched. Preserve unrela
 6. Systematically test the Epic.
    - Run focused tests named in `Verified By` when safe.
    - Treat automated evidence without a concrete repository-relative test path as verification drift even when `sdd validate` reports it only as a warning.
-   - Run broader project checks when changed or claimed surfaces warrant them: unit tests, integration tests, typecheck, lint, build, codegen, migration checks, browser checks, CLI smoke checks, or manual Obsidian/Vercel/Convex checks as appropriate.
+   - Resolve aggregate/runtime verification scope separately from focused evidence. Run a project-defined aggregate gate, or its authoritative equivalent constituents, when project policy requires it or when current implementation confidence spans multiple Stories/Epics, persistence or migrations, security/privacy, process-global state, shared contracts, concurrency/workers/recovery, or accumulated integration work. Do not impose one universal command or require an aggregate gate for a purely artifact-scoped audit with no applicable runtime claim; record the reason as `not applicable`.
+   - Run broader project checks when changed or claimed surfaces warrant them: unit tests, integration tests, typecheck, lint, build, codegen, migration checks, browser checks, CLI smoke checks, or manual Obsidian/Vercel/Convex checks as appropriate. Required aggregate proof must be fresh on `verified_ref`, with caches bypassed or meaningful execution proved; focused passes, structural validation, or a result from another ref are not substitutes.
    - Do not mutate production services, secrets, remote branches, deployments, or external data without explicit authorization.
    - If a check cannot run, record why, the fallback evidence, and whether the gap blocks alignment.
    - Run a cold-navigation check from the Epic for every implemented Requirement and every Scenario that declares or implies a distinct owner. Follow the anchor into source and identify the owning definition or registration; an existing string match alone is not a pass. If locating the governing application logic requires repository-wide rediscovery, record forward-traceability drift.
@@ -126,7 +129,12 @@ Check git status in every repo that may be inspected or touched. Preserve unrela
    - `status-drift`: related Change `tasks.md` status, folder location, review records, manual confirmation status, release-communication state, PR/merge state, or deferred gaps contradict each other. Active status must be `proposed`, `planned`, `in_progress`, or `in_review`; folder location under `closed/` means closed. Historical closed Changes may retain an older status that was valid when they closed. This also includes completed or closed artifacts that still say work is `Not implemented yet`, `Not verified yet`, pending implementation/verification, or use obsolete manual confirmation status vocabulary.
    - `superseded-truth-drift`: later Stories, Requirements, Scenarios, implementation, or docs changed a boundary but earlier Epic truth still reads as current.
 9. Write or print the report.
-   - Include the exact scoped `sdd validate` command and result in `Tests And Checks`.
+   - Capture the first complete audit outcome as `initial_result`, then derive `result` only from the final current gate state.
+   - Keep current gates, findings, and checks in the explicit `Current ...` sections. Put pre-remediation failures only in `Initial Findings (Historical)` and record every remediation plus rerun in `Remediation And Recheck`.
+   - Include the exact scoped `sdd validate` command and result in `Current Tests And Checks`, including `--changed-from <audited-ref>` when available.
+   - Before writing `aligned`, rerun every required gate against the final verified source, confirm current BLOCKING and REQUIRED findings are `None.`, and confirm every current gate is `pass` or `not applicable`.
+   - If an earlier versioned report exists, create a successor with `supersedes`; keep one unambiguous current report tip for the Epic.
+   - For a multi-Epic request, the main coordinator performs one final batch-coherence pass after all per-Epic work. Compare every report's frontmatter, current verdict, scorecard, current findings, required checks, verified ref, predecessor link, and residual risks; rerun or correct any outlier before reporting the batch result. Story or Epic subagents do not assign the final batch verdict.
    - Summarize template-shape findings in the Epic template adherence gate and `Template drift` line.
 10. In `--propose-fixes`, create a scoped SDD change for findings that require implementation or risky decisions after the report exists.
 11. After every non-`--check` run, ask the user whether to apply any safe artifact fixes identified by the audit. Do not apply those fixes until the user explicitly agrees.
@@ -141,7 +149,7 @@ Use `pass`, `findings`, `blocked`, or `not applicable`. Apply the managed workfl
 4. **Forward traceability**: Story references and local Requirement/Scenario IDs are stable and unique; each Story has one authoritative current implementation and verification map; implementation and verification state agree with the Story Index and gap sections; every implemented Requirement has a concrete primary code location whose anchor resolves to the governing definition/registration rather than an incidental occurrence; a cold developer can navigate from behavior to governing logic without repository-wide rediscovery; and moves or legacy identifiers remain traceable.
 5. **Reverse traceability**: a full Epic-scoped working-tree inventory was run and every relevant source/test candidate, missing reference, support exclusion, and generated/framework exclusion was classified. This gate is mandatory and cannot be inferred from declared Epic paths alone.
 6. **Implementation truth**: observable runtime behavior satisfies, defers, gaps, or exposes drift for every declared and materially missing behavior path.
-7. **Verification strength**: `Verified By` is scenario-mapped, automated evidence names repository-relative test paths plus exact titles or stable named anchors rather than framework tokens, cited assertions prove the mapped behavior, evidence types remain distinct, broad gates are supporting evidence, production/mock boundaries are honest, and gaps state the remaining risk.
+7. **Verification strength**: `Verified By` is scenario-mapped, automated evidence names repository-relative test paths plus exact titles or stable named anchors rather than framework tokens, cited assertions prove the mapped behavior, evidence types remain distinct, broad gates are supporting evidence, production/mock boundaries are honest, applicable aggregate/runtime scope is explicit, every required aggregate check passes freshly on `verified_ref`, and gaps state the remaining risk.
 8. **Supporting alignment and status**: project docs, product direction, ADRs, active/closed Changes, machine-readable Change status, manual confirmation, release communication, generated indexes, and review/merge state do not contradict the Epic.
 9. **Security and data safety**: apply relevant available security guidance to auth, permissions, secrets, user data, migrations, destructive actions, dependencies, and external services implicated by the Epic.
 
@@ -169,7 +177,8 @@ After reporting, ask the user whether to apply safe artifact fixes when the audi
 - Epic wording, status, notes, canonical section ordering, Candidate Stories naming, Story ordering, Story labels/references, Requirement/Scenario labels, `Verification Gaps`, stale evidence notes, safe `Verified By` normalization when existing evidence can be mapped without changing behavior semantics, and missing Requirement/Scenario additions that describe already-implemented behavior or explicit gaps without changing product semantics
 - active or closed change artifact wording that clearly contradicts accepted Epic truth, such as stale implementation-pending text, stale verification-pending text, obsolete manual confirmation status vocabulary, or old active-folder references
 - README/docs references that clearly point at moved Epic anchors
-- report files created by this run
+
+Do not edit a report after it has been written as the run's audit snapshot. If artifact remediation changes its result, evidence, refs, or current findings, write a successor report with `supersedes` after rerunning the affected gates.
 
 Do not edit these as post-run artifact fixes:
 
@@ -192,7 +201,7 @@ End every report with one result:
 - `needs product decision`
 - `blocked`
 
-Use `aligned` only when all gates pass or remaining issues are explicitly non-blocking. A skipped full reverse-traceability inventory is always `blocked`, not a non-blocking exception.
+Use `aligned` only when all current gates pass or are not applicable, current BLOCKING and REQUIRED findings are empty, every required current check—including applicable aggregate/runtime verification—passes on the final source named by `verified_ref`, and the report records why any aggregate gate is not applicable. Missing required runtime proof yields `needs verification`, not `aligned`. Suggestions may remain only when they do not contradict a passing gate. A skipped full reverse-traceability inventory is always `blocked`, not a non-blocking exception.
 
 ## Final Response
 

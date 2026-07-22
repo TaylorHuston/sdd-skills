@@ -1,5 +1,5 @@
 ---
-modified: 2026-07-20
+modified: 2026-07-22
 ---
 # Changelog
 
@@ -11,11 +11,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Added versioned Epic verification reports with deterministic current-result, remediation, and lineage validation, plus opt-in `sdd validate --changed-from <commit-ish>` checks for stale Epic `modified` metadata.
 - `sdd doctor` now inspects recognized root guidance files in active mapped repositories and reports obsolete managed-workflow locations or retired `/sdd-propose` instructions.
 - Added the versioned `sdd-epic-v2` template with independent implementation and verification state, behavior-mapped implementation locations, and separate implementation gaps.
 
 ### Changed
 
+- `/sdd-review` now uses a systematic candidate-generation pipeline across intent and history, complete diff coverage, dependency and contract propagation, configured deterministic analyzers, risk-shaped reasoning passes, and explicit blind-spot accounting before consolidating findings.
+- Epic verification now separates historical audit failures from current findings and requires a full final recheck before `aligned`; PR and release workflows now reconcile an exact source-to-target file allowlist before handoff.
+- `/sdd-pr` now performs safe narrow remediation by default and no longer exposes a redundant `--fix` mode.
 - Epic traceability now requires one authoritative current implementation/verification map per Story, behavior-owning primary anchors, narrower mapping for distinct governing boundaries, exact named test evidence instead of framework tokens, current-tense implemented Outcomes, and reconciliation of stale supporting docs and closed Change claims.
 - `sdd validate` now rejects competing prior/detailed/legacy Story traceability sections and generic automated evidence anchors such as `#it(`, `#test(`, and `#describe(`.
 - CLI validation now rejects empty v2 behavior structure, incomplete evidence rows, fabricated or unanchored source/test claims, external symlink evidence, and unrelated Epic reads during a focused validation.

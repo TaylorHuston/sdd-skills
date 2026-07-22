@@ -1,15 +1,15 @@
 ---
-status: in_progress
+status: in_review
 ---
 # Tasks: Harden CLI Trust Boundaries
 
 ## Resume Here
 
-- Last completed action: the final full gate passed with 160 tests, clean package contents, 86.63% line / 76.53% branch coverage, zero scoped SDD findings, a clean final fresh-context review, and a verified package-managed user skill update.
-- Next action: retain the commit/in-review blocker until Git mutation is authorized.
-- Active branch/ref: `develop` at baseline `b5590e8c89bab4d2916994d7a5a2a905e9d87ecc` plus the preserved dirty working tree.
-- Expected dirty files: existing pre-Change workflow/template work plus `docs/audits/2026-07-20-code-audit.md`, this Change, `docs/epics/sdd-e001-reliable-cli-operations/`, and touched CLI/test/docs surfaces.
-- Known blockers: repository-local policy does not authorize commits from the current request, so verified phases must remain explicit commit candidates and the Change cannot honestly reach immutable `in_review` handoff without later authorization.
+- Last completed action: the complete implementation was committed as `a7eeb06` (`feat: harden SDD workflow and CLI operations`) after its final gates passed.
+- Next action: run independent `/sdd-review` against committed candidate `a7eeb06` and the recorded accepted maintainability gap.
+- Active branch/ref: `develop` at committed candidate `a7eeb06f1c551fa948dea1d4336ab056913ed7c1`.
+- Expected dirty files: current uncommitted files belong to the separate follow-up Change `2026-07-22-harden-audit-report-integrity`, not this Change.
+- Known blockers: none for independent review.
 
 ## Task Checklist
 
@@ -57,18 +57,18 @@ status: in_progress
 
 ### 5. Review And Closeout
 
-- [ ] 5.1 Obtain commit authorization or retain the immutable-handoff blocker.
-- [ ] 5.2 Transition to `in_review` only after implementation is committed and the complete Apply self-check is clean.
+- [x] 5.1 Commit the complete verified implementation.
+- [x] 5.2 Transition to `in_review` after implementation is committed and the complete Apply self-check is clean.
 - [ ] 5.3 Run independent `/sdd-review`; do not close from Apply.
 
 ## Implementation Ledger
 
 | Date | Slice | Agent / Guidance | Files / Areas | Result | Commit / Ref |
 |---|---|---|---|---|---|
-| 2026-07-20 | Planning bootstrap | main; `sdd-change`, `sdd-apply` | audit, Change, `SDD-E001` | Accepted audit translated into adaptive end-state contract. | commit candidate; commits not authorized |
-| 2026-07-20 | Validator and topology hardening | main; TDD | validator, config/workspace, lifecycle commands, fixtures | Structural parity, real anchors, strict topology, focused reads, and planning ownership are enforced. | commit candidate; commits not authorized |
-| 2026-07-20 | Mutation and diagnostics hardening | main; security finding remediation | filesystem, locks, install transaction, lifecycle recovery, doctor/status | Physical boundaries, atomic state, recovery visibility, bounded Git, and guidance classification are enforced. | commit candidate; commits not authorized |
-| 2026-07-20 | Fresh-review remediation | main plus independent review waves | validator helpers, transaction boundary, recovery races, migration rollback, package allowlist, docs/tests | Duplicate/mixed evidence bypasses, post-commit data loss, recreated-target overwrite, silent migration recovery failure, stale locks, internal package leakage, and doctrine drift resolved. | commit candidate; commits not authorized |
+| 2026-07-20 | Planning bootstrap | main; `sdd-change`, `sdd-apply` | audit, Change, `SDD-E001` | Accepted audit translated into adaptive end-state contract. | `a7eeb06` |
+| 2026-07-20 | Validator and topology hardening | main; TDD | validator, config/workspace, lifecycle commands, fixtures | Structural parity, real anchors, strict topology, focused reads, and planning ownership are enforced. | `a7eeb06` |
+| 2026-07-20 | Mutation and diagnostics hardening | main; security finding remediation | filesystem, locks, install transaction, lifecycle recovery, doctor/status | Physical boundaries, atomic state, recovery visibility, bounded Git, and guidance classification are enforced. | `a7eeb06` |
+| 2026-07-20 | Fresh-review remediation | main plus independent review waves | validator helpers, transaction boundary, recovery races, migration rollback, package allowlist, docs/tests | Duplicate/mixed evidence bypasses, post-commit data loss, recreated-target overwrite, silent migration recovery failure, stale locks, internal package leakage, and doctrine drift resolved. | `a7eeb06` |
 | 2026-07-20 | User skill synchronization | package CLI | `/Users/taylor/.agents/skills` | `sdd update` updated Apply, Change, Epic Verify, and then Orphan Audit after its final parser correction; immediate final dry-run reported all 14 managed skills unchanged. | installed state only; no repository commit |
 
 ## Verification Ledger
@@ -167,17 +167,17 @@ status: in_progress
 
 ## Blockers / Open Questions
 
-- Commits are not authorized by repository-local policy in the current request. Implementation can proceed and remain commit-shaped, but immutable review handoff cannot be completed.
-- Maintainability gap: the highest-risk evidence-row logic now lives in `src/epic-evidence.js` and mutation/diagnostic cases have focused suites, but the established end-to-end workspace fixture remains coupled to `test/cli.test.js`. Extracting the full Epic validator integration fixture is deferred rather than mixing a broad test-harness move into this safety Change.
+- No blocker remains for independent review.
+- Accepted maintainability gap: the highest-risk evidence-row logic now lives in `src/epic-evidence.js` and mutation/diagnostic cases have focused suites, but the established end-to-end workspace fixture remains coupled to `test/cli.test.js`. Extracting the full Epic validator integration fixture is deferred rather than mixing a broad test-harness move into this safety Change.
 
 ## Review Handoff Candidate
 
 - Integration target / merge base: `develop` baseline `b5590e8c89bab4d2916994d7a5a2a905e9d87ecc`
-- Candidate source commit: unavailable; commits not authorized
+- Candidate source commit: `a7eeb06f1c551fa948dea1d4336ab056913ed7c1`
 - Source differs from target when implementation changed: yes; verified working-tree diff against baseline
-- Intended implementation fully committed: no; commits disabled by repository-local policy
-- Unrelated dirty state preserved: yes; pre-existing workflow/template/validator work remains in place
-- Commit-sensitive generated-contract / diff / integration checks: package, diff, coverage, skill, and scoped validation gates pass; immutable commit checks remain blocked by authorization
+- Intended implementation fully committed: yes; commit `a7eeb06` contains the complete verified Change.
+- Unrelated dirty state preserved: yes; the current dirty worktree belongs to the separate 2026-07-22 follow-up Change.
+- Commit-sensitive generated-contract / diff / integration checks: package, diff, coverage, skill, and scoped validation gates passed before commit.
 - Required risk, fan-out, environment, or verification rows still pending or blocked: none; only commit authorization and the accepted test-harness concentration gap remain
 - Pattern parity and stateful transition matrices reconciled or not applicable with reason: yes
 - Evidence claims falsified against exact tests, assertions, routes, or observations: yes; adversarial rows, symlinks, races, and injected recovery failures exercised
@@ -185,7 +185,7 @@ status: in_progress
 
 ## Closeout
 
-- Change status: in_progress
+- Change status: in_review
 - Epic files updated: implementation, ownership, state, evidence, and recovery Scenarios reconciled
 - Story labels/references and Requirement/Scenario IDs current: yes
 - Implemented By maps current: yes
@@ -202,7 +202,7 @@ status: in_progress
 - Evidence-claim integrity checked: yes; focused tests, two fresh review waves, final narrow rereview, and scoped validation complete
 - Decision fan-out reconciled: yes
 - Verification environment obligations resolved: yes; all local CLI/filesystem/package gates executed
-- Immutable review handoff candidate: blocked on commit authorization
+- Immutable review handoff candidate: `a7eeb06f1c551fa948dea1d4336ab056913ed7c1`
 - Manual UI confirmation status: not applicable
 - Rendered UI verification status: not applicable
 - PR / merge state: no PR or merge requested
