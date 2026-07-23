@@ -70,8 +70,8 @@ status: in_progress
 | 2026-07-22 | Initial S1/S5 implementation | main; TDD and package guidance | validator, Epic Verify, PR, Release, templates, docs | Implemented and committed before cumulative review. | `494b121`, `ee1fa1b`, `a670fa2` |
 | 2026-07-22 | Independent cumulative review | main plus artifact, code/security, and UI reviewers | full `v0.11.0` candidate | Three blocking and seven required findings consolidated. | reviewed snapshot `c477e4a`; record `4ff9240` |
 | 2026-07-23 | Replan | main; `/sdd-change --replan` | proposal, design, tasks, review log | Ownership split revised to S1/S5/S6/S7; S2/S3 boundary retained; Change transitioned to `in_progress`. | `3ec27ab` |
-| 2026-07-23 | S1 report integrity | main plus bounded report-contract agent; TDD | report validator, CLI tests, S1 Epic truth | Canonical template gates, recognized missing-schema reports, exact scoped proof, and complete lineage are implemented and verified. | pending isolated phase commit |
-| 2026-07-23 | S5 immutable Git baseline | bounded code/security agent; TDD | orphan-audit script/tests, S5 Epic truth | Option-like baselines are rejected without side effects; immutable commits and bounded Git subprocesses govern changed-surface audits. | pending isolated phase commit |
+| 2026-07-23 | S1 report integrity | main plus bounded report-contract agent; TDD | report validator, CLI tests, S1 Epic truth | Canonical template gates, recognized missing-schema reports, exact scoped proof, and complete lineage are implemented and verified. | `3d7bffa` |
+| 2026-07-23 | S5 immutable Git baseline | bounded code/security agent; TDD | orphan-audit script/tests, S5 Epic truth | Option-like baselines are rejected without side effects; immutable commits and bounded Git subprocesses govern changed-surface audits. | `3d7bffa` |
 
 ## Verification Ledger
 
