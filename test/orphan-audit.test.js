@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, rm, unlink, writeFile } from "node:fs/promises";
+import {
+  access,
+  chmod,
+  mkdtemp,
+  mkdir,
+  rm,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -130,6 +138,80 @@ test("orphan audit supports Epic and changed-surface scopes", async (t) => {
   assert.deepEqual(report.scope.epics, ["docs/epics/app-e001-core/epic.md"]);
   assert.equal(report.scope.changed_from, "HEAD");
   assert.deepEqual(report.source_without_implemented_by, ["src/changed.ts"]);
+});
+
+test("orphan audit rejects option-like changed-from input without Git side effects", async (t) => {
+  const root = await createRepository();
+  const injectedOutput = `${root}-git-output`;
+  const sideEffectPath = `${injectedOutput}...HEAD`;
+  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => rm(sideEffectPath, { force: true }));
+
+  await write(root, "src/core.ts");
+  await writeEpic(root, "app-e001-core", "APP-E001", ["src/core.ts"], []);
+  await git(root, "add", ".");
+  await git(root, "commit", "-m", "fixture");
+
+  await assert.rejects(
+    execFileAsync(
+      "python3",
+      [
+        auditScript,
+        root,
+        "--format",
+        "json",
+        `--changed-from=--output=${injectedOutput}`,
+      ],
+    ),
+    (error) => {
+      assert.equal(error.code, 2);
+      assert.match(error.stderr, /Unable to resolve changed-file scope from Git ref/);
+      return true;
+    },
+  );
+  await assert.rejects(access(sideEffectPath), { code: "ENOENT" });
+});
+
+test("orphan audit fails promptly with an actionable Git timeout", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-orphan-audit-timeout-"));
+  const fakeBin = join(root, "bin");
+  const fakeGit = join(fakeBin, "git");
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  await mkdir(fakeBin, { recursive: true });
+  await writeFile(
+    fakeGit,
+    [
+      "#!/usr/bin/env python3",
+      "import time",
+      "time.sleep(0.4)",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await chmod(fakeGit, 0o755);
+
+  await assert.rejects(
+    execFileAsync(
+      "python3",
+      [auditScript, root, "--format", "json"],
+      {
+        env: {
+          ...process.env,
+          PATH: `${fakeBin}:${process.env.PATH}`,
+          SDD_ORPHAN_AUDIT_GIT_TIMEOUT_SECONDS: "0.05",
+        },
+      },
+    ),
+    (error) => {
+      assert.equal(error.code, 2);
+      assert.match(
+        error.stderr,
+        /Git command timed out after 0.05 seconds while listing tracked files; verify Git is responsive and retry/,
+      );
+      return true;
+    },
+  );
 });
 
 test("orphan audit preserves primary and supporting implementation ownership", async (t) => {

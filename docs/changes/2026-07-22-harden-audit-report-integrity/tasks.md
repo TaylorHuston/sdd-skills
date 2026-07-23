@@ -5,9 +5,9 @@ status: in_progress
 
 ## Resume Here
 
-- Last completed action: `/sdd-change --replan` classified the cumulative review as an Epic ownership change plus in-scope report/workflow refinement, rebuilt the artifacts, passed scoped validation, and transitioned the Change back to `planned`.
-- Next action: run `/sdd-apply` beginning at `SDD-E001/S1 R4` after confirming the earlier trust-boundary Change owns its S2/S3 remediation.
-- Active branch/ref: `develop@3ec27ab` after the committed replan; `origin/develop@a670fa28ebfd4df175217b60a74d92cfee520c74`.
+- Last completed action: `/sdd-apply` implemented and verified the S1 report-integrity and S5 immutable Git-baseline slices and reconciled their durable Epic truth.
+- Next action: commit the isolated S1 and S5 phases, then reconcile shipped workflow behavior into S6.
+- Active branch/ref: `develop@eba9e5d` after the committed replan ledger; `origin/develop@a670fa28ebfd4df175217b60a74d92cfee520c74`.
 - Expected dirty files: this Change's `proposal.md`, `design.md`, `tasks.md`, and existing user work in `CHANGELOG.md` plus `site/index.html`, `site/site.js`, and `site/styles.css`.
 - Known blockers: implementation and evidence findings remain open; planning has no unresolved decision.
 
@@ -25,8 +25,8 @@ status: in_progress
 
 ### 2. Epic Artifacts
 
-- [ ] 2.1 Update `SDD-E001/S1 R4` with missing-schema, canonical-gate, Epic-scope, and complete lineage Scenarios.
-- [ ] 2.2 Update `SDD-E001/S5` with safe immutable Git-baseline behavior and explicit validator/template boundary ownership.
+- [x] 2.1 Update `SDD-E001/S1 R4` with missing-schema, canonical-gate, Epic-scope, and complete lineage Scenarios.
+- [x] 2.2 Update `SDD-E001/S5` with safe immutable Git-baseline behavior and explicit validator/template boundary ownership.
 - [ ] 2.3 Add `SDD-E001/S6` Reliable Workflow Execution with independently derived implementation and verification state.
 - [ ] 2.4 Add `SDD-E001/S7` Accessible Public Methodology Reference with independently derived implementation and verification state.
 - [ ] 2.5 Reconcile Story Index, current Outcomes, one canonical map per Story, exact primary anchors, evidence, and gaps without claiming proof that has not run.
@@ -34,10 +34,10 @@ status: in_progress
 
 ### 3. Implementation
 
-- [ ] 3.1 `SDD-E001/S1 R4`: make the validator and real packaged report template one coherent canonical-gate contract.
-- [ ] 3.2 `SDD-E001/S1 R4`: reject a recognized report kind with a missing schema and require current-Epic/repository proof for aligned reports.
-- [ ] 3.3 `SDD-E001/S1 R4-S2`: add exact self-referential and non-versioned predecessor behavior/proof.
-- [ ] 3.4 `SDD-E001/S5`: resolve orphan-audit baselines to immutable commits with option barriers and bounded subprocesses.
+- [x] 3.1 `SDD-E001/S1 R4`: make the validator and real packaged report template one coherent canonical-gate contract.
+- [x] 3.2 `SDD-E001/S1 R4`: reject a recognized report kind with a missing schema and require current-Epic/repository proof for aligned reports.
+- [x] 3.3 `SDD-E001/S1 R4-S2`: add exact self-referential and non-versioned predecessor behavior/proof.
+- [x] 3.4 `SDD-E001/S5`: resolve orphan-audit baselines to immutable commits with option barriers and bounded subprocesses.
 - [ ] 3.5 `SDD-E001/S6`: reconcile the shipped Planning, Apply, Review, Design, and Interactive workflow contracts and their mirrored templates/doctrine.
 - [ ] 3.6 `SDD-E001/S7`: reconcile public-guide content, navigation, copy fallback, accessibility, responsive composition, and Steel presentation.
 - [ ] 3.7 Keep S2/S3 topology, initialization, physical-containment, and recovery remediation in the earlier active Change; consume its verified result rather than duplicate code.
@@ -45,7 +45,7 @@ status: in_progress
 
 ### 4. Verification
 
-- [ ] 4.1 Add failing-first tests for each current report/Git finding and inspect the exact assertion and discovery path.
+- [x] 4.1 Add failing-first tests for each current report/Git finding and inspect the exact assertion and discovery path.
 - [ ] 4.2 Add or refine exact package contract tests for every S5/S6 Scenario; do not use string presence as proof of behavior it does not exercise.
 - [ ] 4.3 Add deterministic S7 checks where practical, then directly render and inspect the Visual Verification Matrix.
 - [ ] 4.4 Run `npm run check`, dependency audit, package dry run, changed-skill validation, template parity, diff checks, `sdd doctor`, scoped validation, and changed-surface reverse traceability.
@@ -70,6 +70,8 @@ status: in_progress
 | 2026-07-22 | Initial S1/S5 implementation | main; TDD and package guidance | validator, Epic Verify, PR, Release, templates, docs | Implemented and committed before cumulative review. | `494b121`, `ee1fa1b`, `a670fa2` |
 | 2026-07-22 | Independent cumulative review | main plus artifact, code/security, and UI reviewers | full `v0.11.0` candidate | Three blocking and seven required findings consolidated. | reviewed snapshot `c477e4a`; record `4ff9240` |
 | 2026-07-23 | Replan | main; `/sdd-change --replan` | proposal, design, tasks, review log | Ownership split revised to S1/S5/S6/S7; S2/S3 boundary retained; Change transitioned to `in_progress`. | `3ec27ab` |
+| 2026-07-23 | S1 report integrity | main plus bounded report-contract agent; TDD | report validator, CLI tests, S1 Epic truth | Canonical template gates, recognized missing-schema reports, exact scoped proof, and complete lineage are implemented and verified. | pending isolated phase commit |
+| 2026-07-23 | S5 immutable Git baseline | bounded code/security agent; TDD | orphan-audit script/tests, S5 Epic truth | Option-like baselines are rejected without side effects; immutable commits and bounded Git subprocesses govern changed-surface audits. | pending isolated phase commit |
 
 ## Verification Ledger
 
@@ -80,6 +82,9 @@ status: in_progress
 | 2026-07-22 | changed-surface orphan audit | reverse traceability | Existing mapped refs resolve; broader workflow/site ownership is incomplete. | findings; 22 unowned source candidates |
 | 2026-07-22 | Chromium desktop/tablet/mobile matrix | deterministic rendered UI | Current Steel one-pager layout, focus, navigation, copy, overflow, reduced motion, contrast, console/network. | passed after safe fixes; manual acceptance pending |
 | 2026-07-22 | temporary report/topology/init/path/Git probes | adversarial falsification | Current review defects reproduce outside the green suite. | findings |
+| 2026-07-23 | `node --test test/cli.test.js` | full CLI suite | Report/template parity, missing schema, exact Epic/repository scope, lineage, and existing CLI behavior. | passed; 153 tests |
+| 2026-07-23 | `node --test test/orphan-audit.test.js` | full orphan-audit suite | Immutable baseline resolution, option-injection containment, bounded Git execution, and existing audit behavior. | passed; 7 tests |
+| 2026-07-23 | syntax/compile and diff checks | deterministic source gate | Changed JavaScript and Python parse and the current patch has no whitespace errors. | passed |
 
 ## Manual Feedback
 
@@ -104,10 +109,10 @@ status: in_progress
 
 | Requirement / Surface | End-State Invariant | Risk / Failure Mode | Check Or Confirmation Needed | Evidence / Finding | Status |
 |---|---|---|---|---|---|
-| S1/R4 report contract | A report completed from the shipped template can be validated by the runtime using one canonical gate set. | Template/runtime drift makes `aligned` impossible or falsely permissive. | Template-derived fixture plus exact gate parity and contradictory-result tests. | Review found 18 template rows vs 17 validator rows. | known |
-| S1/R4 report identity/evidence | Every recognized report is validated and only current-Epic proof can certify it. | Missing schema hides the report; another Epic's checks certify it. | Missing-schema and wrong-Epic negative fixtures. | Both probes reproduced. | known |
-| S1/R4 lineage | Predecessors are versioned immutable reports in the same Epic review directory. | Self or non-versioned targets satisfy an overstated Scenario. | Exact self/non-versioned tests plus evidence update. | Current evidence covers only missing and absolute/external. | known |
-| S5 immutable Git selection | User-controlled baseline cannot become a Git option or hang the workflow. | Option injection writes outside the repo; subprocess never returns. | `rev-parse --verify --end-of-options`, immutable commit, option barrier, timeout probes. | Option-injection probe reproduced. | known |
+| S1/R4 report contract | A report completed from the shipped template can be validated by the runtime using one canonical gate set. | Template/runtime drift makes `aligned` impossible or falsely permissive. | Template-derived fixture plus exact gate parity and contradictory-result tests. | Real 18-gate template fixture and full CLI suite pass. | proved |
+| S1/R4 report identity/evidence | Every recognized report is validated and only current-Epic proof can certify it. | Missing schema hides the report; another Epic's checks certify it. | Missing-schema and wrong-Epic negative fixtures. | Exact missing-schema, wrong-Epic, and prefix-confusable wrong-repository tests pass. | proved |
+| S1/R4 lineage | Predecessors are versioned immutable reports in the same Epic review directory. | Self or non-versioned targets satisfy an overstated Scenario. | Exact self/non-versioned tests plus evidence update. | Exact self, non-versioned, missing, and absolute predecessor tests pass. | proved |
+| S5 immutable Git selection | User-controlled baseline cannot become a Git option or hang the workflow. | Option injection writes outside the repo; subprocess never returns. | `rev-parse --verify --end-of-options`, immutable commit, option barrier, timeout probes. | Exact no-side-effect option-injection and fake-Git timeout tests pass. | proved |
 | S6 workflow contracts | Planning/Apply/Review guidance, templates, doctrine, and tests agree on end-state behavior. | Broad string tests pass while one workflow stops early or omits a required final report. | Exact package contract assertions plus semantic source inspection. | Review found ownership/evidence gaps across shipped skills. | known |
 | S7 public guide | Current source remains readable, navigable, accessible, and truthful across representative states. | Source checks miss invalid DOM, interaction fallback, overflow, or visual regression. | Visual Verification Matrix plus static DOM/ID/fragment checks. | Initial review found and safely fixed three issues. | known |
 | Cross-Change integration | Every defect has one owner and both ledgers identify the same final candidate. | Duplicate fixes, stale watermarks, or incompatible Epic updates. | Compare both task/review records before each handoff. | Two active Changes share the cumulative release candidate. | known |
@@ -116,7 +121,7 @@ status: in_progress
 
 | Concern | Reference Location / Contract | New Location / Contract | Focused Proof | Intentional Divergence / Gap | Status |
 |---|---|---|---|---|---|
-| Versioned report runtime/template parity | `src/epic-verify-report.js#CANONICAL_GATES` | canonical and packaged Epic Verify report templates | template-derived aligned-report test | none permitted | pending |
+| Versioned report runtime/template parity | `src/epic-verify-report.js#CANONICAL_GATES` | canonical and packaged Epic Verify report templates | template-derived aligned-report test | none permitted | matched |
 | Workflow final-report parity | single review final report | `--until-ready` final report | packaged Review contract test plus rereview output | iteration history may be cumulative; final fields may not diverge | pending |
 | Rendered navigation and interaction | desktop Steel documentation shell | tablet/mobile navigation and copy fallback | browser matrix with keyboard and clipboard-failure states | composition may collapse responsively without losing semantics | pending |
 
@@ -124,10 +129,10 @@ status: in_progress
 
 | Origin Condition | Domain Result / Invariant | Adapter / Transport Mapping | Client Behavior / Retryability | Exact Proof | Status |
 |---|---|---|---|---|---|
-| Report kind recognized but schema absent | deterministic invalid-report finding | validator JSON finding | caller can fix the report; it never disappears | missing-schema focused test | pending |
-| Aligned report cites another Epic | scoped proof rejected | validator report finding | caller reruns validation/orphan audit for the current Epic | wrong-Epic focused test | pending |
-| Git baseline starts with option syntax | ref rejected before diff | orphan-audit structured failure/exit | no external write; caller supplies a valid ref | option-injection and valid-ref tests | pending |
-| Git subprocess exceeds bound | deterministic timeout/degraded failure | orphan-audit process result | caller receives actionable failure rather than a hung review | fake Git timeout fixture | pending |
+| Report kind recognized but schema absent | deterministic invalid-report finding | validator JSON finding | caller can fix the report; it never disappears | missing-schema focused test | proved |
+| Aligned report cites another Epic | scoped proof rejected | validator report finding | caller reruns validation/orphan audit for the current Epic | wrong-Epic and wrong-repository focused tests | proved |
+| Git baseline starts with option syntax | ref rejected before diff | orphan-audit structured failure/exit | no external write; caller supplies a valid ref | option-injection and valid-ref tests | proved |
+| Git subprocess exceeds bound | deterministic timeout/degraded failure | orphan-audit process result | caller receives actionable failure rather than a hung review | fake Git timeout fixture | proved |
 
 ## Stateful Transition Matrix
 

@@ -348,27 +348,22 @@ async function writeEpicVerificationReport(
     verdictInitialResult = initialResult,
     verdictAuditedRef = auditedRef,
     verdictVerifiedRef = verifiedRef,
+    evidenceEpicId = epicId,
+    evidenceRepository = `code/${repository}`,
   } = {},
 ) {
-  const gateNames = [
-    "SDD workflow adherence",
-    "Epic coherence",
-    "Epic template adherence",
-    "Story shape",
-    "Story requirement completeness",
-    "Story reference traceability",
-    "Canonical map authority",
-    "Cold code navigation",
-    "Semantic anchor ownership",
-    "Reverse traceability inventory",
-    "Requirement and Scenario truth",
-    "Implementation drift",
-    "Verification strength",
-    "Supporting truth freshness",
-    "Change status traceability",
-    "Docs and product alignment",
-    "Security and data safety",
-  ];
+  const template = await readFile(
+    join(PACKAGE_ROOT, "docs", "templates", "epic-verify-report.md"),
+    "utf8",
+  );
+  const scorecard = template.match(
+    /## Current Gate Scorecard[\s\S]*?\|---\|---\|---\|\n(?<rows>[\s\S]*?)\n\n## /,
+  );
+  assert.ok(scorecard?.groups?.rows, "package report template must contain a gate scorecard");
+  const gateNames = scorecard.groups.rows
+    .split("\n")
+    .filter((line) => line.startsWith("|"))
+    .map((line) => line.split("|")[1].trim());
   const reviewsPath = join(
     root,
     "code",
@@ -444,8 +439,8 @@ async function writeEpicVerificationReport(
       "",
       "| Command / Scenario | Result | Proves | Notes |",
       "|---|---|---|---|",
-      `| \`sdd validate sample --epic SAMPLE-E001${includeChangedFrom ? ` --changed-from ${auditedRef}` : ""}\` | pass | Current artifact shape. | Required baseline. |`,
-      "| `python3 sdd_orphan_audit.py . --epic SAMPLE-E001 --format json` | pass | Current reverse inventory. | Required baseline. |",
+      `| \`sdd validate sample --epic ${evidenceEpicId} --repo ${evidenceRepository}${includeChangedFrom ? ` --changed-from ${auditedRef}` : ""}\` | pass | Current artifact shape. | Required baseline. |`,
+      `| \`python3 sdd_orphan_audit.py . --epic ${evidenceEpicId} --format json\` | pass | Current reverse inventory. | Required baseline. |`,
       "",
       "## Next Action",
       "",
@@ -3213,6 +3208,46 @@ test("validate rejects an aligned Epic verification report without its audited b
     finding.code === "EPIC_VERIFY_RESULT_CONTRADICTION"));
 });
 
+test("validate rejects aligned proof scoped to another Epic", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  await writeEpicVerificationReport(root, "sample-web", {
+    evidenceEpicId: "SAMPLE-E002",
+  });
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "EPIC_VERIFY_RESULT_CONTRADICTION"));
+});
+
+test("validate rejects aligned proof scoped to another repository", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  await writeEpicVerificationReport(root, "sample-web", {
+    evidenceRepository: "code/sample-web-copy",
+  });
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "EPIC_VERIFY_RESULT_CONTRADICTION"));
+});
+
 test("validate rejects malformed versioned Epic verification report frontmatter", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -3237,6 +3272,33 @@ test("validate rejects malformed versioned Epic verification report frontmatter"
   assert.equal(result.valid, false);
   assert.ok(result.findings.some((finding) =>
     finding.code === "INVALID_EPIC_VERIFY_REPORT_FRONTMATTER"));
+});
+
+test("validate rejects a recognized Epic verification report without a schema", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  const reportPath = await writeEpicVerificationReport(root, "sample-web");
+  await writeFile(
+    reportPath,
+    (await readFile(reportPath, "utf8")).replace(
+      "schema: sdd-epic-verify-report-v1\n",
+      "",
+    ),
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.equal(result.summary.epicVerificationReports, 1);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "MISSING_EPIC_VERIFY_REPORT_SCHEMA"));
 });
 
 test("validate rejects a missing superseded Epic verification report", async (t) => {
@@ -3298,6 +3360,60 @@ test("validate rejects an absolute Epic verification report predecessor", async 
   await writeEpicVerificationReport(root, "sample-web", {
     fileName: "2026-07-22-1300-epic-verify.md",
     supersedes: predecessor,
+  });
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "BROKEN_EPIC_VERIFY_SUPERSEDES"));
+});
+
+test("validate rejects a self-referential Epic verification report predecessor", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  const fileName = "2026-07-22-1200-epic-verify.md";
+  await writeEpicVerificationReport(root, "sample-web", {
+    fileName,
+    supersedes: `docs/epics/sample-e001-core/reviews/${fileName}`,
+  });
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "BROKEN_EPIC_VERIFY_SUPERSEDES"));
+});
+
+test("validate rejects a non-versioned Epic verification report predecessor", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  const reviewsPath = join(
+    root,
+    "code",
+    "sample-web",
+    "docs",
+    "epics",
+    "sample-e001-core",
+    "reviews",
+  );
+  await mkdir(reviewsPath, { recursive: true });
+  await writeFile(join(reviewsPath, "notes.md"), "# Review notes\n", "utf8");
+  await writeEpicVerificationReport(root, "sample-web", {
+    fileName: "2026-07-22-1300-epic-verify.md",
+    supersedes: "docs/epics/sample-e001-core/reviews/notes.md",
   });
 
   const result = await validateArtifacts(root, {

@@ -38,6 +38,7 @@ const CANONICAL_GATES = Object.freeze([
   "Requirement and Scenario truth",
   "Implementation drift",
   "Verification strength",
+  "Aggregate/runtime verification scope",
   "Supporting truth freshness",
   "Change status traceability",
   "Docs and product alignment",
@@ -102,6 +103,15 @@ function verdictValue(lines, label) {
     .find(Boolean);
 }
 
+function commandHasOptionValue(command, option, value) {
+  const tokens = command
+    .replaceAll("`", "")
+    .trim()
+    .split(/\s+/);
+  const optionIndex = tokens.indexOf(option);
+  return optionIndex >= 0 && tokens[optionIndex + 1] === value;
+}
+
 function reportDisplayPath(repositoryDisplayPath, repositoryRoot, reportPath) {
   return normalizePath(join(repositoryDisplayPath, relative(repositoryRoot, reportPath)));
 }
@@ -120,6 +130,7 @@ export async function validateEpicVerifyReports({
     .sort((left, right) => left.name.localeCompare(right.name));
   const reports = [];
   const malformedReports = [];
+  const missingSchemaReports = [];
   const unknownReports = [];
   for (const entry of entries) {
     const path = join(reviewsPath, entry.name);
@@ -127,6 +138,11 @@ export async function validateEpicVerifyReports({
     const frontmatter = parseFrontmatter(source);
     if (!frontmatter && /^schema:\s*sdd-epic-verify-report-v1\s*$/m.test(source)) {
       malformedReports.push(path);
+      continue;
+    }
+    if (frontmatter?.kind === "sdd-epic-verify-report"
+      && !frontmatter.schema) {
+      missingSchemaReports.push(path);
       continue;
     }
     if (frontmatter?.kind === "sdd-epic-verify-report"
@@ -156,6 +172,15 @@ export async function validateEpicVerifyReports({
       "INVALID_EPIC_VERIFY_REPORT_FRONTMATTER",
       reportDisplayPath(repository.resolvedPath, repositoryRoot, path),
       "Versioned Epic verification report frontmatter cannot be parsed.",
+      context,
+    ));
+  }
+  for (const path of missingSchemaReports) {
+    findings.push(finding(
+      "error",
+      "MISSING_EPIC_VERIFY_REPORT_SCHEMA",
+      reportDisplayPath(repository.resolvedPath, repositoryRoot, path),
+      `Recognized Epic verification reports must declare schema ${REPORT_SCHEMA}.`,
       context,
     ));
   }
@@ -253,9 +278,15 @@ export async function validateEpicVerifyReports({
       const scopedValidation = checks.find((row) => {
         const command = row[0] ?? "";
         return /\bsdd validate\b/.test(command)
-          && command.includes(`--changed-from ${frontmatter.audited_ref}`);
+          && commandHasOptionValue(command, "--epic", epicId)
+          && commandHasOptionValue(command, "--repo", repository.resolvedPath)
+          && commandHasOptionValue(command, "--changed-from", frontmatter.audited_ref);
       });
-      const reverseInventory = checks.find((row) => /(?:sdd[_-]orphan[_-]audit|orphan audit)/i.test(row[0] ?? ""));
+      const reverseInventory = checks.find((row) => {
+        const command = row[0] ?? "";
+        return /(?:sdd[_-]orphan[_-]audit|orphan audit)/i.test(command)
+          && commandHasOptionValue(command, "--epic", epicId);
+      });
       const failedRequiredCheck = checks.find((row) => {
         const required = /\brequired\b/i.test(row[3] ?? "");
         return required && (row[1] ?? "").toLowerCase() !== "pass";
@@ -372,6 +403,9 @@ export async function validateEpicVerifyReports({
 
   return {
     findings,
-    reports: reports.length + malformedReports.length + unknownReports.length,
+    reports: reports.length
+      + malformedReports.length
+      + missingSchemaReports.length
+      + unknownReports.length,
   };
 }
