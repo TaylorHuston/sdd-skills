@@ -1,15 +1,15 @@
 ---
-status: in_review
+status: in_progress
 ---
 # Tasks: Harden CLI Trust Boundaries
 
 ## Resume Here
 
-- Last completed action: the complete implementation was committed as `a7eeb06` (`feat: harden SDD workflow and CLI operations`) after its final gates passed.
-- Next action: run independent `/sdd-review` against committed candidate `a7eeb06` and the recorded accepted maintainability gap.
-- Active branch/ref: `develop` at committed candidate `a7eeb06f1c551fa948dea1d4336ab056913ed7c1`.
-- Expected dirty files: current uncommitted files belong to the separate follow-up Change `2026-07-22-harden-audit-report-integrity`, not this Change.
-- Known blockers: none for independent review.
+- Last completed action: independent `/sdd-review` completed against cumulative snapshot `c477e4a` and recorded two blocking plus six required findings for this Change in `review.md`.
+- Next action: use `/sdd-apply` to correct the validator/template contract, repository-only topology, report validation, initialization race, planning containment, orphan-audit Git boundary, and missing lineage evidence.
+- Active branch/ref: `develop`; the original implementation is already present in `main@7e9a2be`, while the cumulative working tree remains uncommitted.
+- Expected dirty files: current product work belongs to the follow-up Change; this review added only review records and safe Epic/site corrections.
+- Known blockers: the current implementation findings and required adversarial proof.
 
 ## Task Checklist
 

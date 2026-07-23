@@ -1,11 +1,11 @@
 ---
-status: in_review
+status: proposed
 ---
 # Tasks: Harden Audit Report Integrity
 
 ## Resume Here
 
-Implementation and release communication are reconciled and ready for the user-authorized package commit. Local package, traceability, skill, package-content, managed-install, doctor, and static-site checks pass; no push, PR, merge, or release was requested.
+Independent `/sdd-review` returned `changes-requested`. Replan durable Story ownership for the broader shipped workflow/site behavior and rebuild the missing risk, verification, handoff, and visual-review sections before returning to Apply. The detailed findings are in `review.md`; no push, PR, merge, close, or release was performed.
 
 ## Interactive Log
 
