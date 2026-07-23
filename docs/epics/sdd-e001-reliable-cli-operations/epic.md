@@ -57,7 +57,7 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 
 | Story | Implementation | Verification | Capability | Last Verified | Notes |
 |---|---|---|---|---|---|
-| S1 | implemented | verified | Validate navigable behavior and real evidence. | 2026-07-23 | Structure, anchors, scoped report coherence, metadata freshness, and focused reads are enforced. |
+| S1 | partial | partial | Validate navigable behavior and real evidence. | 2026-07-23 | Existing structure, anchor, report, metadata, and focused-read checks pass; three report-integrity edge cases remain explicit gaps. |
 | S2 | partial | partial | Mutate only inside physical owner boundaries and recover safely. | 2026-07-23 | Existing mutation safety is proved; concurrent first initialization remains an explicit gap. |
 | S3 | partial | partial | Reject ambiguous topology and lifecycle routing. | 2026-07-23 | Existing topology checks pass; synthetic-ID collision and owner-relative planning containment remain explicit gaps. |
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
@@ -69,8 +69,8 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 
 ### Story S1: Trustworthy Artifact Validation
 
-Implementation: implemented
-Verification: verified
+Implementation: partial
+Verification: partial
 Created: 2026-07-20
 Modified: 2026-07-23
 Last verified: 2026-07-23
@@ -210,7 +210,9 @@ Map every Requirement to its primary governing location after implementation. `p
 
 #### Implementation Gaps
 
-- None.
+- S1/R4-S4: repeated governing report options are not rejected or reduced using the downstream CLI's effective last-value semantics.
+- S1/R4-S6: a non-aligned report can omit current finding headings and use an arbitrary check/result row while still satisfying coherence validation.
+- S1/R4-S7: a symlinked Markdown report file inside a contained reviews directory is silently ignored instead of producing a fail-closed path finding.
 
 #### Verified By
 
@@ -264,7 +266,9 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 
 #### Verification Gaps
 
-- None.
+- S1/R4-S4: no automated case proves conflicting duplicate `--epic`, `--repo`, or `--changed-from` values are rejected according to effective CLI semantics.
+- S1/R4-S6: no automated case removes both current finding headings and supplies an unrelated check with an invalid result.
+- S1/R4-S7: no automated case places a symlinked Markdown report file inside an otherwise contained reviews directory.
 
 #### Story Notes
 

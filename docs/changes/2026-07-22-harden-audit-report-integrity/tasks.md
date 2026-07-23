@@ -5,11 +5,11 @@ status: in_progress
 
 ## Resume Here
 
-- Last completed action: `/sdd-apply` completed S1/S5/S6/S7 implementation, Epic reconciliation, managed-install refresh, 206-test source and prospective-integration gates, reverse traceability, and immutable S7 rendered verification.
-- Next action: apply the separately owned S2/S3 remediation in `2026-07-20-harden-cli-trust-boundaries`, then reconcile both Changes to one cumulative review candidate.
-- Active branch/ref: `develop@02759fe`; `origin/develop@a670fa28ebfd4df175217b60a74d92cfee520c74`; target `main@7e9a2bef9811f623583232c554417ae08ddc9373`; prospective tree `3b6c505b276633e7a4125b3f7845c948b9eb2782`.
-- Expected dirty files: this task/review evidence-only reconciliation until the final ledger commit; clean afterward.
-- Known blockers: S2/S3 repository ownership, concurrent initialization, and planned-path confinement remain owned by the earlier active Change; this Change cannot truthfully transition to `in_review` while those cumulative-candidate findings remain.
+- Last completed action: independent `/sdd-review` reviewed `develop@373aff7`, passed the complete deterministic and rendered-UI gates, and reproduced three additional S1/R4 integrity defects plus the existing cross-Change S2/S3 gaps.
+- Next action: `/sdd-apply` the consolidated report-integrity findings in `review.md`, then apply the separately owned S2/S3 remediation in `2026-07-20-harden-cli-trust-boundaries` before creating one cumulative review candidate.
+- Active branch/ref: reviewed source `develop@373aff7a202cfa851c1c6dcf5bf3137f66958b29`; target `main@7e9a2bef9811f623583232c554417ae08ddc9373`; merge base `a670fa28ebfd4df175217b60a74d92cfee520c74`.
+- Expected dirty files: safe review remediation in README, CHANGELOG, this ledger, and `review.md` until the review-record commit; clean afterward.
+- Known blockers: duplicate last-wins report options, incoherent non-aligned reports, symlinked report-file disappearance, and the separately owned S2/S3 repository collision, concurrent initialization, and planned-path confinement gaps.
 
 ## Task Checklist
 
@@ -59,7 +59,7 @@ status: in_progress
 - [x] 5.2 Refresh managed skills only through `sdd update`, then verify with `sdd doctor`.
 - [ ] 5.3 Record one immutable cumulative review-handoff candidate shared by both active Changes.
 - [ ] 5.4 Transition to `in_review` only after implementation, evidence, Epic truth, aggregate/integration gates, and rendered verification are current.
-- [ ] 5.5 Run a fresh independent `/sdd-review`; do not reuse the `c477e4a` verdict after material remediation.
+- [x] 5.5 Run a fresh independent `/sdd-review`; do not reuse the `c477e4a` verdict after material remediation.
 - [ ] 5.6 Keep manual UI confirmation `pending user` until the owner confirms the exact final Steel candidate.
 - [ ] 5.7 Do not push, create a PR, merge, close, tag, publish, or release without the owning workflow and current authorization.
 
@@ -105,6 +105,7 @@ status: in_progress
 | 2026-07-23 | `npm run check` on source candidate `02759fe` | required aggregate gate | Final committed current-Change implementation preserves the complete package behavior and CLI surface. | passed; 206 tests plus CLI help |
 | 2026-07-23 | changed-surface orphan audit from `main` on `02759fe` | reverse traceability | Final cumulative changed runtime and test files retain durable ownership and exact evidence. | passed; 19 candidates, 0 unowned source files, 0 unverified tests, 0 missing refs |
 | 2026-07-23 | prospective `main + develop` tree `3b6c505b` via temporary commit `4b39fe4` | required integration gate | The conflict-free production tree preserves the final package behavior. | passed; fresh install, 206 tests plus CLI help |
+| 2026-07-23 | independent review of `373aff7` | full review wave | Current artifacts, code/security boundaries, exact evidence, aggregate/package gates, reverse traceability, and current rendered UI. | changes-requested; three new S1/R4 defects and three known S2/S3 gaps |
 
 ## Manual Feedback
 
@@ -225,54 +226,54 @@ status: in_progress
 ## Blockers / Open Questions
 
 - Planning blockers: none.
-- Implementation blockers: current review findings in `review.md` and the earlier trust-boundary Change must be remediated before review handoff.
+- Implementation blockers: three current S1/R4 findings in `review.md` and the earlier trust-boundary Change's S2/S3 gaps must be remediated before review handoff.
 - Coordination constraint: do not transition this Change to `in_review` until the earlier Change's S2/S3 findings are resolved or explicitly removed from the cumulative candidate.
 
 ## Review Handoff Candidate
 
 - Integration target / merge base: production target `main`; merge base `a670fa28ebfd4df175217b60a74d92cfee520c74`.
-- Candidate source commit: implementation `02759fe`; final evidence-only reconciliation commit pending.
+- Candidate source commit: reviewed source `373aff7`; invalidated for readiness by current review findings.
 - Source differs from target when implementation changed: yes.
-- Intended implementation fully committed: yes for this Change's S1/S5/S6/S7 scope.
+- Intended implementation fully committed: no; S1/R4 retains three current gaps while S5/S6/S7 remain complete.
 - Unrelated dirty state preserved: yes; all formerly dirty Steel product files were confirmed in-scope and committed in `666de8f`.
 - Commit-sensitive generated-contract / diff / integration checks: package/template parity, package dry run, skill validation, diff checks, scoped validation, reverse traceability, and merge-tree aggregate checks passed.
 - Verification Scope Decision and aggregate candidate evidence: source `02759fe` passed 206 tests plus CLI help; exact prospective integration tree `3b6c505b` passed the same gate.
 - Post-gate evidence-only changes classified and affected checks rerun: current Epic/ledger-only reconciliation requires scoped validation, reverse traceability, diff checks, and the final integration-tree rerun.
 - Prospective integration tree and required gate evidence: tree `3b6c505b` via temporary commit `4b39fe4` passed a fresh install, 206 tests, and CLI help.
 - Required risk, fan-out, environment, or verification rows still pending or blocked: only cross-Change S2/S3 implementation owned by `2026-07-20-harden-cli-trust-boundaries`.
-- Pattern parity, boundary contract, and stateful transition matrices reconciled or not applicable with reason: all current-Change rows proved; cumulative state remains blocked on earlier S2/S3.
+- Pattern parity, boundary contract, and stateful transition matrices reconciled or not applicable with reason: S1 command-option and report-file boundaries now have findings; cumulative state also remains blocked on earlier S2/S3.
 - Capability authority, content-budget/provenance conservation, and filesystem mutation-order proof reconciled or not applicable: Git/filesystem boundaries required; content budget not applicable.
-- Evidence claims falsified against exact tests, assertions, routes, or observations: yes for S1/S5/S6/S7.
-- Fresh-context failure-seeking passes completed: bounded report, code/security, artifact/trace, and direct rendered passes completed; independent `/sdd-review` still required after S2/S3 remediation.
+- Evidence claims falsified against exact tests, assertions, routes, or observations: review falsified three S1/R4 completion claims; S5/S6/S7 claims remain proved.
+- Fresh-context failure-seeking passes completed: artifact/trace, code/security, exact evidence, deterministic tooling, and independent rendered UI passes completed; a new review is required after S1/S2/S3 remediation.
 
 ## Closeout
 
 - Change status: in_progress; transition to `in_review` is blocked by separately owned cumulative S2/S3 findings.
-- Epic files updated: S1/S5 refined; S6/S7 added with current implementation, evidence, and gaps.
+- Epic files updated: S1 is partial with three current report-integrity gaps; S2/S3 remain partial; S5/S6/S7 retain current implementation and evidence.
 - Story labels/references and Requirement/Scenario IDs current: yes.
-- Implemented By maps current: yes for S1/S5/S6/S7.
+- Implemented By maps current: yes, with explicit S1/S2/S3 implementation gaps.
 - One canonical implementation and verification map per Story: yes.
 - Primary anchors inspected as behavior-owning definitions/registrations rather than incidental occurrences: yes.
-- Scenario-mapped Verified By maps current: yes.
+- Scenario-mapped Verified By maps current: yes, with explicit S1/S2/S3 verification gaps.
 - Superseded earlier Epic truth reconciled: yes.
 - README/current-state docs and active/closed Change claims reconciled: current Change and release communication yes; earlier Change is updated to retain S2/S3 ownership.
 - ADR status: not applicable.
 - Release communication current: changelog and public guide match current S1/S5/S6/S7 truth.
-- `sdd-review` verdict: `changes-requested` on snapshot `c477e4a`; fresh review required.
+- `sdd-review` verdict: `changes-requested` on source `373aff7`; fresh review required after remediation.
 - Review record: `review.md`.
-- `review.md` findings resolved: current-Change-owned findings yes; earlier S2/S3 findings no.
+- `review.md` findings resolved: no; three current-Change S1/R4 findings and three earlier-Change S2/S3 gaps remain.
 - Planning updates resolved: yes after planned transition.
-- Implementation risk and confirmation rows resolved: all except explicit cross-Change S2/S3 blocker.
-- Pattern parity, boundary contract, and stateful transition rows resolved: current scope yes; cumulative candidate no.
+- Implementation risk and confirmation rows resolved: no; S1 report-integrity and cross-Change S2/S3 blockers remain.
+- Pattern parity, boundary contract, and stateful transition rows resolved: no; report option semantics, report-file containment, and cumulative S2/S3 remain.
 - Capability authority, content-budget/provenance conservation, and filesystem mutation-order proof resolved: no.
-- Evidence-claim integrity checked: yes for every current-Change Scenario.
+- Evidence-claim integrity checked: yes; three S1/R4 claims were reopened as gaps.
 - Decision fan-out reconciled: yes except the explicitly blocked earlier-Change implementation.
 - Verification environment obligations resolved: yes for current scope.
-- Verification Scope Decision current and required candidate gates passed: yes.
-- Immutable review handoff candidate: current-Change source `02759fe` and prospective tree `3b6c505b` are proved; a shared handoff remains blocked on the earlier S2/S3 Change.
-- Tested integration candidate matches actual integrated tree, or rerun recorded: prospective production tree `3b6c505b` was tested exactly; no merge was authorized.
+- Verification Scope Decision current and required candidate gates passed: aggregate source, package, traceability, and rendered gates passed, but code/security findings invalidate readiness.
+- Immutable review handoff candidate: none; reviewed source `373aff7` has current findings and the shared candidate remains blocked on S2/S3.
+- Tested integration candidate matches actual integrated tree, or rerun recorded: historical prospective tree `3b6c505b` passed before review findings; no current integration candidate is certifiable.
 - Manual UI confirmation status: pending user.
-- Rendered UI verification status: committed candidate `666de8f` passed the full matrix.
+- Rendered UI verification status: current source `373aff7` independently passed the full matrix.
 - PR / merge state: no current PR/merge action authorized.
 - Deferred scope accepted: legacy report rewrite, automatic baseline inference, optional favicon/touch polish.
 - Change moved to `docs/changes/closed/`: no.
