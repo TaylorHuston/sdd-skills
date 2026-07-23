@@ -6,7 +6,7 @@ status: in_progress
 ## Resume Here
 
 - Last completed action: `/sdd-apply` implemented and verified the S1 report-integrity and S5 immutable Git-baseline slices and reconciled their durable Epic truth.
-- Next action: finish exact S6 package-contract proof, commit S6/S7 ownership and the Steel site, then rerun rendered evidence on the immutable candidate.
+- Next action: run managed-install refresh, aggregate/integration gates, reverse traceability, and final self-review against the immutable cumulative candidate.
 - Active branch/ref: `develop@eba9e5d` after the committed replan ledger; `origin/develop@a670fa28ebfd4df175217b60a74d92cfee520c74`.
 - Expected dirty files: this Change's `proposal.md`, `design.md`, `tasks.md`, and existing user work in `CHANGELOG.md` plus `site/index.html`, `site/site.js`, and `site/styles.css`.
 - Known blockers: implementation and evidence findings remain open; planning has no unresolved decision.
@@ -29,7 +29,7 @@ status: in_progress
 - [x] 2.2 Update `SDD-E001/S5` with safe immutable Git-baseline behavior and explicit validator/template boundary ownership.
 - [x] 2.3 Add `SDD-E001/S6` Reliable Workflow Execution with independently derived implementation and verification state.
 - [x] 2.4 Add `SDD-E001/S7` Accessible Public Methodology Reference with independently derived implementation and verification state.
-- [ ] 2.5 Reconcile Story Index, current Outcomes, one canonical map per Story, exact primary anchors, evidence, and gaps without claiming proof that has not run.
+- [x] 2.5 Reconcile Story Index, current Outcomes, one canonical map per Story, exact primary anchors, evidence, and gaps without claiming proof that has not run.
 - [ ] 2.6 Reconcile both active Change ledgers and review records to the same final candidate while preserving single finding ownership.
 
 ### 3. Implementation
@@ -41,13 +41,13 @@ status: in_progress
 - [x] 3.5 `SDD-E001/S6`: reconcile the shipped Planning, Apply, Review, Design, and Interactive workflow contracts and their mirrored templates/doctrine.
 - [x] 3.6 `SDD-E001/S7`: reconcile public-guide content, navigation, copy fallback, accessibility, responsive composition, and Steel presentation.
 - [ ] 3.7 Keep S2/S3 topology, initialization, physical-containment, and recovery remediation in the earlier active Change; consume its verified result rather than duplicate code.
-- [ ] 3.8 Commit each completed verified and artifact-reconciled Requirement/Scenario phase when files can be isolated safely.
+- [x] 3.8 Commit each completed verified and artifact-reconciled Requirement/Scenario phase when files can be isolated safely.
 
 ### 4. Verification
 
 - [x] 4.1 Add failing-first tests for each current report/Git finding and inspect the exact assertion and discovery path.
 - [x] 4.2 Add or refine exact package contract tests for every S5/S6 Scenario; do not use string presence as proof of behavior it does not exercise.
-- [ ] 4.3 Add deterministic S7 checks where practical, then directly render and inspect the Visual Verification Matrix.
+- [x] 4.3 Add deterministic S7 checks where practical, then directly render and inspect the Visual Verification Matrix.
 - [ ] 4.4 Run `npm run check`, dependency audit, package dry run, changed-skill validation, template parity, diff checks, `sdd doctor`, scoped validation, and changed-surface reverse traceability.
 - [ ] 4.5 Run the required aggregate gate freshly against the exact final committed source candidate and record meaningful test counts.
 - [ ] 4.6 Build the prospective `develop -> main` integration tree and rerun the aggregate gate there if it differs materially from the source candidate.
@@ -72,8 +72,8 @@ status: in_progress
 | 2026-07-23 | Replan | main; `/sdd-change --replan` | proposal, design, tasks, review log | Ownership split revised to S1/S5/S6/S7; S2/S3 boundary retained; Change transitioned to `in_progress`. | `3ec27ab` |
 | 2026-07-23 | S1 report integrity | main plus bounded report-contract agent; TDD | report validator, CLI tests, S1 Epic truth | Canonical template gates, recognized missing-schema reports, exact scoped proof, and complete lineage are implemented and verified. | `3d7bffa` |
 | 2026-07-23 | S5 immutable Git baseline | bounded code/security agent; TDD | orphan-audit script/tests, S5 Epic truth | Option-like baselines are rejected without side effects; immutable commits and bounded Git subprocesses govern changed-surface audits. | `3d7bffa` |
-| 2026-07-23 | S7 public methodology reference | main; agent-browser and deterministic source contracts | Steel site source, site tests, S7 Epic truth | Durable Story semantics, document order, fragments, navigation, copy fallback, focus, responsive containment, and reduced motion are mapped and verified on current source; immutable-candidate rerun remains. | pending phase commit |
-| 2026-07-23 | S6 workflow execution | bounded artifact/trace agent plus main semantic inspection | Planning, Apply, Review, Design, Interactive, mirrors, doctrine, workflow tests, S6 Epic truth | All six durable workflow Requirements have exact ordered semantic package-contract proof; canonical mirrors are checked byte-for-byte. | pending phase commit |
+| 2026-07-23 | S7 public methodology reference | main; agent-browser and deterministic source contracts | Steel site source, site tests, S7 Epic truth | Durable Story semantics, document order, fragments, navigation, copy fallback, focus, responsive containment, and reduced motion are mapped and verified on the immutable source candidate. | `666de8f` |
+| 2026-07-23 | S6 workflow execution | bounded artifact/trace agent plus main semantic inspection | Planning, Apply, Review, Design, Interactive, mirrors, doctrine, workflow tests, S6 Epic truth | All six durable workflow Requirements have exact ordered semantic package-contract proof; canonical mirrors are checked byte-for-byte. | `666de8f` |
 
 ## Verification Ledger
 
@@ -90,6 +90,7 @@ status: in_progress
 | 2026-07-23 | `node --test test/site.test.js` | deterministic public-guide source contract | Portable-method ordering, durable Story wording, unique fragment targets, skip/focus structure, clipboard fallback, and reduced-motion rules. | passed; 3 tests |
 | 2026-07-23 | agent-browser current-source matrix | deterministic rendered UI | Desktop/tablet/mobile/landscape containment, 44px mobile navigation, skip-link focus, injected clipboard fallback, reduced motion, active navigation, contrast, console, and local requests. | passed on working source; immutable-candidate rerun pending |
 | 2026-07-23 | `node --test test/workflow-contracts.test.js` | semantic package-contract suite | Complete operative clauses for replan, persistent Apply, full Review, yielded continuation, rendered UI, evidence closure, and Interactive tracking. | passed; 7 tests |
+| 2026-07-23 | agent-browser immutable-candidate matrix on `666de8f` | deterministic rendered UI | Exact committed S7 candidate across all planned viewports, overflow bounds, 44px controls, skip focus, injected clipboard denial, reduced motion, active navigation, console, and local requests. | passed; optional deferred favicon request remained the only 404 |
 
 ## Manual Feedback
 
@@ -119,7 +120,7 @@ status: in_progress
 | S1/R4 lineage | Predecessors are versioned immutable reports in the same Epic review directory. | Self or non-versioned targets satisfy an overstated Scenario. | Exact self/non-versioned tests plus evidence update. | Exact self, non-versioned, missing, and absolute predecessor tests pass. | proved |
 | S5 immutable Git selection | User-controlled baseline cannot become a Git option or hang the workflow. | Option injection writes outside the repo; subprocess never returns. | `rev-parse --verify --end-of-options`, immutable commit, option barrier, timeout probes. | Exact no-side-effect option-injection and fake-Git timeout tests pass. | proved |
 | S6 workflow contracts | Planning/Apply/Review/Design/Interactive guidance, templates, doctrine, and tests agree on end-state behavior. | Broad string tests pass while one workflow stops early or omits a required final report. | Exact package contract assertions plus semantic source inspection. | Seven ordered semantic tests cover complete operative clauses and canonical mirror parity. | proved |
-| S7 public guide | Current source remains readable, navigable, accessible, and truthful across representative states. | Source checks miss invalid DOM, interaction fallback, overflow, or visual regression. | Visual Verification Matrix plus static DOM/ID/fragment checks. | Static contract passes; current source rendered across the full matrix with injected clipboard failure and no page overflow. | proved on working source; final commit pending |
+| S7 public guide | Current source remains readable, navigable, accessible, and truthful across representative states. | Source checks miss invalid DOM, interaction fallback, overflow, or visual regression. | Visual Verification Matrix plus static DOM/ID/fragment checks. | Static contracts and the full rendered matrix pass on immutable candidate `666de8f`. | proved |
 | Cross-Change integration | Every defect has one owner and both ledgers identify the same final candidate. | Duplicate fixes, stale watermarks, or incompatible Epic updates. | Compare both task/review records before each handoff. | Two active Changes share the cumulative release candidate. | known |
 
 ## Pattern Parity Matrix
@@ -128,7 +129,7 @@ status: in_progress
 |---|---|---|---|---|---|
 | Versioned report runtime/template parity | `src/epic-verify-report.js#CANONICAL_GATES` | canonical and packaged Epic Verify report templates | template-derived aligned-report test | none permitted | matched |
 | Workflow final-report parity | single review final report | `--until-ready` final report | packaged Review contract test plus rereview output | iteration history may be cumulative; final fields may not diverge | matched |
-| Rendered navigation and interaction | desktop Steel documentation shell | tablet/mobile navigation and copy fallback | browser matrix with keyboard and clipboard-failure states | composition may collapse responsively without losing semantics | matched on working source |
+| Rendered navigation and interaction | desktop Steel documentation shell | tablet/mobile navigation and copy fallback | browser matrix with keyboard and clipboard-failure states | composition may collapse responsively without losing semantics | matched on `666de8f` |
 
 ## Boundary Contract Matrix
 
@@ -145,8 +146,8 @@ status: in_progress
 |---|---|---|---|---|---|
 | Review running required aggregate gate | command yields resumable session or exceeds progress interval | review remains active until command completes or genuinely blocks | user receives progress; session is resumed | yielded-command contract test or controlled shell observation | pending |
 | `--until-ready` has unresolved findings | remediation iteration reaches default cap of five | final report still includes full scorecard, cumulative remediation, and residual findings | caller receives `changes-requested`/`blocked`, never a partial success summary | packaged Review contract test | pending |
-| One-page navigation active | viewport/scroll/hash changes | one current location reflects the visible section without overflow | desktop/mobile navigation updates and remains keyboard reachable | browser matrix | passed on working source |
-| Copy interaction pending | clipboard succeeds or throws | command remains available and status resets after feedback | `Copied` or selected-text fallback is visible/announced | injected clipboard failure selected the full command and announced `Selected` | passed on working source |
+| One-page navigation active | viewport/scroll/hash changes | one current location reflects the visible section without overflow | desktop/mobile navigation updates and remains keyboard reachable | browser matrix | passed on `666de8f` |
+| Copy interaction pending | clipboard succeeds or throws | command remains available and status resets after feedback | `Copied` or selected-text fallback is visible/announced | injected clipboard failure selected the full command and announced `Selected` | passed on `666de8f` |
 
 ## Decision Fan-Out Ledger
 
@@ -195,12 +196,12 @@ status: in_progress
 
 | Surface / Route or Fixture | Viewport | State / Interaction | Expected Rendered Behavior | Tool / Setup | Inspected Evidence | Console / Network | Result |
 |---|---|---|---|---|---|---|---|
-| One-page guide root | 1440×900 | full page, sticky sidebar, active section, Example Epic | bounded reading column, no card pile, balanced headings, contained tables | local static server plus agent-browser | full-page screenshot directly inspected; document composition and table containment match the Steel direction | clean; accepted optional favicon 404 only | passed on working source; final commit rerun pending |
-| One-page guide root | 768×1024 | collapsed navigation, long content | no page overflow; navigation remains reachable | same | full-page screenshot; `scrollWidth === clientWidth === 768` | clean | passed on working source; final commit rerun pending |
-| One-page guide root | 375×812 and 320×812 | top, Scenario/evidence rows, footer, focus order | 44px controls, readable type, no collision/overflow | same | both full-page screenshots inspected; mobile nav measured 44px; scroll widths equal client widths | clean | passed on working source; final commit rerun pending |
-| One-page guide root | 812×375 | mobile landscape navigation | header fits and content remains readable | same | full-page screenshot; `scrollWidth === clientWidth === 812` | clean | passed on working source; final commit rerun pending |
-| Skip/copy/table interactions | desktop and mobile | skip link, keyboard focus, copy success/failure, overflow scroll | visible focus; main receives focus; feedback announced; fallback selects text; table scroll is contained | agent-browser interaction runner | skip link became visible/focused and moved focus to main; injected clipboard denial selected command and announced `Selected`; screenshot inspected | clean | passed on working source; final commit rerun pending |
-| Motion/contrast | representative desktop/mobile | reduced motion and computed color pairs | smooth motion reduced; required text/control/focus contrast passes | browser emulation/inspection | computed scroll behavior `auto`, transition `0.00001s`, active navigation retained; sampled contrast ratios 8.89–18.10:1 | not applicable | passed on working source; final commit rerun pending |
+| One-page guide root | 1440×900 | full page, sticky sidebar, active section, Example Epic | bounded reading column, no card pile, balanced headings, contained tables | local static server plus agent-browser | full-page screenshot directly inspected; document composition and table containment match the Steel direction | clean; accepted optional favicon 404 only | passed on `666de8f` |
+| One-page guide root | 768×1024 | collapsed navigation, long content | no page overflow; navigation remains reachable | same | `scrollWidth === clientWidth === 768` | clean | passed on `666de8f` |
+| One-page guide root | 375×812 and 320×812 | top, Scenario/evidence rows, footer, focus order | 44px controls, readable type, no collision/overflow | same | 320px full-page screenshot inspected; both mobile navs measured 44px; scroll widths equal client widths | clean | passed on `666de8f` |
+| One-page guide root | 812×375 | mobile landscape navigation | header fits and content remains readable | same | `scrollWidth === clientWidth === 812` | clean | passed on `666de8f` |
+| Skip/copy/table interactions | desktop and mobile | skip link, keyboard focus, copy success/failure, overflow scroll | visible focus; main receives focus; feedback announced; fallback selects text; table scroll is contained | agent-browser interaction runner | skip link became visible/focused and moved focus to main; injected clipboard denial selected command and announced `Selected` | clean | passed on `666de8f` |
+| Motion/contrast | representative desktop/mobile | reduced motion and computed color pairs | smooth motion reduced; required text/control/focus contrast passes | browser emulation/inspection | computed scroll behavior `auto`, transition `0.00001s`, and active navigation retained; working-source sampled ratios remained unchanged in committed source | not applicable | passed on `666de8f` |
 
 ## Blockers / Open Questions
 

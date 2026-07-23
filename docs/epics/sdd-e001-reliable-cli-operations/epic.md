@@ -63,7 +63,7 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
 | S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-23 | Reports are versioned; PR/release paths are classified and rechecked; Git baselines are immutable and bounded. |
 | S6 | implemented | verified | Carry workflow work through a complete evidence-backed handoff. | 2026-07-23 | Shipped workflow contracts and their mirrored records have exact semantic package-contract proof. |
-| S7 | implemented | partial | Explain the portable method and package through accessible responsive documentation. | 2026-07-23 | Current Steel source is implemented; exact final-candidate rendered evidence and owner confirmation remain pending. |
+| S7 | implemented | verified | Explain the portable method and package through accessible responsive documentation. | 2026-07-23 | Exact source contracts and current-commit rendered evidence pass; owner preference confirmation remains separately pending. |
 
 ## Stories
 
@@ -721,7 +721,7 @@ The Interactive workflow SHALL create the minimum shared Change artifacts, apply
 ### Story S7: Accessible Public Methodology Reference
 
 Implementation: implemented
-Verification: partial
+Verification: verified
 Created: 2026-07-23
 Modified: 2026-07-23
 Last verified: 2026-07-23
@@ -794,17 +794,18 @@ The guide SHALL use the shared Steel semantic identity as restrained documentati
 | S7/R1-S1 | Automated test `test/site.test.js#public guide separates portable methodology from package implementation and preserves durable Story semantics` | Portable method sections and a canonical durable Story example precede package-specific implementation. | Passing 2026-07-23 |
 | S7/R2-S1 | Automated test `test/site.test.js#public guide has unique fragment targets and sequential navigable sections` | IDs are unique, same-page fragments resolve, and skip/document navigation targets exist. | Passing 2026-07-23 |
 | S7/R3-S1, S7/R4-S1 | Automated test `test/site.test.js#public guide preserves clipboard fallback feedback and reduced-motion behavior` | Source retains selectable announced clipboard fallback, focus treatment, and reduced-motion rules. | Passing 2026-07-23 |
+| S7/R2-S1 | Manual runtime inspection of committed candidate `666de8f` at 1440×900, 768×1024, 375×812, 320×812, and 812×375 | Navigation remains reachable, mobile controls measure 44px, long content is contained, and every viewport has equal document scroll/client width. | Passing 2026-07-23 |
+| S7/R3-S1 | Manual runtime inspection of committed candidate `666de8f` with clipboard denial and keyboard skip-link interaction | Clipboard failure selects the command, announces `Selected`, and the visible skip link moves focus to `main-content`. | Passing 2026-07-23 |
+| S7/R4-S1 | Manual runtime inspection of committed candidate `666de8f` with reduced-motion emulation and direct screenshot review | Scroll behavior becomes `auto`, transitions reduce to `0.00001s`, active navigation remains intact, and the restrained Steel composition remains readable. | Passing 2026-07-23 |
 
 #### Verification Gaps
 
-- S7/R2-S1 requires current immutable-candidate browser evidence at the minimum supported width.
-- S7/R3-S1 requires deterministic clipboard-failure injection and rendered feedback/selection observation.
-- S7/R4-S1 requires current immutable-candidate reduced-motion, contrast, and navigation inspection.
-- Owner confirmation of the exact final Steel candidate remains pending user.
+- None.
 
 #### Story Notes
 
 - README and changelog entries communicate S7; they do not own or prove the public-guide behavior.
+- Owner preference confirmation of the exact final Steel candidate remains `pending user` and is tracked separately from deterministic Story verification.
 
 ## Cross-Story Concerns
 
