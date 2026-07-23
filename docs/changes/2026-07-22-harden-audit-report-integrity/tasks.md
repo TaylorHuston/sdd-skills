@@ -74,7 +74,7 @@ status: in_progress
 | 2026-07-23 | S5 immutable Git baseline | bounded code/security agent; TDD | orphan-audit script/tests, S5 Epic truth | Option-like baselines are rejected without side effects; immutable commits and bounded Git subprocesses govern changed-surface audits. | `3d7bffa` |
 | 2026-07-23 | S7 public methodology reference | main; agent-browser and deterministic source contracts | Steel site source, site tests, S7 Epic truth | Durable Story semantics, document order, fragments, navigation, copy fallback, focus, responsive containment, and reduced motion are mapped and verified on the immutable source candidate. | `666de8f` |
 | 2026-07-23 | S6 workflow execution | bounded artifact/trace agent plus main semantic inspection | Planning, Apply, Review, Design, Interactive, mirrors, doctrine, workflow tests, S6 Epic truth | All six durable workflow Requirements have exact ordered semantic package-contract proof; canonical mirrors are checked byte-for-byte. | `666de8f` |
-| 2026-07-23 | Package artifact hygiene | main; package dry-run | npm manifest and package test | Dry run exposed generated Python bytecode; package now excludes `__pycache__` directories and `.pyc` files explicitly. | pending phase commit |
+| 2026-07-23 | Package artifact hygiene | main; package dry-run | npm manifest, package test, S5/R4 Epic truth | Dry run exposed generated Python bytecode; package now excludes `__pycache__` directories and `.pyc` files explicitly. | `20c4934`; Epic reconciliation pending |
 
 ## Verification Ledger
 
@@ -107,6 +107,7 @@ status: in_progress
 | Date | Discovery | Classification | Planning Updates | Next Apply Starting Point |
 |---|---|---|---|---|
 | 2026-07-23 | Cumulative review found shipped workflow/site behavior outside S1/S5 plus missing report/Git boundary proof. | Epic ownership change and in-scope refinement | Expanded proposal/design; planned S6/S7; refined S1/S5; separated earlier S2/S3 Change ownership; rebuilt risk, scope, environment, handoff, and visual records. | `/sdd-apply` at `SDD-E001/S1 R4` after confirming cross-Change ownership |
+| 2026-07-23 | Package dry-run included locally generated Python bytecode from the bundled orphan-audit script. | in-scope refinement | Added S5/R4 portable package behavior, explicit manifest exclusions, and an exact package-contract test. | Continue package and aggregate closure after the isolated hygiene commit. |
 
 ## Design Updates
 
@@ -160,6 +161,7 @@ status: in_progress
 | 2026-07-23 | Keep S2/S3 findings in the earlier active Change. | One implementation owner per defect while both Changes share a final candidate. | both Changes, S2/S3 Epic evidence, aggregate/integration gates | coordination row and restart point recorded | open |
 | 2026-07-23 | Treat template and runtime as one canonical report contract. | S1 runtime and S5 workflow/template cannot drift independently. | validator, templates/assets, package tests, Epic maps, docs | risk/parity rows seeded | open |
 | 2026-07-23 | Public guide is a user-facing package surface. | S7 requires deterministic rendered evidence and owner acceptance. | `site/`, Epic, README/changelog, visual/manual ledgers | experience contract and matrix seeded | open |
+| 2026-07-23 | Universal bundled scripts must not publish local compile artifacts. | S5 owns a clean portable audit package in addition to runtime Git safety. | package manifest, package test, package dry run, S5 map/evidence | bytecode exclusions and exact proof added | reconciled |
 
 ## Verification Environment
 

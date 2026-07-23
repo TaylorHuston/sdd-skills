@@ -512,7 +512,7 @@ The CLI SHALL time out a stalled Git status process, return degraded metadata fo
 Implementation: implemented
 Verification: verified
 Created: 2026-07-22
-Modified: 2026-07-22
+Modified: 2026-07-23
 Last verified: 2026-07-23
 
 As a developer, I want Epic audits and PR/release handoffs to describe the final verified source and exact changed-file scope, so that historical failures or unrelated files cannot be mistaken for a clean candidate.
@@ -561,6 +561,15 @@ The orphan-audit workflow SHALL resolve a caller-supplied Git baseline to an imm
 - WHEN a Git subprocess exceeds the configured execution bound
 - THEN the audit stops promptly with a deterministic actionable failure instead of hanging the workflow.
 
+##### Requirement R4: Clean Portable Audit Packaging
+
+The published package SHALL include the orphan-audit source and universal bundled scripts without generated local Python bytecode or cache directories.
+
+###### Scenario R4-S1: Local Compile Before Packaging
+
+- WHEN a local verification run creates Python bytecode beside a bundled audit script
+- THEN the package manifest excludes the generated cache while retaining the portable script source.
+
 #### Implemented By
 
 | Requirement / Scenario | Location / Anchor | Kind | Responsibility |
@@ -573,6 +582,7 @@ The orphan-audit workflow SHALL resolve a caller-supplied Git baseline to an imm
 | S5/R3 | `skills/sdd-orphan-audit/scripts/sdd_orphan_audit.py#changed_files` | primary | Resolves the baseline to a validated immutable commit and diffs behind an option barrier. |
 | S5/R3-S2 | `skills/sdd-orphan-audit/scripts/sdd_orphan_audit.py#run_git_paths` | support | Applies the bounded Git execution contract and actionable timeout failure. |
 | S5/R3-S2 | `skills/sdd-orphan-audit/scripts/sdd_orphan_audit.py#git_timeout_seconds` | support | Provides a bounded default with a constrained test/operation override. |
+| S5/R4 | `package.json#!**/__pycache__/**` | primary | Excludes generated Python cache directories and bytecode from the published universal skill package. |
 | S5/R1, S5/R2 | `docs/story-driven-development.md#Epic verification reports use` | support | Defines the shared package doctrine for report integrity and exact publication scope. |
 
 #### Implementation Gaps
@@ -589,6 +599,7 @@ The orphan-audit workflow SHALL resolve a caller-supplied Git baseline to an imm
 | S5/R2-S2 | Automated test `test/cli.test.js#packaged workflow templates preserve boundary, transition, and evidence-integrity contracts` | The release template mirrors its skill asset and includes file-scope plus SDD-integrity sections. | Passing 2026-07-22 |
 | S5/R3-S1 | Automated test `test/orphan-audit.test.js#orphan audit rejects option-like changed-from input without Git side effects` | Option-like baselines are rejected before diffing and cannot create an external output file. | Passing 2026-07-23 |
 | S5/R3-S2 | Automated test `test/orphan-audit.test.js#orphan audit fails promptly with an actionable Git timeout` | A stalled Git child is bounded and returns deterministic recovery guidance. | Passing 2026-07-23 |
+| S5/R4-S1 | Automated test `test/package.test.js#package manifest excludes generated Python bytecode` | The publish manifest explicitly excludes Python cache directories and `.pyc` files while the dry-run retains the source script. | Passing 2026-07-23 |
 
 #### Verification Gaps
 
