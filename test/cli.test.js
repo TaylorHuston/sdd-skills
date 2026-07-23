@@ -976,7 +976,7 @@ test("runtime config validation rejects unknown keys and ambiguous artifact root
 
 test("runtime config validation confines planned Change directories to their owner", async () => {
   const config = await createUserConfig("/workspace");
-  for (const plannedChangesDirectory of ["/outside", "../../outside", "~/outside"]) {
+  for (const plannedChangesDirectory of ["/outside", "\\outside", "../../outside", "~/outside"]) {
     config.planning.plannedChangesDirectory = plannedChangesDirectory;
     assert.ok(
       validateConfig(config).some((finding) =>

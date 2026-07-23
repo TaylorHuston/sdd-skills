@@ -485,7 +485,7 @@ The CLI SHALL refuse a planned Change ID that already exists in any selected rep
 | S3/R2-S1 | Automated test `test/cli.test.js#runtime config validation rejects unknown keys and ambiguous artifact roots` | Runtime validation matches strict shapes and rejects overlap. | Passing 2026-07-20 |
 | S3/R2-S1 | Automated test `test/cli.test.js#context rejects physical aliases claimed as different repositories` | Two configured paths cannot claim one physical repository. | Passing 2026-07-20 |
 | S3/R2-S2 | Automated test `test/cli.test.js#context rejects a repository-only ID that collides with an existing Idea` | A same-ID repository-only contract is rejected without changing existing configuration ownership. | Passing 2026-07-23 |
-| S3/R2-S3 | Automated test `test/cli.test.js#runtime config validation confines planned Change directories to their owner` | Absolute, home-relative, and parent-traversing planned Changes paths fail validation; nested owner-relative paths remain valid. | Passing 2026-07-23 |
+| S3/R2-S3 | Automated test `test/cli.test.js#runtime config validation confines planned Change directories to their owner` | Absolute, leading-separator, home-relative, and parent-traversing planned Changes paths fail validation; nested owner-relative paths remain valid. | Passing 2026-07-23 |
 | S3/R2-S3 | Automated test `test/cli.test.js#validation rejects a planned Changes directory symlinked outside its owner` | Artifact validation refuses an external symlink before enumerating its Change directories. | Passing 2026-07-23 |
 | S3/R3-S1 | Automated test `test/cli.test.js#change create refuses IDs already active or closed in a selected repository` | Active and closed collisions fail even in dry-run before planning writes. | Passing 2026-07-20 |
 

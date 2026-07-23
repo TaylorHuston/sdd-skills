@@ -447,6 +447,7 @@ export function validateConfig(config) {
     }
     if (
       isAbsolute(path) ||
+      /^[\\/]/.test(path) ||
       /^[A-Za-z]:[\\/]/.test(path) ||
       path === "~" ||
       path.startsWith("~/") ||
