@@ -75,6 +75,7 @@ status: in_progress
 | 2026-07-23 | S7 public methodology reference | main; agent-browser and deterministic source contracts | Steel site source, site tests, S7 Epic truth | Durable Story semantics, document order, fragments, navigation, copy fallback, focus, responsive containment, and reduced motion are mapped and verified on the immutable source candidate. | `666de8f` |
 | 2026-07-23 | S6 workflow execution | bounded artifact/trace agent plus main semantic inspection | Planning, Apply, Review, Design, Interactive, mirrors, doctrine, workflow tests, S6 Epic truth | All six durable workflow Requirements have exact ordered semantic package-contract proof; canonical mirrors are checked byte-for-byte. | `666de8f` |
 | 2026-07-23 | Package artifact hygiene | main; package dry-run | npm manifest, package test, S5/R4 Epic truth | Dry run exposed generated Python bytecode; package now excludes `__pycache__` directories and `.pyc` files explicitly. | `20c4934`; Epic reconciliation pending |
+| 2026-07-23 | Final self-check remediation | fresh S1/S5 reviewer plus main; adversarial proof | report command parser/repository binding, executable package-manifest test, Epic evidence | Orphan audit must use the exact report repository root; quoted paths remain valid; package proof now inspects actual dry-run contents with injected bytecode. | pending phase commit |
 
 ## Verification Ledger
 
@@ -97,6 +98,7 @@ status: in_progress
 | 2026-07-23 | `npm run check` on source candidate `20c4934` | required aggregate gate | Complete implementation candidate before evidence-only Epic/ledger updates. | passed; 197 tests plus CLI help |
 | 2026-07-23 | changed-surface orphan audit from `main` after `1485103` | reverse traceability | Cumulative changed runtime and test files have durable ownership/evidence with no broken refs. | passed; 19 candidates, 0 unowned source files, 0 unverified tests, 0 missing refs |
 | 2026-07-23 | prospective `main + develop` tree `dee9095f` via temporary commit `852d94d` | required integration gate | Materially different conflict-free production tree preserves the full package behavior. | passed; fresh install, 197 tests plus CLI help |
+| 2026-07-23 | focused final-self-check regressions | adversarial automated tests | Wrong orphan-audit repository is rejected, quoted exact paths are accepted, and an injected `.pyc` is absent while source remains in actual npm dry-run output. | passed; 5 report tests and 1 executable package test |
 
 ## Manual Feedback
 
@@ -123,7 +125,7 @@ status: in_progress
 | Requirement / Surface | End-State Invariant | Risk / Failure Mode | Check Or Confirmation Needed | Evidence / Finding | Status |
 |---|---|---|---|---|---|
 | S1/R4 report contract | A report completed from the shipped template can be validated by the runtime using one canonical gate set. | Template/runtime drift makes `aligned` impossible or falsely permissive. | Template-derived fixture plus exact gate parity and contradictory-result tests. | Real 18-gate template fixture and full CLI suite pass. | proved |
-| S1/R4 report identity/evidence | Every recognized report is validated and only current-Epic proof can certify it. | Missing schema hides the report; another Epic's checks certify it. | Missing-schema and wrong-Epic negative fixtures. | Exact missing-schema, wrong-Epic, and prefix-confusable wrong-repository tests pass. | proved |
+| S1/R4 report identity/evidence | Every recognized report is validated and only current-Epic/repository proof can certify it. | Missing schema hides the report; another Epic or repository's checks certify it. | Missing-schema, wrong-Epic, wrong structural repository, wrong orphan-audit root, and quoted-path fixtures. | All exact negative cases pass; quoted exact paths remain accepted. | proved |
 | S1/R4 lineage | Predecessors are versioned immutable reports in the same Epic review directory. | Self or non-versioned targets satisfy an overstated Scenario. | Exact self/non-versioned tests plus evidence update. | Exact self, non-versioned, missing, and absolute predecessor tests pass. | proved |
 | S5 immutable Git selection | User-controlled baseline cannot become a Git option or hang the workflow. | Option injection writes outside the repo; subprocess never returns. | `rev-parse --verify --end-of-options`, immutable commit, option barrier, timeout probes. | Exact no-side-effect option-injection and fake-Git timeout tests pass. | proved |
 | S6 workflow contracts | Planning/Apply/Review/Design/Interactive guidance, templates, doctrine, and tests agree on end-state behavior. | Broad string tests pass while one workflow stops early or omits a required final report. | Exact package contract assertions plus semantic source inspection. | Seven ordered semantic tests cover complete operative clauses and canonical mirror parity. | proved |

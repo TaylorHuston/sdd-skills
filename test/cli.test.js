@@ -350,6 +350,7 @@ async function writeEpicVerificationReport(
     verdictVerifiedRef = verifiedRef,
     evidenceEpicId = epicId,
     evidenceRepository = `code/${repository}`,
+    evidenceAuditRoot = evidenceRepository,
   } = {},
 ) {
   const template = await readFile(
@@ -440,7 +441,7 @@ async function writeEpicVerificationReport(
       "| Command / Scenario | Result | Proves | Notes |",
       "|---|---|---|---|",
       `| \`sdd validate sample --epic ${evidenceEpicId} --repo ${evidenceRepository}${includeChangedFrom ? ` --changed-from ${auditedRef}` : ""}\` | pass | Current artifact shape. | Required baseline. |`,
-      `| \`python3 sdd_orphan_audit.py . --epic ${evidenceEpicId} --format json\` | pass | Current reverse inventory. | Required baseline. |`,
+      `| \`python3 sdd_orphan_audit.py ${evidenceAuditRoot} --epic ${evidenceEpicId} --format json\` | pass | Current reverse inventory. | Required baseline. |`,
       "",
       "## Next Action",
       "",
@@ -3246,6 +3247,44 @@ test("validate rejects aligned proof scoped to another repository", async (t) =>
   assert.equal(result.valid, false);
   assert.ok(result.findings.some((finding) =>
     finding.code === "EPIC_VERIFY_RESULT_CONTRADICTION"));
+});
+
+test("validate rejects orphan-audit proof scoped to another repository", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  await writeEpicVerificationReport(root, "sample-web", {
+    evidenceAuditRoot: "code/sample-web-copy",
+  });
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) =>
+    finding.code === "EPIC_VERIFY_RESULT_CONTRADICTION"));
+});
+
+test("validate accepts quoted repository paths in aligned proof", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  await writeEpicVerificationReport(root, "sample-web", {
+    evidenceRepository: '"code/sample-web"',
+  });
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, true);
 });
 
 test("validate rejects malformed versioned Epic verification report frontmatter", async (t) => {

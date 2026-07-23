@@ -103,13 +103,49 @@ function verdictValue(lines, label) {
     .find(Boolean);
 }
 
+function parseCommandTokens(command) {
+  const tokens = [];
+  let token = "";
+  let quote = null;
+  let escaped = false;
+
+  for (const character of command.replaceAll("`", "").trim()) {
+    if (escaped) {
+      token += character;
+      escaped = false;
+    } else if (character === "\\" && quote !== "'") {
+      escaped = true;
+    } else if (quote) {
+      if (character === quote) quote = null;
+      else token += character;
+    } else if (character === "'" || character === '"') {
+      quote = character;
+    } else if (/\s/.test(character)) {
+      if (token) {
+        tokens.push(token);
+        token = "";
+      }
+    } else {
+      token += character;
+    }
+  }
+
+  if (escaped) token += "\\";
+  if (token) tokens.push(token);
+  return quote ? [] : tokens;
+}
+
 function commandHasOptionValue(command, option, value) {
-  const tokens = command
-    .replaceAll("`", "")
-    .trim()
-    .split(/\s+/);
+  const tokens = parseCommandTokens(command);
   const optionIndex = tokens.indexOf(option);
   return optionIndex >= 0 && tokens[optionIndex + 1] === value;
+}
+
+function orphanAuditHasRepositoryRoot(command, value) {
+  const tokens = parseCommandTokens(command);
+  const scriptIndex = tokens.findIndex((token) =>
+    /(?:^|\/)sdd[_-]orphan[_-]audit(?:\.py)?$/i.test(token));
+  return scriptIndex >= 0 && tokens[scriptIndex + 1] === value;
 }
 
 function reportDisplayPath(repositoryDisplayPath, repositoryRoot, reportPath) {
@@ -285,7 +321,8 @@ export async function validateEpicVerifyReports({
       const reverseInventory = checks.find((row) => {
         const command = row[0] ?? "";
         return /(?:sdd[_-]orphan[_-]audit|orphan audit)/i.test(command)
-          && commandHasOptionValue(command, "--epic", epicId);
+          && commandHasOptionValue(command, "--epic", epicId)
+          && orphanAuditHasRepositoryRoot(command, repository.resolvedPath);
       });
       const failedRequiredCheck = checks.find((row) => {
         const required = /\brequired\b/i.test(row[3] ?? "");

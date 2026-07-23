@@ -186,6 +186,7 @@ Map every Requirement to its primary governing location after implementation. `p
 | S1/R4 | `src/epic-verify-report.js#validateEpicVerifyReports` | primary | Validates versioned report identity, current-result coherence, remediation sections, and predecessor containment. |
 | S1/R4 | `src/epic-verify-report.js#CANONICAL_GATES` | support | Keeps aligned-report coverage synchronized with the canonical shipped scorecard. |
 | S1/R4-S4 | `src/epic-verify-report.js#commandHasOptionValue` | support | Requires report checks to carry exact Epic, repository, and immutable baseline option values. |
+| S1/R4-S4 | `src/epic-verify-report.js#orphanAuditHasRepositoryRoot` | support | Binds reverse-inventory proof to the exact repository root instead of accepting another checkout. |
 | S1/R4 | `src/commands/validate.js#validateRepository` | support | Discovers and merges report findings only for selected Epics. |
 | S1/R5 | `src/epic-history.js#validateEpicHistory` | primary | Compares substantive baseline and working-tree Epic content while excluding top-level freshness metadata. |
 | S1/R5 | `src/epic-history.js#resolveChangedFrom` | support | Resolves the requested commit-ish without shell evaluation before repository validation. |
@@ -231,6 +232,8 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 | S1/R4-S3 | Automated test `test/cli.test.js#validate rejects a recognized Epic verification report without a schema` | A recognized schema-less report produces a deterministic finding and remains in the report count. | Passing 2026-07-23 |
 | S1/R4-S4 | Automated test `test/cli.test.js#validate rejects aligned proof scoped to another Epic` | Alignment cannot reuse structural or orphan-audit evidence for a different Epic. | Passing 2026-07-23 |
 | S1/R4-S4 | Automated test `test/cli.test.js#validate rejects aligned proof scoped to another repository` | Alignment cannot use a prefix-confusable or otherwise different repository path. | Passing 2026-07-23 |
+| S1/R4-S4 | Automated test `test/cli.test.js#validate rejects orphan-audit proof scoped to another repository` | A current structural check cannot hide reverse-inventory proof run against another repository root. | Passing 2026-07-23 |
+| S1/R4-S4 | Automated test `test/cli.test.js#validate accepts quoted repository paths in aligned proof` | Exact repository scoping remains portable when command arguments require shell quoting. | Passing 2026-07-23 |
 | S1/R5-S1 | Automated test `test/cli.test.js#validate changed-from rejects substantive Epic edits with stale modified metadata` | Working-tree Epic changes require advanced `modified` metadata relative to the selected baseline. | Passing 2026-07-22 |
 | S1/R5-S2 | Automated test `test/cli.test.js#validate changed-from accepts verification-only metadata changes` | Top-level verification freshness updates do not create a false substantive-change finding. | Passing 2026-07-22 |
 | S1/R5-S3 | Automated test `test/cli.test.js#validate changed-from reports an invalid Git baseline as a finding` | Invalid commit-ish input becomes a deterministic validation error. | Passing 2026-07-22 |
