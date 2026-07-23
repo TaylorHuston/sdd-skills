@@ -7,7 +7,7 @@ status: in_progress
 
 - Last completed action: `/sdd-change --replan` classified the cumulative review as an Epic ownership change plus in-scope report/workflow refinement, rebuilt the artifacts, passed scoped validation, and transitioned the Change back to `planned`.
 - Next action: run `/sdd-apply` beginning at `SDD-E001/S1 R4` after confirming the earlier trust-boundary Change owns its S2/S3 remediation.
-- Active branch/ref: `develop@4ff924038fa4029705f584da785a4a24463057f3`; `origin/develop@a670fa28ebfd4df175217b60a74d92cfee520c74`.
+- Active branch/ref: `develop@3ec27ab` after the committed replan; `origin/develop@a670fa28ebfd4df175217b60a74d92cfee520c74`.
 - Expected dirty files: this Change's `proposal.md`, `design.md`, `tasks.md`, and existing user work in `CHANGELOG.md` plus `site/index.html`, `site/site.js`, and `site/styles.css`.
 - Known blockers: implementation and evidence findings remain open; planning has no unresolved decision.
 
@@ -69,7 +69,7 @@ status: in_progress
 |---|---|---|---|---|---|
 | 2026-07-22 | Initial S1/S5 implementation | main; TDD and package guidance | validator, Epic Verify, PR, Release, templates, docs | Implemented and committed before cumulative review. | `494b121`, `ee1fa1b`, `a670fa2` |
 | 2026-07-22 | Independent cumulative review | main plus artifact, code/security, and UI reviewers | full `v0.11.0` candidate | Three blocking and seven required findings consolidated. | reviewed snapshot `c477e4a`; record `4ff9240` |
-| 2026-07-23 | Replan | main; `/sdd-change --replan` | proposal, design, tasks | Ownership split revised to S1/S5/S6/S7; S2/S3 boundary retained. | working tree |
+| 2026-07-23 | Replan | main; `/sdd-change --replan` | proposal, design, tasks, review log | Ownership split revised to S1/S5/S6/S7; S2/S3 boundary retained; Change transitioned to `in_progress`. | `3ec27ab` |
 
 ## Verification Ledger
 
