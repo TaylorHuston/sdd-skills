@@ -6,10 +6,10 @@ status: in_progress
 ## Resume Here
 
 - Last completed action: the follow-up Apply resolved shared S1 report integrity, S5 orphan-audit Git handling, lineage proof, workflow/site ownership, package gates, and reverse traceability through `develop@1485103`.
-- Next action: constrain `plannedChangesDirectory` to its lexical and physical planning owner, then rerun the cumulative source/integration gates.
+- Next action: run the full source/integration gates and fresh implementation self-check, then prepare the review handoff.
 - Active branch/ref: current shared candidate includes S1/S5 remediation through `develop@83ff3a1`; the original implementation remains in `main@7e9a2be`.
 - Expected dirty files: both active Change ledgers and the shared Epic while current truth is reconciled; implementation should start from the next clean ledger commit.
-- Known blocker: S3/R2-S3 planned-path confinement and its adversarial proof; the S1/S5/S6/S7 findings and S2/R2-S5/S3/R2-S2 are resolved and must not be duplicated here.
+- Known blocker: implementation is complete; cumulative verification and the guarded `in_review` transition remain.
 
 ## Task Checklist
 
@@ -39,12 +39,12 @@ status: in_progress
   - [x] R2 detects pre-commit and post-commit Change edits and reports retained recovery state.
   - [x] R3 atomically writes configuration/lock state, preserves modes, reclaims verified dead-owner locks, reports conservative manual recovery for alive/unknown ownership, serializes managed updates, and rolls workflow/skills back when lock commit fails.
   - [x] R2-S5 serializes or CAS-publishes concurrent first repository initialization without silent writer loss.
-- [ ] 3.3 `SDD-E001/S3` unambiguous topology and lifecycle routing.
+- [x] 3.3 `SDD-E001/S3` unambiguous topology and lifecycle routing.
   - [x] R1 refuses idea-owned Change creation and promotion from repository-only context.
   - [x] R2 rejects physical repository aliases, unknown keys, and invalid artifact overlap.
   - [x] R3 rejects planned Change IDs already active or closed in any target repository.
   - [x] R2-S2 rejects synthetic repository IDs that collide with existing Idea/configuration ownership.
-  - [ ] R2-S3 constrains `plannedChangesDirectory` lexically and physically to its planning owner.
+  - [x] R2-S3 constrains `plannedChangesDirectory` lexically and physically to its planning owner.
 - [x] 3.4 `SDD-E001/S4` bounded, context-aware diagnostics.
   - [x] R1 ignores negated, historical, migration, imported-document, and quoted obsolete-guidance mentions while reporting affirmative/modal instructions.
   - [x] R2 bounds Git status and returns degraded per-repository results on timeout.
@@ -73,6 +73,7 @@ status: in_progress
 | 2026-07-20 | Mutation and diagnostics hardening | main; security finding remediation | filesystem, locks, install transaction, lifecycle recovery, doctor/status | Physical boundaries, atomic state, recovery visibility, bounded Git, and guidance classification are enforced. | `a7eeb06` |
 | 2026-07-23 | S2/R2-S5 concurrent repository initialization | main; TDD | repository initialization, shared mutation lock, CLI test, S2 Epic truth | The first repository contract is published only while its physical owner lock is held; a simultaneous initializer receives `OPERATION_IN_PROGRESS` and cannot silently win later. | `be2d2e5` |
 | 2026-07-23 | S3/R2-S2 synthetic repository-ID collision | main; TDD | workspace context, repository selection, validation, CLI test, S3 Epic truth | A repository-only ID that belongs to an existing Idea fails deterministically, while repository-local artifact roots remain local to that synthetic context. | `bec4004` |
+| 2026-07-23 | S3/R2-S3 planned-path confinement | main; TDD | runtime config, checked schemas, validation preflight, CLI tests, S3 Epic truth | Absolute/traversing planned paths are invalid and symlink escapes are rejected before external planned Changes are listed. | commit pending |
 | 2026-07-20 | Fresh-review remediation | main plus independent review waves | validator helpers, transaction boundary, recovery races, migration rollback, package allowlist, docs/tests | Duplicate/mixed evidence bypasses, post-commit data loss, recreated-target overwrite, silent migration recovery failure, stale locks, internal package leakage, and doctrine drift resolved. | `a7eeb06` |
 | 2026-07-20 | User skill synchronization | package CLI | `/Users/taylor/.agents/skills` | `sdd update` updated Apply, Change, Epic Verify, and then Orphan Audit after its final parser correction; immediate final dry-run reported all 14 managed skills unchanged. | installed state only; no repository commit |
 

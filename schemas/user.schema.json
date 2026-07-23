@@ -19,7 +19,11 @@
       "required": ["root", "plannedChangesDirectory"],
       "properties": {
         "root": { "type": "string", "minLength": 1 },
-        "plannedChangesDirectory": { "type": "string", "minLength": 1 }
+        "plannedChangesDirectory": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?![\\\\/]|[A-Za-z]:[\\\\/]|~(?:[\\\\/]|$))(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
+        }
       },
       "additionalProperties": false
     },

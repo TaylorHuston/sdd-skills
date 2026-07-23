@@ -974,6 +974,20 @@ test("runtime config validation rejects unknown keys and ambiguous artifact root
     finding.message.includes("Repository configuration contains unknown key")));
 });
 
+test("runtime config validation confines planned Change directories to their owner", async () => {
+  const config = await createUserConfig("/workspace");
+  for (const plannedChangesDirectory of ["/outside", "../../outside", "~/outside"]) {
+    config.planning.plannedChangesDirectory = plannedChangesDirectory;
+    assert.ok(
+      validateConfig(config).some((finding) =>
+        finding.message.includes("planning.plannedChangesDirectory must be relative")),
+      plannedChangesDirectory,
+    );
+  }
+  config.planning.plannedChangesDirectory = "changes/planned";
+  assert.equal(validateConfig(config).filter((finding) => finding.level === "error").length, 0);
+});
+
 test("context rejects physical aliases claimed as different repositories", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -992,6 +1006,23 @@ test("context rejects physical aliases claimed as different repositories", async
       && error.code === "INVALID_CONFIG"
       && error.details.some((detail) => detail.includes("already claimed")),
   );
+});
+
+test("validation rejects a planned Changes directory symlinked outside its owner", async (t) => {
+  const root = await createMappedWorkspace();
+  const externalRoot = await createWorkspace("sdd-external-planned-changes-");
+  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => rm(externalRoot, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await mkdir(join(externalRoot, "outside-change"), { recursive: true });
+  await symlink(externalRoot, join(root, "ideas", "sample", "planned-changes"));
+
+  const result = await validateArtifacts(root, { spaceId: "sample" });
+
+  assert.equal(result.valid, false);
+  assert.equal(result.summary.plannedChanges, 0);
+  assert.ok(result.findings.some((finding) => finding.code === "UNSAFE_ARTIFACT_PATH"
+    && finding.path === "ideas/sample/planned-changes"));
 });
 
 test("interactive configure asks only for missing roots and accepts detected defaults", async (t) => {

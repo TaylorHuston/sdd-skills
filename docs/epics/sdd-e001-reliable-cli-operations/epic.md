@@ -59,7 +59,7 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 |---|---|---|---|---|---|
 | S1 | partial | partial | Validate navigable behavior and real evidence. | 2026-07-23 | Existing structure, anchor, report, metadata, and focused-read checks pass; three report-integrity edge cases remain explicit gaps. |
 | S2 | implemented | verified | Mutate only inside physical owner boundaries and recover safely. | 2026-07-23 | Physical boundaries, recovery, and first-initialization contention now fail closed. |
-| S3 | partial | partial | Reject ambiguous topology and lifecycle routing. | 2026-07-23 | Existing topology checks pass; synthetic-ID collision and owner-relative planning containment remain explicit gaps. |
+| S3 | implemented | verified | Reject ambiguous topology and lifecycle routing. | 2026-07-23 | Synthetic-ID collisions and lexical/physical planned-path escapes now fail closed. |
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
 | S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-23 | Reports are versioned; PR/release paths are classified and rechecked; Git baselines are immutable and bounded. |
 | S6 | implemented | verified | Carry workflow work through a complete evidence-backed handoff. | 2026-07-23 | Shipped workflow contracts and their mirrored records have exact semantic package-contract proof. |
@@ -273,8 +273,8 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 
 ### Story S2: Safe And Recoverable Mutation
 
-Implementation: partial
-Verification: partial
+Implementation: implemented
+Verification: verified
 Created: 2026-07-20
 Modified: 2026-07-23
 Last verified: 2026-07-23
@@ -466,14 +466,15 @@ The CLI SHALL refuse a planned Change ID that already exists in any selected rep
 |---|---|---|---|
 | S3/R1 | `src/commands/change-create.js#createPlannedChange` | primary | Refuses planned Change creation without Idea planning ownership. |
 | S3/R1 | `src/commands/change-promote.js#promotePlannedChange` | support | Refuses promotion without the same planning ownership. |
-| S3/R2 | `src/config.js#validateConfig` | primary | Enforces schema-shape parity and artifact relationships. |
+| S3/R2 | `src/config.js#validateConfig` | primary | Enforces schema-shape parity, artifact relationships, and owner-relative planned Changes paths. |
 | S3/R2 | `src/workspace.js#resolveWorkspaceContext` | primary | Rejects duplicate physical repository ownership, artifact ambiguity, and synthetic IDs that would collide with an existing Idea. |
 | S3/R2-S2 | `src/change-repositories.js#resolvedActiveRepositories` and `src/commands/validate.js#configuredRepositories` | support | Preserve repository-local artifact roots without mutating global defaults while synthetic context is resolved. |
+| S3/R2-S3 | `src/commands/validate.js#validatePlannedChanges` | primary | Rechecks physical containment before enumerating planned Changes. |
 | S3/R3 | `src/commands/change-create.js#createPlannedChange` | primary | Preflights selected repositories' active and closed roots. |
 
 #### Implementation Gaps
 
-- S3/R2-S3: `plannedChangesDirectory` is not yet constrained to an owner-relative physically contained path.
+- None.
 
 #### Verified By
 
@@ -484,11 +485,13 @@ The CLI SHALL refuse a planned Change ID that already exists in any selected rep
 | S3/R2-S1 | Automated test `test/cli.test.js#runtime config validation rejects unknown keys and ambiguous artifact roots` | Runtime validation matches strict shapes and rejects overlap. | Passing 2026-07-20 |
 | S3/R2-S1 | Automated test `test/cli.test.js#context rejects physical aliases claimed as different repositories` | Two configured paths cannot claim one physical repository. | Passing 2026-07-20 |
 | S3/R2-S2 | Automated test `test/cli.test.js#context rejects a repository-only ID that collides with an existing Idea` | A same-ID repository-only contract is rejected without changing existing configuration ownership. | Passing 2026-07-23 |
+| S3/R2-S3 | Automated test `test/cli.test.js#runtime config validation confines planned Change directories to their owner` | Absolute, home-relative, and parent-traversing planned Changes paths fail validation; nested owner-relative paths remain valid. | Passing 2026-07-23 |
+| S3/R2-S3 | Automated test `test/cli.test.js#validation rejects a planned Changes directory symlinked outside its owner` | Artifact validation refuses an external symlink before enumerating its Change directories. | Passing 2026-07-23 |
 | S3/R3-S1 | Automated test `test/cli.test.js#change create refuses IDs already active or closed in a selected repository` | Active and closed collisions fail even in dry-run before planning writes. | Passing 2026-07-20 |
 
 #### Verification Gaps
 
-- S3/R2-S3: add lexical and symlink escape fixtures proving configuration and artifact discovery fail closed without external reads or writes.
+- None.
 
 #### Story Notes
 

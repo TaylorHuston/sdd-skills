@@ -440,6 +440,24 @@ export function validateConfig(config) {
     }
     return true;
   };
+  const validateOwnerRelativePath = (label, path) => {
+    if (typeof path !== "string" || !path) {
+      error(`${label} must be a non-empty path.`);
+      return false;
+    }
+    if (
+      isAbsolute(path) ||
+      /^[A-Za-z]:[\\/]/.test(path) ||
+      path === "~" ||
+      path.startsWith("~/") ||
+      path.startsWith("~\\") ||
+      path.split(/[\\/]/).includes("..")
+    ) {
+      error(`${label} must be relative and cannot traverse to a parent directory.`);
+      return false;
+    }
+    return true;
+  };
 
   if (!config || typeof config !== "object" || Array.isArray(config)) {
     return [{ level: "error", message: "Configuration must be a YAML mapping." }];
@@ -464,7 +482,7 @@ export function validateConfig(config) {
   }
   validatePath("skills.directory", config.skills?.directory);
   validatePath("planning.root", config.planning?.root);
-  validatePath("planning.plannedChangesDirectory", config.planning?.plannedChangesDirectory);
+  validateOwnerRelativePath("planning.plannedChangesDirectory", config.planning?.plannedChangesDirectory);
   if (
     !config.repositories?.roots ||
     typeof config.repositories.roots !== "object" ||
