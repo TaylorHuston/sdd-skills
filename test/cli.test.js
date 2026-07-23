@@ -422,7 +422,7 @@ async function writeEpicVerificationReport(
       "",
       "### REQUIRED",
       "",
-      "- None.",
+      result === "aligned" ? "- None." : "- Current report finding.",
       "",
       "### SUGGESTION",
       "",
@@ -3340,6 +3340,75 @@ test("validate rejects a recognized Epic verification report without a schema", 
     finding.code === "MISSING_EPIC_VERIFY_REPORT_SCHEMA"));
 });
 
+test("validate rejects spoofed report check commands", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  const report = await writeEpicVerificationReport(root, "sample-web");
+  await writeFile(report, (await readFile(report, "utf8"))
+    .replace("`sdd validate sample", "`echo sdd validate sample"), "utf8");
+  const result = await validateArtifacts(root, { spaceId: "sample", repositories: ["sample-web"], epicId: "SAMPLE-E001" });
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) => finding.code === "EPIC_VERIFY_RESULT_CONTRADICTION"));
+});
+
+test("validate rejects incoherent non-aligned Epic verification reports", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  const report = await writeEpicVerificationReport(root, "sample-web", {
+    result: "changes-requested",
+    gateResult: "pass",
+  });
+  await writeFile(report, (await readFile(report, "utf8"))
+    .replace("- Current report finding.", "- None."), "utf8");
+  const result = await validateArtifacts(root, { spaceId: "sample", repositories: ["sample-web"], epicId: "SAMPLE-E001" });
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) => finding.code === "EPIC_VERIFY_RESULT_CONTRADICTION"));
+});
+
+test("validate fails closed on malformed raw report identity", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  const report = await writeEpicVerificationReport(root, "sample-web");
+  await writeFile(report, (await readFile(report, "utf8"))
+    .replace("schema: sdd-epic-verify-report-v1\n", "")
+    .replace("kind: sdd-epic-verify-report", "kind: [sdd-epic-verify-report"), "utf8");
+  const result = await validateArtifacts(root, { spaceId: "sample", repositories: ["sample-web"], epicId: "SAMPLE-E001" });
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) => finding.code === "INVALID_EPIC_VERIFY_REPORT_FRONTMATTER"));
+});
+
+test("validate rejects an external Epic verification reviews directory", async (t) => {
+  const root = await createMappedWorkspace();
+  const external = await mkdtemp(join(tmpdir(), "sdd-report-reviews-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => rm(external, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const epic = await writeCanonicalEpic(root, "sample-web");
+  await symlink(external, join(dirname(epic), "reviews"));
+  const result = await validateArtifacts(root, { spaceId: "sample", repositories: ["sample-web"], epicId: "SAMPLE-E001" });
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) => finding.code === "UNSAFE_EPIC_VERIFY_REPORT_PATH"));
+});
+
+test("validate reports typed Epic verification paths without crashing", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  const report = await writeEpicVerificationReport(root, "sample-web");
+  await writeFile(report, (await readFile(report, "utf8"))
+    .replace("epic_path: docs/epics/sample-e001-core/epic.md", "epic_path: [typed]"), "utf8");
+  const result = await validateArtifacts(root, { spaceId: "sample", repositories: ["sample-web"], epicId: "SAMPLE-E001" });
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) => finding.code === "INVALID_EPIC_VERIFY_REPORT_IDENTITY"));
+});
+
 test("validate rejects a missing superseded Epic verification report", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -3386,6 +3455,28 @@ test("validate accepts one explicit Epic verification report successor", async (
 
   assert.equal(result.valid, true);
   assert.equal(result.summary.epicVerificationReports, 2);
+});
+
+test("validate rejects successor result discontinuity", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  await writeEpicVerificationReport(root, "sample-web", {
+    fileName: "2026-07-22-1200-epic-verify.md",
+    initialResult: "needs artifact fix",
+    result: "needs artifact fix",
+    gateResult: "findings",
+  });
+  await writeEpicVerificationReport(root, "sample-web", {
+    fileName: "2026-07-22-1300-epic-verify.md",
+    initialResult: "blocked",
+    result: "aligned",
+    supersedes: "docs/epics/sample-e001-core/reviews/2026-07-22-1200-epic-verify.md",
+  });
+  const result = await validateArtifacts(root, { spaceId: "sample", repositories: ["sample-web"], epicId: "SAMPLE-E001" });
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((finding) => finding.code === "EPIC_VERIFY_LINEAGE_RESULT_MISMATCH"));
 });
 
 test("validate rejects an absolute Epic verification report predecessor", async (t) => {

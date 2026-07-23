@@ -76,6 +76,7 @@ status: in_progress
 | 2026-07-23 | S6 workflow execution | bounded artifact/trace agent plus main semantic inspection | Planning, Apply, Review, Design, Interactive, mirrors, doctrine, workflow tests, S6 Epic truth | All six durable workflow Requirements have exact ordered semantic package-contract proof; canonical mirrors are checked byte-for-byte. | `666de8f` |
 | 2026-07-23 | Package artifact hygiene | main; package dry-run | npm manifest, package test, S5/R4 Epic truth | Dry run exposed generated Python bytecode; package now excludes `__pycache__` directories and `.pyc` files explicitly. | `20c4934`; Epic reconciliation pending |
 | 2026-07-23 | Final self-check remediation | fresh S1/S5 reviewer plus main; adversarial proof | report command parser/repository binding, executable package-manifest test, Epic evidence | Orphan audit must use the exact report repository root; quoted paths remain valid; package proof now inspects actual dry-run contents with injected bytecode. | pending phase commit |
+| 2026-07-23 | Final trust-boundary remediation | bounded S1 and code/security reviewers plus main | report validator/tests, orphan-audit script/tests, Epic evidence | Report commands, result coherence, identity, physical containment, and lineage fail closed; every changed-surface Git query is required and fail closed. | pending phase commit |
 
 ## Verification Ledger
 
@@ -99,6 +100,8 @@ status: in_progress
 | 2026-07-23 | changed-surface orphan audit from `main` after `1485103` | reverse traceability | Cumulative changed runtime and test files have durable ownership/evidence with no broken refs. | passed; 19 candidates, 0 unowned source files, 0 unverified tests, 0 missing refs |
 | 2026-07-23 | prospective `main + develop` tree `dee9095f` via temporary commit `852d94d` | required integration gate | Materially different conflict-free production tree preserves the full package behavior. | passed; fresh install, 197 tests plus CLI help |
 | 2026-07-23 | focused final-self-check regressions | adversarial automated tests | Wrong orphan-audit repository is rejected, quoted exact paths are accepted, and an injected `.pyc` is absent while source remains in actual npm dry-run output. | passed; 5 report tests and 1 executable package test |
+| 2026-07-23 | `node --test test/cli.test.js` after final trust-boundary remediation | full CLI suite | Approved command shape, coherent non-aligned records, fail-closed identity/path handling, and continuous successor results preserve all prior CLI behavior. | passed; 161 tests |
+| 2026-07-23 | `node --test test/orphan-audit.test.js` after final trust-boundary remediation | full orphan-audit suite | Every required changed-surface Git query fails closed while safe inventory fallback remains conservative. | passed; 8 tests |
 
 ## Manual Feedback
 
@@ -127,6 +130,8 @@ status: in_progress
 | S1/R4 report contract | A report completed from the shipped template can be validated by the runtime using one canonical gate set. | Template/runtime drift makes `aligned` impossible or falsely permissive. | Template-derived fixture plus exact gate parity and contradictory-result tests. | Real 18-gate template fixture and full CLI suite pass. | proved |
 | S1/R4 report identity/evidence | Every recognized report is validated and only current-Epic/repository proof can certify it. | Missing schema hides the report; another Epic or repository's checks certify it. | Missing-schema, wrong-Epic, wrong structural repository, wrong orphan-audit root, and quoted-path fixtures. | All exact negative cases pass; quoted exact paths remain accepted. | proved |
 | S1/R4 lineage | Predecessors are versioned immutable reports in the same Epic review directory. | Self or non-versioned targets satisfy an overstated Scenario. | Exact self/non-versioned tests plus evidence update. | Exact self, non-versioned, missing, and absolute predecessor tests pass. | proved |
+| S1/R4 command/result coherence | Required checks begin with an approved executable and every result carries complete current evidence. | Embedded command text or incomplete non-aligned reports satisfy the contract. | Spoofed-command and result-specific incomplete-report fixtures. | Exact command-shape and every non-aligned coherence case pass. | proved |
+| S1/R4 identity/containment | Malformed typed identity and external review roots fail closed. | Invalid YAML types crash validation or symlinked report storage crosses the repository boundary. | Typed-path, malformed raw identity, and external reviews-directory fixtures. | All cases return deterministic findings without trusting external artifacts. | proved |
 | S5 immutable Git selection | User-controlled baseline cannot become a Git option or hang the workflow. | Option injection writes outside the repo; subprocess never returns. | `rev-parse --verify --end-of-options`, immutable commit, option barrier, timeout probes. | Exact no-side-effect option-injection and fake-Git timeout tests pass. | proved |
 | S6 workflow contracts | Planning/Apply/Review/Design/Interactive guidance, templates, doctrine, and tests agree on end-state behavior. | Broad string tests pass while one workflow stops early or omits a required final report. | Exact package contract assertions plus semantic source inspection. | Seven ordered semantic tests cover complete operative clauses and canonical mirror parity. | proved |
 | S7 public guide | Current source remains readable, navigable, accessible, and truthful across representative states. | Source checks miss invalid DOM, interaction fallback, overflow, or visual regression. | Visual Verification Matrix plus static DOM/ID/fragment checks. | Static contracts and the full rendered matrix pass on immutable candidate `666de8f`. | proved |
@@ -148,6 +153,7 @@ status: in_progress
 | Aligned report cites another Epic | scoped proof rejected | validator report finding | caller reruns validation/orphan audit for the current Epic | wrong-Epic and wrong-repository focused tests | proved |
 | Git baseline starts with option syntax | ref rejected before diff | orphan-audit structured failure/exit | no external write; caller supplies a valid ref | option-injection and valid-ref tests | proved |
 | Git subprocess exceeds bound | deterministic timeout/degraded failure | orphan-audit process result | caller receives actionable failure rather than a hung review | fake Git timeout fixture | proved |
+| Required changed-surface Git query fails | deterministic fail-closed audit result | orphan-audit process result | caller fixes Git access/state; missing output is never treated as an empty change set | four injected baseline/unstaged/staged/untracked failures | proved |
 
 ## Stateful Transition Matrix
 

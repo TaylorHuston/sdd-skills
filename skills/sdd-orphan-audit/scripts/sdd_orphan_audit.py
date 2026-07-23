@@ -96,6 +96,16 @@ def run_git_paths(root: Path, args: list[str], operation: str) -> list[str] | No
     return [part.decode("utf-8", errors="replace") for part in result.stdout.split(b"\0") if part]
 
 
+def require_git_paths(root: Path, args: list[str], operation: str) -> list[str]:
+    paths = run_git_paths(root, args, operation)
+    if paths is None:
+        raise ValueError(
+            f"Git command failed while {operation}; "
+            f"verify Git repository state and retry for: {root}"
+        )
+    return paths
+
+
 def run_git_files(root: Path) -> list[str] | None:
     cached = run_git_paths(
         root,
@@ -108,15 +118,17 @@ def run_git_files(root: Path) -> list[str] | None:
         root,
         ["ls-files", "-z", "--others", "--exclude-standard"],
         "listing untracked files",
-    ) or []
-    deleted = set(
-        run_git_paths(
-            root,
-            ["ls-files", "-z", "--deleted"],
-            "listing deleted files",
-        ) or []
     )
-    return sorted((set(cached) | set(untracked)) - deleted)
+    if untracked is None:
+        return None
+    deleted = run_git_paths(
+        root,
+        ["ls-files", "-z", "--deleted"],
+        "listing deleted files",
+    )
+    if deleted is None:
+        return None
+    return sorted((set(cached) | set(untracked)) - set(deleted))
 
 
 def changed_files(root: Path, ref: str, inventory: set[str]) -> list[str]:
@@ -126,32 +138,36 @@ def changed_files(root: Path, ref: str, inventory: set[str]) -> list[str]:
         "resolving the changed-file baseline",
     )
     if not resolved:
-        raise ValueError(f"Unable to resolve changed-file scope from Git ref: {ref}")
+        raise ValueError(
+            f"Unable to resolve changed-file scope from Git ref: {ref}; "
+            f"verify the ref and Git repository state, then retry for: {root}"
+        )
     commit = resolved[0].strip()
     if not re.fullmatch(r"[0-9a-fA-F]{40,64}", commit):
-        raise ValueError(f"Unable to resolve changed-file scope from Git ref: {ref}")
-    committed = run_git_paths(
+        raise ValueError(
+            f"Unable to resolve changed-file scope from Git ref: {ref}; "
+            f"verify the ref and Git repository state, then retry for: {root}"
+        )
+    committed = require_git_paths(
         root,
         ["diff", "--name-only", "-z", "--end-of-options", f"{commit}...HEAD", "--"],
         "comparing the changed-file baseline",
     )
-    if committed is None:
-        raise ValueError(f"Unable to resolve changed-file scope from Git ref: {ref}")
-    unstaged = run_git_paths(
+    unstaged = require_git_paths(
         root,
         ["diff", "--name-only", "-z", "--"],
         "listing unstaged changes",
-    ) or []
-    staged = run_git_paths(
+    )
+    staged = require_git_paths(
         root,
         ["diff", "--cached", "--name-only", "-z", "--"],
         "listing staged changes",
-    ) or []
-    untracked = run_git_paths(
+    )
+    untracked = require_git_paths(
         root,
         ["ls-files", "-z", "--others", "--exclude-standard"],
         "listing untracked changes",
-    ) or []
+    )
     return sorted((set(committed) | set(unstaged) | set(staged) | set(untracked)) & inventory)
 
 

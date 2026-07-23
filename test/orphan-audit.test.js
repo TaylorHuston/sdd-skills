@@ -214,6 +214,90 @@ test("orphan audit fails promptly with an actionable Git timeout", async (t) => 
   );
 });
 
+test("orphan audit fails closed when any changed-surface Git command fails", async (t) => {
+  const root = await createRepository();
+  const fakeBinRoot = await mkdtemp(join(tmpdir(), "sdd-orphan-audit-fake-git-"));
+  const fakeGit = join(fakeBinRoot, "git");
+  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => rm(fakeBinRoot, { recursive: true, force: true }));
+
+  await write(root, "src/core.ts", "export const value = 1;\n");
+  await writeEpic(root, "app-e001-core", "APP-E001", [], []);
+  await git(root, "add", ".");
+  await git(root, "commit", "-m", "fixture");
+  await write(root, "src/core.ts", "export const value = 2;\n");
+  await write(root, "src/untracked.ts");
+
+  await writeFile(
+    fakeGit,
+    [
+      "#!/usr/bin/env python3",
+      "import os",
+      "import sys",
+      "",
+      "args = sys.argv[1:]",
+      "mode = os.environ['SDD_TEST_FAIL_GIT_MODE']",
+      "should_fail = (",
+      "    (mode == 'baseline' and 'diff' in args and '--end-of-options' in args)",
+      "    or (mode == 'unstaged' and args[-4:] == ['diff', '--name-only', '-z', '--'])",
+      "    or (mode == 'staged' and args[-5:] == ['diff', '--cached', '--name-only', '-z', '--'])",
+      "    or (mode == 'untracked' and args[-4:] == ['ls-files', '-z', '--others', '--exclude-standard'])",
+      ")",
+      "if should_fail:",
+      "    sys.stderr.write(f'injected {mode} failure\\n')",
+      "    raise SystemExit(73)",
+      "environment = os.environ.copy()",
+      "environment['PATH'] = environment['SDD_TEST_REAL_PATH']",
+      "os.execvpe('git', ['git', *args], environment)",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await chmod(fakeGit, 0o755);
+
+  const failures = new Map([
+    ["baseline", "comparing the changed-file baseline"],
+    ["unstaged", "listing unstaged changes"],
+    ["staged", "listing staged changes"],
+    ["untracked", "listing untracked changes"],
+  ]);
+  for (const [mode, operation] of failures) {
+    await assert.rejects(
+      execFileAsync(
+        "python3",
+        [
+          auditScript,
+          root,
+          "--format",
+          "json",
+          "--epic",
+          "APP-E001",
+          "--changed-from",
+          "HEAD",
+        ],
+        {
+          env: {
+            ...process.env,
+            PATH: `${fakeBinRoot}:${process.env.PATH}`,
+            SDD_TEST_FAIL_GIT_MODE: mode,
+            SDD_TEST_REAL_PATH: process.env.PATH,
+          },
+        },
+      ),
+      (error) => {
+        assert.equal(error.code, 2);
+        assert.match(
+          error.stderr,
+          new RegExp(
+            `Git command failed while ${operation}; verify Git repository state and retry`,
+          ),
+        );
+        return true;
+      },
+    );
+  }
+});
+
 test("orphan audit preserves primary and supporting implementation ownership", async (t) => {
   const root = await createRepository();
   t.after(() => rm(root, { recursive: true, force: true }));

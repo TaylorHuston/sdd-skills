@@ -47,7 +47,7 @@ const CANONICAL_GATES = Object.freeze([
 const IMMUTABLE_COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
 
 function normalizePath(value) {
-  return value.split("\\").join("/");
+  return typeof value === "string" ? value.split("\\").join("/") : "";
 }
 
 function finding(level, code, path, message, context) {
@@ -148,6 +148,17 @@ function orphanAuditHasRepositoryRoot(command, value) {
   return scriptIndex >= 0 && tokens[scriptIndex + 1] === value;
 }
 
+function isStructuralValidationCommand(command) {
+  const tokens = parseCommandTokens(command);
+  return tokens[0] === "sdd" && tokens[1] === "validate";
+}
+
+function isOrphanAuditCommand(command) {
+  const tokens = parseCommandTokens(command);
+  return ["python", "python3"].includes(tokens[0])
+    && /(?:^|\/)sdd[_-]orphan[_-]audit\.py$/i.test(tokens[1] ?? "");
+}
+
 function reportDisplayPath(repositoryDisplayPath, repositoryRoot, reportPath) {
   return normalizePath(join(repositoryDisplayPath, relative(repositoryRoot, reportPath)));
 }
@@ -160,6 +171,23 @@ export async function validateEpicVerifyReports({
 }) {
   const reviewsPath = join(dirname(epicPath), "reviews");
   if (!(await pathExists(reviewsPath))) return { findings: [], reports: 0 };
+  if (!(await isPathPhysicallyInside(dirname(epicPath), reviewsPath))) {
+    return {
+      findings: [finding(
+        "error",
+        "UNSAFE_EPIC_VERIFY_REPORT_PATH",
+        reportDisplayPath(repository.resolvedPath, repositoryRoot, reviewsPath),
+        "Epic verification reviews must remain physically inside their Epic directory.",
+        {
+          spaceId: repository.spaceId,
+          repository: repository.resolvedPath,
+          artifactType: "epic-verification-report",
+          artifactId: epicId,
+        },
+      )],
+      reports: 0,
+    };
+  }
 
   const entries = (await readdir(reviewsPath, { withFileTypes: true }))
     .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
@@ -172,7 +200,7 @@ export async function validateEpicVerifyReports({
     const path = join(reviewsPath, entry.name);
     const source = await readFile(path, "utf8");
     const frontmatter = parseFrontmatter(source);
-    if (!frontmatter && /^schema:\s*sdd-epic-verify-report-v1\s*$/m.test(source)) {
+    if (!frontmatter && /^(?:schema:.*sdd-epic-verify-report-v1|kind:.*sdd-epic-verify-report).*$/m.test(source)) {
       malformedReports.push(path);
       continue;
     }
@@ -271,7 +299,7 @@ export async function validateEpicVerifyReports({
     }
     if (frontmatter.kind !== "sdd-epic-verify-report"
       || frontmatter.epic !== epicId
-      || normalizePath(frontmatter.epic_path ?? "") !== expectedEpicPath) {
+      || normalizePath(frontmatter.epic_path) !== expectedEpicPath) {
       findings.push(finding(
         "error",
         "INVALID_EPIC_VERIFY_REPORT_IDENTITY",
@@ -313,14 +341,14 @@ export async function validateEpicVerifyReports({
       const checks = tableRows(sectionLines(source, "Current Tests And Checks"));
       const scopedValidation = checks.find((row) => {
         const command = row[0] ?? "";
-        return /\bsdd validate\b/.test(command)
+        return isStructuralValidationCommand(command)
           && commandHasOptionValue(command, "--epic", epicId)
           && commandHasOptionValue(command, "--repo", repository.resolvedPath)
           && commandHasOptionValue(command, "--changed-from", frontmatter.audited_ref);
       });
       const reverseInventory = checks.find((row) => {
         const command = row[0] ?? "";
-        return /(?:sdd[_-]orphan[_-]audit|orphan audit)/i.test(command)
+        return isOrphanAuditCommand(command)
           && commandHasOptionValue(command, "--epic", epicId)
           && orphanAuditHasRepositoryRoot(command, repository.resolvedPath);
       });
@@ -340,6 +368,33 @@ export async function validateEpicVerifyReports({
           "EPIC_VERIFY_RESULT_CONTRADICTION",
           displayPath,
           "An aligned report must cover every canonical Current Gate Scorecard row exactly once with pass/not-applicable, have no current blocking or required findings, and include passing required checks against its audited ref.",
+          context,
+        ));
+      }
+    }
+
+    if (frontmatter.result && frontmatter.result !== "aligned"
+      && RESULT_LABELS.has(frontmatter.result)) {
+      const gates = tableRows(sectionLines(source, "Current Gate Scorecard"));
+      const gateCounts = new Map();
+      for (const row of gates) {
+        const gate = row[0] ?? "";
+        gateCounts.set(gate, (gateCounts.get(gate) ?? 0) + 1);
+      }
+      const completeGateCoverage = gates.length === CANONICAL_GATES.length
+        && CANONICAL_GATES.every((gate) => gateCounts.get(gate) === 1);
+      const expectedGate = frontmatter.result === "blocked" ? "blocked" : "findings";
+      const hasExpectedGate = gates.some((row) => (row[1] ?? "").toLowerCase() === expectedGate);
+      const currentFindings = sectionLines(source, "Current Findings");
+      const hasCurrentFinding = !currentFindingIsNone(currentFindings, "BLOCKING")
+        || !currentFindingIsNone(currentFindings, "REQUIRED");
+      const checks = tableRows(sectionLines(source, "Current Tests And Checks"));
+      if (!completeGateCoverage || !hasExpectedGate || !hasCurrentFinding || checks.length === 0) {
+        findings.push(finding(
+          "error",
+          "EPIC_VERIFY_RESULT_CONTRADICTION",
+          displayPath,
+          "A non-aligned report must have a complete scorecard, a result-appropriate current gate, current blocking or required findings, and current checks.",
           context,
         ));
       }
@@ -386,6 +441,15 @@ export async function validateEpicVerifyReports({
           context,
         ));
       } else {
+        if (frontmatter.initial_result !== predecessor.frontmatter.result) {
+          findings.push(finding(
+            "error",
+            "EPIC_VERIFY_LINEAGE_RESULT_MISMATCH",
+            displayPath,
+            "A successor initial_result must equal its predecessor current result.",
+            context,
+          ));
+        }
         const reportKey = resolve(report.path);
         predecessorByReport.set(reportKey, target);
         successorsByPredecessor.set(

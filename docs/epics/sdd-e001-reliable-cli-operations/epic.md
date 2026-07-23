@@ -132,7 +132,7 @@ The CLI SHALL validate versioned Epic verification reports as current-state audi
 
 ###### Scenario R4-S2: Broken Report Lineage
 
-- WHEN a versioned report names a missing, external, self, or non-versioned predecessor
+- WHEN a versioned report names a missing, external, self, or non-versioned predecessor, or its initial result disagrees with the predecessor's current result
 - THEN validation reports a broken `supersedes` link.
 
 ###### Scenario R4-S3: Missing Report Schema
@@ -144,6 +144,21 @@ The CLI SHALL validate versioned Epic verification reports as current-state audi
 
 - WHEN an aligned report cites structural or orphan-audit evidence for another Epic or repository
 - THEN validation rejects the report instead of accepting unrelated proof.
+
+###### Scenario R4-S5: Spoofed Check Command
+
+- WHEN report evidence merely contains the text of a required command inside another executable or argument
+- THEN validation rejects it unless the approved executable and argument shape begin the parsed command.
+
+###### Scenario R4-S6: Incoherent Non-Aligned Result
+
+- WHEN a blocked or changes-requested report omits the complete scorecard, result-appropriate findings, blocked gate, or current checks
+- THEN validation rejects the internally incomplete report instead of treating non-alignment as an evidence exemption.
+
+###### Scenario R4-S7: Malformed Or External Report Identity
+
+- WHEN report identity fields have invalid types or the reviews directory resolves outside the physical repository
+- THEN validation returns deterministic findings without crashing or trusting the external artifact.
 
 ##### Requirement R5: Git-Relative Epic Metadata Freshness
 
@@ -187,6 +202,8 @@ Map every Requirement to its primary governing location after implementation. `p
 | S1/R4 | `src/epic-verify-report.js#CANONICAL_GATES` | support | Keeps aligned-report coverage synchronized with the canonical shipped scorecard. |
 | S1/R4-S4 | `src/epic-verify-report.js#commandHasOptionValue` | support | Requires report checks to carry exact Epic, repository, and immutable baseline option values. |
 | S1/R4-S4 | `src/epic-verify-report.js#orphanAuditHasRepositoryRoot` | support | Binds reverse-inventory proof to the exact repository root instead of accepting another checkout. |
+| S1/R4-S5 | `src/epic-verify-report.js#isStructuralValidationCommand` | support | Accepts structural proof only when the parsed command starts with the approved executable and argument shape. |
+| S1/R4-S5 | `src/epic-verify-report.js#isOrphanAuditCommand` | support | Accepts reverse-inventory proof only when the parsed command starts with the approved executable and audit subcommand. |
 | S1/R4 | `src/commands/validate.js#validateRepository` | support | Discovers and merges report findings only for selected Epics. |
 | S1/R5 | `src/epic-history.js#validateEpicHistory` | primary | Compares substantive baseline and working-tree Epic content while excluding top-level freshness metadata. |
 | S1/R5 | `src/epic-history.js#resolveChangedFrom` | support | Resolves the requested commit-ish without shell evaluation before repository validation. |
@@ -234,6 +251,12 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 | S1/R4-S4 | Automated test `test/cli.test.js#validate rejects aligned proof scoped to another repository` | Alignment cannot use a prefix-confusable or otherwise different repository path. | Passing 2026-07-23 |
 | S1/R4-S4 | Automated test `test/cli.test.js#validate rejects orphan-audit proof scoped to another repository` | A current structural check cannot hide reverse-inventory proof run against another repository root. | Passing 2026-07-23 |
 | S1/R4-S4 | Automated test `test/cli.test.js#validate accepts quoted repository paths in aligned proof` | Exact repository scoping remains portable when command arguments require shell quoting. | Passing 2026-07-23 |
+| S1/R4-S5 | Automated test `test/cli.test.js#validate rejects spoofed report check commands` | Required command text embedded inside another executable or argument cannot certify a report. | Passing 2026-07-23 |
+| S1/R4-S6 | Automated test `test/cli.test.js#validate rejects incoherent non-aligned Epic verification reports` | Non-aligned results still require the complete scorecard, checks, and result-appropriate current findings. | Passing 2026-07-23 |
+| S1/R4-S7 | Automated test `test/cli.test.js#validate fails closed on malformed raw report identity` | Malformed raw kind/schema identity cannot evade report validation. | Passing 2026-07-23 |
+| S1/R4-S7 | Automated test `test/cli.test.js#validate rejects an external Epic verification reviews directory` | A physically external reviews directory cannot supply trusted report artifacts. | Passing 2026-07-23 |
+| S1/R4-S7 | Automated test `test/cli.test.js#validate reports typed Epic verification paths without crashing` | Invalid typed path fields produce deterministic findings rather than exceptions. | Passing 2026-07-23 |
+| S1/R4-S2 | Automated test `test/cli.test.js#validate rejects successor result discontinuity` | A successor's initial result must continue from its predecessor's current result. | Passing 2026-07-23 |
 | S1/R5-S1 | Automated test `test/cli.test.js#validate changed-from rejects substantive Epic edits with stale modified metadata` | Working-tree Epic changes require advanced `modified` metadata relative to the selected baseline. | Passing 2026-07-22 |
 | S1/R5-S2 | Automated test `test/cli.test.js#validate changed-from accepts verification-only metadata changes` | Top-level verification freshness updates do not create a false substantive-change finding. | Passing 2026-07-22 |
 | S1/R5-S3 | Automated test `test/cli.test.js#validate changed-from reports an invalid Git baseline as a finding` | Invalid commit-ish input becomes a deterministic validation error. | Passing 2026-07-22 |
@@ -581,6 +604,11 @@ The orphan-audit workflow SHALL resolve a caller-supplied Git baseline to an imm
 - WHEN a Git subprocess exceeds the configured execution bound
 - THEN the audit stops promptly with a deterministic actionable failure instead of hanging the workflow.
 
+###### Scenario R3-S3: Changed-Surface Git Failure
+
+- WHEN any required baseline, unstaged, staged, or untracked Git query fails
+- THEN the audit fails closed with actionable diagnostics instead of treating missing output as an empty changed surface.
+
 ##### Requirement R4: Clean Portable Audit Packaging
 
 The published package SHALL include the orphan-audit source and universal bundled scripts without generated local Python bytecode or cache directories.
@@ -602,6 +630,7 @@ The published package SHALL include the orphan-audit source and universal bundle
 | S5/R3 | `skills/sdd-orphan-audit/scripts/sdd_orphan_audit.py#changed_files` | primary | Resolves the baseline to a validated immutable commit and diffs behind an option barrier. |
 | S5/R3-S2 | `skills/sdd-orphan-audit/scripts/sdd_orphan_audit.py#run_git_paths` | support | Applies the bounded Git execution contract and actionable timeout failure. |
 | S5/R3-S2 | `skills/sdd-orphan-audit/scripts/sdd_orphan_audit.py#git_timeout_seconds` | support | Provides a bounded default with a constrained test/operation override. |
+| S5/R3-S3 | `skills/sdd-orphan-audit/scripts/sdd_orphan_audit.py#require_git_paths` | support | Converts every required changed-surface Git query failure into an actionable fail-closed audit result. |
 | S5/R4 | `package.json#!**/__pycache__/**` | primary | Excludes generated Python cache directories and bytecode from the published universal skill package. |
 | S5/R1, S5/R2 | `docs/story-driven-development.md#Epic verification reports use` | support | Defines the shared package doctrine for report integrity and exact publication scope. |
 
@@ -619,6 +648,7 @@ The published package SHALL include the orphan-audit source and universal bundle
 | S5/R2-S2 | Automated test `test/cli.test.js#packaged workflow templates preserve boundary, transition, and evidence-integrity contracts` | The release template mirrors its skill asset and includes file-scope plus SDD-integrity sections. | Passing 2026-07-22 |
 | S5/R3-S1 | Automated test `test/orphan-audit.test.js#orphan audit rejects option-like changed-from input without Git side effects` | Option-like baselines are rejected before diffing and cannot create an external output file. | Passing 2026-07-23 |
 | S5/R3-S2 | Automated test `test/orphan-audit.test.js#orphan audit fails promptly with an actionable Git timeout` | A stalled Git child is bounded and returns deterministic recovery guidance. | Passing 2026-07-23 |
+| S5/R3-S3 | Automated test `test/orphan-audit.test.js#orphan audit fails closed when any changed-surface Git command fails` | Baseline, unstaged, staged, and untracked query failures cannot silently erase changed-surface evidence. | Passing 2026-07-23 |
 | S5/R4-S1 | Automated test `test/package.test.js#package manifest excludes generated Python bytecode` | The publish manifest explicitly excludes Python cache directories and `.pyc` files while the dry-run retains the source script. | Passing 2026-07-23 |
 
 #### Verification Gaps
