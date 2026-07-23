@@ -22,7 +22,7 @@ status: proposed
 - [ ] 1.5 Confirm the planned `Verified By` sections can become scenario-mapped evidence indexes.
 - [ ] 1.6 For UI-bearing changes with material experience uncertainty, complete `/sdd-design` or record why existing product conventions already make the direction implementation-ready.
 - [ ] 1.7 For UI-bearing changes, define a proportional Visual Verification Matrix with affected surfaces, routes or fixtures, representative desktop/mobile viewports, relevant states/interactions, expected rendered behavior, and preferred tooling or fallback.
-- [ ] 1.8 Seed the living risk, decision fan-out, verification-environment, and Verification Scope Decision sections with end-state obligations already known. Include any known project-defined aggregate or prospective-integration gate. Do not turn them into an exhaustive implementation sequence; `/sdd-apply` must refine them from real implementation evidence.
+- [ ] 1.8 Seed the living risk, triggered boundary-contract applicability, decision fan-out, verification-environment, and Verification Scope Decision sections with end-state obligations already known. Include any known project-defined aggregate or prospective-integration gate. Do not turn them into an exhaustive implementation sequence; `/sdd-apply` must refine them from real implementation evidence.
 - [ ] 1.9 Set `status: planned` only after the proposal, design, tasks, Epic actions, and verification strategy are coherent and validated.
 
 ### 2. Epic Artifacts
@@ -49,9 +49,10 @@ status: proposed
 - [ ] 4.2 Add short enabling phases only when needed before a Requirement can be tested or implemented.
 - [ ] 4.3 Re-evaluate and update applicable end-state risks, decision fan-out, and evidence-environment readiness as each slice reveals implementation reality.
 - [ ] 4.4 When a new adapter, client, route, workspace, worker, migration, command, or similar surface parallels an established implementation, complete the applicable Pattern Parity Matrix rows and explain intentional divergences.
-- [ ] 4.5 When the slice owns editable, autosaving, cached, routed, asynchronous, or identity-sensitive state, complete the applicable Stateful Transition Matrix rows.
-- [ ] 4.6 Update Story-level Implemented By maps with behavior-owning definitions, registrations, or configuration. Use narrower Requirement/Scenario rows for distinct governing boundaries; do not accept imports, call sites, incidental handlers, or already-cited files as semantic coverage.
-- [ ] 4.7 Commit every completed, verified, reconciled phase before beginning the next unless commits are explicitly disabled or prohibited.
+- [ ] 4.5 When an important typed result, error, status, permission, or retry decision crosses a service, plugin/capability, adapter, transport, or client boundary, complete the applicable Boundary Contract Matrix rows.
+- [ ] 4.6 When the slice owns editable, autosaving, cached, routed, asynchronous, durable, or identity-sensitive state, complete the applicable Stateful Transition Matrix rows, including relevant concurrency, cancellation, stale-completion, remount, restart, and recovery interleavings.
+- [ ] 4.7 Update Story-level Implemented By maps with behavior-owning definitions, registrations, or configuration. Use narrower Requirement/Scenario rows for distinct governing boundaries; do not accept imports, call sites, incidental handlers, or already-cited files as semantic coverage.
+- [ ] 4.8 Commit every completed, verified, reconciled phase before beginning the next unless commits are explicitly disabled or prohibited.
 
 ### 5. Verification
 
@@ -136,13 +137,21 @@ Required when implementation adds a surface parallel to an established adapter, 
 |---|---|---|---|---|---|
 | auth/session/CSRF/retry/timeout/error/recovery/navigation/state/visual token as applicable | TBD | TBD | exact test title, assertion, route, injected failure, or observation | none / reason | pending / matched / intentional divergence / accepted gap / blocked / not applicable |
 
+## Boundary Contract Matrix
+
+Required when an important typed result, error, status, permission, or retry decision crosses a service, plugin/capability, adapter, transport, or client boundary. Preserve distinctions that downstream behavior needs. If not applicable, record why.
+
+| Origin Condition | Domain Result / Invariant | Adapter / Transport Mapping | Client Behavior / Retryability | Exact Proof | Status |
+|---|---|---|---|---|---|
+| TBD | TBD | service / plugin / capability / HTTP / IPC / client mapping | visible result, status, retry, recovery, or terminal behavior | exact test title, injected condition, assertion, or observation | pending / preserved / accepted gap / blocked / not applicable |
+
 ## Stateful Transition Matrix
 
-Required when implementation owns editable, autosaving, cached, routed, asynchronous, or identity-sensitive state. Cover applicable edges such as entity changes, pending writes plus navigation, conflict/failure recovery, return context, browser history, session expiry/sign-out, authoritative refresh, and slow or hung requests. If not applicable, record why.
+Required when implementation owns editable, autosaving, cached, routed, asynchronous, durable, or identity-sensitive state. Cover applicable edges and interleavings such as entity changes, pending writes plus navigation, concurrent start before/after the first await, cancel/disconnect during pending work, stale completion after replacement, terminal retry, mounted refresh, remount, process restart, durable records whose identifier never reached the client, conflict/failure recovery, return context, browser history, session expiry/sign-out, authoritative refresh, and slow or hung requests. If recovery depends on an operation identifier, verify when identity is reserved. If not applicable, record why.
 
-| Start State | Trigger / Transition | Expected Invariant | Focused Test Or Runtime Observation | Result |
-|---|---|---|---|---|
-| TBD | entity A to B / dirty then navigate / expired session / slow-hung request / authoritative refresh | TBD | exact test title, network control, trace, route, or observation | pending / passed / accepted gap / blocked / not applicable |
+| Start State | Trigger / Interleaving | Durable Invariant | Observer / Recovery Behavior | Focused Test Or Runtime Observation | Result |
+|---|---|---|---|---|---|
+| TBD | concurrent start / cancel then late completion / replacement / retry / remount / restart / entity A to B / slow-hung request | TBD | client, worker, mounted consumer, restart recovery, or cleanup behavior | exact test title, network control, restart fixture, trace, route, or observation | pending / passed / accepted gap / blocked / not applicable |
 
 ## Decision Fan-Out Ledger
 
@@ -209,7 +218,8 @@ Required for UI-bearing changes. If not applicable, record why.
 - Post-gate evidence-only changes classified and affected checks rerun:
 - Prospective integration tree and required gate evidence:
 - Required risk, fan-out, environment, or verification rows still pending or blocked:
-- Pattern parity and stateful transition matrices reconciled or not applicable with reason:
+- Pattern parity, boundary contract, and stateful transition matrices reconciled or not applicable with reason:
+- Capability authority, content-budget/provenance conservation, and filesystem mutation-order proof reconciled or not applicable:
 - Evidence claims falsified against exact tests, assertions, routes, or observations:
 - Fresh-context failure-seeking passes completed:
 
@@ -231,7 +241,8 @@ Required for UI-bearing changes. If not applicable, record why.
 - `review.md` findings resolved:
 - Planning updates resolved:
 - Implementation risk and confirmation rows resolved:
-- Pattern parity and stateful transition rows resolved:
+- Pattern parity, boundary contract, and stateful transition rows resolved:
+- Capability authority, content-budget/provenance conservation, and filesystem mutation-order proof resolved:
 - Evidence-claim integrity checked:
 - Decision fan-out reconciled:
 - Verification environment obligations resolved:

@@ -61,7 +61,7 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
    - Confirm each release-relevant active Change has a valid `tasks.md` status and is `in_review` with a passing review record when release handling is the last remaining transition. A folder under `docs/changes/closed/` is closed regardless of its retained active status value.
    - Confirm release-relevant active or closed SDD changes have consistent review records, manual confirmation status, release-communication state, PR/merge state, accepted deferred gaps, and folder location.
    - Distinguish technical review readiness from manual acceptance. Resolve whether project policy permits the configured release handoff while confirmation is `pending user`; if not, stop with the prepared walkthrough. Never report full release readiness, merge, deploy, close, or perform another acceptance-dependent action until required confirmation is `user confirmed` or recorded as an accepted gap.
-   - Perform a cumulative source-vs-target release risk scan. Do not re-run full `/sdd-review`, but check whether the combined release diff contains important deterministic claims that local reviews only asserted, such as reset completeness, stable editable-state identity, async write ordering, parser/extractor rejection, remote/config failure behavior, or portable tooling assumptions. If a release-critical claim lacks proof or an accepted gap, stop or route back to `/sdd-review` or `/sdd-apply`.
+   - Perform a cumulative source-vs-target release risk scan. Require a fresh-context cumulative release-candidate code/security/state review of the exact combined diff for an initial production release, multiple integrated Changes, material post-review work, or a cumulative diff that crosses auth/credentials, filesystem confinement, plugins/capabilities, AI tools or provider-visible content, concurrency/recovery, persistence/migrations, or another high-risk shared boundary. Apply the relevant `/sdd-review` code, boundary-contract, state-transition, security/data-safety, evidence, and integration gates without reopening individual Change lifecycle or repeating unaffected artifact review. Existing per-Change reviews are inputs, not a substitute for this triggered cumulative review. For an ordinary single-Change low-risk release, the proportional cumulative scan is sufficient. Record the exact reviewed release-candidate commit, reviewer/context, gates, result, and accepted gaps. If a release-critical claim lacks proof or the cumulative review finds unresolved risk, stop or route back to `/sdd-review` or `/sdd-apply`.
    - Stop on duplicate `S#` Story labels inside one Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs unless the release is explicitly carrying the cleanup and it has already passed `/sdd-review`.
    - Confirm every project-required release record exists. Create a missing record from a compatible template only when project policy or the user authorizes that format.
    - Confirm secrets, env files, generated caches, build artifacts, and local-only files will not be staged.
@@ -108,9 +108,9 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
    - Push only the resolved source branch; never use this authorization to push the production target, another branch, tags, or rewritten history.
    - Open or prepare the project-defined release handoff using the configured provider and available tools.
    - Use `assets/release-pr-template.md` for the PR body.
-   - Include release scope, the reconciled changed-file classifications, any excluded/unrelated paths, release-communication summary, SDD reviews checked, the exact reviewed source commit, the initial reconciled PR head, post-review change classifications or `none`, commands run, relevant end-to-end results, security/data notes, manual acceptance notes, and known risks.
+   - Include release scope, the reconciled changed-file classifications, any excluded/unrelated paths, release-communication summary, SDD reviews checked, the triggered cumulative release-candidate review decision and exact reviewed commit, the exact reviewed source commit, the initial reconciled PR head, post-review change classifications or `none`, commands run, relevant end-to-end results, security/data notes, manual acceptance notes, and known risks.
    - Treat the remote PR as the handoff to hosted CI and remote AI-assisted review when configured. Add required labels, reviewers, or context only when project docs or the user's request calls for them.
-   - Record remote AI-assisted review as `triggered`, `not configured`, `unavailable`, or `not checked`; do not block PR creation solely because an optional remote review has not completed.
+   - Initialize the Remote Review Watermarks table for each configured human, AI-assisted reviewer, or status check with `required` or `optional`, triggered head SHA when known, completed head SHA when known, and current state/result. Record unconfigured or unavailable optional review explicitly; do not block PR creation solely because an optional review has not completed. Required remote review may remain pending at PR creation but cannot be treated as merge-ready.
    - End new PR creation with a handoff to `/sdd-pr` for later review-thread and status-check stewardship after CI, bots, or humans have had time to respond.
    - Do not merge the PR unless the user explicitly asked for release merge and branch policy allows it.
 9. Update SDD artifacts when appropriate.
@@ -135,6 +135,7 @@ Use the app's documented release gate first. In addition, prefer these gates whe
 - source-vs-target conflict check
 - CI status check after PR creation when available
 - remote AI-assisted code review status after PR creation when configured
+- remote reviewer/check watermarks against the current PR head when the provider exposes them
 
 Scale to the app. A small static app may only have build. A local MVP may intentionally keep browser or provider-backed checks optional until they are stable and cheap. A multi-app system should use the app's full documented release gate.
 
@@ -159,6 +160,7 @@ Stop and report when:
 - no project-local release guidance exists and no meaningful local release gate can be identified or satisfied.
 - required release checks fail.
 - `/sdd-review` readiness is missing for release-blocking SDD changes.
+- a triggered cumulative release-candidate review is missing, stale, or has unresolved findings for an initial, multi-Change, materially post-review, or high-risk cumulative release diff.
 - required manual confirmation remains `pending user` and project policy requires acceptance before the configured release handoff or requested release action.
 - release-relevant SDD closeout state is contradictory, duplicate Story labels/references make Epic traceability unreliable, or conflicting legacy app-wide Story IDs are unresolved.
 - a required release record is missing and the user or project policy has not authorized creating one.
@@ -181,8 +183,9 @@ Include:
 - changelog review summary, current version, suggested increment and version, user-confirmed version decision, and rationale
 - release commit hash or commit candidate
 - SDD review/readiness status
+- cumulative release-candidate review trigger, exact commit, gates, and result
 - manual confirmation status and whether acceptance permits the configured handoff and any later merge, deployment, or closeout
-- remote CI and AI-assisted review status when known
+- remote reviewer/check watermarks and required-versus-optional status when known
 - whether `/sdd-pr` should be rerun later to steward the opened PR
 - remaining risks or approvals needed
 - exact next action

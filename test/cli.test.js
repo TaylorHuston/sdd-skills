@@ -1768,7 +1768,7 @@ test("packaged Epic templates stay synchronized", async () => {
   }
 });
 
-test("packaged workflow templates preserve parity, transition, and evidence-integrity contracts", async () => {
+test("packaged workflow templates preserve boundary, transition, and evidence-integrity contracts", async () => {
   const tasksTemplate = await readFile(
     join(PACKAGE_ROOT, "docs", "templates", "tasks.md"),
     "utf8",
@@ -1782,7 +1782,9 @@ test("packaged workflow templates preserve parity, transition, and evidence-inte
     "sdd-change tasks template must match the canonical package template",
   );
   assert.match(tasksTemplate, /^## Pattern Parity Matrix$/m);
+  assert.match(tasksTemplate, /^## Boundary Contract Matrix$/m);
   assert.match(tasksTemplate, /^## Stateful Transition Matrix$/m);
+  assert.match(tasksTemplate, /concurrent start \/ cancel then late completion \/ replacement \/ retry \/ remount \/ restart/);
   assert.match(tasksTemplate, /^## Verification Scope Decision$/m);
   assert.match(tasksTemplate, /exact test title or stable named test anchor/);
 
@@ -1800,7 +1802,9 @@ test("packaged workflow templates preserve parity, transition, and evidence-inte
   );
   assert.match(reviewTemplate, /^\| Evidence falsification \|/m);
   assert.match(reviewTemplate, /^\| Pattern conformance \|/m);
+  assert.match(reviewTemplate, /^\| Boundary contracts \|/m);
   assert.match(reviewTemplate, /^\| Stateful transitions \|/m);
+  assert.match(reviewTemplate, /^## Boundary And Conservation Review$/m);
   assert.match(reviewTemplate, /^## Verification Scope And Candidate Gates$/m);
 
   const epicVerifyTemplate = await readFile(
@@ -1833,6 +1837,8 @@ test("packaged workflow templates preserve parity, transition, and evidence-inte
     "sdd-release PR template must match the canonical package template",
   );
   assert.match(releaseTemplate, /^## File Scope Reconciliation$/m);
+  assert.match(releaseTemplate, /^## Remote Review Watermarks$/m);
+  assert.match(releaseTemplate, /Cumulative release-candidate review required/);
   assert.match(releaseTemplate, /^## Documentation And SDD Integrity$/m);
 
   const applySkill = await readFile(
@@ -1844,12 +1850,16 @@ test("packaged workflow templates preserve parity, transition, and evidence-inte
     "utf8",
   );
   assert.match(applySkill, /Pattern Parity Matrix/);
+  assert.match(applySkill, /Boundary Contract Matrix/);
   assert.match(applySkill, /Stateful Transition Matrix/);
+  assert.match(applySkill, /filesystem mutation-order/);
   assert.match(applySkill, /Evidence Claim Integrity/);
   assert.match(applySkill, /Keep three proof layers distinct/);
   assert.match(reviewSkill, /\*\*Evidence falsification\*\*/);
   assert.match(reviewSkill, /\*\*Pattern conformance\*\*/);
+  assert.match(reviewSkill, /\*\*Boundary contracts\*\*/);
   assert.match(reviewSkill, /\*\*Risk-shaped evidence and stateful transitions\*\*/);
+  assert.match(reviewSkill, /durable work whose identifier never reached the client/);
   assert.match(reviewSkill, /Require integration-candidate proof/);
 });
 
@@ -1869,6 +1879,8 @@ test("packaged audit and handoff skills preserve current-state and file-scope ga
   );
   assert.doesNotMatch(prSkill, /^\s*- `--fix`:/m);
   assert.match(prSkill, /exact source-to-target changed-file inventory/);
+  assert.match(prSkill, /Remote Review Watermark/);
+  assert.match(prSkill, /resolved old-head comments alone do not satisfy this gate/);
 
   const releaseSkill = await readFile(
     join(PACKAGE_ROOT, "skills", "sdd-release", "SKILL.md"),
@@ -1877,6 +1889,8 @@ test("packaged audit and handoff skills preserve current-state and file-scope ga
   assert.match(releaseSkill, /exact source-to-target changed-file inventory/);
   assert.match(releaseSkill, /compare it path-for-path with the recorded release allowlist/);
   assert.match(releaseSkill, /Per-Change focused evidence/);
+  assert.match(releaseSkill, /fresh-context cumulative release-candidate code\/security\/state review/);
+  assert.match(releaseSkill, /initial production release, multiple integrated Changes/);
 });
 
 test("epic create refuses ambiguous repositories, collisions, and dry-run writes", async (t) => {

@@ -20,7 +20,8 @@ changes-requested | blocked | ready
 | Semantic anchor ownership | TBD | Primary anchors identify governing definitions/registrations rather than incidental occurrences. |
 | Evidence falsification | TBD | Exact named test/anchor, assertion/observation, discovery path, and boundary match for new or high-risk claims; generic framework anchors rejected. |
 | Pattern conformance | TBD | New sibling surfaces compared with the closest established behavior contract and focused tests. |
-| Stateful transitions | TBD | Applicable identity, pending-write, navigation, recovery, session, refresh, and timeout edges inspected. |
+| Boundary contracts | TBD | Typed domain results preserve status, permission, retryability, recovery, and client-visible meaning across layers. |
+| Stateful transitions | TBD | Applicable concurrency, cancellation, stale completion, retry, remount, restart, identity, navigation, recovery, refresh, and timeout edges inspected. |
 | Rendered UI verification | TBD | Directly inspected current rendering, representative viewports/states/interactions, and console/network result. |
 | Manual UI confirmation | TBD | TBD |
 | Code review | TBD | TBD |
@@ -67,6 +68,13 @@ changes-requested | blocked | ready
 | Prospective integration candidate | TBD | TBD | TBD | pass / findings / blocked / reusable source proof |
 | Actual integrated result | TBD | TBD | matches tested tree / rerun evidence / pending | pass / findings / blocked / not applicable |
 
+## Boundary And Conservation Review
+
+- Boundary Contract Matrix status and exact proof:
+- Capability identifier issuer, scope, lifetime, and invalid-reuse proof:
+- Content-budget and provider-visible provenance conservation:
+- Filesystem ancestor/confinement validation before mutation and fail-closed no-write proof:
+
 ## Rendered UI Verification
 
 | Surface / Route or Fixture | Viewport | State / Interaction | Tool / Setup | Directly Inspected Evidence | Console / Network | Result |
@@ -108,8 +116,9 @@ changes-requested | blocked | ready
 | Verification coverage | TBD | TBD | TBD |
 | Evidence falsification | TBD | TBD | TBD |
 | Pattern conformance | TBD | TBD | TBD |
+| Boundary contracts | TBD | TBD | TBD |
 | Stateful transitions | TBD | TBD | TBD |
-| Security | TBD | TBD | TBD |
+| Security / authority / budget / mutation safety | TBD | TBD | TBD |
 | UI / visual identity | TBD | TBD | TBD |
 | Docs / Idea truth / release communication / PRD | TBD | TBD | TBD |
 | Integration readiness | TBD | TBD | TBD |
