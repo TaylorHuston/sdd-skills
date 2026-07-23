@@ -41,9 +41,14 @@ Evaluate:
 - Later Stories have not superseded earlier Story, Requirement, Scenario, evidence, or gap wording without reconciliation.
 - The Epic follows the canonical section spine: Product Context, Outcome, Current Scope, Deferred Scope, Candidate Stories, Story Index, Stories, Cross-Story Concerns, Open Decisions, Completion Criteria, and Notes.
 - Candidate Stories are unlabeled until promoted into accepted Stories.
-- Promoted Story sections follow the template shape: `### Story S#` for new or normalized Epics, Story statement, Requirements And Scenarios, `Implemented By`, scenario-mapped `Verified By`, `Verification Gaps`, and Story Notes.
+- Promoted Story sections follow the template shape: `### Story S#` for new or normalized Epics, Story statement, independent implementation/verification state, Requirements And Scenarios, behavior-mapped `Implemented By`, `Implementation Gaps`, scenario-mapped `Verified By`, `Verification Gaps`, and Story Notes.
+- Every Story has exactly one authoritative current `Implemented By` map and one authoritative current `Verified By` map. Flag competing prior/detailed/legacy maps even when they contain better detail than the canonical sections.
 - `S#` Story labels are unique within each Epic, full Story references are traceable, and legacy app-wide Story IDs remain unique unless an explicit migration note says the duplicate blocks further implementation.
 - Story ownership still makes sense for this Epic; recommend moving Stories to more focused Epics when the current Epic has become an MVP/container artifact.
+- Each Story represents one primary user path; several actors, independently valuable outcomes, separately releasable workflows, title/scope mismatch, more than six Requirements, or more than twelve Scenarios receive an explicit split/keep judgment.
+- A cold developer can navigate from every implemented Requirement to its concrete primary code location and stable symbol/searchable anchor without repository-wide rediscovery. Open representative anchors and reject imports, call sites, incidental handlers, broad tokens, or a file cited for a different symbol as governing ownership.
+- Automated evidence names exact test titles or stable named anchors rather than generic framework tokens such as `#it(`, and the cited assertion proves the mapped Scenario.
+- Implemented Outcomes read as current capability, partial Outcomes distinguish current behavior from gaps, and wholly unimplemented Outcomes alone use future tense.
 - Story labels or documented legacy Story IDs are stable and sensible for current order, and remain traceable across rename, reorder, split, merge, or Epic moves.
 - Candidate Stories are still candidates, should be formalized, or should be deferred/removed.
 - Requirements and Scenarios are not absorbing implementation-only technical details that belong in design, ADRs, data docs, or tasks.

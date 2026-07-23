@@ -12,7 +12,7 @@ import {
 } from "../config.js";
 import { resolveOperationConfiguration } from "../workspace.js";
 import { SddError } from "../errors.js";
-import { isDirectory, pathExists } from "../fs.js";
+import { isDirectory, isPathPhysicallyInside, pathExists } from "../fs.js";
 
 function normalizePath(value) {
   return value.split("\\").join("/");
@@ -26,7 +26,8 @@ async function assertInReview(sourcePath, displayPath) {
     });
   }
 
-  const { status, error } = parseChangeStatus(await readFile(tasksPath, "utf8"));
+  const source = await readFile(tasksPath, "utf8");
+  const { status, error } = parseChangeStatus(source);
   if (error) {
     throw new SddError(`Cannot parse Change status in ${displayPath}/tasks.md: ${error}`, {
       code: "INVALID_CHANGE_STATUS",
@@ -38,13 +39,14 @@ async function assertInReview(sourcePath, displayPath) {
       details: [`Current status: ${status ?? "missing"}`],
     });
   }
+  return source;
 }
 
 export async function closeChange(
   startPath,
   spaceId,
   changeId,
-  { repositories = [], dryRun = false } = {},
+  { repositories = [], dryRun = false, beforeRepositoryCommit = null } = {},
 ) {
   assertValidChangeId(changeId);
   const { workspaceRoot, config } = await resolveOperationConfiguration(startPath);
@@ -94,29 +96,70 @@ export async function closeChange(
         code: "CHANGE_NOT_FOUND",
       });
     }
-    await assertInReview(sourceAbsolutePath, sourcePath);
+    const tasksSource = await assertInReview(sourceAbsolutePath, sourcePath);
     transitions.push({
       ...repository,
+      repositoryPath,
       sourcePath,
       path: destinationPath,
       sourceAbsolutePath,
       destinationAbsolutePath,
+      tasksSource,
     });
   }
 
   if (!dryRun) {
     const moved = [];
     try {
-      for (const transition of transitions) {
+      for (const [index, transition] of transitions.entries()) {
+        if (beforeRepositoryCommit) {
+          await beforeRepositoryCommit({ transition, index, transitions });
+        }
+        if (!(await isPathPhysicallyInside(transition.repositoryPath, transition.sourceAbsolutePath))
+          || !(await isPathPhysicallyInside(transition.repositoryPath, transition.destinationAbsolutePath))) {
+          throw new SddError(`Change close path resolves outside its repository: ${transition.sourcePath}`, {
+            code: "UNSAFE_ARTIFACT_PATH",
+          });
+        }
+        if (await readFile(join(transition.sourceAbsolutePath, "tasks.md"), "utf8") !== transition.tasksSource) {
+          throw new SddError(`Change changed during close: ${transition.sourcePath}`, {
+            code: "CONCURRENT_CHANGE",
+          });
+        }
         await mkdir(dirname(transition.destinationAbsolutePath), { recursive: true });
+        if (await pathExists(transition.destinationAbsolutePath)) {
+          throw new SddError(`Closed Change appeared during close: ${transition.path}`, {
+            code: "CONCURRENT_CHANGE",
+          });
+        }
         await rename(transition.sourceAbsolutePath, transition.destinationAbsolutePath);
         moved.push(transition);
+        if (await readFile(join(transition.destinationAbsolutePath, "tasks.md"), "utf8") !== transition.tasksSource) {
+          throw new SddError(`Change changed during close: ${transition.sourcePath}`, {
+            code: "CONCURRENT_CHANGE",
+          });
+        }
       }
     } catch (error) {
+      const recoveryFailures = [];
       for (const transition of moved.reverse()) {
-        await rename(transition.destinationAbsolutePath, transition.sourceAbsolutePath).catch(
-          () => {},
-        );
+        try {
+          if (await pathExists(transition.sourceAbsolutePath)) {
+            recoveryFailures.push(
+              `${transition.sourcePath}: concurrent source preserved; moved Change retained at ${transition.path}.`,
+            );
+            continue;
+          }
+          await rename(transition.destinationAbsolutePath, transition.sourceAbsolutePath);
+        } catch (recoveryError) {
+          recoveryFailures.push(`${transition.path}: ${recoveryError.message}`);
+        }
+      }
+      if (recoveryFailures.length > 0) {
+        throw new SddError("Change close failed and recovery was incomplete.", {
+          code: "MUTATION_RECOVERY_FAILED",
+          details: [`Original error: ${error.message}`, ...recoveryFailures],
+        });
       }
       throw error;
     }
@@ -129,7 +172,7 @@ export async function closeChange(
     spaceId,
     changeId,
     repositories: transitions.map(
-      ({ sourceAbsolutePath, destinationAbsolutePath, ...transition }) => transition,
+      ({ sourceAbsolutePath, destinationAbsolutePath, repositoryPath, tasksSource, ...transition }) => transition,
     ),
   };
 }

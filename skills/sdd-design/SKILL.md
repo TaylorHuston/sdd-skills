@@ -133,7 +133,20 @@ Inspect the skills and tools available in the current runtime and use the smalle
 
 If no design tooling is installed, produce a clear text, ASCII, or Markdown experience contract and continue. Missing optional tools are not blockers.
 
-### 6. Converge With The User
+### 6. Define The Visual Verification Matrix
+
+For every UI-bearing Change, define the smallest representative matrix that lets implementation and review detect obvious rendered regressions. Record:
+
+- affected surface and route, fixture, preview, or setup entry point
+- representative desktop and mobile viewports
+- applicable default, loading, empty, error, populated, long-content, focus, selected, disabled, permission, and recovery states
+- changed interactions to exercise
+- expected rendered behavior and important accessibility observations
+- preferred project-owned browser, screenshot, preview, or fixture command, plus the best portable fallback when that capability is unavailable
+
+Keep the matrix proportional to the changed experience. Do not demand every state when the Change cannot affect it. The matrix is an implementation and review plan, not proof that rendering already passes.
+
+### 7. Converge With The User
 
 Present the strongest direction, meaningful alternatives, and tradeoffs. Refine until the user confirms a direction. The user may explicitly accept an unresolved gap only when it is non-blocking, safely deferrable, and recorded with its implementation or verification consequence.
 
@@ -141,7 +154,7 @@ Confirmation applies to the experience direction, not to implementation details 
 
 For an `in_review` Change, perform the guarded `in_review -> in_progress` transition only after this classification and confirmation pass succeeds, and immediately before recording the revised contract.
 
-### 7. Record The Experience Contract
+### 8. Record The Experience Contract
 
 Create or update one `## Experience Design` section in the Change's existing `design.md`. It is the canonical current accepted experience contract, not the revision history. Keep it proportional to the Change and use the canonical section in the installed `/sdd-change` `assets/design-template.md` when available. For an older or independently managed Change without that template, record the confirmed direction, user confirmation, stable reference artifacts, user flow and information architecture, responsive composition, component and state contract, material component strategies, accessibility and interaction behavior, visual direction, and open design questions.
 
@@ -155,6 +168,7 @@ Update `tasks.md` only as needed to preserve cold-resume state:
 - unresolved design blockers or accepted gaps
 - expected `/sdd-apply` starting point
 - Storybook states or manual UI checks the implementation should create
+- the Visual Verification Matrix covering affected surfaces, viewports, states, interactions, expected observations, and preferred tooling or fallback
 
 For `--revise`, update `Experience Design` to the newly confirmed current contract and append a dated `Design Updates` entry containing the feedback, classification, reference and target, preserve/change/non-goal summary, artifacts changed, and exact `/sdd-apply` restart point. The ledger preserves the superseded direction and why it changed; `design.md` must not leave the old and revised directions competing as simultaneous current truth.
 
@@ -179,9 +193,10 @@ Before reporting design readiness:
 1. Re-read `proposal.md`, `design.md`, and `tasks.md` for contradictions.
 2. Confirm each material design decision traces to accepted behavior or is explicitly identified as a visual implementation choice.
 3. Confirm desktop/mobile composition, required states, accessibility, and design-system deviations are sufficiently resolved for implementation.
-4. Confirm selected references use stable identifiers and their status is not ambiguous.
-5. Run scoped `sdd validate` and resolve deterministic artifact errors caused by this work.
-6. Confirm the Change status follows the selected mode and preserve git/branch policy.
+4. Confirm the Visual Verification Matrix is proportional, covers every materially affected surface, and gives `/sdd-apply` and `/sdd-review` a reproducible rendered-state plan.
+5. Confirm selected references use stable identifiers and their status is not ambiguous.
+6. Run scoped `sdd validate` and resolve deterministic artifact errors caused by this work.
+7. Confirm the Change status follows the selected mode and preserve git/branch policy.
 
 In `--revise`, confirm the Change remains `in_progress`. `/sdd-design` does not return it to `in_review`; a fresh `/sdd-apply` must implement the revised contract, reconcile evidence and Epic truth, and perform the implementation handoff.
 
@@ -200,6 +215,7 @@ The `/sdd-apply` handoff should name:
 - material component strategies and their initial implementation owners
 - required responsive and interaction states
 - Storybook stories or equivalent previews to build
+- the Visual Verification Matrix, including routes or fixtures, viewports, states, interactions, expected rendered behavior, and preferred tool or fallback
 - accessibility and manual UI confirmation obligations
 - unresolved accepted gaps or stop conditions
 
@@ -226,6 +242,7 @@ Report:
 - mode used and, for `--revise`, the feedback classification and status transition
 - confirmed direction and stable reference artifacts
 - major responsive, state, accessibility, and visual decisions
+- planned rendered surfaces, viewports, states, interactions, and verification tooling or fallback
 - files updated and validation result
 - requirement discoveries routed elsewhere
 - exact next workflow selected from the status-aware handoff and behavioral-discovery routes above

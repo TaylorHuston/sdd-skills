@@ -1,5 +1,5 @@
 ---
-modified: 2026-07-18
+modified: 2026-07-22
 ---
 # Changelog
 
@@ -8,6 +8,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+
+- Added versioned Epic verification reports with deterministic current-result, remediation, and lineage validation, plus opt-in `sdd validate --changed-from <commit-ish>` checks for stale Epic `modified` metadata.
+- `sdd doctor` now inspects recognized root guidance files in active mapped repositories and reports obsolete managed-workflow locations or retired `/sdd-propose` instructions.
+- Added the versioned `sdd-epic-v2` template with independent implementation and verification state, behavior-mapped implementation locations, and separate implementation gaps.
+
+### Changed
+
+- `/sdd-review` now uses a systematic candidate-generation pipeline across intent and history, complete diff coverage, dependency and contract propagation, configured deterministic analyzers, risk-shaped reasoning passes, and explicit blind-spot accounting before consolidating findings.
+- Epic verification now separates historical audit failures from current findings and requires a full final recheck before `aligned`; PR and release workflows now reconcile an exact source-to-target file allowlist before handoff.
+- `/sdd-pr` now performs safe narrow remediation by default and no longer exposes a redundant `--fix` mode.
+- Epic traceability now requires one authoritative current implementation/verification map per Story, behavior-owning primary anchors, narrower mapping for distinct governing boundaries, exact named test evidence instead of framework tokens, current-tense implemented Outcomes, and reconciliation of stale supporting docs and closed Change claims.
+- `sdd validate` now rejects competing prior/detailed/legacy Story traceability sections and generic automated evidence anchors such as `#it(`, `#test(`, and `#describe(`.
+- CLI validation now rejects empty v2 behavior structure, incomplete evidence rows, fabricated or unanchored source/test claims, external symlink evidence, and unrelated Epic reads during a focused validation.
+- Configuration and lifecycle commands now reject unknown keys, physical repository aliases, invalid artifact overlap, repository-only planning guesses, active/closed Change ID collisions, and physical path escapes.
+- Managed configuration and lock writes are atomic, managed updates are serialized, lifecycle mutations detect commit-time drift and report incomplete recovery, guidance diagnostics ignore non-affirmative historical/negated examples, and Git status degrades after a bounded timeout.
+- `sdd validate` now checks v2 Story Index/body consistency, implementation and verification coverage, repository-relative implementation paths, gap contradictions, strict automated evidence paths, and oversized-Story review signals while retaining legacy Epic compatibility warnings.
+- SDD planning, apply, review, Epic verification, and orphan-audit guidance now treats cold-start code navigation as a required traceability outcome.
+- `/sdd-apply` default/full mode now persists through all safe implementation and self-remediation work until the Change is transitioned to `in_review` and ready for independent review, unless an explicit bounded mode or genuine stop condition applies.
+- `/sdd-apply` now treats local commits as regular phase boundaries: commit every completed, verified Requirement/Scenario slice before beginning the next, and use coherent green checkpoints for unusually long phases unless `--no-commit`, the user, repository policy, or file-isolation safety prevents it.
+- Planning now defines the required end state and confirmation obligations without freezing an implementation sequence; `/sdd-apply` maintains living risk, decision fan-out, verification-environment, phase-closure, and immutable review-handoff records as implementation reveals the real path.
+- `/sdd-release` now reviews the changelog against release scope, recommends and confirms the project-policy version increment, and treats default/full invocation as scoped authorization for one normal source push and the configured release PR after all gates pass without extending that permission to merge, tag, publish, or deploy.
+- `/sdd-review` now requires every applicable review gate to finish before one consolidated verdict, treating ordinary blocking findings as verdict evidence rather than a reason to stop discovery at the first issue.
+- `/sdd-review --until-ready` now defaults to at most five remediation iterations.
+- `/sdd-review` now treats long-running commands, yielded command sessions, progress updates, and status questions as continuation points rather than accidental review boundaries.
+- `/sdd-review --until-ready` now has the same mandatory full final-report contract as a single review loop, including a complete gate scorecard, final reviewed commit, cumulative remediation, residual findings, and explicit classification of pending live-provider evidence.
+- UI-bearing planning, apply, and review now use a proportional Visual Verification Matrix and require agents to render current source, exercise changed interactions, directly inspect screenshots or rendered results, check console/network failures, and cover representative viewports and relevant states before review readiness. The workflow remains tool-agnostic and keeps owner manual acceptance separate.
+- `/sdd-apply` now uses triggered Pattern Parity and Stateful Transition matrices for new sibling implementations and stateful surfaces, while `/sdd-review` adds independent pattern-conformance, transition, and evidence-falsification gates. New or high-risk evidence claims must identify exact test anchors and important assertions, survive test-discovery and boundary checks, and cannot rely on aggregate green commands or unsupported Scenario aggregation.
+- Planning, apply, and review now add triggered Boundary Contract coverage, concurrent and durable lifecycle interleavings, capability-authority and content-budget/provenance conservation, and filesystem ancestor/confinement validation before mutation.
+- `/sdd-release` now requires a fresh-context cumulative release-candidate review for initial, multi-Change, materially post-review, or high-risk combined diffs, while `/sdd-pr` and release handoffs track required/optional remote reviewer and check watermarks against exact PR heads.
+- The framework-free one-page guide now uses the shared UI Foundations Mono identity profile, canonical semantic tokens, restrained foundation geometry, and a single dark presentation instead of its legacy blue/orange light-and-dark theme model.
+
+### Removed
+
+- Removed the redundant `/sdd-review --fix` alias. Safe consolidated remediation remains the default, while `--until-ready` now works directly.
 
 ## [0.11.0] - 2026-07-18
 

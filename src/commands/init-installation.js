@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 
 import {
@@ -16,9 +16,11 @@ import {
   writeConfig,
 } from "../config.js";
 import { SddError } from "../errors.js";
-import { pathExists, writeJson } from "../fs.js";
-import { applySkillSync, planSkillSync } from "../skills.js";
+import { pathExists, writeFileAtomically } from "../fs.js";
+import { planSkillSync } from "../skills.js";
 import { WORKFLOW_SOURCE_PATH } from "../constants.js";
+import { withWorkspaceMutationLock } from "../mutation.js";
+import { applyManagedInstallation } from "../installation.js";
 
 function defaultRepositoryId(repositoryRoot) {
   return basename(repositoryRoot)
@@ -28,6 +30,18 @@ function defaultRepositoryId(repositoryRoot) {
 }
 
 export async function setupInstallation(
+  options = {},
+) {
+  const userRoot = getUserRoot();
+  if (options.dryRun) return setupInstallationUnlocked(userRoot, options);
+  return withWorkspaceMutationLock(
+    userRoot,
+    () => setupInstallationUnlocked(userRoot, options),
+  );
+}
+
+async function setupInstallationUnlocked(
+  userRoot,
   {
     planningRoot,
     repositoryRoots,
@@ -35,9 +49,9 @@ export async function setupInstallation(
     fromWorkspace,
     force = false,
     dryRun = false,
-  } = {},
+    writeLock = null,
+  },
 ) {
-  const userRoot = getUserRoot();
   const userConfigExists = await pathExists(getConfigPath(userRoot));
   const requestedOverrides = [planningRoot, repositoryRoots, skillsDirectory, fromWorkspace].some(
     (value) => value !== undefined,
@@ -57,16 +71,36 @@ export async function setupInstallation(
   assertValidConfig(userConfig, "set up the user installation");
 
   const skillPlan = await planSkillSync(userRoot, userConfig, { force });
-  if (!dryRun) {
-    if (!userConfigExists) {
+  const ignorePath = `${getConfigDirectory(userRoot)}/.gitignore`;
+  const ignoreExists = await pathExists(ignorePath);
+  let createdIgnore = false;
+  let skills;
+  try {
+    if (!dryRun && !userConfigExists) {
       await writeConfig(userRoot, userConfig);
       await mkdir(getConfigDirectory(userRoot), { recursive: true });
-      await writeFile(`${getConfigDirectory(userRoot)}/.gitignore`, "cache/\n", "utf8");
+      if (!ignoreExists) {
+        await writeFileAtomically(ignorePath, "cache/\n");
+        createdIgnore = true;
+      }
     }
-  }
-  const skills = await applySkillSync(userRoot, skillPlan, { dryRun });
-  if (!dryRun) {
-    await writeJson(getInstallLockPath(userRoot), skillPlan.lock);
+    ({ skills } = await applyManagedInstallation(userRoot, {
+      skillPlan,
+      dryRun,
+      ...(writeLock ? { writeLock } : {}),
+    }));
+  } catch (error) {
+    if (!dryRun && !userConfigExists && !(await pathExists(getInstallLockPath(userRoot)))) {
+      const configPath = getConfigPath(userRoot);
+      const currentConfig = await readConfig(userRoot).catch(() => null);
+      if (JSON.stringify(currentConfig) === JSON.stringify(userConfig)) {
+        await rm(configPath, { force: true }).catch(() => {});
+      }
+      if (createdIgnore && await readFile(ignorePath, "utf8").catch(() => null) === "cache/\n") {
+        await rm(ignorePath, { force: true }).catch(() => {});
+      }
+    }
+    throw error;
   }
 
   return {

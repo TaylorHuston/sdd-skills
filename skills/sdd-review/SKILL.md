@@ -1,6 +1,6 @@
 ---
 name: sdd-review
-description: Review a SDD change as the independent local integration gate after /sdd-apply or before closing. Verifies the source-vs-target diff and reverse traceability, proposal, design, task ledger, Epic truth, template adherence, Stories, Requirements, Scenarios, tests, manual confirmation, code quality, security, Idea-side repository and product truth, supporting docs, release communication, branch policy, merge readiness, and closeout consistency. Use when the user invokes /sdd-review, asks to verify a SDD change, run a local PR-style review, prepare integration readiness, address findings, close or finish a change, or perform a policy-defined integration handoff. Use /sdd-release for production-target promotion and release handoff.
+description: Run the independent local integration review after /sdd-apply or before closing. Complete every applicable review gate across the source-vs-target diff, reverse traceability, SDD artifacts, implementation, verification, security, UI, docs, product truth, branch policy, and closeout state before issuing one consolidated verdict; never stop discovery at the first ordinary finding. Use when the user invokes /sdd-review or asks to verify, review, prepare integration readiness, address findings, finish, close, or perform a non-production integration handoff. Use /sdd-release for production promotion.
 ---
 
 # SDD Review
@@ -12,6 +12,10 @@ Review a SDD change like a local pull request. This is the final independent gat
 Resolve the workspace, idea-owned planning path, and target implementation repository with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before judging artifact authority, traceability, evidence, reconciliation, or closeout. Use the resolved topology unless project guidance declares an explicit exception, then enforce Epics under `docs/epics/` and active/closed changes under `docs/changes/` inside the implementation repository. Project guidance owns source and target policy, required checks, merge/PR rules, truth-bearing supporting-doc requirements, release conventions, technology constraints, available review skills, and permissions. If user setup is missing, direct the user to `sdd setup`; if the repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
 
 Default behavior is deep review. A clean `/sdd-review` means the source branch and its evidence are technically ready for the selected target, not merely that the active change folder looks plausible. Required manual acceptance and explicit integration authorization remain separate readiness gates. The primary review surface is the source-vs-target diff plus the SDD artifacts that claim to explain it. When default review returns `ready` for a non-production target and closeout readiness passes, treat merge-and-close as the obvious recommended next action and ask the user to confirm it. Use cheaper or narrower modes only when the user asks for them explicitly.
+
+Full-review invariant: complete the entire applicable discovery surface before issuing a verdict or beginning ordinary remediation. A `BLOCKING` or `REQUIRED` finding in one gate is evidence for the final verdict, not permission to skip later gates. Continue all independent read-only inspection, verification, and delegated passes even when integration is already known to be blocked. Halt the whole discovery wave early only when further inspection itself is unsafe or impossible, such as unresolved change/branch selection, inaccessible required inputs, an active destructive or production hazard, or required authorization for the next inspection step. When mutation, credentials, or user judgment block one gate, mark that gate `blocked` and finish every other independent gate that remains safe.
+
+Execution-continuity invariant: a running, yielded, or just-completed command is pending review work, not a handoff boundary. Resume or poll long-running command sessions until they complete, provide a concise progress update at least every 60 seconds while work continues, and then immediately continue the next unfinished gate. If the user asks for status while the review is active, answer the status question and continue unless the user cancels or replaces the review. A missed progress update is a process failure to correct, never an explanation for returning control early. Do not send the final response until the complete gate scorecard and consolidated verdict are ready or a genuine Stop Condition makes further safe inspection impossible.
 
 Use `/sdd-release` instead when the task is production-target promotion, full release checks, release-artifact finalization, or the project-defined release handoff.
 
@@ -31,7 +35,7 @@ Start from an explicit change folder, change name, source branch, target branch,
 
 Supported modes:
 
-- Default: run one complete deep PR-style discovery wave against the selected target branch, consolidate and validate all findings, fix the complete safe in-scope subset as one batch, rerun affected checks, perform one regression-focused rereview, commit only the verified safe-fix batch, and report the resulting verdict. Do not pause after individual findings or require the user to invoke `/sdd-review` again merely to discover the next review category. Do not create a PR, merge, push, or close the change without confirmation. If the verdict is `ready` but manual confirmation is `pending user`, present the prepared walkthrough and report closeout readiness separately. If the verdict is `ready`, the target is non-production, and closeout readiness passes, ask whether to perform the policy-defined merge-and-close next.
+- Default: run one complete deep PR-style discovery wave against the selected target branch, finish every applicable gate even after findings are known, consolidate and validate the full finding set, fix the complete safe in-scope subset as one batch, rerun affected checks, perform one regression-focused rereview, commit only the verified safe-fix batch, and report one resulting verdict. Long-running or completed commands do not change this terminal condition. Do not pause after individual findings or require another `/sdd-review` invocation to discover omitted review categories. Do not create a PR, merge, push, or close the change without confirmation. If the verdict is `ready` but manual confirmation is `pending user`, present the prepared walkthrough and report closeout readiness separately. If the verdict is `ready`, the target is non-production, and closeout readiness passes, ask whether to perform the policy-defined merge-and-close next.
 - `--deep`: explicit alias for default behavior.
 - `--fast`: run a lightweight review on the main thread only. Still check source-vs-target diff, required SDD artifacts, branch policy, dirty state, security, and verification evidence, but skip delegated review passes and broad optional checks unless a risk is obvious.
 - `--artifact-only`: review SDD artifacts, Epic truth, Change status, manual confirmation status, release-communication status, and PRD alignment when applicable. Do not review application code beyond what is necessary to confirm artifact claims. Do not return `ready` for integration from this mode; use `artifact-ready`, `changes-requested`, or `blocked`.
@@ -39,9 +43,8 @@ Supported modes:
 - `--no-delegate`: use the main thread only. Use when subagent tooling is unavailable, the change is tiny, or delegation would add more noise than useful independent review.
 - `--check`: review only and do not edit any files, including `review.md`.
 - `--no-fix`: review only, write or update `review.md` when deficiencies exist, and report the verdict.
-- `--fix`: same consolidated safe-fix behavior as default, kept as an explicit alias for callers that want to signal remediation intent. Do not broaden scope.
-- `--until-ready`: after the default full discovery, batch remediation, and regression rereview, allow additional bounded remediation cycles until all gates pass or a stop condition occurs. Requires `--fix`.
-- `--max-iterations N`: cap `--until-ready`; default to `3`.
+- `--until-ready`: after the default full discovery, batch remediation, and regression rereview, allow additional bounded remediation cycles until all gates pass or a stop condition occurs. This changes only the number of remediation cycles; it must end with the same complete Final Response as a single review loop. Per-cycle updates are progress messages, not substitute verdicts.
+- `--max-iterations N`: cap `--until-ready`; default to `5`.
 - `--pr`: when all gates pass, create a non-production pull request following the app's branch policy. If the target is the production branch, use `/sdd-release` instead.
 - `--merge`: when all gates pass, merge to the non-production integration branch following the app's branch policy. If the target is the production branch, use `/sdd-release` instead.
 - `--merge-and-close`: when all gates pass, complete the policy-defined non-production merge path and close the change. Treat this as explicit authorization for both the non-production merge/integration action and the closeout mutation, but not for push, rebase, branch deletion, deployment, production action, or remote PR merge unless the request or app policy explicitly covers that action.
@@ -84,6 +87,11 @@ Capture:
 - untracked files relevant to the app/source repo
 - conflict check result without performing a merge
 - branch policy and whether the current source/target pair satisfies it
+- available PR description, linked issue, review discussion, relevant source-only commit history, and related-repository context; record material context that is unavailable rather than silently assuming it does not exist
+- project-configured linters, typecheckers, static/security/dependency analyzers, generated-contract checks, and CI commands relevant to the changed surface
+- the project-defined aggregate gate or authoritative constituent commands, their source of truth, and any documented optional checks
+- the Verification Scope Decision, including risk or policy triggers, exact candidate ref, freshness/cache treatment, and recorded result
+- the prospective integration tree and whether it materially differs from the reviewed source candidate
 - active `review.md`, `tasks.md` review state, manual confirmation state, release-communication state, PR/merge state, and closeout state
 - JSON reverse-traceability inventory for the source working tree since the selected target or merge base, produced by the packaged `sdd-orphan-audit` script with `--changed-from`; run one `--epic` pass per affected Epic when ownership needs to be distinguished
 
@@ -107,6 +115,16 @@ Prefer `git merge-tree --write-tree TARGET SOURCE` for conflict checks. Treat ex
 Treat `TARGET...SOURCE` as the primary PR-style review diff. Use the working tree diff only to understand uncommitted review fixes, local artifact edits, generated files, or blockers. Do not allow unrelated dirty files outside the source repo to obscure the source-vs-target review.
 
 Record the bundle summary, including the immutable reviewed source commit, in `review.md` when findings exist, or in `tasks.md` when the review is clean and no `review.md` is required. A branch name alone is not a sufficient review watermark because it can advance after review.
+
+## Resolve Verification Scope
+
+Keep focused behavior proof, aggregate candidate proof, and integration-candidate proof distinct. Focused tests establish individual Requirements and Scenarios; broad gates support them but do not replace their exact evidence.
+
+Resolve the project-defined aggregate command from project guidance, testing/CI docs, workflow files, and package scripts. Require aggregate proof when project policy requires it or when the reviewed diff crosses multiple capabilities, persistence or migrations, auth/security/privacy boundaries, process-global state, shared contracts, concurrency/workers/recovery, or another surface where isolated checks can conceal integration failures. Do not impose one universal command name or constituent list. Prefer one project-owned command; otherwise record and run the authoritative equivalent constituents. If materially required proof cannot be identified or run safely, block `ready` unless the user explicitly accepts the gap.
+
+Run every required aggregate gate freshly against the exact committed source candidate after the final review remediation. Bypass caches or prove meaningful fresh execution, and record the command, commit, constituent/test counts or equivalent execution evidence, and result. A later evidence-record-only commit may reuse that result only after its diff is classified and every gate that observes the changed artifacts is rerun; any behavior, test, dependency, configuration, migration, generated, executable, or gate-observed change invalidates the prior result. An earlier behavior candidate, a green command that skipped meaningful work, remote CI for another ref, focused suites, or structural SDD validation cannot satisfy this gate.
+
+Require integration-candidate proof when the target has advanced, contains accumulated Changes, requires conflict resolution, or produces a materially different prospective tree. Materialize that result through a safe disposable worktree or equivalent non-destructive project mechanism, record its tree/ref, and run the required aggregate gate there. Recheck source and target refs immediately before integration. Reuse source-candidate proof only when the prospective integration content is demonstrably identical; otherwise a changed tree requires fresh proof. After integration, confirm the actual integrated tree matches the tested tree or rerun the gate before closeout.
 
 ## Required Context
 
@@ -136,6 +154,19 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
 
 For review readiness, uncommitted files outside the implementation/source repo do not block review, PR, or merge readiness unless they are explicitly part of the requested change, target repo, or branch operation. Report related workflow-artifact or adjacent-repo dirty state clearly, but do not classify it as blocking merely because it is uncommitted. Source-repo dirty state still blocks readiness when it is part of the change and not committed or explicitly deferred.
 
+## Systematic Review Search
+
+Default and deep review must generate candidates through distinct passes instead of relying on one salience-driven reading of the diff. Scale the work to the change, but complete every applicable pass before consolidating findings:
+
+1. **Intent and history**: derive promised behavior and constraints from the Change artifacts, diff, source-only commits, and available PR description, linked issue, review discussion, or related-repository context. Treat missing external context as a blind spot, not evidence that no constraint exists.
+2. **Complete diff coverage**: inspect every changed path and behavior-bearing hunk, including deleted and renamed code, tests, configuration, schemas, migrations, generated contracts, and supporting docs. Classify generated or mechanical changes explicitly rather than skipping them implicitly.
+3. **Dependency and contract propagation**: for every changed public or behavior-owning symbol, trace materially relevant callers, consumers, registrations, imports, routes, persistence, schemas, configuration, generated boundaries, and downstream tests. Check both upstream inputs and downstream effects; existing Epic paths and search/index results are starting points, not complete coverage.
+4. **Deterministic tool pass**: discover relevant configured tools from project guidance, package scripts, CI workflows, and checked-in configuration, then run the applicable lint, typecheck, static/security/dependency, generated-contract, and test checks. Do not install or impose a new scanner merely to make the review look broader. Treat tool output as finding candidates that still require impact and diff validation.
+5. **Risk-shaped reasoning passes**: separately challenge correctness and regressions; typed-result preservation across service/plugin/transport/client boundaries; security and data safety; capability authority and content-budget/provenance conservation; filesystem mutation order and confinement; concurrency, async timing, retry, cancellation, restart, and recovery; API/schema/configuration compatibility and migrations; test/evidence strength; and rendered UI behavior when applicable. A green aggregate command does not replace these passes.
+6. **Blind-spot accounting**: record unavailable metadata, providers, related repositories, external contracts, runtime environments, scanners, or rendered surfaces that could materially change confidence. Mark the affected gate `blocked` or record an explicit accepted gap when the missing surface is required.
+
+Keep the union of candidates until the discovery wave is complete. Validate each candidate against the actual source-vs-target diff, concrete code path, executable reproduction, deterministic tool result, or artifact contract before promoting it to a finding. Record inspected surfaces and rejected material candidates in reviewer output when that is necessary to show coverage; do not inflate the final report with preference-only or disproved concerns.
+
 ## Delegated Review Model
 
 Default to an orchestrator-and-reviewers model when subagent tooling is available and the change is not trivial. The main agent remains responsible for the final verdict, git safety, branch policy, artifact mutation, safe fixes, and validating delegated claims.
@@ -147,6 +178,10 @@ Use delegated fresh-context passes for:
 - artifact truth and Change-status consistency
 - source-vs-target code review
 - verification and Requirement/Scenario coverage
+- evidence falsification for new or high-risk completion, `Verified By`, E2E, security, recovery, and production-path claims
+- pattern conformance when the diff adds or changes an adapter, client, route, workspace, worker, migration, command, or other surface parallel to an established implementation
+- boundary-contract review when important typed results, errors, statuses, permissions, or retry decisions cross service, plugin/capability, adapter, transport, or client layers
+- stateful transition review when the diff owns editable, autosaving, cached, routed, asynchronous, durable, or identity-sensitive behavior
 - risk-shaped evidence review for deterministic edge cases the happy path may miss
 - security review
 - UI/UX and visual identity review when the diff affects user-visible UI
@@ -172,7 +207,7 @@ Treat all materially relevant delegated passes plus the orchestrator's own inspe
 4. Classify the complete set by severity and remediation boundary.
 5. Create one ordered remediation batch grouped by root cause and affected verification.
 
-A confirmed critical security issue, destructive-data risk, active production hazard, or ambiguity that makes continued inspection unsafe may stop the wave early. Ordinary code, test, accessibility, documentation, CI, or artifact findings should be accumulated instead of surfaced as serial interruptions.
+A confirmed critical security issue, destructive-data risk, or active production hazard may stop mutations, runtime checks, or integration immediately. Continue the remaining safe read-only review gates unless the hazard or unresolved ambiguity makes further inspection itself unsafe. Ordinary code, test, security, accessibility, documentation, CI, integration-readiness, or artifact findings must be accumulated instead of surfaced as serial interruptions.
 
 Keep delegated review waits bounded. Continue independent review work after spawning, and wait only when the next required decision depends on delegated evidence. Never wait silently for more than 60 seconds; report which gates are complete and which review pass remains. After roughly three minutes of cumulative waiting on one pass or review wave, interrupt or close the slow reviewer and complete that gate locally, or re-delegate a narrower question. An optional reviewer must never prevent a concise status response. Close completed or abandoned reviewers promptly.
 
@@ -185,6 +220,8 @@ Use `assets/subagent-pr-review-prompt.md` for delegated passes when structured p
 - assigned review pass
 - relevant Story, Requirement, and Scenario IDs when known
 - branch policy summary
+- available PR/issue/review-history and related-repository context, or an explicit note that it is unavailable
+- configured deterministic review tools relevant to the assigned pass
 - selected available skills and guidance to load, with selection reasons
 - explicit instruction not to edit, commit, push, merge, close, or update Change status
 - required report shape
@@ -193,25 +230,32 @@ Treat subagent output as evidence, not final truth. Validate important claims by
 
 ## Review Gates
 
-Run every gate that applies and record `pass`, `findings`, `blocked`, or `not applicable`. Apply the detailed semantics from the managed workflow document, the canonical templates, selected available review skills, and project guidance instead of restating them here.
+Run every gate that applies and record `pass`, `findings`, `blocked`, or `not applicable`. Do not short-circuit this list because an earlier gate already guarantees `changes-requested` or `blocked`; complete later independent gates so the user receives one comprehensive finding set. Before finalizing, confirm that every gate has an explicit result and that no delegated or main-thread review pass remains uncollected. Apply the detailed semantics from the managed workflow document, the canonical templates, selected available review skills, and project guidance instead of restating them here.
 
-1. **Artifact truth**: proposal, design, task ledger, Epic/Story truth, Requirements, Scenarios, evidence maps, gaps, and Change status agree with implementation reality.
-2. **Source-vs-target code review**: review the actual diff and source-only commits for correctness, regressions, maintainability, accidental scope, project-pattern fit, and user-visible state handling.
-3. **Reverse traceability**: classify every behavior-bearing source/test candidate from the diff inventory as Epic-owned, supporting/generated/framework infrastructure, an explicit gap, or tracked cleanup. For refactors, check stranded routes, registrations, imports, dependencies, tests, migrations, generated bindings, and obsolete files. Skipping this inventory blocks `ready`.
-4. **Verification**: scenario-mapped focused evidence exists, broad gates are not substituted for behavior proof, production/mock boundaries are honest, and required project checks pass or have explicit blocking gaps.
-5. **Risk-shaped evidence**: important deterministic claims are challenged against plausible failure modes and supported by tests, source inspection, repeatable runtime evidence, or an explicit gap.
-6. **Security and data safety**: use relevant available security guidance and inspect the risk surfaces identified by the diff and project policy.
-7. **Manual acceptance**: user-facing changes have the workflow-defined walkthrough and status when applicable. A complete current walkthrough with status `pending user` does not make the review `changes-requested`, though project policy may keep integration or closeout pending until confirmation.
-8. **Supporting truth**: required project docs, release communication, generated indexes, ADRs, and product direction do not contradict the implementation or Epic map. The resolved Idea's current entry-point docs must identify the selected repository and repository lifecycle correctly, agree with `.sdd/config.yaml`, and avoid describing implemented replacement work as future or an archived repository as active. Clearly dated exploration, decisions, and historical sections may preserve their original point-in-time language when they are recognizable as history rather than current routing guidance.
-9. **Integration readiness**: source, target, reviewed commit, dirty state, conflict state, required checks, authorization, and the project-defined PR/merge/closeout path are unambiguous.
+1. **Artifact truth**: proposal, design, task ledger, Epic/Story truth, Requirements, Scenarios, independent implementation/verification state, behavior and evidence maps, implementation/verification gaps, and Change status agree with implementation reality.
+2. **Canonical map authority and cold navigation**: confirm every Story has one current `Implemented By` map and one current `Verified By` map, with no competing `Prior`, `Detailed`, `Legacy`, or migration-era maps. For every changed Requirement, and for Scenarios with distinct owners, start from the Epic and identify the primary governing definition, registration, or configuration plus stable anchor without a repository-wide rediscovery search. Treat imports, call sites, incidental handlers, broad file tokens, files cited for a different symbol, undifferentiated dumps, mappings that stop at UI/tests, missing paths/anchors, and unclassified support files as findings.
+3. **Source-vs-target code review**: review the actual diff and source-only commits for correctness, regressions, maintainability, accidental scope, project-pattern fit, and user-visible state handling.
+4. **Pattern conformance**: when the diff adds or changes a surface parallel to an established adapter, client, route, workspace, worker, migration, command, or similar implementation, identify the closest current reference and compare applicable auth/session/CSRF, retry, timeout/cancel, error/conflict, recovery, pending-write, identity, route-context, configuration, generated-contract, accessibility, and visual-token behavior plus focused tests. Unexplained divergence or copied defects are findings.
+5. **Boundary contracts**: when important typed results, errors, statuses, permissions, or retry decisions cross service, plugin/capability, adapter, transport, or client layers, trace each origin condition through the domain result, every mapping, client-visible behavior and retryability, and exact proof. Generic fallbacks or exception handlers that erase a required distinction are findings.
+6. **Reverse traceability**: classify every behavior-bearing source/test candidate from the diff inventory as Epic-owned, supporting/generated/framework infrastructure, an explicit gap, or tracked cleanup. For refactors, check stranded routes, registrations, imports, dependencies, tests, migrations, generated bindings, and obsolete files. Skipping this inventory blocks `ready`.
+7. **Verification**: scenario-mapped focused evidence exists, broad gates are not substituted for behavior proof, production/mock boundaries are honest, the Verification Scope Decision is explicit, and required aggregate candidate checks pass freshly on the exact reviewed commit or have explicit blocking gaps.
+8. **Evidence falsification**: for every new or high-risk completion, `Verified By`, E2E, security, recovery, or production-path claim, open the cited proof and confirm its exact test title or stable named anchor, important assertion/observation, and discovery by the command that passed. Reject generic framework anchors such as `#it(`, unsupported Scenario aggregation, missing/skipped/undiscovered evidence, and server-side proof used to imply untested client retry, redirect, timeout, draft, navigation, or recovery behavior.
+9. **Risk-shaped evidence and stateful transitions**: challenge important deterministic claims against plausible failure modes. For editable, autosaving, cached, routed, asynchronous, durable, or identity-sensitive surfaces, inspect applicable concurrent starts before and after the first await, cancel/disconnect while pending, late or stale completion after replacement, terminal retry, mounted refresh, remount, process restart, durable work whose identifier never reached the client, entity changes, pending-write navigation, failed/conflicted save recovery, return context, browser history, session expiry/sign-out, authoritative refresh, and slow or hung requests. Require tests, controlled runtime evidence, restart fixtures, source inspection that directly establishes the property, or an explicit gap.
+10. **Security and data safety**: use relevant available security guidance and inspect the risk surfaces identified by the diff and project policy. For capability-style identifiers, prove issuer, scope, lifetime, and rejection of guessed, pasted, stale, cross-run, or cross-owner use. For bounded or provider-visible content, prove all content-bearing paths consume the same budget and provenance accounting. For filesystem writes, prove every existing ancestor and confinement boundary is validated before descendants are created, mutable roots are revalidated when necessary, and fail-closed rejection leaves no unauthorized writes.
+11. **Rendered UI verification**: for every UI-bearing change, independently render current source, open the affected surfaces, exercise changed interactions, directly inspect screenshots or rendered results, and inspect relevant console and network failures. Cover the proportional Visual Verification Matrix, including representative desktop/mobile viewports and applicable default, loading, empty, error, populated, long-content, focus, selected, disabled, permission, and recovery states. Prefer project-owned browser, screenshot, or preview tooling, then an available runtime browser capability, rendered preview or fixture, or manual browser capture. A green build, passing non-visual tests, apply-side screenshots alone, or generated-but-uninspected images cannot pass this gate. If no available path can render a required surface, mark the gate `blocked` unless the user explicitly accepts the gap.
+12. **Manual acceptance**: user-facing changes have the workflow-defined walkthrough and status when applicable. A complete current walkthrough with status `pending user` does not make the review `changes-requested`, though project policy may keep integration or closeout pending until confirmation. Owner manual acceptance is distinct from the reviewer's rendered UI verification and does not substitute for it.
+13. **Supporting truth**: required project docs, release communication, generated indexes, ADRs, and product direction do not contradict the implementation or Epic map. The resolved Idea's current entry-point docs must identify the selected repository and repository lifecycle correctly, agree with `.sdd/config.yaml`, and avoid describing implemented replacement work as future or an archived repository as active. Clearly dated exploration, decisions, and historical sections may preserve their original point-in-time language when they are recognizable as history rather than current routing guidance.
+14. **Integration readiness**: source, target, reviewed commit, prospective integration tree, dirty state, conflict state, required checks, authorization, and the project-defined PR/merge/closeout path are unambiguous; required integration-candidate proof passes for the exact tree that will be integrated.
 
-For UI-bearing changes with a recorded component strategy, verify that required component-state evidence exists through configured previews or equivalent rendered-route, fixture, browser, or manual evidence; adopted source follows the project's ownership model; application-specific behavior did not leak into a generic reference; deliberate divergences preserve accepted product behavior; and anything described as shared or standardized has implemented consumer use outside the catalog itself at the level required by project guidance. A candidate that remains explicitly experimental is not a finding merely because it has not yet been promoted.
+For UI-bearing changes with a recorded component strategy, verify that required component-state evidence exists through configured previews or equivalent rendered-route, fixture, browser, or manual evidence; adopted source follows the project's ownership model; application-specific behavior did not leak into a generic reference; deliberate divergences preserve accepted product behavior; and anything described as shared or standardized has implemented consumer use outside the catalog itself at the level required by project guidance. A candidate that remains explicitly experimental is not a finding merely because it has not yet been promoted. Use apply-side visual evidence to target the independent review, but reproduce and directly inspect representative current rendering rather than accepting that evidence on trust.
 
-Before finalizing the discovery wave, explicitly challenge cross-cutting failure classes that commonly escape happy-path tests when they are relevant to the diff: upgrade paths and migration immutability, existing-data compatibility, async focus or draft preservation, responsive interaction targets and accessibility, dependency or CI action validity, generated-contract drift, and fresh-install versus existing-install behavior. Keep this framework-neutral and mark irrelevant classes `not applicable`; do not manufacture work where the diff creates no such risk.
+Before finalizing the discovery wave, explicitly challenge cross-cutting failure classes that commonly escape happy-path tests when they are relevant to the diff: sibling-pattern drift; typed-result collapse across layers; concurrent start/cancel/replacement/retry; mounted refresh, remount, restart, and durable records unknown to the client; capability issuer/scope/lifetime; content-budget or provenance bypass; filesystem mutation before ancestor validation; entity identity changes; pending-write navigation; session expiry and sign-out; retry/timeout behavior; upgrade paths and migration immutability; existing-data compatibility; async focus or draft preservation; responsive interaction targets and accessibility; dependency or CI action validity; generated-contract drift; and fresh-install versus existing-install behavior. Keep this framework-neutral and mark irrelevant classes `not applicable`; do not manufacture work where the diff creates no such risk.
 
 Select the smallest materially relevant set of available skills for these gates, read them completely, pass them into delegated review work, and validate their consequences. Absence of an optional skill is not a blocker; unresolved risk is.
 
-Use verdict `ready` when the independent review is clean: no `BLOCKING` or `REQUIRED` finding remains, required non-manual gates pass, and any required manual walkthrough is complete and current. Manual confirmation may still be `pending user`; record that separately as an acceptance and closeout gate rather than converting a clean technical review into `changes-requested` or `blocked`. A `ready` review with pending required confirmation is not yet ready to merge or close.
+Use verdict `ready` when the independent review is clean: no `BLOCKING` or `REQUIRED` finding remains, required non-manual gates—including applicable aggregate and integration-candidate gates—pass for the recorded exact candidate, and any required manual walkthrough is complete and current. Manual confirmation may still be `pending user`; record that separately as an acceptance and closeout gate rather than converting a clean technical review into `changes-requested` or `blocked`. A `ready` review with pending required confirmation is not yet ready to merge or close.
+
+Do not classify required live-provider, production-path, deterministic E2E, integration, or other non-manual verification as manual acceptance merely because a person must trigger or observe it. Pending required non-manual evidence blocks `ready` unless project policy explicitly marks it optional or the user explicitly accepts it as a gap. State whether each pending live-provider check is required verification, optional confidence evidence, or manual acceptance, and make the verdict agree.
 
 Use `changes-requested` when code, artifacts, verification, documentation, or the manual walkthrough itself needs correction. Narrow modes may report narrower outcomes but must not imply full integration readiness.
 
@@ -229,7 +273,7 @@ If the review is clean, a separate review artifact is optional unless project po
 
 ## Remediation
 
-Default mode performs one consolidated safe-remediation batch after the complete discovery wave. With default mode or `--fix`, only include findings that are:
+Default mode performs one consolidated safe-remediation batch after the complete discovery wave. Only include findings that are:
 
 - clearly in scope for the SDD change
 - small enough to verify in the same review pass
@@ -250,7 +294,7 @@ After the finding set is consolidated:
 
 The regression rereview is a validation pass, not a second broad discovery wave. If it reveals a genuinely new safe regression introduced by the batch, fix it within the same run when practical and rerun only affected checks. If it reveals pre-existing review scope that the original complete wave should have covered, record the process miss and consolidate the remainder before stopping; do not drip-feed one finding per invocation. Additional broad review-fix cycles require `--until-ready`.
 
-If the safe-fix diff cannot be isolated from unrelated dirty files, affected verification fails, or the local commit fails, stop and report the blocker instead of continuing.
+If the safe-fix diff cannot be isolated from unrelated dirty files, affected verification fails, or the local commit fails, stop remediation and integration. If the full discovery wave is not yet complete, continue every remaining safe read-only gate before reporting the consolidated blocker and findings.
 
 If findings require implementation work beyond safe review remediation, leave them in `review.md` and recommend returning to `/sdd-apply`.
 
@@ -277,7 +321,7 @@ When merge-and-closing:
 
 1. Follow the app's local `AGENTS.md` merge policy for target branch, merge strategy, PR requirements, and whether direct integration-branch commits are allowed.
 2. Perform the non-production merge/integration step before closeout unless project policy explicitly says to close on the source branch first.
-3. After the merge/integration step succeeds, update the closeout record with the actual PR/merge status, target branch, date, commit or PR reference when available, review outcome, manual confirmation status, release-communication status, and remaining accepted risks.
+3. After the merge/integration step succeeds, confirm the actual integrated tree matches the reviewed integration candidate. If it differs, rerun every required integration-candidate gate before closeout. Update the closeout record with the tested and actual tree/commit, aggregate result, PR/merge status, target branch, date, review outcome, manual confirmation status, release-communication status, and remaining accepted risks.
 4. Run `sdd change close <space-id> <change-id> --repo <resolved-repository-path> --workspace <workspace-root>`, then commit the closeout mutation in the repo and branch required by app policy.
 5. Verify the target branch has the closed change path, no active duplicate path, and no contradictory references to the old active path.
 
@@ -289,6 +333,8 @@ When closing:
 
 ## Stop Conditions
 
+These conditions block remediation, integration, readiness, or a specific gate; they do not automatically end the review discovery wave. Unless the condition makes further inspection unsafe or impossible, record it, mark the affected gate `blocked` or `findings`, and complete every other independent gate before reporting. Never return immediately after encountering the first item in this list.
+
 Stop and report when:
 
 - change or branch selection is ambiguous.
@@ -296,13 +342,21 @@ Stop and report when:
 - branch policy is missing with no documented fallback, violated for implementation changes, or unclear for a requested PR/merge/closeout.
 - unrelated app/source-repo dirty files block safe review, fixes, PR, or merge.
 - required checks fail without a safe in-scope fix.
+- the Verification Scope Decision is absent or understates an applicable project-policy or cross-cutting trigger; a required aggregate or integration-candidate gate is missing, stale, cached without freshness proof, ran against a different commit/tree, skipped meaningful constituents, or failed.
 - security review finds unresolved risk.
 - Epic truth or Requirement/Scenario evidence is stale, incomplete, or unmapped.
 - a deterministic implementation claim is important to readiness but is only asserted in artifacts, not supported by concrete source inspection, automated verification, manual/browser evidence, or an explicit accepted gap.
+- a new or high-risk evidence claim lacks an inspected exact test title or stable anchor, important assertion or observation, or proof that the passing command discovers it; several Scenarios are aggregated without one named proof that exercises each one; or one implementation boundary is used to imply untested behavior at another boundary.
+- a Story retains competing current and historical implementation/evidence maps, or an implementation anchor resolves only to an import, call site, incidental handler, broad token, or a file mapped for a different symbol.
+- a new sibling implementation lacks an inspected pattern-conformance comparison, has an unexplained safety or recovery divergence, or its Pattern Parity Matrix contradicts the code and focused tests.
+- an important typed result crosses service, plugin/capability, adapter, transport, or client boundaries without a complete mapping and exact proof, or a generic fallback erases status, retryability, permission, recovery, or other client-relevant meaning.
+- an editable, autosaving, cached, routed, asynchronous, durable, or identity-sensitive surface lacks direct proof or an explicit gap for applicable interleavings such as concurrent start, cancellation/disconnect, late or stale completion, replacement, terminal retry, mounted refresh, remount, process restart, client-unknown durable records, entity changes, pending-write navigation, failed/conflicted saves, session expiry/sign-out, authoritative refresh, or slow/hung requests.
+- a capability-style identifier can be used outside its issuer/scope/lifetime authority; a content-bearing path bypasses required budget or provenance accounting; or filesystem descendants can be written before existing ancestors and confinement are validated or remain after a fail-closed rejection.
 - later implementation or Stories superseded earlier Epic truth without reconciling the earlier Story wording, evidence, or gaps.
 - duplicate Story labels inside one Epic, duplicate full Story references, or duplicate legacy app-wide Story IDs exist without an explicit migration/blocking note and cannot be safely corrected mechanically during the review pass.
 - new or modified Stories lack stable Epic-scoped labels or documented legacy Story IDs, local Requirement IDs, local Scenario IDs, or concrete non-generic Scenarios.
 - user-facing app changes lack a useful manual UI confirmation walkthrough, the walkthrough is stale relative to the implementation, or the review does not explicitly state which manual UI tests the user should confirm next.
+- a UI-bearing change lacks a proportional Visual Verification Matrix, the reviewer did not independently render and directly inspect the affected current UI, representative viewports or relevant states/interactions were skipped without justification, console/network failures were not checked, or the only visual evidence is source inspection or generated-but-uninspected screenshots.
 - a required or claimed `Experience Design` is unconfirmed, identifies its selected direction only through an unstable reference such as “latest,” contradicts accepted Requirements, or is materially absent from the implemented responsive/state/accessibility behavior without an explicit accepted deviation.
 - a required component strategy is absent or materially contradicted by implementation, required component-state evidence is missing, adopted ownership conflicts with project guidance, or a component is claimed as shared or standardized without implemented consumer use at the level required by project guidance.
 - manual confirmation status, review record, release-communication state, PR/merge state, or closeout state is contradictory.
@@ -317,18 +371,23 @@ Stop and report when:
 
 ## Final Response
 
-Lead with verdict.
+Final-report invariant: default, `--deep`, `--no-fix`, `--until-ready`, and a run that reaches `--max-iterations` all use the same complete report structure below. Never replace it with a short narrative such as “review is ready,” a list of resolved themes, test totals, or key commits. Iteration summaries and progress updates may be concise, but the last response must independently contain the complete review result. If the iteration cap is reached, issue the full report with the resulting `changes-requested` or `blocked` verdict and every residual finding.
+
+For a full review, lead with the exact line `Verdict: ready`, `Verdict: changes-requested`, or `Verdict: blocked`. Narrow modes use their documented narrower verdict vocabulary but retain the applicable report fields.
 
 Include:
 
-- verdict: `ready`, `changes-requested`, or `blocked`
+- complete gate scorecard covering every applicable Review Gate with `pass`, `findings`, `blocked`, or `not applicable`; no gate may be silently omitted because another gate already failed
 - selected change path, source branch, exact reviewed source commit, and target branch
+- the final post-remediation reviewed source commit as the review watermark; list remediation, review-record, ledger, and planning-document commits separately rather than substituting a “key commits” summary for the watermark
 - blocking and required findings, ordered by severity
+- consolidated remediation performed across all cycles, plus residual suggestions and accepted gaps
 - whether `review.md` was created or updated
 - Requirement/Scenario coverage result
 - Story reference traceability result
 - Epic truth result
-- test and verification commands/results
+- test and verification commands/results, with every pending live-provider or production-path check classified as required verification, optional confidence evidence, or manual acceptance and reflected in the verdict
+- rendered UI verification result, including surfaces, viewports, states/interactions, directly inspected evidence, console/network outcome, and any blocked or accepted rows; say `not applicable` with a reason when the change is not UI-bearing
 - manual UI confirmation walkthrough status, plus a concise `Suggested manual UI testing` list with route/setup/actions/expected result for anything the user should confirm; say `none` when no manual UI confirmation is useful
 - Change status, closeout readiness, and any contradictory state
 - formal security review result

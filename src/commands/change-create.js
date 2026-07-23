@@ -5,6 +5,7 @@ import {
   assertValidConfig,
   relativeWorkspacePath,
   resolveIdeaPlanningPath,
+  resolveRepositoryArtifacts,
   resolveWorkspaceStatus,
   resolveWorkspacePath,
 } from "../config.js";
@@ -12,7 +13,7 @@ import { resolveOperationConfiguration } from "../workspace.js";
 import { resolvedActiveRepositories, selectRepositories } from "../change-repositories.js";
 import { PACKAGE_ROOT } from "../constants.js";
 import { SddError } from "../errors.js";
-import { pathExists } from "../fs.js";
+import { isPathPhysicallyInside, pathExists } from "../fs.js";
 
 const TEMPLATE_FILES = Object.freeze([
   ["proposal.md", join(PACKAGE_ROOT, "skills", "sdd-change", "assets", "proposal-template.md")],
@@ -80,7 +81,7 @@ export async function createPlannedChange(
   slug,
   { date = null, repositories = [], dryRun = false } = {},
 ) {
-  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath);
+  const { workspaceRoot, config, context } = await resolveOperationConfiguration(startPath);
   assertValidConfig(config, "create a planned Change");
   const space = config.ideas[spaceId];
   if (!space) {
@@ -88,6 +89,14 @@ export async function createPlannedChange(
       code: "SPACE_NOT_FOUND",
       details: Object.keys(config.ideas).sort().map((id) => `Available Space ID: ${id}`),
     });
+  }
+  if (space._repositoryOnly === true || (
+    context.kind === "repository" && context.spaceId === spaceId && context.planningPath === null
+  )) {
+    throw new SddError(
+      `Space ${spaceId} has no configured Idea planning mapping for a planned Change.`,
+      { code: "PLANNING_MAPPING_REQUIRED" },
+    );
   }
   if (resolveWorkspaceStatus(space.status) !== "active") {
     throw new SddError(`Space ${spaceId} is not active. Update its .sdd status before creating work.`, {
@@ -110,19 +119,40 @@ export async function createPlannedChange(
   }
 
   const changeId = `${selectedDate}-${slug}`;
+  const selectedRepositories = selectRepositories(
+    resolvedActiveRepositories(config, space),
+    repositories,
+  );
   const planningPath = resolveIdeaPlanningPath(config, spaceId, space);
   const plannedPath = normalizePath(
     join(planningPath, config.planning.plannedChangesDirectory, changeId),
   );
   const absolutePath = resolveWorkspacePath(workspaceRoot, plannedPath);
+  const ideaPlanningRoot = resolveWorkspacePath(workspaceRoot, planningPath);
+  if (!(await isPathPhysicallyInside(ideaPlanningRoot, absolutePath))) {
+    throw new SddError(`Planned Change resolves outside its configured Idea planning root: ${plannedPath}`, {
+      code: "UNSAFE_ARTIFACT_PATH",
+    });
+  }
   if (await pathExists(absolutePath)) {
     throw new SddError(`Planned Change already exists: ${plannedPath}`, { code: "CHANGE_EXISTS" });
   }
-
-  const selectedRepositories = selectRepositories(
-    resolvedActiveRepositories(config, space),
-    repositories,
-  );
+  for (const repository of selectedRepositories) {
+    const repositoryPath = resolveWorkspacePath(workspaceRoot, repository.resolvedPath);
+    const artifacts = resolveRepositoryArtifacts(config, repository);
+    for (const [location, root] of [
+      ["active", artifacts.activeChanges],
+      ["closed", artifacts.closedChanges],
+    ]) {
+      const collisionPath = join(repositoryPath, root, changeId);
+      if (await pathExists(collisionPath)) {
+        throw new SddError(
+          `Change already exists in ${location} repository history: ${normalizePath(join(repository.resolvedPath, root, changeId))}`,
+          { code: "CHANGE_EXISTS" },
+        );
+      }
+    }
+  }
   const title = changeTitle(slug);
   const files = TEMPLATE_FILES.map(([name]) => name);
 
@@ -144,6 +174,16 @@ export async function createPlannedChange(
           }),
           "utf8",
         );
+      }
+      if (!(await isPathPhysicallyInside(ideaPlanningRoot, absolutePath))) {
+        throw new SddError(`Planned Change resolves outside its configured Idea planning root: ${plannedPath}`, {
+          code: "UNSAFE_ARTIFACT_PATH",
+        });
+      }
+      if (await pathExists(absolutePath)) {
+        throw new SddError(`Planned Change appeared during creation: ${plannedPath}`, {
+          code: "CONCURRENT_CHANGE",
+        });
       }
       await rename(temporaryPath, absolutePath);
     } catch (error) {

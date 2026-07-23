@@ -1,27 +1,43 @@
 :root {
   color-scheme: dark;
-  --background: #09090b;
-  --surface: #18181b;
-  --surface-muted: #27272a;
-  --surface-raised: #202023;
-  --border: #27272a;
-  --border-strong: #3f3f46;
-  --text-primary: #f4f4f5;
+
+  /* UI Foundations: Mono identity profile. */
+  --canvas: #0a0a0a;
+  --surface: #202020;
+  --surface-raised: #2f2f2f;
+  --border: #404040;
+  --control-boundary: #737373;
+  --identity: #2f2f2f;
+  --identity-foreground: #ffffff;
+  --action: #525252;
+  --action-hover: #464646;
+  --action-active: #3a3a3a;
+  --action-foreground: #ffffff;
+  --action-text: #b3b3b3;
+  --focus-ring: #a3a3a3;
+
+  /* Text and status meaning stay stable across identity profiles. */
+  --text: #f4f4f5;
   --text-secondary: #d4d4d8;
   --text-muted: #a1a1aa;
-  --identity: #14263d;
-  --action: #3f6f99;
-  --action-strong: #4f82ad;
-  --action-foreground: #ffffff;
-  --action-text: #77a5cc;
-  --accent: #e58a3a;
   --success: #4ade80;
-  --info: #3f6f99;
-  --focus-ring: #3f6f99;
-  --code-background: #0f0f11;
-  --header-background: rgb(9 9 11 / 92%);
+  --warning: #fbbf24;
+  --danger: #ce4053;
+  --info: var(--action-text);
+  --selection: color-mix(in srgb, var(--action) 35%, transparent);
+  --selection-foreground: var(--text);
+
+  /* Page-owned surfaces retain the canonical semantic vocabulary. */
+  --code-surface: #111111;
+  --header-surface: #0a0a0a;
+
+  --radius-row: 2px;
   --radius-control: 4px;
-  --radius-panel: 8px;
+  --radius-panel: 6px;
+  --control-dense: 28px;
+  --control-toolbar: 32px;
+  --control-standard: 36px;
+  --control-touch: 44px;
   --content-width: 1180px;
   --reading-width: 720px;
   --space-1: 4px;
@@ -33,34 +49,16 @@
   --space-12: 48px;
   --space-16: 64px;
   --space-24: 96px;
-  --motion-fast: 120ms;
-  --motion-standard: 180ms;
-  --font-sans: "Geist", "Geist Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-}
-
-[data-theme="light"] {
-  color-scheme: light;
-  --background: #fafafa;
-  --surface: #ffffff;
-  --surface-muted: #f4f4f5;
-  --surface-raised: #ffffff;
-  --border: #e4e4e7;
-  --border-strong: #a1a1aa;
-  --text-primary: #18181b;
-  --text-secondary: #3f3f46;
-  --text-muted: #71717a;
-  --identity: #14263d;
-  --action: #315f86;
-  --action-strong: #244866;
-  --action-foreground: #ffffff;
-  --action-text: #315f86;
-  --accent: #b85f18;
-  --success: #167a3a;
-  --info: #315f86;
-  --focus-ring: #315f86;
-  --code-background: #f4f4f5;
-  --header-background: rgb(250 250 250 / 92%);
+  --motion-fast: 150ms;
+  --motion-standard: 200ms;
+  --font-size-label: 0.75rem;
+  --font-size-mono: 0.8125rem;
+  --font-size-ui: 0.875rem;
+  --font-size-content: 1rem;
+  --font-size-section: 1.125rem;
+  --font-size-title: 1.5rem;
+  --font-sans: "Geist Variable", "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", "Geist Mono", ui-monospace, monospace;
 }
 
 *,
@@ -77,8 +75,8 @@ html {
 body {
   margin: 0;
   min-width: 320px;
-  background: var(--background);
-  color: var(--text-primary);
+  background: var(--canvas);
+  color: var(--text);
   font-family: var(--font-sans);
   font-size: 16px;
   line-height: 1.6;
@@ -116,8 +114,8 @@ pre {
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--info) 35%, transparent);
-  color: var(--text-primary);
+  background: var(--selection);
+  color: var(--selection-foreground);
 }
 
 .skipLink {
@@ -127,8 +125,8 @@ pre {
   inset-inline-start: var(--space-3);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-control);
-  background: var(--text-primary);
-  color: var(--background);
+  background: var(--text);
+  color: var(--canvas);
   transform: translateY(-160%);
 }
 
@@ -151,8 +149,7 @@ pre {
   min-height: 64px;
   padding-inline: max(var(--space-6), calc((100vw - var(--content-width)) / 2));
   border-block-end: 1px solid var(--border);
-  background: var(--header-background);
-  backdrop-filter: blur(12px);
+  background: var(--header-surface);
 }
 
 .brand {
@@ -160,7 +157,7 @@ pre {
   align-items: center;
   gap: var(--space-3);
   width: fit-content;
-  color: var(--text-primary);
+  color: var(--text);
   font-size: 14px;
   font-weight: 650;
   text-decoration: none;
@@ -171,10 +168,10 @@ pre {
   width: 28px;
   height: 28px;
   place-items: center;
-  border-block-end: 2px solid var(--accent);
+  border-block-end: 2px solid var(--action-text);
   border-radius: var(--radius-control);
   background: var(--identity);
-  color: #f4f4f5;
+  color: var(--identity-foreground);
   font-family: var(--font-mono);
   font-size: 13px;
 }
@@ -197,7 +194,7 @@ pre {
 .siteNav a:hover,
 .githubLink:hover,
 .siteFooter a:hover {
-  color: var(--text-primary);
+  color: var(--text);
 }
 
 .headerActions {
@@ -214,45 +211,25 @@ pre {
   line-height: 44px;
 }
 
-.iconButton,
 .copyButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--border-strong);
+  border: 0;
   border-radius: var(--radius-control);
-  background: var(--surface);
+  background: var(--surface-raised);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: border-color var(--motion-fast), background-color var(--motion-fast), color var(--motion-fast);
+  transition: background-color var(--motion-fast), color var(--motion-fast);
 }
 
-.iconButton {
-  width: 44px;
-  height: 44px;
-}
-
-.iconButton:hover,
 .copyButton:hover {
-  border-color: var(--action);
-  color: var(--text-primary);
+  background: color-mix(in srgb, var(--surface-raised) 88%, var(--text) 12%);
+  color: var(--text);
 }
 
-.iconButton svg {
-  width: 18px;
-  height: 18px;
-}
-
-.moonIcon {
-  display: none;
-}
-
-[data-theme="light"] .sunIcon {
-  display: none;
-}
-
-[data-theme="light"] .moonIcon {
-  display: block;
+.copyButton:active {
+  background: color-mix(in srgb, var(--surface-raised) 94%, var(--text) 6%);
 }
 
 .intro {
@@ -285,7 +262,7 @@ pre {
 }
 
 .eyebrow {
-  color: var(--accent);
+  color: var(--action-text);
 }
 
 .sectionNumber {
@@ -298,7 +275,7 @@ pre {
   width: 16px;
   height: 2px;
   flex: 0 0 auto;
-  background: var(--accent);
+  background: var(--action-text);
   content: "";
 }
 
@@ -312,7 +289,7 @@ p {
 h1 {
   max-width: 700px;
   margin: var(--space-4) 0 var(--space-6);
-  font-size: 64px;
+  font-size: clamp(2.75rem, 5vw, 3.5rem);
   font-weight: 650;
   line-height: 1.02;
 }
@@ -352,24 +329,31 @@ h1 {
 }
 
 .primaryAction:hover {
-  background: var(--action-strong);
+  background: var(--action-hover);
+}
+
+.primaryAction:active {
+  background: var(--action-active);
 }
 
 .textAction {
   padding-inline: var(--space-4);
-  border: 1px solid var(--border-strong);
+  background: var(--surface-raised);
   color: var(--text-secondary);
 }
 
 .textAction:hover {
-  border-color: var(--action);
-  color: var(--text-primary);
+  background: color-mix(in srgb, var(--surface-raised) 88%, var(--text) 12%);
+  color: var(--text);
+}
+
+.textAction:active {
+  background: color-mix(in srgb, var(--surface-raised) 94%, var(--text) 6%);
 }
 
 .behaviorMap {
   margin: 0;
   padding: var(--space-6);
-  border: 1px solid var(--border);
   border-radius: var(--radius-panel);
   background: var(--surface);
 }
@@ -387,12 +371,12 @@ h1 {
   min-height: 168px;
   align-content: space-between;
   padding: var(--space-4);
-  border-block-start: 2px solid var(--border-strong);
-  background: var(--surface-muted);
+  border-block-start: 2px solid var(--control-boundary);
+  background: var(--surface-raised);
 }
 
 .mapNodePrimary {
-  border-block-start-color: var(--accent);
+  border-block-start-color: var(--action-text);
 }
 
 .mapNodeEvidence {
@@ -407,7 +391,7 @@ h1 {
 }
 
 .workflow li:nth-child(even) .stepIndex {
-  color: var(--accent);
+  color: var(--action-text);
 }
 
 .mapNode strong {
@@ -432,7 +416,7 @@ h1 {
   min-height: 44px;
   margin-block-start: var(--space-3);
   padding-inline: var(--space-3);
-  background: var(--code-background);
+  background: var(--code-surface);
   color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: 11px;
@@ -453,7 +437,7 @@ h1 {
   align-items: baseline;
   padding: var(--space-12) max(var(--space-6), calc((100vw - var(--content-width)) / 2));
   background: var(--identity);
-  color: #f4f4f5;
+  color: var(--identity-foreground);
 }
 
 .principleBand p,
@@ -468,7 +452,7 @@ h1 {
 }
 
 .principleBand span {
-  color: #d4d4d8;
+  color: var(--text-secondary);
   font-size: 15px;
 }
 
@@ -520,14 +504,14 @@ h1 {
   gap: var(--space-2) var(--space-4);
   margin-block-end: var(--space-6);
   padding: var(--space-4);
-  border-inline-start: 2px solid var(--accent);
+  border-inline-start: 2px solid var(--action-text);
   background: var(--surface);
   color: var(--text-secondary);
   font-size: 13px;
 }
 
 .methodNote strong {
-  color: var(--text-primary);
+  color: var(--text);
 }
 
 .workflow li {
@@ -697,7 +681,7 @@ h1 {
 
 .toolColumn {
   padding-block-start: var(--space-4);
-  border-block-start: 2px solid var(--border-strong);
+  border-block-start: 2px solid var(--control-boundary);
 }
 
 .toolColumn:first-child {
@@ -705,7 +689,7 @@ h1 {
 }
 
 .toolColumn:last-child {
-  border-block-start-color: var(--accent);
+  border-block-start-color: var(--action-text);
 }
 
 .toolColumn h3 {
@@ -785,7 +769,7 @@ h1 {
 }
 
 .referenceFlow li:first-child {
-  border-inline-start: 2px solid var(--accent);
+  border-inline-start: 2px solid var(--action-text);
 }
 
 .referenceFlow li:last-child {
@@ -816,7 +800,7 @@ h1 {
 .commandBlock {
   margin-block-start: var(--space-12);
   border-radius: var(--radius-panel);
-  background: var(--code-background);
+  background: var(--code-surface);
   overflow: hidden;
 }
 
@@ -864,12 +848,12 @@ h1 {
 }
 
 .commandNote strong {
-  color: var(--accent);
+  color: var(--action-text);
   font-weight: 650;
 }
 
 .prompt {
-  color: var(--accent);
+  color: var(--action-text);
 }
 
 .closingBand {

@@ -19,7 +19,7 @@ This skill may create branches, commits, pushes, and PR comments when needed. Ne
 
 Treat PR creation and PR stewardship as separate phases. On the activation that creates a new PR, do not immediately conclude there are no comments or that the PR is ready to merge; CI, automation, and humans need time to react. Report the new PR URL, current checks if any, and tell the user to rerun `/sdd-pr` after reviewers or automation have had time to comment. On later activations for an existing PR, run the comment/check stewardship loop.
 
-Non-negotiable invariant: PR feedback must not move implementation beyond the durable Epic/Story map or beyond the commit covered by SDD review without an explicit reconciliation. Track the immutable reviewed source commit and the latest reconciled PR head. Do not return a merge-ready result while the current PR head contains unclassified or unreconciled post-review commits.
+Non-negotiable invariant: PR feedback must not move implementation beyond the durable Epic/Story map or beyond the commit covered by SDD review without an explicit reconciliation. Track the immutable reviewed source commit, latest reconciled PR head, and a Remote Review Watermark for each configured reviewer and status check. A resolved comment or completed review on an older head is historical evidence, not current-head coverage. Do not return a merge-ready result while the current PR head contains unclassified or unreconciled post-review commits or any required reviewer/check watermark remains pending, failed, unavailable without an accepted policy path, or stale for a material change.
 
 A `/sdd-review` verdict of `ready` establishes technical review readiness. It does not by itself prove that required manual acceptance is complete. Resolve the current manual confirmation status from `tasks.md` or the review record and apply project policy separately. PR creation may proceed with `pending user` only when project policy allows review to continue before acceptance; never describe the PR as merge-ready or perform the merge while required confirmation remains pending.
 
@@ -31,9 +31,8 @@ Infer inputs in this order:
 - Target branch: explicit user branch, otherwise the app branch policy's PR, review, integration, or stable target.
 - Repository root: current git repo, or the app repo implied by the conversation.
 - PR mode:
-  - default: create the PR if missing; otherwise check and address review comments, then stop before merge.
+  - default: create the PR if missing; otherwise check and address accepted review comments with narrow fixes, then stop before merge.
   - `--check`: inspect and report only; do not edit code, comment, resolve, push, or create a PR.
-  - `--fix`: allow narrow code, test, and documentation changes for accepted PR comments.
   - `--until-clean`: keep looping until no actionable comments remain or a stop condition is reached.
   - `--check-now`: after creating a PR, immediately perform a best-effort comment/check pass anyway. Use only when the user explicitly asks for an immediate check.
 
@@ -57,6 +56,8 @@ If the source branch, target branch, provider, or project policy cannot be infer
    - Use focused commit messages.
    - Resolve the current source commit SHA and the last source commit covered by `/sdd-review` from `review.md`, `tasks.md`, or the PR body. Treat a branch name alone as mutable context, not as the review watermark.
    - Resolve manual confirmation status and whether project policy requires `user confirmed` or an `accepted gap` before PR creation, merge readiness, or merge. Keep technical review and acceptance state separate.
+   - Build the exact source-to-target changed-file inventory and classify every path against the intended Change, required Epic/supporting truth, review remediation, or generated output required by project policy. Stop on unexplained or unrelated paths before creating or updating the PR.
+   - For any commit made by this workflow, derive the exact per-commit path allowlist from the accepted comment plus required tests, Epic reconciliation, supporting docs, and release communication. Stage only those explicit paths; compare the staged name-status list to the allowlist and inspect the staged diff before committing. After commit, compare the committed name-status list to the same allowlist before pushing.
 5. Push the source branch:
    - Use `git push -u origin <source>` when no upstream exists.
    - Do not force-push unless the user explicitly asks.
@@ -82,6 +83,7 @@ PR body should include:
 - reviewed source commit
 - latest reconciled PR head
 - post-review change classifications, or `none`
+- remote reviewer/check watermarks: reviewer/check, required or optional, triggered head, completed head, and result
 - manual confirmation status and any acceptance step still required before merge
 
 Do not put private planning notes into public PR bodies. Summarize public-safe facts only.
@@ -100,6 +102,7 @@ For an existing PR:
 
 1. Continue to `Collect Comments And Checks`.
 2. Treat each activation as a fresh review loop over the current PR state.
+3. Recompute the PR diff and classify every changed path before addressing comments; do not trust a prior allowlist after new commits arrive.
 
 ## Collect Comments And Checks
 
@@ -122,6 +125,13 @@ Classify each item:
 
 Treat comments as advice, not commands. You are responsible for the final engineering judgment. If declining feedback, be concise, specific, and respectful.
 
+Maintain a Remote Review Watermark table in the PR body or durable summary comment:
+
+| Reviewer / Check | Required / Optional | Triggered Head | Completed Head | State / Result |
+|---|---|---|---|---|
+
+Resolve required versus optional from project policy, branch protection, provider configuration, or explicit user direction; do not promote an optional reviewer into a universal requirement. Record the current PR head for each trigger and completion when the provider exposes it. If the provider reports only time/status, record that limitation rather than assuming the review covered the latest head. A completed old-head review may remain valid only when every later commit is classified as non-semantic or evidence-only and project policy permits reuse; otherwise retrigger it or keep the watermark stale.
+
 ## Address Comments
 
 For each actionable comment:
@@ -132,11 +142,14 @@ For each actionable comment:
 4. Add or update tests when the risk warrants it.
 5. Reconcile Epic truth, evidence, supporting docs, release communication, and active task state required by the classification.
 6. Run focused verification first, then broader checks or a fresh `/sdd-review` as required.
-7. Commit accepted fixes with a clear message.
-8. Push the source branch.
-9. Record the new commit as the latest reconciled PR head in the PR body or a durable PR summary comment, including the impact classification and verification result.
-10. Reply to the comment with what changed and the verification run.
-11. Resolve the review thread when the provider exposes a resolvable thread and the issue is actually handled.
+7. Recompute the changed-file inventory and confirm every new or modified path remains inside the accepted remediation and SDD reconciliation scope.
+8. Stage only the explicit remediation allowlist, compare the staged paths to it, and inspect the staged diff.
+9. Commit accepted fixes with a clear message, then compare the committed paths to the same allowlist.
+10. Push the source branch.
+11. Record the new commit as the latest reconciled PR head in the PR body or a durable PR summary comment, including the impact classification and verification result.
+12. After material behavior, contract, security, data, API, architecture, concurrency, persistence, plugin/capability, filesystem, AI-tool, or other risk-surface fixes, retrigger configured remote reviewers/checks when the provider supports it and update their triggered-head watermarks. If retriggering is unavailable, record that fact and do not claim current-head coverage; required review remains a merge-readiness blocker unless project policy explicitly provides another accepted path.
+13. Reply to the comment with what changed and the verification run.
+14. Resolve the review thread when the provider exposes a resolvable thread and the issue is actually handled.
 
 For answer-only, declined, or stale comments:
 
@@ -149,7 +162,7 @@ For answer-only, declined, or stale comments:
 Classify every accepted change after the last reviewed source commit. Comment disposition such as `actionable` or `declined` does not replace this impact classification.
 
 - `non-semantic`: formatting, comments, internal cleanup, or another change that does not alter observable behavior, important ownership, verification meaning, public documentation, or release communication. Record the rationale and focused verification; no Epic edit is required.
-- `code-map-or-evidence`: behavior is unchanged, but important implementation ownership, tests, assertions, or verification confidence changed. Update Story `Implemented By`, scenario-mapped `Verified By`, `Verification Gaps`, and affected supporting docs.
+- `code-map-or-evidence`: behavior is unchanged, but important implementation ownership, tests, assertions, or verification confidence changed. Update Story implementation/verification state, behavior-mapped `Implemented By`, `Implementation Gaps`, scenario-mapped `Verified By`, `Verification Gaps`, and affected supporting docs.
 - `existing-contract-fix`: implementation is corrected to satisfy an existing Requirement or Scenario. Update implementation/evidence maps and active task state when present, then run the affected SDD review gates. Use a fresh full `/sdd-review` when the fix materially changes the reviewed diff or risk surface.
 - `behavior-or-contract-change`: observable behavior, Requirements, Scenarios, API semantics, permissions, validation, recovery, data handling, security behavior, or user-facing release meaning changed. Reconcile the affected Epic, supporting docs, and release communication, then require a fresh `/sdd-review` before merge readiness.
 - `scope-product-or-architecture-change`: the feedback expands scope or changes product direction, Epic ownership, durable architecture, data model, auth model, public API, migration, deployment, or external-service behavior. Stop PR remediation and route to `/sdd-change --replan`, `/sdd-adr`, or `/sdd-prd` as appropriate.
@@ -168,12 +181,12 @@ Repeat until one stop condition applies:
 
 Each loop iteration should:
 
-1. Refresh PR comments, review threads, checks, and branch status.
+1. Refresh PR comments, review threads, checks, branch status, and every remote reviewer/check watermark.
 2. Resolve the current PR head and compare it with the reviewed source commit and latest reconciled PR head.
 3. Reclassify comments against current code and classify the SDD impact of accepted changes.
 4. Address accepted comments and reconcile required artifacts.
 5. Push changes and reply/resolve threads.
-6. Update the PR body or a durable summary comment with the current reconciliation watermark when the PR state materially changed.
+6. Update the PR body or a durable summary comment with the current reconciliation and remote-review watermarks when the PR state materially changed.
 
 ## Verification
 
@@ -199,6 +212,9 @@ When the existing PR has no actionable comments left:
    - unresolved threads
    - required status checks
    - mergeability
+   - every configured reviewer/check has a recorded required-or-optional classification, triggered head, completed head when available, and result
+   - every required reviewer/check is terminal and successful for the current material head; resolved old-head comments alone do not satisfy this gate
+   - optional pending, unavailable, or stale review is recorded with the policy reason it does not block merge readiness
 2. Confirm SDD review freshness:
    - exact current PR head
    - immutable source commit covered by the last `/sdd-review`
@@ -206,6 +222,7 @@ When the existing PR has no actionable comments left:
    - every commit after the reviewed source commit has an impact classification
    - behavior, contract, security, data, API, architecture, or other material risk changes received a fresh `/sdd-review`
    - Epic truth, evidence, supporting docs, and release communication match the current PR head
+   - the final source-to-target file inventory is identical to the classified PR scope, with no unexplained path
 3. Confirm acceptance readiness:
    - manual confirmation status uses the canonical vocabulary
    - any project-required walkthrough remains complete and current for the reviewed PR head
@@ -216,6 +233,7 @@ When the existing PR has no actionable comments left:
    - declined comments and reasons
    - verification run
    - reviewed source commit and latest reconciled PR head
+   - remote reviewer/check watermarks and any accepted optional/unavailable status
    - remaining non-blocking risks
 5. Stop and prompt the user only after technical, remote-review, and required acceptance gates pass:
    - Say the PR is ready for their review/approval.
@@ -235,6 +253,7 @@ Include:
 - comments addressed, declined, stale, or blocked
 - commits pushed
 - reviewed source commit, current PR head, and latest reconciled PR head
+- remote reviewer/check watermarks, including required/optional classification and triggered/completed heads
 - post-review change classifications and SDD artifacts reconciled
 - verification commands and results
 - manual confirmation status and whether acceptance blocks merge readiness

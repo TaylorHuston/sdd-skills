@@ -14,7 +14,7 @@ import {
 } from "../config.js";
 import { resolveOperationConfiguration } from "../workspace.js";
 import { SddError } from "../errors.js";
-import { isDirectory, pathExists } from "../fs.js";
+import { hashDirectory, isDirectory, isPathPhysicallyInside, pathExists } from "../fs.js";
 
 const REQUIRED_FILES = Object.freeze(["proposal.md", "design.md", "tasks.md"]);
 
@@ -65,6 +65,20 @@ async function markdownFiles(root, directory = root) {
   return files;
 }
 
+async function assertNoSymlinks(directory, displayPath) {
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isSymbolicLink()) {
+      throw new SddError(`Planned Change contains a symbolic link: ${displayPath}/${entry.name}`, {
+        code: "UNSAFE_ARTIFACT_PATH",
+      });
+    }
+    if (entry.isDirectory()) {
+      await assertNoSymlinks(path, `${displayPath}/${entry.name}`);
+    }
+  }
+}
+
 function rewriteProposal(source, { activePath, role, repositoryCount }) {
   const target = role ? `- This repository (role: ${role}).` : "- This repository.";
   const coordination = repositoryCount > 1
@@ -99,10 +113,15 @@ export async function promotePlannedChange(
   startPath,
   spaceId,
   changeId,
-  { repositories = [], dryRun = false } = {},
+  {
+    repositories = [],
+    dryRun = false,
+    beforeCommit = null,
+    beforeDestinationCommit = null,
+  } = {},
 ) {
   assertValidChangeId(changeId);
-  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath);
+  const { workspaceRoot, config, context } = await resolveOperationConfiguration(startPath);
   assertValidConfig(config, "promote a planned Change");
   const space = config.ideas[spaceId];
   if (!space) {
@@ -110,6 +129,14 @@ export async function promotePlannedChange(
       code: "SPACE_NOT_FOUND",
       details: Object.keys(config.ideas).sort().map((id) => `Available Space ID: ${id}`),
     });
+  }
+  if (space._repositoryOnly === true || (
+    context.kind === "repository" && context.spaceId === spaceId && context.planningPath === null
+  )) {
+    throw new SddError(
+      `Space ${spaceId} has no configured Idea planning mapping for a planned Change.`,
+      { code: "PLANNING_MAPPING_REQUIRED" },
+    );
   }
   if (resolveWorkspaceStatus(space.status) !== "active") {
     throw new SddError(`Space ${spaceId} is not active. Update its .sdd status before promoting work.`, {
@@ -123,7 +150,23 @@ export async function promotePlannedChange(
     changeId,
   ));
   const sourcePath = resolveWorkspacePath(workspaceRoot, plannedPath);
+  const planningRoot = resolveWorkspacePath(
+    workspaceRoot,
+    resolveIdeaPlanningPath(config, spaceId, space),
+  );
+  if (!(await isPathPhysicallyInside(planningRoot, sourcePath))) {
+    throw new SddError(`Planned Change resolves outside its configured planning root: ${plannedPath}`, {
+      code: "UNSAFE_ARTIFACT_PATH",
+    });
+  }
+  if (!(await isDirectory(sourcePath))) {
+    throw new SddError(`Planned Change does not exist: ${plannedPath}`, {
+      code: "CHANGE_NOT_FOUND",
+    });
+  }
+  await assertNoSymlinks(sourcePath, plannedPath);
   await validateDraft(sourcePath, plannedPath);
+  const sourceHash = await hashDirectory(sourcePath);
 
   const selected = selectRepositories(
     resolvedActiveRepositories(config, space),
@@ -148,6 +191,7 @@ export async function promotePlannedChange(
     }
     destinations.push({
       ...repository,
+      repositoryPath,
       activePath,
       path: normalizePath(join(repository.resolvedPath, activePath)),
       absolutePath,
@@ -160,13 +204,28 @@ export async function promotePlannedChange(
     const committed = [];
     let heldSource = null;
     try {
+      heldSource = join(dirname(sourcePath), `.${changeId}.sdd-promoted-${nonce}`);
+      await rename(sourcePath, heldSource);
+      if (await hashDirectory(heldSource) !== sourceHash) {
+        await rename(heldSource, sourcePath);
+        heldSource = null;
+        throw new SddError(`Planned Change changed during promotion: ${plannedPath}`, {
+          code: "CONCURRENT_CHANGE",
+        });
+      }
       for (const destination of destinations) {
+        if (!(await isPathPhysicallyInside(destination.repositoryPath, destination.absolutePath))) {
+          throw new SddError(`Active Change resolves outside its repository: ${destination.path}`, {
+            code: "UNSAFE_ARTIFACT_PATH",
+          });
+        }
         const temporaryPath = join(
           dirname(destination.absolutePath),
           `.${changeId}.sdd-promote-${nonce}`,
         );
         await mkdir(dirname(destination.absolutePath), { recursive: true });
-        await cp(sourcePath, temporaryPath, { recursive: true, verbatimSymlinks: true });
+        await cp(heldSource, temporaryPath, { recursive: true, verbatimSymlinks: true });
+        await assertNoSymlinks(temporaryPath, destination.path);
         await rewritePromotedMarkdown(temporaryPath, {
           plannedPath,
           activePath: destination.activePath,
@@ -174,26 +233,83 @@ export async function promotePlannedChange(
           role: destination.role,
           repositoryCount: destinations.length,
         });
-        staged.push({ ...destination, temporaryPath });
+        staged.push({
+          ...destination,
+          temporaryPath,
+          stagedHash: await hashDirectory(temporaryPath),
+        });
       }
-
-      heldSource = join(dirname(sourcePath), `.${changeId}.sdd-promoted-${nonce}`);
-      await rename(sourcePath, heldSource);
-      for (const destination of staged) {
+      if (beforeCommit) await beforeCommit({ sourcePath, heldSource, destinations: staged });
+      if (await pathExists(sourcePath) || await hashDirectory(heldSource) !== sourceHash) {
+        throw new SddError(`Planned Change changed during promotion: ${plannedPath}`, {
+          code: "CONCURRENT_CHANGE",
+        });
+      }
+      for (const [index, destination] of staged.entries()) {
+        if (beforeDestinationCommit) {
+          await beforeDestinationCommit({ destination, index, destinations: staged });
+        }
+        if (!(await isPathPhysicallyInside(destination.repositoryPath, destination.absolutePath))) {
+          throw new SddError(`Active Change resolves outside its repository: ${destination.path}`, {
+            code: "UNSAFE_ARTIFACT_PATH",
+          });
+        }
+        await assertNoSymlinks(destination.temporaryPath, destination.path);
+        if (await pathExists(destination.absolutePath)) {
+          throw new SddError(`Active Change appeared during promotion: ${destination.path}`, {
+            code: "CONCURRENT_CHANGE",
+          });
+        }
         await rename(destination.temporaryPath, destination.absolutePath);
         committed.push(destination);
+      }
+      if (await pathExists(sourcePath) || await hashDirectory(heldSource) !== sourceHash) {
+        throw new SddError(`Planned Change changed during promotion: ${plannedPath}`, {
+          code: "CONCURRENT_CHANGE",
+        });
       }
       await rm(heldSource, { recursive: true, force: true });
       heldSource = null;
     } catch (error) {
+      const recoveryFailures = [];
       for (const destination of staged) {
-        await rm(destination.temporaryPath, { recursive: true, force: true }).catch(() => {});
+        try {
+          await rm(destination.temporaryPath, { recursive: true, force: true });
+        } catch (recoveryError) {
+          recoveryFailures.push(`${destination.temporaryPath}: ${recoveryError.message}`);
+        }
       }
       for (const destination of committed) {
-        await rm(destination.absolutePath, { recursive: true, force: true }).catch(() => {});
+        try {
+          if (await hashDirectory(destination.absolutePath) !== destination.stagedHash) {
+            recoveryFailures.push(
+              `${destination.path}: newer content preserved; promoted destination was not removed.`,
+            );
+            continue;
+          }
+          await rm(destination.absolutePath, { recursive: true, force: true });
+        } catch (recoveryError) {
+          recoveryFailures.push(`${destination.path}: ${recoveryError.message}`);
+        }
       }
-      if (heldSource && (await pathExists(heldSource)) && !(await pathExists(sourcePath))) {
-        await rename(heldSource, sourcePath).catch(() => {});
+      if (heldSource && await pathExists(heldSource)) {
+        try {
+          if (await pathExists(sourcePath)) {
+            recoveryFailures.push(
+              `${plannedPath}: concurrent replacement preserved; original retained at ${heldSource}.`,
+            );
+          } else {
+            await rename(heldSource, sourcePath);
+          }
+        } catch (recoveryError) {
+          recoveryFailures.push(`${heldSource}: ${recoveryError.message}`);
+        }
+      }
+      if (recoveryFailures.length > 0) {
+        throw new SddError("Change promotion failed and recovery was incomplete.", {
+          code: "MUTATION_RECOVERY_FAILED",
+          details: [`Original error: ${error.message}`, ...recoveryFailures],
+        });
       }
       throw error;
     }
@@ -207,7 +323,9 @@ export async function promotePlannedChange(
     changeId,
     sourcePath: relativeWorkspacePath(workspaceRoot, sourcePath),
     sourceRemoved: !dryRun,
-    repositories: destinations.map(({ absolutePath, ...destination }) => destination),
+    repositories: destinations.map(
+      ({ absolutePath, repositoryPath, stagedHash, ...destination }) => destination,
+    ),
     files: [...REQUIRED_FILES],
   };
 }

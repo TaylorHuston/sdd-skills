@@ -22,6 +22,8 @@ audit written | check complete | blocked | no SDD evidence found
 - Missing Epic references:
 - Tests without scenario-mapped `Verified By` ownership:
 - Source files without `Implemented By` ownership:
+- Primary implementation references:
+- Requirements with participating files but no usable primary owner or stable anchor:
 - Test-support files excluded:
 - Framework/configuration/generated files excluded:
 - Stack analyzers used:
@@ -59,6 +61,12 @@ audit written | check complete | blocked | no SDD evidence found
 ### Source Without `Implemented By`
 
 - TBD
+
+### Implementation Ownership
+
+- Primary behavior owners:
+- Adapter, persistence, presentation, configuration, migration, and support ownership:
+- Navigation gaps:
 
 ### Exclusions Reviewed
 

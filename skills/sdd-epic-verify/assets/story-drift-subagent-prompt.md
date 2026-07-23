@@ -36,7 +36,8 @@ Evaluate:
 
 - Story shape: capability-level user outcome, not a tiny task or implementation step.
 - Story template adherence: promoted Story sections use `### Story S#` for new or normalized Epics, or a documented legacy Story ID when existing references depend on it.
-- Story template adherence: each promoted Story includes the expected subsection shape: Story statement, Requirements And Scenarios, `Implemented By`, scenario-mapped `Verified By`, `Verification Gaps`, and Story Notes.
+- Story template adherence: each promoted Story includes independent implementation/verification state plus the expected subsection shape: Story statement, Requirements And Scenarios, behavior-mapped `Implemented By`, `Implementation Gaps`, scenario-mapped `Verified By`, `Verification Gaps`, and Story Notes.
+- Canonical map authority: the Story has exactly one current implementation map and one current verification map; prior/detailed/legacy maps do not compete with them.
 - Story ownership: the Story still belongs in this Epic, or any move/split/merge recommendation is explicit and preserves traceability.
 - Requirement completeness: declared Requirements cover the Story's stated capability, current implementation behavior, relevant UI/API/CLI/runtime surfaces, and product/docs claims.
 - Scenario completeness: declared Scenarios cover important happy path, failure, empty, validation, permission, recovery, migration, and security-sensitive modes where relevant.
@@ -44,10 +45,13 @@ Evaluate:
 - Story reference traceability: Story label or documented legacy Story ID, `R#` Requirements, and `R#-S#` Scenarios are present and usable.
 - Story reference traceability: flag duplicate `S#` labels inside the same Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs when the orchestrator provides evidence.
 - Scenario quality: Scenarios are concrete and not generic workflow placeholders.
-- Supersession drift: later Stories or implementation changes have not left this Story's Requirements, Scenarios, `Verified By`, or `Verification Gaps` reading as current truth when they are now superseded or narrowed.
+- Supersession drift: later Stories or implementation changes have not left this Story's Requirements, Scenarios, implementation/verification state, `Implemented By`, `Implementation Gaps`, `Verified By`, or `Verification Gaps` reading as current truth when they are now superseded or narrowed.
 - Implementation drift: current code satisfies each Scenario or the gap is explicit.
+- Implementation state: `not implemented`, `partial`, or `implemented` agrees with the behavior map and `Implementation Gaps`; verification state independently agrees with evidence and `Verification Gaps`.
+- Cold navigation: beginning only from the Story, each implemented Requirement leads to a concrete repository-relative primary code location and stable symbol or searchable anchor without repository-wide rediscovery. Open each primary anchor needed for the judgment and confirm it identifies the governing definition, registration, or configuration rather than an import, call site, incidental handler, broad token, or a file cited for another symbol. Distinguish primary application logic from adapters, persistence, presentation, configuration, migrations, and support.
 - Verification drift: claimed evidence is current, concrete, and mapped to the right Scenario.
 - Verification drift: automated evidence names a concrete repository-relative test path rather than a generic suite label.
+- Verification drift: automated evidence uses an exact test title or stable named test anchor rather than `#it(`, `#test(`, `#describe(`, or another generic framework token, and the inspected assertion proves the mapped Scenario.
 - Verification drift: `Verified By` is a scenario-mapped evidence index, not a chronological command log or a broad-only gate list.
 - Verification drift: evidence types are not blurred together. Distinguish focused automated tests, broad supporting gates, deterministic E2E, live-provider playtests, manual UI confirmation, and debug/log inspection.
 - Verification drift: stale `AC-#` or `TAC-#` references are mapped to current IDs or explicitly marked legacy.
@@ -65,7 +69,7 @@ Return:
 - Story result: `aligned`, `changes-requested`, `needs artifact fix`, `needs implementation`, `needs verification`, `blocked`
 - Scenario coverage matrix with Story label/reference plus Requirement/Scenario IDs
 - missing Requirement or Scenario candidates, with rationale and suggested Story/Requirement/Scenario placement
-- superseded Requirement, Scenario, evidence, or gap wording that should be reconciled
+- superseded Requirement, Scenario, state, implementation map, evidence, or gap wording that should be reconciled
 - commands/checks run and results
 - findings by severity with file/path references
 - drift type for each finding

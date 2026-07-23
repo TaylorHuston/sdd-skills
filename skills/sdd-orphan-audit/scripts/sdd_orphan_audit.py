@@ -192,10 +192,10 @@ def clean_candidate(raw: str, root: Path) -> str | None:
     candidate = raw.strip().strip(".,;:)]}'\"")
     if not candidate or "://" in candidate or candidate.startswith("#"):
         return None
-    if " " in candidate and not candidate.startswith("/"):
-        return None
     candidate = re.sub(r"[?#].*$", "", candidate)
     candidate = re.sub(r":\d+$", "", candidate).strip()
+    if " " in candidate and not candidate.startswith("/"):
+        return None
     if not candidate:
         return None
     path = Path(candidate)
@@ -235,8 +235,12 @@ def extract_candidates(line: str, root: Path) -> set[str]:
     return {path for path in cleaned if "/" in path or path not in qualified_names}
 
 
-def parse_epic_refs(root: Path, epic_path: Path) -> dict[str, set[str]]:
-    refs: dict[str, set[str]] = {"implemented": set(), "verified": set()}
+def parse_epic_refs(root: Path, epic_path: Path) -> dict[str, object]:
+    refs: dict[str, object] = {
+        "implemented": set(),
+        "verified": set(),
+        "implementation_kinds": defaultdict(set),
+    }
     current: str | None = None
     for line in epic_path.read_text(encoding="utf-8", errors="replace").splitlines():
         stripped = line.strip()
@@ -250,7 +254,14 @@ def parse_epic_refs(root: Path, epic_path: Path) -> dict[str, set[str]]:
                 continue
             current = None
         if current:
-            refs[current].update(extract_candidates(line, root))
+            cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+            evidence_source = cells[1] if stripped.startswith("|") and len(cells) >= 2 else line
+            candidates = extract_candidates(evidence_source, root)
+            refs[current].update(candidates)
+            if current == "implemented" and candidates:
+                kind = cells[2].lower() if len(cells) >= 4 else "legacy"
+                for candidate in candidates:
+                    refs["implementation_kinds"][candidate].add(kind)
     return refs
 
 
@@ -270,6 +281,7 @@ def build_report(root: Path, epic_selector: str | None = None, changed_from: str
     verified_by: dict[str, list[str]] = defaultdict(list)
     missing_implemented: dict[str, list[str]] = defaultdict(list)
     missing_verified: dict[str, list[str]] = defaultdict(list)
+    implementation_ownership: dict[str, dict[str, set[str]]] = {}
 
     for epic in epics:
         relative_epic = epic.relative_to(root).as_posix()
@@ -283,6 +295,15 @@ def build_report(root: Path, epic_selector: str | None = None, changed_from: str
                 if matches:
                     for match in matches:
                         ownership[match].append(relative_epic)
+                        if kind == "implemented":
+                            record = implementation_ownership.setdefault(
+                                match,
+                                {"epics": set(), "kinds": set()},
+                            )
+                            record["epics"].add(relative_epic)
+                            record["kinds"].update(
+                                refs["implementation_kinds"].get(reference, {"legacy"})
+                            )
                 else:
                     missing[reference].append(relative_epic)
 
@@ -314,6 +335,10 @@ def build_report(root: Path, epic_selector: str | None = None, changed_from: str
             "working_tree_files": len(files),
             "candidate_files": len(scoped_files),
             "implemented_refs": len(implemented_by),
+            "primary_implemented_refs": sum(
+                1 for record in implementation_ownership.values()
+                if "primary" in record["kinds"]
+            ),
             "verified_refs": len(verified_by),
             "missing_implemented_refs": len(missing_implemented),
             "missing_verified_refs": len(missing_verified),
@@ -327,6 +352,13 @@ def build_report(root: Path, epic_selector: str | None = None, changed_from: str
         "epics": relative_epics,
         "missing_implemented_refs": dict(sorted(missing_implemented.items())),
         "missing_verified_refs": dict(sorted(missing_verified.items())),
+        "implementation_ownership": {
+            path: {
+                "epics": sorted(record["epics"]),
+                "kinds": sorted(record["kinds"]),
+            }
+            for path, record in sorted(implementation_ownership.items())
+        },
         "tests_without_verified_by": unverified_tests,
         "source_without_implemented_by": unimplemented_sources,
         "test_support_files": test_support_files,
@@ -363,6 +395,14 @@ def print_markdown(report: dict, limit: int) -> None:
             print(f"\n### {label}")
             for path, epics in limited(values.items(), limit):
                 print(f"- `{path}` referenced by {', '.join(f'`{epic}`' for epic in epics)}")
+
+    print("\n## Implementation Ownership")
+    if not report["implementation_ownership"]:
+        print("- None found.")
+    for path, ownership in limited(report["implementation_ownership"].items(), limit):
+        kinds = ", ".join(f"`{kind}`" for kind in ownership["kinds"])
+        epics = ", ".join(f"`{epic}`" for epic in ownership["epics"])
+        print(f"- `{path}`: kinds {kinds}; Epics {epics}")
 
     print("\n## Reverse-Traceability Candidates")
     sections = (

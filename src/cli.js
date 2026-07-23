@@ -30,7 +30,7 @@ Usage:
   sdd init [path] [options]       Initialize one repository
   sdd configure [path] [options]  Repair configured user topology paths
   sdd update [path] [options]     Update user skills or a legacy installation
-  sdd doctor [path] [--json]      Validate SDD installation, topology, repository, and Changes
+  sdd doctor [path] [--json]      Validate SDD installation, topology, guidance, repository, and Changes
   sdd context [path] [--json]     Resolve the current planning/repository context
   sdd status [space-id] [options] List Space status or show one Space in detail
   sdd validate [space-id] [options] Validate SDD artifact structure and references
@@ -79,6 +79,7 @@ Validate options:
   --repo <path>                   Select a mapped repository; may be repeated
   --change <change-id>            Validate one planned, active, or closed Change
   --epic <epic-id>                Validate one Epic
+  --changed-from <commit-ish>     Check Epic modified metadata against a Git baseline
   --json                          Emit machine-readable JSON
 
 Epic create usage:
@@ -671,6 +672,7 @@ async function executeCommand(command, args) {
         repo: { type: "string", multiple: true },
         change: { type: "string" },
         epic: { type: "string" },
+        "changed-from": { type: "string" },
       }),
     );
     if (values.help) return { help: true };
@@ -683,6 +685,7 @@ async function executeCommand(command, args) {
         repositories: values.repo ?? [],
         changeId: values.change ?? null,
         epicId: values.epic ?? null,
+        changedFrom: values["changed-from"] ?? null,
       }),
       json: values.json ?? false,
     };

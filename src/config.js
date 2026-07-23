@@ -16,7 +16,13 @@ import {
   USER_SCHEMA_VERSION,
 } from "./constants.js";
 import { SddError } from "./errors.js";
-import { isDirectory, isPathInside, pathExists } from "./fs.js";
+import {
+  isDirectory,
+  isPathInside,
+  isPathPhysicallyInside,
+  pathExists,
+  writeFileAtomically,
+} from "./fs.js";
 
 export const WORKSPACE_STATUSES = Object.freeze(["active", "inactive", "archived"]);
 
@@ -73,8 +79,14 @@ export async function readRepositoryConfig(repositoryRoot) {
 
 export async function writeConfig(workspaceRoot, config) {
   const path = getConfigPath(workspaceRoot);
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, stringify(config, { lineWidth: 0, sortMapEntries: false }), "utf8");
+  if (!(await isPathPhysicallyInside(workspaceRoot, path))) {
+    throw new SddError(`SDD configuration path resolves outside its owner root: ${path}`, {
+      code: "UNSAFE_CONFIG_PATH",
+    });
+  }
+  const source = stringify(config, { lineWidth: 0, sortMapEntries: false });
+  await writeFileAtomically(path, source);
+  return source;
 }
 
 export async function findWorkspaceRoot(startPath) {
@@ -407,6 +419,12 @@ export function validateConfig(config) {
   const findings = [];
   const error = (message) => findings.push({ level: "error", message });
   const userConfig = config?.kind === "user";
+  const rejectUnknownKeys = (label, value, allowed) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return;
+    for (const key of Object.keys(value)) {
+      if (!allowed.includes(key)) error(`${label} contains unknown key: ${key}.`);
+    }
+  };
   const validatePath = (label, path) => {
     if (typeof path !== "string" || !path) {
       error(`${label} must be a non-empty path.`);
@@ -426,6 +444,16 @@ export function validateConfig(config) {
   if (!config || typeof config !== "object" || Array.isArray(config)) {
     return [{ level: "error", message: "Configuration must be a YAML mapping." }];
   }
+  rejectUnknownKeys(
+    "Configuration",
+    config,
+    userConfig
+      ? ["kind", "version", "schema", "skills", "planning", "repositories", "repositoryArtifacts", "ideas"]
+      : ["version", "schema", "skills", "planning", "repositories", "repositoryArtifacts", "ideas"],
+  );
+  rejectUnknownKeys("skills", config.skills, ["directory"]);
+  rejectUnknownKeys("planning", config.planning, ["root", "plannedChangesDirectory"]);
+  rejectUnknownKeys("repositories", config.repositories, ["roots"]);
   const expectedVersion = userConfig ? USER_CONFIG_VERSION : CONFIG_VERSION;
   const expectedSchema = userConfig ? USER_SCHEMA_VERSION : SCHEMA_VERSION;
   if (config.version !== expectedVersion) {
@@ -456,9 +484,11 @@ export function validateConfig(config) {
   ) {
     error("repositoryArtifacts must be a mapping.");
   } else {
+    rejectUnknownKeys("repositoryArtifacts", config.repositoryArtifacts, Object.keys(DEFAULT_ARTIFACT_PATHS));
     for (const key of Object.keys(DEFAULT_ARTIFACT_PATHS)) {
       validatePath(`repositoryArtifacts.${key}`, config.repositoryArtifacts[key]);
     }
+    validateArtifactRelationships(config.repositoryArtifacts, "repositoryArtifacts", error);
   }
   if (!config.ideas || typeof config.ideas !== "object" || Array.isArray(config.ideas)) {
     error("ideas must be a mapping.");
@@ -473,6 +503,7 @@ export function validateConfig(config) {
         error(`ideas.${ideaId} must be a mapping.`);
         continue;
       }
+      rejectUnknownKeys(`ideas.${ideaId}`, idea, ["status", "planning", "planningPath", "repositories"]);
       if (idea.status !== undefined && !WORKSPACE_STATUSES.includes(idea.status)) {
         error(`ideas.${ideaId}.status must be one of: ${WORKSPACE_STATUSES.join(", ")}.`);
       }
@@ -494,6 +525,11 @@ export function validateConfig(config) {
           error(`ideas.${ideaId}.repositories entries must contain a path.`);
           continue;
         }
+        rejectUnknownKeys(
+          `ideas.${ideaId}.repositories entry`,
+          repository,
+          ["root", "path", "role", "status"],
+        );
         validatePath(`ideas.${ideaId}.repositories path`, repository.path);
         if (repository.root !== undefined) {
           if (typeof repository.root !== "string" || !repository.root) {
@@ -514,11 +550,12 @@ export function validateConfig(config) {
           repository.root && Object.hasOwn(config.repositories?.roots ?? {}, repository.root)
             ? resolveRepositoryPath(config, repository)
             : repository.path;
-        const existingOwner = claimedRepositories.get(resolvedRepository);
+        const repositoryIdentity = normalizePath(resolve("/", resolvedRepository));
+        const existingOwner = claimedRepositories.get(repositoryIdentity);
         if (existingOwner && existingOwner !== ideaId) {
           error(`Repository ${resolvedRepository} is claimed by both ${existingOwner} and ${ideaId}.`);
         } else {
-          claimedRepositories.set(resolvedRepository, ideaId);
+          claimedRepositories.set(repositoryIdentity, ideaId);
         }
       }
     }
@@ -532,6 +569,13 @@ export function validateRepositoryConfig(config) {
   if (!config || typeof config !== "object" || Array.isArray(config)) {
     return [{ level: "error", message: "Repository configuration must be a YAML mapping." }];
   }
+  const rejectUnknownKeys = (label, value, allowed) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return;
+    for (const key of Object.keys(value)) {
+      if (!allowed.includes(key)) error(`${label} contains unknown key: ${key}.`);
+    }
+  };
+  rejectUnknownKeys("Repository configuration", config, ["kind", "version", "schema", "id", "artifacts"]);
   if (config.kind !== "repository") error('Repository configuration kind must be "repository".');
   if (config.version !== REPOSITORY_CONFIG_VERSION) {
     error(`Repository configuration version must be ${REPOSITORY_CONFIG_VERSION}.`);
@@ -545,14 +589,38 @@ export function validateRepositoryConfig(config) {
   if (!config.artifacts || typeof config.artifacts !== "object" || Array.isArray(config.artifacts)) {
     error("Repository artifacts must be a mapping.");
   } else {
+    rejectUnknownKeys("artifacts", config.artifacts, Object.keys(DEFAULT_ARTIFACT_PATHS));
     for (const key of Object.keys(DEFAULT_ARTIFACT_PATHS)) {
       const path = config.artifacts[key];
       if (typeof path !== "string" || !path || isAbsolute(path) || path.split(/[\\/]/).includes("..")) {
         error(`artifacts.${key} must be a repository-relative path.`);
       }
     }
+    validateArtifactRelationships(config.artifacts, "artifacts", error);
   }
   return findings;
+}
+
+function validateArtifactRelationships(artifacts, label, error) {
+  const entries = Object.entries(DEFAULT_ARTIFACT_PATHS).map(([key]) => [
+    key,
+    normalizePath(resolve("/", artifacts[key] ?? ".")),
+  ]);
+  for (const [key, path] of entries) {
+    if (path === "/") error(`${label}.${key} must not own the repository root.`);
+  }
+  for (let leftIndex = 0; leftIndex < entries.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < entries.length; rightIndex += 1) {
+      const [leftKey, leftPath] = entries[leftIndex];
+      const [rightKey, rightPath] = entries[rightIndex];
+      const allowedClosedChild = leftKey === "activeChanges" && rightKey === "closedChanges"
+        && dirname(rightPath) === leftPath;
+      if (allowedClosedChild) continue;
+      if (leftPath === rightPath || isPathInside(leftPath, rightPath) || isPathInside(rightPath, leftPath)) {
+        error(`${label}.${leftKey} and ${label}.${rightKey} overlap invalidly.`);
+      }
+    }
+  }
 }
 
 export function assertValidRepositoryConfig(config) {
