@@ -57,8 +57,8 @@ status: in_review
 
 - [x] 5.1 Reconcile README, canonical doctrine, templates, changelog, public guide, both active Changes, and current review findings.
 - [x] 5.2 Refresh managed skills only through `sdd update`, then verify with `sdd doctor`.
-- [ ] 5.3 Record one immutable cumulative review-handoff candidate shared by both active Changes.
-- [ ] 5.4 Transition to `in_review` only after implementation, evidence, Epic truth, aggregate/integration gates, and rendered verification are current.
+- [x] 5.3 Record one immutable cumulative review-handoff candidate shared by both active Changes.
+- [x] 5.4 Transition to `in_review` only after implementation, evidence, Epic truth, aggregate/integration gates, and rendered verification are current.
 - [ ] 5.5 Run a fresh independent `/sdd-review`; do not reuse the `373aff7` verdict after material remediation.
 - [ ] 5.6 Keep manual UI confirmation `pending user` until the owner confirms the exact final Steel candidate.
 - [ ] 5.7 Do not push, create a PR, merge, close, tag, publish, or release without the owning workflow and current authorization.
@@ -240,7 +240,7 @@ status: in_review
 ## Review Handoff Candidate
 
 - Integration target / merge base: production target `main`; merge base `a670fa28ebfd4df175217b60a74d92cfee520c74`.
-- Candidate source commit: `082d311` before final documentation-only reconciliation.
+- Candidate source commit: `6813d39`.
 - Source differs from target when implementation changed: yes.
 - Intended implementation fully committed: yes; S1/R4, S2, and S3 remediation commits are all on `develop`.
 - Unrelated dirty state preserved: yes; all formerly dirty Steel product files were confirmed in-scope and committed in `666de8f`.
@@ -256,7 +256,7 @@ status: in_review
 
 ## Closeout
 
-- Change status: in_progress; ready for guarded transition to `in_review` after final documentation reconciliation.
+- Change status: in_review.
 - Epic files updated: S1/S2/S3 and S5/S6/S7 are implemented and verified; no current implementation gaps remain.
 - Story labels/references and Requirement/Scenario IDs current: yes.
 - Implemented By maps current: yes.
@@ -278,7 +278,7 @@ status: in_review
 - Decision fan-out reconciled: yes.
 - Verification environment obligations resolved: yes for current scope.
 - Verification Scope Decision current and required candidate gates passed: current aggregate source and structural gates pass; independent review remains required.
-- Immutable review handoff candidate: pending final documentation-only reconciliation and guarded transition.
+- Immutable review handoff candidate: `6813d39`; independent `/sdd-review` remains pending.
 - Tested integration candidate matches actual integrated tree, or rerun recorded: rerun is required before release if the eventual integration tree differs materially.
 - Manual UI confirmation status: pending user.
 - Rendered UI verification status: current source `373aff7` independently passed the full matrix.

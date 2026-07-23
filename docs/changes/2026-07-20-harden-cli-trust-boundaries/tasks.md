@@ -61,7 +61,7 @@ status: in_review
 ### 5. Review And Closeout
 
 - [x] 5.1 Commit the complete verified S2/S3 remediation.
-- [ ] 5.2 Transition to `in_review` after implementation is committed and the complete Apply self-check is clean.
+- [x] 5.2 Transition to `in_review` after implementation is committed and the complete Apply self-check is clean.
 - [ ] 5.3 Run independent `/sdd-review`; do not close from Apply.
 
 ## Implementation Ledger
@@ -183,7 +183,7 @@ status: in_review
 
 - Historical candidate `a7eeb06` was invalidated by the cumulative review and is not a current review watermark.
 - Current integration target: `main@7e9a2bef9811f623583232c554417ae08ddc9373`.
-- Current candidate source commit: `082d311` before final documentation reconciliation.
+- Current candidate source commit: `6813d39`.
 - Intended implementation fully committed: yes; `be2d2e5`, `bec4004`, and `fcdfe66` resolve S2/R2-S5 and S3/R2-S2/R2-S3.
 - Required risk, fan-out, environment, and verification rows: focused adversarial tests, aggregate package check, and structural validation are current; independent review remains pending.
 - Fresh-context failure-seeking passes completed: earlier review findings are resolved by focused adversarial fixtures; a new independent review must assess the cumulative candidate.
@@ -207,7 +207,7 @@ status: in_review
 - Evidence-claim integrity checked: current focused and aggregate proof is recorded.
 - Decision fan-out reconciled: yes
 - Verification environment obligations resolved: yes; all local CLI/filesystem/package gates executed
-- Immutable review handoff candidate: pending final documentation-only reconciliation and guarded transition.
+- Immutable review handoff candidate: `6813d39`; independent `/sdd-review` remains pending.
 - Manual UI confirmation status: not applicable
 - Rendered UI verification status: not applicable
 - PR / merge state: no PR or merge requested
