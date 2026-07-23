@@ -135,10 +135,11 @@ function parseCommandTokens(command) {
   return quote ? [] : tokens;
 }
 
-function commandHasOptionValue(command, option, value) {
+function commandHasUniqueOptionValue(command, option, value) {
   const tokens = parseCommandTokens(command);
-  const optionIndex = tokens.indexOf(option);
-  return optionIndex >= 0 && tokens[optionIndex + 1] === value;
+  const values = tokens.flatMap((token, index) =>
+    token === option ? [tokens[index + 1]] : []);
+  return values.length === 1 && values[0] === value;
 }
 
 function orphanAuditHasRepositoryRoot(command, value) {
@@ -342,14 +343,14 @@ export async function validateEpicVerifyReports({
       const scopedValidation = checks.find((row) => {
         const command = row[0] ?? "";
         return isStructuralValidationCommand(command)
-          && commandHasOptionValue(command, "--epic", epicId)
-          && commandHasOptionValue(command, "--repo", repository.resolvedPath)
-          && commandHasOptionValue(command, "--changed-from", frontmatter.audited_ref);
+          && commandHasUniqueOptionValue(command, "--epic", epicId)
+          && commandHasUniqueOptionValue(command, "--repo", repository.resolvedPath)
+          && commandHasUniqueOptionValue(command, "--changed-from", frontmatter.audited_ref);
       });
       const reverseInventory = checks.find((row) => {
         const command = row[0] ?? "";
         return isOrphanAuditCommand(command)
-          && commandHasOptionValue(command, "--epic", epicId)
+          && commandHasUniqueOptionValue(command, "--epic", epicId)
           && orphanAuditHasRepositoryRoot(command, repository.resolvedPath);
       });
       const failedRequiredCheck = checks.find((row) => {

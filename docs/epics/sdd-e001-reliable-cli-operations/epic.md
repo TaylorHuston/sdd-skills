@@ -142,7 +142,7 @@ The CLI SHALL validate versioned Epic verification reports as current-state audi
 
 ###### Scenario R4-S4: Mis-Scoped Alignment Evidence
 
-- WHEN an aligned report cites structural or orphan-audit evidence for another Epic or repository
+- WHEN an aligned report cites structural or orphan-audit evidence for another Epic or repository, or repeats a governing `--epic`, `--repo`, or `--changed-from` option
 - THEN validation rejects the report instead of accepting unrelated proof.
 
 ###### Scenario R4-S5: Spoofed Check Command
@@ -200,7 +200,7 @@ Map every Requirement to its primary governing location after implementation. `p
 | S1/R3 | `skills/sdd-orphan-audit/scripts/sdd_orphan_audit.py#parse_epic_refs` | support | Keeps reverse traceability aligned with canonical path-plus-anchor evidence rows. |
 | S1/R4 | `src/epic-verify-report.js#validateEpicVerifyReports` | primary | Validates versioned report identity, current-result coherence, remediation sections, and predecessor containment. |
 | S1/R4 | `src/epic-verify-report.js#CANONICAL_GATES` | support | Keeps aligned-report coverage synchronized with the canonical shipped scorecard. |
-| S1/R4-S4 | `src/epic-verify-report.js#commandHasOptionValue` | support | Requires report checks to carry exact Epic, repository, and immutable baseline option values. |
+| S1/R4-S4 | `src/epic-verify-report.js#commandHasUniqueOptionValue` | support | Requires report checks to carry exactly one exact Epic, repository, and immutable baseline option value. |
 | S1/R4-S4 | `src/epic-verify-report.js#orphanAuditHasRepositoryRoot` | support | Binds reverse-inventory proof to the exact repository root instead of accepting another checkout. |
 | S1/R4-S5 | `src/epic-verify-report.js#isStructuralValidationCommand` | support | Accepts structural proof only when the parsed command starts with the approved executable and argument shape. |
 | S1/R4-S5 | `src/epic-verify-report.js#isOrphanAuditCommand` | support | Accepts reverse-inventory proof only when the parsed command starts with the approved executable and audit subcommand. |
@@ -210,7 +210,6 @@ Map every Requirement to its primary governing location after implementation. `p
 
 #### Implementation Gaps
 
-- S1/R4-S4: repeated governing report options are not rejected or reduced using the downstream CLI's effective last-value semantics.
 - S1/R4-S6: a non-aligned report can omit current finding headings and use an arbitrary check/result row while still satisfying coherence validation.
 - S1/R4-S7: a symlinked Markdown report file inside a contained reviews directory is silently ignored instead of producing a fail-closed path finding.
 
@@ -253,6 +252,7 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 | S1/R4-S4 | Automated test `test/cli.test.js#validate rejects aligned proof scoped to another repository` | Alignment cannot use a prefix-confusable or otherwise different repository path. | Passing 2026-07-23 |
 | S1/R4-S4 | Automated test `test/cli.test.js#validate rejects orphan-audit proof scoped to another repository` | A current structural check cannot hide reverse-inventory proof run against another repository root. | Passing 2026-07-23 |
 | S1/R4-S4 | Automated test `test/cli.test.js#validate accepts quoted repository paths in aligned proof` | Exact repository scoping remains portable when command arguments require shell quoting. | Passing 2026-07-23 |
+| S1/R4-S4 | Automated test `test/cli.test.js#validate rejects duplicate governing options in aligned report proof` | Repeated `--epic`, `--repo`, or `--changed-from` options cannot misrepresent last-wins downstream command scope. | Passing 2026-07-23 |
 | S1/R4-S5 | Automated test `test/cli.test.js#validate rejects spoofed report check commands` | Required command text embedded inside another executable or argument cannot certify a report. | Passing 2026-07-23 |
 | S1/R4-S6 | Automated test `test/cli.test.js#validate rejects incoherent non-aligned Epic verification reports` | Non-aligned results still require the complete scorecard, checks, and result-appropriate current findings. | Passing 2026-07-23 |
 | S1/R4-S7 | Automated test `test/cli.test.js#validate fails closed on malformed raw report identity` | Malformed raw kind/schema identity cannot evade report validation. | Passing 2026-07-23 |
@@ -266,7 +266,6 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 
 #### Verification Gaps
 
-- S1/R4-S4: no automated case proves conflicting duplicate `--epic`, `--repo`, or `--changed-from` values are rejected according to effective CLI semantics.
 - S1/R4-S6: no automated case removes both current finding headings and supplies an unrelated check with an invalid result.
 - S1/R4-S7: no automated case places a symlinked Markdown report file inside an otherwise contained reviews directory.
 

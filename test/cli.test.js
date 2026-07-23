@@ -3287,6 +3287,38 @@ test("validate accepts quoted repository paths in aligned proof", async (t) => {
   assert.equal(result.valid, true);
 });
 
+test("validate rejects duplicate governing options in aligned report proof", async (t) => {
+  const cases = [
+    ["--epic SAMPLE-E001", "--epic SAMPLE-E001 --epic SAMPLE-E002"],
+    ["--repo code/sample-web", "--repo code/sample-web --repo code/sample-web-copy"],
+    ["--changed-from aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "--changed-from aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --changed-from cccccccccccccccccccccccccccccccccccccccc"],
+    ["python3 sdd_orphan_audit.py code/sample-web --epic SAMPLE-E001 --format json", "python3 sdd_orphan_audit.py code/sample-web --epic SAMPLE-E001 --epic SAMPLE-E002 --format json"],
+  ];
+
+  for (const [expectedOption, duplicateOption] of cases) {
+    const root = await createMappedWorkspace();
+    t.after(() => rm(root, { recursive: true, force: true }));
+    await initWorkspace(root);
+    await writeCanonicalEpic(root, "sample-web");
+    const report = await writeEpicVerificationReport(root, "sample-web");
+    await writeFile(
+      report,
+      (await readFile(report, "utf8")).replace(expectedOption, duplicateOption),
+      "utf8",
+    );
+
+    const result = await validateArtifacts(root, {
+      spaceId: "sample",
+      repositories: ["sample-web"],
+      epicId: "SAMPLE-E001",
+    });
+
+    assert.equal(result.valid, false, `duplicate ${expectedOption} must not certify aligned proof`);
+    assert.ok(result.findings.some((finding) =>
+      finding.code === "EPIC_VERIFY_RESULT_CONTRADICTION"));
+  }
+});
+
 test("validate rejects malformed versioned Epic verification report frontmatter", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
