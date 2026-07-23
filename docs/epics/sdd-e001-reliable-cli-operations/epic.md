@@ -467,6 +467,8 @@ The CLI SHALL refuse a planned Change ID that already exists in any selected rep
 | S3/R1 | `src/commands/change-create.js#createPlannedChange` | primary | Refuses planned Change creation without Idea planning ownership. |
 | S3/R1 | `src/commands/change-promote.js#promotePlannedChange` | support | Refuses promotion without the same planning ownership. |
 | S3/R2 | `src/config.js#validateConfig` | primary | Enforces schema-shape parity, artifact relationships, and owner-relative planned Changes paths. |
+| S3/R2-S3 | `schemas/user.schema.json#plannedChangesDirectory` | support | Publishes the user configuration contract that rejects non-owner-relative planned Changes paths. |
+| S3/R2-S3 | `schemas/workspace.schema.json#plannedChangesDirectory` | support | Publishes the workspace configuration contract that rejects non-owner-relative planned Changes paths. |
 | S3/R2 | `src/workspace.js#resolveWorkspaceContext` | primary | Rejects duplicate physical repository ownership, artifact ambiguity, and synthetic IDs that would collide with an existing Idea. |
 | S3/R2-S2 | `src/change-repositories.js#resolvedActiveRepositories` and `src/commands/validate.js#configuredRepositories` | support | Preserve repository-local artifact roots without mutating global defaults while synthetic context is resolved. |
 | S3/R2-S3 | `src/commands/validate.js#validatePlannedChanges` | primary | Rechecks physical containment before enumerating planned Changes. |

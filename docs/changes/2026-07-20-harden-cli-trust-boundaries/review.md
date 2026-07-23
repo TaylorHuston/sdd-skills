@@ -1,6 +1,6 @@
 # Review: Harden CLI Trust Boundaries
 
-## Verdict
+## Historical Verdict
 
 changes-requested
 
@@ -152,3 +152,28 @@ Not applicable to the declared scope of this Change. The follow-up Change owns t
 - 2026-07-22: Deep cumulative review created. Verdict `changes-requested`; implementation findings require `/sdd-apply`.
 - 2026-07-22: Post-fix recheck passed `npm run check` (179/179), scoped SDD validation (0 errors, 0 warnings), `sdd doctor`, package/diff checks, and the shared rendered regression; current implementation and ownership findings remain open.
 - 2026-07-23: Follow-up Apply resolved the shared S1/S5 and ownership findings, passed 197-test source and prospective-integration gates, and left only this Change's S2/S3 repository ownership, concurrent initialization, and planned-path confinement findings open.
+
+## Current Re-Review — 2026-07-23
+
+### Verdict
+
+ready
+
+The historical `changes-requested` result above remains immutable evidence for `c477e4a`. The coordinated implementation candidate `6086e07` resolves its S2/S3 findings; the review-authorized record reconciliation is documentation-only and is revalidated with the companion Change. This Change remains `in_review`: readiness is technical, not authorization to close, release, merge, or push.
+
+### Current Gate Summary
+
+| Gate | Result | Notes |
+|---|---|---|
+| Change/Epic artifacts and traceability | pass | Scoped validation has 0 errors and the intentional large-Story warning only. |
+| Reverse traceability | pass after safe remediation | 27 candidates; zero unowned source, missing refs, or unverified tests after adding the two schema ownership anchors. |
+| Code, security, boundary, and transition review | pass | Independent review found no implementation defect; focused adversarial regressions pass. |
+| Aggregate source candidate | pass | `npm run check` passed 212 tests plus CLI help. |
+| Exact `develop -> main` integration candidate | pass | Conflict-free tree `8aed3a589d26751420a9c20a0f3a8ecc85657303` passed the aggregate gate before documentation-only reconciliation. |
+| Documentation and release communication | pass after safe remediation | README and CHANGELOG now state that planning paths are lexically and physically confined. |
+| Rendered UI and manual confirmation | pass / pending user | Site assets are unchanged from the full rendered matrix; current desktop/mobile rendering is clean. Owner confirmation remains pending in the companion Change. |
+| Branch and merge readiness | ready for release handoff | `main` is production; `/sdd-release`, not this review, owns any PR or release action. |
+
+### Current Review Log
+
+- 2026-07-23: Independent cumulative re-review found two missing schema ownership anchors and stale handoff/release wording. The safe record batch corrected them; no implementation or security finding remained.

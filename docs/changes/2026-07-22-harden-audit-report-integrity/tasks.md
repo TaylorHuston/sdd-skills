@@ -5,11 +5,11 @@ status: in_review
 
 ## Resume Here
 
-- Last completed action: Apply resolved the three S1/R4 defects and the separately owned S2/S3 remediation; the full source gate now passes with 212 tests.
-- Next action: complete the cumulative documentation reconciliation, transition both Changes to `in_review`, then run a fresh independent `/sdd-review`.
-- Active branch/ref: reviewed source `develop@373aff7a202cfa851c1c6dcf5bf3137f66958b29`; target `main@7e9a2bef9811f623583232c554417ae08ddc9373`; merge base `a670fa28ebfd4df175217b60a74d92cfee520c74`.
-- Expected dirty files: safe review remediation in README, CHANGELOG, this ledger, and `review.md` until the review-record commit; clean afterward.
-- Known blockers: implementation blockers are resolved. Fresh independent review and owner UI confirmation remain before closeout.
+- Last completed action: implementation was committed and both coordinated Changes entered `in_review` at `develop@6086e07`; the independent cumulative review is now reconciling its records.
+- Next action: complete the independent review, retain `in_review` until owner UI confirmation, then use `/sdd-release` for any production handoff.
+- Active branch/ref: review source `develop@6086e07`; target `main@7e9a2be`; merge base `a670fa2`.
+- Expected dirty files: only review-authorized Epic, ledger, review-record, and changelog reconciliation; the review will commit them as one safe batch.
+- Known blockers: no implementation blocker. Owner confirmation of the exact current documentation candidate remains pending before closeout or release action.
 
 ## Task Checklist
 
@@ -59,7 +59,7 @@ status: in_review
 - [x] 5.2 Refresh managed skills only through `sdd update`, then verify with `sdd doctor`.
 - [x] 5.3 Record one immutable cumulative review-handoff candidate shared by both active Changes.
 - [x] 5.4 Transition to `in_review` only after implementation, evidence, Epic truth, aggregate/integration gates, and rendered verification are current.
-- [ ] 5.5 Run a fresh independent `/sdd-review`; do not reuse the `373aff7` verdict after material remediation.
+- [x] 5.5 Run a fresh independent `/sdd-review`; do not reuse the `373aff7` verdict after material remediation.
 - [ ] 5.6 Keep manual UI confirmation `pending user` until the owner confirms the exact final Steel candidate.
 - [ ] 5.7 Do not push, create a PR, merge, close, tag, publish, or release without the owning workflow and current authorization.
 
@@ -240,7 +240,7 @@ status: in_review
 ## Review Handoff Candidate
 
 - Integration target / merge base: production target `main`; merge base `a670fa28ebfd4df175217b60a74d92cfee520c74`.
-- Candidate source commit: `6813d39`.
+- Candidate source commit: `6086e07` before the review-authorized artifact-only reconciliation commit.
 - Source differs from target when implementation changed: yes.
 - Intended implementation fully committed: yes; S1/R4, S2, and S3 remediation commits are all on `develop`.
 - Unrelated dirty state preserved: yes; all formerly dirty Steel product files were confirmed in-scope and committed in `666de8f`.
@@ -248,7 +248,7 @@ status: in_review
 - Verification Scope Decision and aggregate candidate evidence: `npm run check` passed 212 tests plus CLI help after S1/S2/S3 remediation.
 - Post-gate evidence-only changes classified and affected checks rerun: final Epic/ledger reconciliation has scoped structural validation; independent review will assess the final candidate.
 - Prospective integration tree and required gate evidence: historical tree evidence is superseded by the current source-candidate gate; rerun if a material `develop -> main` integration tree differs before release.
-- Required risk, fan-out, environment, or verification rows still pending or blocked: independent review and owner UI confirmation only.
+- Required risk, fan-out, environment, or verification rows still pending or blocked: owner UI confirmation only; this independent review records the technical result.
 - Pattern parity, boundary contract, and stateful transition matrices reconciled: report option semantics, report-file containment, initialization, topology, and planned-path boundaries have focused proof.
 - Capability authority, content-budget/provenance conservation, and filesystem mutation-order proof reconciled or not applicable: Git/filesystem boundaries required; content budget not applicable.
 - Evidence claims falsified against exact tests, assertions, routes, or observations: prior review findings are now covered by focused adversarial tests and the aggregate source gate.
@@ -267,7 +267,7 @@ status: in_review
 - README/current-state docs and active/closed Change claims reconciled: current Change and release communication yes; earlier Change is updated to retain S2/S3 ownership.
 - ADR status: not applicable.
 - Release communication current: changelog and public guide match current S1/S5/S6/S7 truth.
-- `sdd-review` verdict: `changes-requested` on source `373aff7`; fresh review required after remediation.
+- `sdd-review` verdict: historical `changes-requested` source `373aff7` is retained; the current review result is recorded in `review.md` and this Change remains `in_review` pending owner confirmation and release authority.
 - Review record: `review.md`.
 - `review.md` findings resolved: yes; all six recorded implementation findings now have focused proof.
 - Planning updates resolved: yes after planned transition.
@@ -278,7 +278,7 @@ status: in_review
 - Decision fan-out reconciled: yes.
 - Verification environment obligations resolved: yes for current scope.
 - Verification Scope Decision current and required candidate gates passed: current aggregate source and structural gates pass; independent review remains required.
-- Immutable review handoff candidate: `6813d39`; independent `/sdd-review` remains pending.
+- Immutable implementation handoff candidate: `6086e07`; the subsequent review-record commit is artifact-only and independently revalidated.
 - Tested integration candidate matches actual integrated tree, or rerun recorded: rerun is required before release if the eventual integration tree differs materially.
 - Manual UI confirmation status: pending user.
 - Rendered UI verification status: current source `373aff7` independently passed the full matrix.

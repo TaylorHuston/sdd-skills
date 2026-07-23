@@ -1,6 +1,6 @@
 # Review: Harden Audit Report Integrity
 
-## Verdict
+## Historical Verdict
 
 changes-requested
 
@@ -164,3 +164,59 @@ The earlier `c477e4aedbb118b88dac5f2a0d97b1e8bcbbe2df` review remains historical
 - 2026-07-22: Historical cumulative review of `c477e4a` returned `changes-requested`.
 - 2026-07-23: Apply resolved the original S1/S5/S6/S7 batch and produced source `373aff7`.
 - 2026-07-23: Fresh review passed 206-test/package/traceability/UI gates, reproduced three new S1/R4 defects, confirmed three companion S2/S3 gaps, returned the Change to `in_progress`, and applied only safe artifact/release-communication corrections.
+
+## Current Re-Review — 2026-07-23
+
+### Verdict
+
+ready
+
+The historical `changes-requested` verdict above is retained as evidence for `373aff7`. The coordinated implementation candidate `6086e07` resolves every recorded S1/R4, S2, and S3 finding. This review's record reconciliation is documentation-only and revalidated before its containing commit. Both Changes remain `in_review`; technical readiness does not authorize owner acceptance, release, PR creation, merge, push, or closeout.
+
+### Current Gate Scorecard
+
+| Gate | Result | Notes |
+|---|---|---|
+| Change artifacts | pass | Both coordinated Changes are coherent and remain `in_review`. |
+| Change status | pass | No review finding reopened either Change. |
+| Epic truth / canonical maps | pass after safe remediation | Current maps cover the two published planning-path schemas as supporting S3/R2-S3 ownership. |
+| Requirements, Scenarios, and evidence falsification | pass | Prior report-integrity, topology, concurrency, and containment regressions have exact focused proof. |
+| Story reference and reverse traceability | pass after safe remediation | Both scoped validations: 0 errors, one intentional large-Story warning; 27 candidates with zero ownership/evidence gaps. |
+| Tests and aggregate verification | pass | `npm run check`: 212 tests plus CLI help; dependency audit: 0 production vulnerabilities. |
+| Pattern, boundary, stateful-transition, and security review | pass | Independent code/security pass found no remaining actionable defect. |
+| Package and skill integrity | pass | `npm pack --dry-run` contains 106 expected files; 14 bundled skill files passed structural frontmatter validation. |
+| Rendered UI verification | pass | Full desktop/tablet/mobile/interactions matrix remains applicable because `site/` is unchanged since `666de8f`; current desktop and 375px rendering were directly inspected, with no horizontal overflow or console error. Only `/favicon.ico` returns 404. |
+| Manual UI confirmation | pending user | Owner confirmation of the exact Steel documentation candidate remains a release/closeout condition, not a technical defect. |
+| Documentation and release communication | pass after safe remediation | README, CHANGELOG, Epic map, and both ledgers agree that owner-relative planned paths are enforced. |
+| Integration candidate | pass | `git merge-tree --write-tree main 6086e07` produced conflict-free tree `8aed3a589d26751420a9c20a0f3a8ecc85657303`; its aggregate gate passed. |
+| Branch and merge readiness | ready for release handoff | `develop` is technically ready; production policy requires `/sdd-release` for any PR/release action. |
+| PRD / Idea truth | not applicable | This is a repository-only package with no governing PRD. |
+
+### Current Findings
+
+### BLOCKING
+
+- None.
+
+### REQUIRED
+
+- None.
+
+### SUGGESTION
+
+- [ ] `site/index.html:4` - Provide a favicon when a stable package mark exists; the browser still receives a non-blocking `/favicon.ico` 404.
+
+### Current Verification And Integration Evidence
+
+| Command / Scenario | Result | What It Proves |
+|---|---|---|
+| `npm run check` | pass; 212 tests plus CLI help | Full package suite on the review-authorized source worktree. |
+| `sdd validate` for each active Change | pass; 0 errors, 1 intentional warning each | Current Change, Epic, map, and evidence structure are coherent. |
+| orphan audit, full and `--epic SDD-E001` | pass; 27 candidates, zero gaps | Every changed source/test candidate has current implementation and verification ownership. |
+| `npm audit --omit=dev --json` and `npm pack --dry-run --json` | pass; 0 vulnerabilities, 106 files | Production dependency graph and published package inventory are clean. |
+| `git merge-tree --write-tree main 6086e07` plus aggregate gate | pass | Exact prospective integration tree is conflict-free and passed its required aggregate check. |
+| rendered current source | pass; desktop and 375px inspected | No desktop/mobile overflow or console errors; site assets match the prior full matrix source. |
+
+### Current Review Log
+
+- 2026-07-23: Independent cumulative re-review discovered only safe traceability and documentation drift: two schema ownership rows, stale ledger watermarks, and stale public confinement wording. The single safe batch resolved them and regression checks remained green.
