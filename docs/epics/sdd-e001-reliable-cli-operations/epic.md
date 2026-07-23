@@ -11,6 +11,8 @@ stories:
   - S3
   - S4
   - S5
+  - S6
+  - S7
 ---
 
 # SDD-E001 Reliable Toolchain Operations
@@ -34,11 +36,13 @@ Developers can validate SDD artifacts, mutate lifecycle state, resolve topology,
 - Unambiguous configuration, topology, and Change lifecycle routing.
 - Bounded, context-aware `doctor` and `status` diagnostics.
 - Current-state Epic audit reports and exact-diff PR/release handoffs.
+- Persistent evidence-backed planning, implementation, review, design, and interactive workflows.
+- An accessible public methodology reference with restrained Steel documentation presentation.
 
 ## Deferred Scope
 
 - Hosted or cross-machine coordination.
-- UI, browser, database, provider, deployment, or production behavior.
+- Application UI, database, provider, deployment, or production behavior outside this package's public guide.
 - Broad refactoring that does not materially strengthen these contracts.
 
 ## Candidate Stories
@@ -58,6 +62,8 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 | S3 | implemented | verified | Reject ambiguous topology and lifecycle routing. | 2026-07-20 | Shape, physical ownership, planning, and collision ambiguity are rejected. |
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
 | S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-23 | Reports are versioned; PR/release paths are classified and rechecked; Git baselines are immutable and bounded. |
+| S6 | implemented | verified | Carry workflow work through a complete evidence-backed handoff. | 2026-07-23 | Shipped workflow contracts and their mirrored records have exact semantic package-contract proof. |
+| S7 | implemented | partial | Explain the portable method and package through accessible responsive documentation. | 2026-07-23 | Current Steel source is implemented; exact final-candidate rendered evidence and owner confirmation remain pending. |
 
 ## Stories
 
@@ -591,6 +597,214 @@ The orphan-audit workflow SHALL resolve a caller-supplied Git baseline to an imm
 #### Story Notes
 
 - Workflow skills are implemented package behavior, not incidental documentation; their source files must remain traceable from this Epic.
+
+### Story S6: Reliable Workflow Execution
+
+Implementation: implemented
+Verification: verified
+Created: 2026-07-23
+Modified: 2026-07-23
+Last verified: 2026-07-23
+
+As a developer, I want SDD planning, implementation, and review workflows to carry work through a complete evidence-backed handoff, so that an agent does not stop at a partial task, a green command, or the first finding.
+
+#### Requirements And Scenarios
+
+##### Requirement R1: Adaptive Planning And Handoff Records
+
+The packaged planning workflow SHALL define accepted end-state behavior and seed risk, decision fan-out, verification-environment, visual-verification, and candidate-scope obligations without freezing a file-by-file implementation sequence.
+
+###### Scenario R1-S1: Replanning After Review
+
+- WHEN review invalidates Story ownership or verification scope
+- THEN `/sdd-change --replan` returns the Change to a coherent planned state with a dated planning update and exact Apply restart point.
+
+##### Requirement R2: Persistent Verified Implementation
+
+Default/full Apply SHALL continue through safe implementation and self-remediation until the Change is ready for independent review or reaches a genuine stop condition, and SHALL commit completed verified slices when policy and isolation permit.
+
+###### Scenario R2-S1: Long Multi-Slice Change
+
+- WHEN one Requirement finishes while more accepted work remains
+- THEN Apply reconciles and commits the green slice before continuing instead of reporting the Change ready early.
+
+##### Requirement R3: Comprehensive Independent Review
+
+Review SHALL complete every applicable discovery and verification gate before one consolidated verdict, SHALL treat yielded or long-running commands as continuation points, and SHALL give `--until-ready` the same full final-report contract with a default maximum of five remediation iterations.
+
+###### Scenario R3-S1: Early Blocking Finding
+
+- WHEN one review pass finds a blocking defect
+- THEN the reviewer retains it and continues the materially relevant discovery wave before consolidating the verdict.
+
+###### Scenario R3-S2: Yielded Aggregate Gate
+
+- WHEN a required command yields a resumable session or runs longer than a progress interval
+- THEN review reports progress, resumes the command, and does not mistake the yield for completion.
+
+##### Requirement R4: Rendered UI Verification
+
+UI-bearing planning SHALL define a proportional Visual Verification Matrix, and Apply/Review SHALL render current source, exercise changed interactions, inspect representative desktop/mobile states and console/network results, and keep owner manual confirmation separate.
+
+###### Scenario R4-S1: Source-Only UI Confidence
+
+- WHEN a UI change passes source, build, or static checks without rendered inspection
+- THEN the workflow records rendered verification as pending or blocked rather than review-ready.
+
+##### Requirement R5: Risk-Shaped Evidence Closure
+
+Apply and Review SHALL trigger pattern-parity, boundary-contract, stateful-transition, capability-authority, provenance/budget, filesystem-confinement, aggregate-candidate, and evidence-falsification checks when those boundaries intersect the Change.
+
+###### Scenario R5-S1: Aggregate Green With Weak Scenario Proof
+
+- WHEN a broad gate passes but a high-risk Scenario citation does not assert the claimed boundary
+- THEN the workflow keeps the Scenario unverified and records the exact proof gap.
+
+##### Requirement R6: Lightweight Tracked Sessions
+
+The Interactive workflow SHALL create the minimum shared Change artifacts, apply the narrow behavior change immediately, reconcile durable Epic truth, and preserve the same verification and closeout invariants without creating an independent template family.
+
+###### Scenario R6-S1: Small Durable Behavior Change
+
+- WHEN a narrow change deserves a durable record but not a full planning pass
+- THEN `/sdd-interactive` creates the trimmed shared artifacts, applies and verifies the work, and routes broader scope back to `/sdd-change --plan`.
+
+#### Implemented By
+
+| Requirement / Scenario | Location / Anchor | Kind | Responsibility |
+|---|---|---|---|
+| S6/R1 | `skills/sdd-change/SKILL.md#Replan Mode` | primary | Governs review-driven replanning, guarded lifecycle transitions, dated planning updates, and the exact Apply restart. |
+| S6/R1 | `docs/templates/tasks.md#Decision Fan-Out Ledger` | support | Carries decisions, environments, verification scope, visual checks, and immutable candidate obligations into delivery. |
+| S6/R2 | `skills/sdd-apply/SKILL.md#Persistence invariant` | primary | Defines full Apply as an outcome request that continues until review readiness or a genuine stop. |
+| S6/R2-S1 | `skills/sdd-apply/SKILL.md#Commit cadence invariant` | primary | Makes a verified artifact-reconciled phase commit part of each completed slice. |
+| S6/R2 | `skills/sdd-apply/references/risk-closure.md#Phase Commit` | support | Defines coherent green phase boundaries and immutable handoff behavior. |
+| S6/R3 | `skills/sdd-review/SKILL.md#Full-review invariant` | primary | Requires complete applicable discovery despite early findings. |
+| S6/R3-S2 | `skills/sdd-review/SKILL.md#Execution-continuity invariant` | primary | Requires yielded and long-running commands to be resumed through completion. |
+| S6/R4 | `skills/sdd-design/SKILL.md#Define The Visual Verification Matrix` | primary | Defines proportional rendered states, interactions, viewports, and evidence before implementation. |
+| S6/R4 | `skills/sdd-apply/SKILL.md#Apply Loop` | primary | Requires direct rendered inspection of current UI source during implementation. |
+| S6/R4 | `skills/sdd-review/SKILL.md#Review Gates` | primary | Keeps deterministic rendered verification distinct from owner manual confirmation. |
+| S6/R5 | `skills/sdd-apply/SKILL.md#Verification And Implementation Self-Check` | primary | Runs risk-shaped implementation closure and evidence reconciliation. |
+| S6/R5 | `skills/sdd-apply/references/risk-closure.md#Evidence Claim Integrity` | support | Defines parity, boundary, state, authority, provenance, mutation, and evidence-falsification checks. |
+| S6/R5 | `skills/sdd-review/SKILL.md#Systematic Review Search` | primary | Independently falsifies claimed behavior and evidence across the candidate. |
+| S6/R6 | `skills/sdd-interactive/SKILL.md#Workflow` | primary | Implements a trimmed shared-artifact session with immediate Apply-style execution and routing for broader scope. |
+
+#### Implementation Gaps
+
+- None.
+
+#### Verified By
+
+| Requirement / Scenario | Evidence | Proves | Status |
+|---|---|---|---|
+| S6/R1-S1 | Semantic source inspection of `skills/sdd-change/SKILL.md#Replan Mode` and `docs/templates/tasks.md#Planning Updates` | The shipped planning workflow and ledger define guarded replan state, dated discovery, and an exact restart. | Passing 2026-07-23 |
+| S6/R2-S1 | Semantic source inspection of `skills/sdd-apply/SKILL.md#Persistence invariant` and `skills/sdd-apply/SKILL.md#Commit cadence invariant` | Apply continues beyond a green slice and commits an isolated reconciled phase before later work. | Passing 2026-07-23 |
+| S6/R3-S1, S6/R3-S2 | Semantic source inspection of `skills/sdd-review/SKILL.md#Full-review invariant` and `skills/sdd-review/SKILL.md#Execution-continuity invariant` | Review retains early findings while completing discovery and resumes yielded commands. | Passing 2026-07-23 |
+| S6/R4-S1 | Semantic source inspection of `skills/sdd-design/SKILL.md#Define The Visual Verification Matrix`, `skills/sdd-apply/SKILL.md#Apply Loop`, and `skills/sdd-review/SKILL.md#Review Gates` | Design, Apply, and Review jointly reject source-only UI confidence. | Passing 2026-07-23 |
+| S6/R5-S1 | Semantic source inspection of `skills/sdd-apply/references/risk-closure.md#Evidence Claim Integrity` and `skills/sdd-review/SKILL.md#Review Gates` | Aggregate success cannot substitute for exact high-risk Scenario proof. | Passing 2026-07-23 |
+| S6/R6-S1 | Semantic source inspection of `skills/sdd-interactive/SKILL.md#Workflow` and `skills/sdd-interactive/SKILL.md#Artifact Shape` | Interactive uses trimmed shared artifacts, immediate execution, durable Epic reconciliation, and broader-scope routing. | Passing 2026-07-23 |
+| S6/R1-S1 | Automated test `test/workflow-contracts.test.js#packaged change replan preserves a coherent planned handoff and exact Apply restart` | Replan preserves guarded state, complete planning ledgers, template parity, and an exact Apply restart. | Passing 2026-07-23 |
+| S6/R2-S1 | Automated test `test/workflow-contracts.test.js#packaged Apply continues after a verified slice and commits the phase before later work` | Full Apply persists beyond one slice and commits each isolated verified artifact-reconciled phase. | Passing 2026-07-23 |
+| S6/R3-S1 | Automated test `test/workflow-contracts.test.js#packaged Review completes every applicable gate after an early blocking finding` | Review retains early findings while completing all applicable discovery and scorecard gates. | Passing 2026-07-23 |
+| S6/R3-S2 | Automated test `test/workflow-contracts.test.js#packaged Review resumes yielded commands and preserves the full until-ready report contract` | Yielded work resumes, the default cap remains five, and every mode returns the same complete report. | Passing 2026-07-23 |
+| S6/R4-S1 | Automated test `test/workflow-contracts.test.js#packaged UI workflows reject source-only confidence without rendered current-source evidence` | Design, Apply, Review, templates, and doctrine consistently require current-source rendered evidence. | Passing 2026-07-23 |
+| S6/R5-S1 | Automated test `test/workflow-contracts.test.js#packaged evidence closure keeps high-risk Scenarios unverified when only an aggregate gate passes` | Risk closure and review require exact claimed-boundary proof beyond an aggregate green result. | Passing 2026-07-23 |
+| S6/R6-S1 | Automated test `test/workflow-contracts.test.js#packaged Interactive workflow tracks one lightweight request through an honest review handoff` | Interactive keeps trimmed shared artifacts, immediate tracked execution, validation, and honest handoff semantics. | Passing 2026-07-23 |
+
+#### Verification Gaps
+
+- None.
+
+#### Story Notes
+
+- Instruction source is executable package behavior for agent workflows; semantic contract tests should prove complete operative clauses rather than isolated strings.
+
+### Story S7: Accessible Public Methodology Reference
+
+Implementation: implemented
+Verification: partial
+Created: 2026-07-23
+Modified: 2026-07-23
+Last verified: 2026-07-23
+
+As a developer or coding agent, I want one readable public guide to explain the SDD problem, durable behavior model, general workflow, and package implementation, so that I can understand the method and find the correct entry point without reverse-engineering the repository.
+
+#### Requirements And Scenarios
+
+##### Requirement R1: Methodology And Implementation Separation
+
+The public guide SHALL explain the context-loss problem, portable SDD model, durable Story semantics, and a complete example before describing this package's document layout, CLI, and agent skills.
+
+###### Scenario R1-S1: Behavior Changes After Implementation
+
+- WHEN the guide explains how accepted behavior evolves
+- THEN it says to update the existing durable Story and reserve new Stories for distinct user outcomes rather than implementation tasks.
+
+##### Requirement R2: Navigable Responsive Documentation
+
+The guide SHALL provide sequential headings, current-location navigation, readable bounded content, and contained long-form evidence/examples across representative desktop and mobile widths without page-level overflow.
+
+###### Scenario R2-S1: Narrow Viewport Navigation
+
+- WHEN the guide is opened at the minimum supported mobile width
+- THEN navigation and controls remain reachable without collision or horizontal page overflow.
+
+##### Requirement R3: Accessible Interaction Feedback
+
+The guide SHALL expose visible keyboard focus, a working skip link, touch-sized controls, canonical labels, and announced copy success or selectable fallback behavior.
+
+###### Scenario R3-S1: Clipboard Failure
+
+- WHEN command copying is unavailable
+- THEN the command text is selected and the control exposes temporary visible feedback instead of failing silently.
+
+##### Requirement R4: Steel Documentation Presentation
+
+The guide SHALL use the shared Steel semantic identity as restrained documentation, with readable contrast, balanced headings, reduced-motion behavior, and contained surfaces reserved for documents, evidence, code, and controls.
+
+###### Scenario R4-S1: Reduced Motion
+
+- WHEN the user prefers reduced motion
+- THEN smooth scrolling and nonessential transition duration are reduced without breaking navigation feedback.
+
+#### Implemented By
+
+| Requirement / Scenario | Location / Anchor | Kind | Responsibility |
+|---|---|---|---|
+| S7/R1 | `site/index.html#A Change updates the Story. It does not replace it.` | primary | Presents the portable problem, method, durable Story semantics, generalized workflow, and complete Epic example before package-specific material. |
+| S7/R2 | `site/index.html#Documentation navigation` | primary | Defines the sequential document structure and reachable section navigation. |
+| S7/R2 | `site/site.js#updateCurrentNavigation` | primary | Tracks the current visible section and synchronizes desktop and mobile navigation. |
+| S7/R2 | `site/styles.css#Documentation shell` | primary | Bounds the reading layout and contains responsive navigation, tables, and code examples. |
+| S7/R3 | `site/index.html#Skip to content` | primary | Defines keyboard bypass, canonical labels, command target, and announced feedback surface. |
+| S7/R3-S1 | `site/site.js#copyButton?.addEventListener` | primary | Copies the command or selects it on clipboard failure and exposes temporary feedback. |
+| S7/R3 | `site/styles.css#:focus-visible` | support | Provides visible focus and touch-sized interactive treatment. |
+| S7/R4 | `site/styles.css#UI Foundations: Steel identity profile` | primary | Implements the Steel semantic palette and restrained documentation composition. |
+| S7/R4-S1 | `site/styles.css#@media (prefers-reduced-motion: reduce)` | support | Reduces smooth scrolling and transition duration while preserving state. |
+
+#### Implementation Gaps
+
+- None.
+
+#### Verified By
+
+| Requirement / Scenario | Evidence | Proves | Status |
+|---|---|---|---|
+| S7/R1-S1 | Semantic source inspection of `site/index.html#A Change updates the Story. It does not replace it.` | The portable methodology and durable behavior example precede package implementation detail. | Passing 2026-07-23 |
+| S7/R2-S1 | Historical rendered review of candidate `c477e4a` at desktop, tablet, and mobile widths | The prior Steel candidate retained reachable navigation and avoided page-level overflow. | Provisional 2026-07-22 |
+| S7/R4-S1 | Historical rendered review of candidate `c477e4a` with reduced-motion emulation | The prior Steel candidate reduced motion without losing active navigation state. | Provisional 2026-07-22 |
+| S7/R1-S1 | Automated test `test/site.test.js#public guide separates portable methodology from package implementation and preserves durable Story semantics` | Portable method sections and a canonical durable Story example precede package-specific implementation. | Passing 2026-07-23 |
+| S7/R2-S1 | Automated test `test/site.test.js#public guide has unique fragment targets and sequential navigable sections` | IDs are unique, same-page fragments resolve, and skip/document navigation targets exist. | Passing 2026-07-23 |
+| S7/R3-S1, S7/R4-S1 | Automated test `test/site.test.js#public guide preserves clipboard fallback feedback and reduced-motion behavior` | Source retains selectable announced clipboard fallback, focus treatment, and reduced-motion rules. | Passing 2026-07-23 |
+
+#### Verification Gaps
+
+- S7/R2-S1 requires current immutable-candidate browser evidence at the minimum supported width.
+- S7/R3-S1 requires deterministic clipboard-failure injection and rendered feedback/selection observation.
+- S7/R4-S1 requires current immutable-candidate reduced-motion, contrast, and navigation inspection.
+- Owner confirmation of the exact final Steel candidate remains pending user.
+
+#### Story Notes
+
+- README and changelog entries communicate S7; they do not own or prove the public-guide behavior.
 
 ## Cross-Story Concerns
 

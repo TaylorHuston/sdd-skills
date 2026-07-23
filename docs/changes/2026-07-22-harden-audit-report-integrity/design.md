@@ -110,6 +110,15 @@ Apply and Review SHALL trigger pattern-parity, boundary-contract, stateful-trans
 - WHEN a broad gate passes but a high-risk Scenario citation does not assert the claimed boundary
 - THEN the workflow keeps the Scenario unverified and records the exact proof gap.
 
+##### Requirement R6: Lightweight Tracked Sessions
+
+The Interactive workflow SHALL create the minimum shared Change artifacts, apply the narrow behavior change immediately, reconcile durable Epic truth, and preserve the same verification and closeout invariants without creating an independent template family.
+
+###### Scenario R6-S1: Small Durable Behavior Change
+
+- WHEN a narrow change deserves a durable record but not a full planning pass
+- THEN `/sdd-interactive` creates the trimmed shared artifacts, applies and verifies the work, and routes broader scope back to `/sdd-change --plan`.
+
 #### Planned Story S7: Accessible Public Methodology Reference
 
 As a developer or coding agent, I want one readable public guide to explain the SDD problem, durable behavior model, general workflow, and package implementation, so that I can understand the method and find the correct entry point without reverse-engineering the repository.
