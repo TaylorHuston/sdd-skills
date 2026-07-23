@@ -78,7 +78,7 @@ status: in_progress
 | 2026-07-23 | Final self-check remediation | fresh S1/S5 reviewer plus main; adversarial proof | report command parser/repository binding, executable package-manifest test, Epic evidence | Orphan audit must use the exact report repository root; quoted paths remain valid; package proof now inspects actual dry-run contents with injected bytecode. | `02759fe` |
 | 2026-07-23 | Final trust-boundary remediation | bounded S1 and code/security reviewers plus main | report validator/tests, orphan-audit script/tests, Epic evidence | Report commands, result coherence, identity, physical containment, and lineage fail closed; every changed-surface Git query is required and fail closed. | `02759fe` |
 | 2026-07-23 | S1/R4-S4 duplicate option scope | main; TDD | report validator, CLI tests, S1 Epic truth | Aligned report proof now rejects duplicate governing `--epic`, `--repo`, and `--changed-from` options instead of accepting an earlier value that downstream parsers would override. | `6a72ebd` |
-| 2026-07-23 | S1/R4-S6 non-aligned coherence | main; TDD | report validator, CLI tests, S1 Epic truth | Non-aligned reports now require the finding category implied by their result and recognized outcomes for every current check. | commit pending |
+| 2026-07-23 | S1/R4-S6 non-aligned coherence | main; TDD | report validator, CLI tests, S1 Epic truth | Non-aligned reports now require the finding category implied by their result and recognized outcomes for every current check. | `6dfd4c5` |
 
 ## Verification Ledger
 
