@@ -467,12 +467,12 @@ The CLI SHALL refuse a planned Change ID that already exists in any selected rep
 | S3/R1 | `src/commands/change-create.js#createPlannedChange` | primary | Refuses planned Change creation without Idea planning ownership. |
 | S3/R1 | `src/commands/change-promote.js#promotePlannedChange` | support | Refuses promotion without the same planning ownership. |
 | S3/R2 | `src/config.js#validateConfig` | primary | Enforces schema-shape parity and artifact relationships. |
-| S3/R2 | `src/workspace.js#resolveWorkspaceContext` | primary | Rejects duplicate physical repository ownership and physical artifact ambiguity. |
+| S3/R2 | `src/workspace.js#resolveWorkspaceContext` | primary | Rejects duplicate physical repository ownership, artifact ambiguity, and synthetic IDs that would collide with an existing Idea. |
+| S3/R2-S2 | `src/change-repositories.js#resolvedActiveRepositories` and `src/commands/validate.js#configuredRepositories` | support | Preserve repository-local artifact roots without mutating global defaults while synthetic context is resolved. |
 | S3/R3 | `src/commands/change-create.js#createPlannedChange` | primary | Preflights selected repositories' active and closed roots. |
 
 #### Implementation Gaps
 
-- S3/R2-S2: repository-only context can still replace an existing same-ID Idea and its global artifact defaults.
 - S3/R2-S3: `plannedChangesDirectory` is not yet constrained to an owner-relative physically contained path.
 
 #### Verified By
@@ -483,11 +483,11 @@ The CLI SHALL refuse a planned Change ID that already exists in any selected rep
 | S3/R1-S2 | Automated test `test/cli.test.js#CLI init requires setup and creates only a portable repository contract` | Repository-only `change promote --dry-run` returns `PLANNING_MAPPING_REQUIRED`. | Passing 2026-07-20 |
 | S3/R2-S1 | Automated test `test/cli.test.js#runtime config validation rejects unknown keys and ambiguous artifact roots` | Runtime validation matches strict shapes and rejects overlap. | Passing 2026-07-20 |
 | S3/R2-S1 | Automated test `test/cli.test.js#context rejects physical aliases claimed as different repositories` | Two configured paths cannot claim one physical repository. | Passing 2026-07-20 |
+| S3/R2-S2 | Automated test `test/cli.test.js#context rejects a repository-only ID that collides with an existing Idea` | A same-ID repository-only contract is rejected without changing existing configuration ownership. | Passing 2026-07-23 |
 | S3/R3-S1 | Automated test `test/cli.test.js#change create refuses IDs already active or closed in a selected repository` | Active and closed collisions fail even in dry-run before planning writes. | Passing 2026-07-20 |
 
 #### Verification Gaps
 
-- S3/R2-S2: add a same-ID Idea/repository collision fixture proving existing ownership remains unchanged.
 - S3/R2-S3: add lexical and symlink escape fixtures proving configuration and artifact discovery fail closed without external reads or writes.
 
 #### Story Notes

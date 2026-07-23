@@ -788,6 +788,8 @@ function configuredRepositories(config, selectedSpaces, requested) {
   const available = selectedSpaces.flatMap(([spaceId, space]) =>
     (space.repositories ?? []).map((repository) => ({
       ...repository,
+      ...(repository.id ? { id: repository.id } : {}),
+      ...(repository.artifacts ? { artifacts: repository.artifacts } : {}),
       spaceId,
       resolvedPath: normalizePath(resolveRepositoryPath(config, repository)),
     })),

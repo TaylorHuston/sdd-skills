@@ -27,6 +27,7 @@ import { updateWorkspace } from "../src/commands/update.js";
 import {
   getConfigPath,
   getInstallLockPath,
+  createRepositoryConfig,
   createUserConfig,
   readConfig,
   validateConfig,
@@ -1441,6 +1442,23 @@ test("context resolves planning and repository ownership", async (t) => {
   assert.equal(repository.repository.role, "mobile");
   assert.equal(repository.repository.status, "active");
   assert.equal(repository.repository.resolvedPath, "code/sample-mobile");
+});
+
+test("context rejects a repository-only ID that collides with an existing Idea", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const repositoryRoot = join(root, "code", "unmapped-repository");
+  await mkdir(repositoryRoot, { recursive: true });
+  await writeConfig(repositoryRoot, createRepositoryConfig("sample"));
+  const before = await readFile(getConfigPath(root), "utf8");
+
+  await assert.rejects(
+    () => getWorkspaceContext(repositoryRoot),
+    (error) => error instanceof SddError && error.code === "REPOSITORY_ID_COLLISION",
+  );
+  assert.equal(await readFile(getConfigPath(root), "utf8"), before);
+  assert.equal(await pathExists(join(repositoryRoot, "docs", "changes")), false);
 });
 
 test("status summarizes every Space and prefers its newest active Change", async (t) => {

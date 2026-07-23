@@ -65,6 +65,12 @@ export async function resolveWorkspaceContext(startPath) {
       }
     }
     if (!mapped) {
+      if (Object.hasOwn(config.ideas, repositoryConfig.id)) {
+        throw new SddError("Cannot resolve repository-only context with an ID already owned by an Idea.", {
+          code: "REPOSITORY_ID_COLLISION",
+          details: [`Repository ID: ${repositoryConfig.id}`],
+        });
+      }
       let rootId = `repository-${repositoryConfig.id}`;
       let suffix = 2;
       while (Object.hasOwn(config.repositories.roots, rootId)) {
@@ -89,7 +95,6 @@ export async function resolveWorkspaceContext(startPath) {
         artifacts: { value: repositoryConfig.artifacts, enumerable: false },
       });
       config.ideas[repositoryConfig.id] = repositoryOnlySpace;
-      config.repositoryArtifacts = repositoryConfig.artifacts;
     }
   }
   for (const [ideaId, idea] of Object.entries(config.ideas ?? {})) {
