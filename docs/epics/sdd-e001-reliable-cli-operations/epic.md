@@ -58,7 +58,7 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 | Story | Implementation | Verification | Capability | Last Verified | Notes |
 |---|---|---|---|---|---|
 | S1 | partial | partial | Validate navigable behavior and real evidence. | 2026-07-23 | Existing structure, anchor, report, metadata, and focused-read checks pass; three report-integrity edge cases remain explicit gaps. |
-| S2 | partial | partial | Mutate only inside physical owner boundaries and recover safely. | 2026-07-23 | Existing mutation safety is proved; concurrent first initialization remains an explicit gap. |
+| S2 | implemented | verified | Mutate only inside physical owner boundaries and recover safely. | 2026-07-23 | Physical boundaries, recovery, and first-initialization contention now fail closed. |
 | S3 | partial | partial | Reject ambiguous topology and lifecycle routing. | 2026-07-23 | Existing topology checks pass; synthetic-ID collision and owner-relative planning containment remain explicit gaps. |
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
 | S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-23 | Reports are versioned; PR/release paths are classified and rechecked; Git baselines are immutable and bounded. |
@@ -69,8 +69,8 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 
 ### Story S1: Trustworthy Artifact Validation
 
-Implementation: partial
-Verification: partial
+Implementation: implemented
+Verification: verified
 Created: 2026-07-20
 Modified: 2026-07-23
 Last verified: 2026-07-23
@@ -341,6 +341,8 @@ The CLI SHALL atomically replace configuration and installation-lock files, seri
 | S2/R2 | `src/commands/change-transition.js#transitionChange` | primary | Compares staged `tasks.md` with commit-time content and preserves concurrent edits. |
 | S2/R2 | `src/commands/change-promote.js#promotePlannedChange` | primary | Holds and hashes the draft while staging and committing promotion. |
 | S2/R2 | `src/commands/change-close.js#closeChange` | primary | Rechecks status and ownership at commit time and reports incomplete multi-target recovery. |
+| S2/R2-S5 | `src/commands/init-installation.js#initRepository` | primary | Serializes first repository-contract publication under the physical repository owner lock. |
+| S2/R2-S5 | `src/mutation.js#withWorkspaceMutationLock` | support | Exclusively reserves the repository mutation boundary and returns an actionable contention error. |
 | S2/R3 | `src/fs.js#writeFileAtomically` | primary | Durably replaces configuration and JSON lock state through a synced temporary file. |
 | S2/R3 | `src/fs.js#replaceFileAtomically` | primary | Publishes managed files with no-replace semantics and retains recovery state on a concurrent recreation. |
 | S2/R3 | `src/fs.js#replaceDirectoryAtomically` | primary | Exclusively reserves managed directories before publishing their staged contents. |
@@ -354,7 +356,7 @@ The CLI SHALL atomically replace configuration and installation-lock files, seri
 
 #### Implementation Gaps
 
-- S2/R2-S5: first repository initialization does not yet serialize or publish with expected absence; two writers can report success while only one result remains.
+- None.
 
 #### Verified By
 
@@ -370,6 +372,7 @@ The CLI SHALL atomically replace configuration and installation-lock files, seri
 | S2/R2-S3 | Automated test `test/cli.test.js#change transition preserves an edit made after an earlier repository commit` | A later failure does not erase newer content in an earlier repository. | Passing 2026-07-20 |
 | S2/R2-S3 | Automated test `test/cli.test.js#change promote preserves a destination edited after commit when a later destination fails` | Promotion recovery preserves an edited committed destination. | Passing 2026-07-20 |
 | S2/R2-S4 | Automated test `test/cli.test.js#change close rechecks status at commit time` | Close refuses a Change reopened after preflight. | Passing 2026-07-20 |
+| S2/R2-S5 | Automated test `test/cli.test.js#repository init rejects concurrent first initialization without losing the winner` | One initial repository contract wins; the concurrent caller receives `OPERATION_IN_PROGRESS`, and no mutation lock remains. | Passing 2026-07-23 |
 | S2/R3-S1 | Automated test `test/mutation.test.js#atomic JSON writes leave one complete parseable document` | Competing lock writes leave one whole parseable document. | Passing 2026-07-20 |
 | S2/R3-S1 | Automated test `test/mutation.test.js#atomic JSON writes preserve the existing file mode` | Atomic replacement retains existing permissions. | Passing 2026-07-20 |
 | S2/R3-S1 | Automated test `test/mutation.test.js#workspace mutation lock recovers a stale dead-owner lock` | A crashed owner does not permanently block managed mutation. | Passing 2026-07-20 |
@@ -396,7 +399,7 @@ The CLI SHALL atomically replace configuration and installation-lock files, seri
 
 #### Verification Gaps
 
-- S2/R2-S5: add a deterministic concurrent-initialization fixture that proves one winner, one actionable conflict, and no silent writer loss.
+- None.
 
 #### Story Notes
 

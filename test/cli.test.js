@@ -18,6 +18,7 @@ import { promotePlannedChange } from "../src/commands/change-promote.js";
 import { transitionChange } from "../src/commands/change-transition.js";
 import { createEpic } from "../src/commands/epic-create.js";
 import { diagnoseWorkspace } from "../src/commands/doctor.js";
+import { initRepository } from "../src/commands/init-installation.js";
 import { initWorkspace } from "../src/commands/init.js";
 import { getStatus } from "../src/commands/status.js";
 import { validateArtifacts } from "../src/commands/validate.js";
@@ -26,6 +27,7 @@ import { updateWorkspace } from "../src/commands/update.js";
 import {
   getConfigPath,
   getInstallLockPath,
+  createUserConfig,
   readConfig,
   validateConfig,
   validateRepositoryConfig,
@@ -803,6 +805,35 @@ test("CLI init requires setup and creates only a portable repository contract", 
   const updated = JSON.parse(updateOutput.stdout);
   assert.equal(updated.workflow.action, "bundled");
   assert.equal(await pathExists(join(userRoot, ".sdd", "story-driven-development.md")), false);
+});
+
+test("repository init rejects concurrent first initialization without losing the winner", async (t) => {
+  const root = await createWorkspace("sdd-concurrent-repository-init-");
+  const userRoot = join(root, "home");
+  const repositoryRoot = join(root, "repos", "sample-app");
+  const originalUserRoot = process.env.SDD_USER_HOME;
+  process.env.SDD_USER_HOME = userRoot;
+  t.after(() => {
+    if (originalUserRoot === undefined) delete process.env.SDD_USER_HOME;
+    else process.env.SDD_USER_HOME = originalUserRoot;
+  });
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(repositoryRoot, { recursive: true });
+  await writeConfig(userRoot, await createUserConfig(userRoot));
+
+  const results = await Promise.allSettled([
+    initRepository(repositoryRoot, { repositoryId: "winner-one" }),
+    initRepository(repositoryRoot, { repositoryId: "winner-two" }),
+  ]);
+  const successes = results.filter((result) => result.status === "fulfilled");
+  const failures = results.filter((result) => result.status === "rejected");
+
+  assert.equal(successes.length, 1);
+  assert.equal(failures.length, 1);
+  assert.equal(failures[0].reason.code, "OPERATION_IN_PROGRESS");
+  const repositoryConfig = parse(await readFile(join(repositoryRoot, ".sdd", "config.yaml"), "utf8"));
+  assert.equal(repositoryConfig.id, successes[0].value.repositoryConfig.id);
+  assert.equal(await pathExists(join(repositoryRoot, ".sdd", "mutation.lock")), false);
 });
 
 test("interactive init asks for planning and repository roots", async (t) => {

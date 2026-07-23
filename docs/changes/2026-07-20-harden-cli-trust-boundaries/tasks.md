@@ -38,7 +38,7 @@ status: in_progress
   - [x] R1 rejects symlink escape for install, artifact mutation, and evidence paths.
   - [x] R2 detects pre-commit and post-commit Change edits and reports retained recovery state.
   - [x] R3 atomically writes configuration/lock state, preserves modes, reclaims verified dead-owner locks, reports conservative manual recovery for alive/unknown ownership, serializes managed updates, and rolls workflow/skills back when lock commit fails.
-  - [ ] R2-S5 serializes or CAS-publishes concurrent first repository initialization without silent writer loss.
+  - [x] R2-S5 serializes or CAS-publishes concurrent first repository initialization without silent writer loss.
 - [ ] 3.3 `SDD-E001/S3` unambiguous topology and lifecycle routing.
   - [x] R1 refuses idea-owned Change creation and promotion from repository-only context.
   - [x] R2 rejects physical repository aliases, unknown keys, and invalid artifact overlap.
@@ -71,6 +71,7 @@ status: in_progress
 | 2026-07-20 | Planning bootstrap | main; `sdd-change`, `sdd-apply` | audit, Change, `SDD-E001` | Accepted audit translated into adaptive end-state contract. | `a7eeb06` |
 | 2026-07-20 | Validator and topology hardening | main; TDD | validator, config/workspace, lifecycle commands, fixtures | Structural parity, real anchors, strict topology, focused reads, and planning ownership are enforced. | `a7eeb06` |
 | 2026-07-20 | Mutation and diagnostics hardening | main; security finding remediation | filesystem, locks, install transaction, lifecycle recovery, doctor/status | Physical boundaries, atomic state, recovery visibility, bounded Git, and guidance classification are enforced. | `a7eeb06` |
+| 2026-07-23 | S2/R2-S5 concurrent repository initialization | main; TDD | repository initialization, shared mutation lock, CLI test, S2 Epic truth | The first repository contract is published only while its physical owner lock is held; a simultaneous initializer receives `OPERATION_IN_PROGRESS` and cannot silently win later. | commit pending |
 | 2026-07-20 | Fresh-review remediation | main plus independent review waves | validator helpers, transaction boundary, recovery races, migration rollback, package allowlist, docs/tests | Duplicate/mixed evidence bypasses, post-commit data loss, recreated-target overwrite, silent migration recovery failure, stale locks, internal package leakage, and doctrine drift resolved. | `a7eeb06` |
 | 2026-07-20 | User skill synchronization | package CLI | `/Users/taylor/.agents/skills` | `sdd update` updated Apply, Change, Epic Verify, and then Orphan Audit after its final parser correction; immediate final dry-run reported all 14 managed skills unchanged. | installed state only; no repository commit |
 
