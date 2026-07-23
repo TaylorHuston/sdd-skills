@@ -5,10 +5,10 @@ status: in_progress
 
 ## Resume Here
 
-- Last completed action: `/sdd-apply` completed S1/S5/S6/S7 implementation, Epic reconciliation, managed-install refresh, 197-test source and prospective-integration gates, reverse traceability, and immutable S7 rendered verification.
+- Last completed action: `/sdd-apply` completed S1/S5/S6/S7 implementation, Epic reconciliation, managed-install refresh, 206-test source and prospective-integration gates, reverse traceability, and immutable S7 rendered verification.
 - Next action: apply the separately owned S2/S3 remediation in `2026-07-20-harden-cli-trust-boundaries`, then reconcile both Changes to one cumulative review candidate.
-- Active branch/ref: `develop@1485103`; `origin/develop@a670fa28ebfd4df175217b60a74d92cfee520c74`; target `main@7e9a2bef9811f623583232c554417ae08ddc9373`.
-- Expected dirty files: current Change/earlier-Change evidence-only reconciliation records until the final ledger commit.
+- Active branch/ref: `develop@02759fe`; `origin/develop@a670fa28ebfd4df175217b60a74d92cfee520c74`; target `main@7e9a2bef9811f623583232c554417ae08ddc9373`; prospective tree `3b6c505b276633e7a4125b3f7845c948b9eb2782`.
+- Expected dirty files: this task/review evidence-only reconciliation until the final ledger commit; clean afterward.
 - Known blockers: S2/S3 repository ownership, concurrent initialization, and planned-path confinement remain owned by the earlier active Change; this Change cannot truthfully transition to `in_review` while those cumulative-candidate findings remain.
 
 ## Task Checklist
@@ -75,8 +75,8 @@ status: in_progress
 | 2026-07-23 | S7 public methodology reference | main; agent-browser and deterministic source contracts | Steel site source, site tests, S7 Epic truth | Durable Story semantics, document order, fragments, navigation, copy fallback, focus, responsive containment, and reduced motion are mapped and verified on the immutable source candidate. | `666de8f` |
 | 2026-07-23 | S6 workflow execution | bounded artifact/trace agent plus main semantic inspection | Planning, Apply, Review, Design, Interactive, mirrors, doctrine, workflow tests, S6 Epic truth | All six durable workflow Requirements have exact ordered semantic package-contract proof; canonical mirrors are checked byte-for-byte. | `666de8f` |
 | 2026-07-23 | Package artifact hygiene | main; package dry-run | npm manifest, package test, S5/R4 Epic truth | Dry run exposed generated Python bytecode; package now excludes `__pycache__` directories and `.pyc` files explicitly. | `20c4934`; Epic reconciliation pending |
-| 2026-07-23 | Final self-check remediation | fresh S1/S5 reviewer plus main; adversarial proof | report command parser/repository binding, executable package-manifest test, Epic evidence | Orphan audit must use the exact report repository root; quoted paths remain valid; package proof now inspects actual dry-run contents with injected bytecode. | pending phase commit |
-| 2026-07-23 | Final trust-boundary remediation | bounded S1 and code/security reviewers plus main | report validator/tests, orphan-audit script/tests, Epic evidence | Report commands, result coherence, identity, physical containment, and lineage fail closed; every changed-surface Git query is required and fail closed. | pending phase commit |
+| 2026-07-23 | Final self-check remediation | fresh S1/S5 reviewer plus main; adversarial proof | report command parser/repository binding, executable package-manifest test, Epic evidence | Orphan audit must use the exact report repository root; quoted paths remain valid; package proof now inspects actual dry-run contents with injected bytecode. | `02759fe` |
+| 2026-07-23 | Final trust-boundary remediation | bounded S1 and code/security reviewers plus main | report validator/tests, orphan-audit script/tests, Epic evidence | Report commands, result coherence, identity, physical containment, and lineage fail closed; every changed-surface Git query is required and fail closed. | `02759fe` |
 
 ## Verification Ledger
 
@@ -102,6 +102,9 @@ status: in_progress
 | 2026-07-23 | focused final-self-check regressions | adversarial automated tests | Wrong orphan-audit repository is rejected, quoted exact paths are accepted, and an injected `.pyc` is absent while source remains in actual npm dry-run output. | passed; 5 report tests and 1 executable package test |
 | 2026-07-23 | `node --test test/cli.test.js` after final trust-boundary remediation | full CLI suite | Approved command shape, coherent non-aligned records, fail-closed identity/path handling, and continuous successor results preserve all prior CLI behavior. | passed; 161 tests |
 | 2026-07-23 | `node --test test/orphan-audit.test.js` after final trust-boundary remediation | full orphan-audit suite | Every required changed-surface Git query fails closed while safe inventory fallback remains conservative. | passed; 8 tests |
+| 2026-07-23 | `npm run check` on source candidate `02759fe` | required aggregate gate | Final committed current-Change implementation preserves the complete package behavior and CLI surface. | passed; 206 tests plus CLI help |
+| 2026-07-23 | changed-surface orphan audit from `main` on `02759fe` | reverse traceability | Final cumulative changed runtime and test files retain durable ownership and exact evidence. | passed; 19 candidates, 0 unowned source files, 0 unverified tests, 0 missing refs |
+| 2026-07-23 | prospective `main + develop` tree `3b6c505b` via temporary commit `4b39fe4` | required integration gate | The conflict-free production tree preserves the final package behavior. | passed; fresh install, 206 tests plus CLI help |
 
 ## Manual Feedback
 
@@ -190,13 +193,13 @@ status: in_progress
 - Project-defined aggregate command or authoritative constituent source: `npm run check`
 - Aggregate gate required before `in_review`: yes
 - Trigger or project-policy reason: cumulative scope crosses CLI validation, security-sensitive Git handling, multiple workflow capabilities, generated/template contracts, and browser-visible behavior.
-- Exact committed source candidate: current implementation `83ff3a1`; later edits are artifact-only reconciliation.
+- Exact committed source candidate: current implementation `02759fe`; later edits are artifact-only reconciliation.
 - Freshness and cache treatment: fresh local run on the immutable committed candidate; record 179-or-current test count and CLI-help result.
-- Aggregate result and meaningful execution/count evidence: `npm run check` passed 199 tests plus CLI help on `83ff3a1`.
+- Aggregate result and meaningful execution/count evidence: `npm run check` passed 206 tests plus CLI help on `02759fe`.
 - Post-gate evidence-record-only changes and affected checks rerun: classify every later artifact-only edit and rerun scoped validation, diff checks, template parity, and any affected exact test.
 - Prospective integration gate required: yes when `develop -> main` produces a materially different tree.
-- Current target and prospective integration tree/ref: `main@7e9a2bef9811f623583232c554417ae08ddc9373`; prior tree `dee9095f` passed before the final S1 code correction and must be regenerated after the artifact reconciliation commit.
-- Integration-candidate result or reason source proof is reusable: pending final merge-tree rerun because `83ff3a1` changed runtime report validation.
+- Current target and prospective integration tree/ref: `main@7e9a2bef9811f623583232c554417ae08ddc9373`; final tree `3b6c505b276633e7a4125b3f7845c948b9eb2782` via temporary commit `4b39fe4c8a2d447b18de9ba2fb83a3af704228f8`.
+- Integration-candidate result or reason source proof is reusable: fresh install and `npm run check` passed 206 tests plus CLI help on the exact final prospective tree.
 - Remote CI role: corroborating; local exact-candidate aggregate proof remains required before release handoff.
 
 ## Manual UI Confirmation
@@ -228,14 +231,14 @@ status: in_progress
 ## Review Handoff Candidate
 
 - Integration target / merge base: production target `main`; merge base `a670fa28ebfd4df175217b60a74d92cfee520c74`.
-- Candidate source commit: implementation `83ff3a1`; final evidence-only reconciliation commit pending.
+- Candidate source commit: implementation `02759fe`; final evidence-only reconciliation commit pending.
 - Source differs from target when implementation changed: yes.
 - Intended implementation fully committed: yes for this Change's S1/S5/S6/S7 scope.
 - Unrelated dirty state preserved: yes; all formerly dirty Steel product files were confirmed in-scope and committed in `666de8f`.
 - Commit-sensitive generated-contract / diff / integration checks: package/template parity, package dry run, skill validation, diff checks, scoped validation, reverse traceability, and merge-tree aggregate checks passed.
-- Verification Scope Decision and aggregate candidate evidence: source `83ff3a1` passed 199 tests plus CLI help; final prospective integration rerun is pending after this artifact-only commit.
+- Verification Scope Decision and aggregate candidate evidence: source `02759fe` passed 206 tests plus CLI help; exact prospective integration tree `3b6c505b` passed the same gate.
 - Post-gate evidence-only changes classified and affected checks rerun: current Epic/ledger-only reconciliation requires scoped validation, reverse traceability, diff checks, and the final integration-tree rerun.
-- Prospective integration tree and required gate evidence: prior tree `dee9095f` passed 197 tests; it is historical after `83ff3a1` and will be replaced by the final tree.
+- Prospective integration tree and required gate evidence: tree `3b6c505b` via temporary commit `4b39fe4` passed a fresh install, 206 tests, and CLI help.
 - Required risk, fan-out, environment, or verification rows still pending or blocked: only cross-Change S2/S3 implementation owned by `2026-07-20-harden-cli-trust-boundaries`.
 - Pattern parity, boundary contract, and stateful transition matrices reconciled or not applicable with reason: all current-Change rows proved; cumulative state remains blocked on earlier S2/S3.
 - Capability authority, content-budget/provenance conservation, and filesystem mutation-order proof reconciled or not applicable: Git/filesystem boundaries required; content budget not applicable.
@@ -266,8 +269,8 @@ status: in_progress
 - Decision fan-out reconciled: yes except the explicitly blocked earlier-Change implementation.
 - Verification environment obligations resolved: yes for current scope.
 - Verification Scope Decision current and required candidate gates passed: yes.
-- Immutable review handoff candidate: not yet assignable across both Changes; final current-Change evidence watermark pending this commit.
-- Tested integration candidate matches actual integrated tree, or rerun recorded: pending final merge-tree rerun after `83ff3a1`.
+- Immutable review handoff candidate: current-Change source `02759fe` and prospective tree `3b6c505b` are proved; a shared handoff remains blocked on the earlier S2/S3 Change.
+- Tested integration candidate matches actual integrated tree, or rerun recorded: prospective production tree `3b6c505b` was tested exactly; no merge was authorized.
 - Manual UI confirmation status: pending user.
 - Rendered UI verification status: committed candidate `666de8f` passed the full matrix.
 - PR / merge state: no current PR/merge action authorized.
