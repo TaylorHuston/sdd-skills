@@ -17,6 +17,8 @@
     "schemas",
     "skills",
     "src",
+    "!**/__pycache__/**",
+    "!**/*.pyc",
     "!**/*.sync-conflict-*"
   ],
   "scripts": {

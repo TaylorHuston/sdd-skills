@@ -74,6 +74,7 @@ status: in_progress
 | 2026-07-23 | S5 immutable Git baseline | bounded code/security agent; TDD | orphan-audit script/tests, S5 Epic truth | Option-like baselines are rejected without side effects; immutable commits and bounded Git subprocesses govern changed-surface audits. | `3d7bffa` |
 | 2026-07-23 | S7 public methodology reference | main; agent-browser and deterministic source contracts | Steel site source, site tests, S7 Epic truth | Durable Story semantics, document order, fragments, navigation, copy fallback, focus, responsive containment, and reduced motion are mapped and verified on the immutable source candidate. | `666de8f` |
 | 2026-07-23 | S6 workflow execution | bounded artifact/trace agent plus main semantic inspection | Planning, Apply, Review, Design, Interactive, mirrors, doctrine, workflow tests, S6 Epic truth | All six durable workflow Requirements have exact ordered semantic package-contract proof; canonical mirrors are checked byte-for-byte. | `666de8f` |
+| 2026-07-23 | Package artifact hygiene | main; package dry-run | npm manifest and package test | Dry run exposed generated Python bytecode; package now excludes `__pycache__` directories and `.pyc` files explicitly. | pending phase commit |
 
 ## Verification Ledger
 
@@ -91,6 +92,8 @@ status: in_progress
 | 2026-07-23 | agent-browser current-source matrix | deterministic rendered UI | Desktop/tablet/mobile/landscape containment, 44px mobile navigation, skip-link focus, injected clipboard fallback, reduced motion, active navigation, contrast, console, and local requests. | passed on working source; immutable-candidate rerun pending |
 | 2026-07-23 | `node --test test/workflow-contracts.test.js` | semantic package-contract suite | Complete operative clauses for replan, persistent Apply, full Review, yielded continuation, rendered UI, evidence closure, and Interactive tracking. | passed; 7 tests |
 | 2026-07-23 | agent-browser immutable-candidate matrix on `666de8f` | deterministic rendered UI | Exact committed S7 candidate across all planned viewports, overflow bounds, 44px controls, skip focus, injected clipboard denial, reduced motion, active navigation, console, and local requests. | passed; optional deferred favicon request remained the only 404 |
+| 2026-07-23 | `sdd update . --json`; `sdd doctor --json` | managed-install/package health | Package source refreshed the managed orphan-audit skill and the resulting installation/configuration is healthy. | passed; one managed skill updated, doctor 0 findings |
+| 2026-07-23 | skill validation, dependency audit, and package dry run | package gates | Changed orphan-audit skill is structurally valid, dependencies have no known vulnerabilities, and publish scope excludes generated Python bytecode after remediation. | passed; 0 vulnerabilities, 106 package entries |
 
 ## Manual Feedback
 
