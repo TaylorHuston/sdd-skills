@@ -79,7 +79,7 @@ status: in_progress
 | 2026-07-23 | Final trust-boundary remediation | bounded S1 and code/security reviewers plus main | report validator/tests, orphan-audit script/tests, Epic evidence | Report commands, result coherence, identity, physical containment, and lineage fail closed; every changed-surface Git query is required and fail closed. | `02759fe` |
 | 2026-07-23 | S1/R4-S4 duplicate option scope | main; TDD | report validator, CLI tests, S1 Epic truth | Aligned report proof now rejects duplicate governing `--epic`, `--repo`, and `--changed-from` options instead of accepting an earlier value that downstream parsers would override. | `6a72ebd` |
 | 2026-07-23 | S1/R4-S6 non-aligned coherence | main; TDD | report validator, CLI tests, S1 Epic truth | Non-aligned reports now require the finding category implied by their result and recognized outcomes for every current check. | `6dfd4c5` |
-| 2026-07-23 | S1/R4-S7 report-file containment | main; TDD | report validator, CLI tests, S1 Epic truth | Report-shaped entries are rechecked as regular and physically contained before reading; symlinked or nonregular entries remain counted and produce a fail-closed finding. | commit pending |
+| 2026-07-23 | S1/R4-S7 report-file containment | main; TDD | report validator, CLI tests, S1 Epic truth | Report-shaped entries are rechecked as regular and physically contained before reading; symlinked or nonregular entries remain counted and produce a fail-closed finding. | `62df63b` |
 
 ## Verification Ledger
 
