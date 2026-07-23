@@ -7,7 +7,7 @@ status: in_progress
 
 - Last completed action: the follow-up Apply resolved shared S1 report integrity, S5 orphan-audit Git handling, lineage proof, workflow/site ownership, package gates, and reverse traceability through `develop@1485103`.
 - Next action: run the full source/integration gates and fresh implementation self-check, then prepare the review handoff.
-- Active branch/ref: current shared candidate includes S1/S5 remediation through `develop@83ff3a1`; the original implementation remains in `main@7e9a2be`.
+- Active branch/ref: current shared candidate is `develop@082d311`; the original implementation remains in `main@7e9a2be`.
 - Expected dirty files: both active Change ledgers and the shared Epic while current truth is reconciled; implementation should start from the next clean ledger commit.
 - Known blocker: implementation is complete; cumulative verification and the guarded `in_review` transition remain.
 
@@ -60,7 +60,7 @@ status: in_progress
 
 ### 5. Review And Closeout
 
-- [ ] 5.1 Commit the complete verified S2/S3 remediation.
+- [x] 5.1 Commit the complete verified S2/S3 remediation.
 - [ ] 5.2 Transition to `in_review` after implementation is committed and the complete Apply self-check is clean.
 - [ ] 5.3 Run independent `/sdd-review`; do not close from Apply.
 
@@ -92,6 +92,8 @@ status: in_progress
 | 2026-07-20 | fresh-context failure-seeking review | independent review | Review continued through validator, package, and mutation surfaces and rechecked remediations. | passed; no remaining blockers |
 | 2026-07-20 | changed-surface orphan audit | reverse traceability | Current Change runtime modules and test files resolve through `SDD-E001`; preserved pre-Change skill/template edits remain separate classification candidates. | passed; 21 implementation refs, 4 test refs, 0 missing refs, 0 unverified tests |
 | 2026-07-20 | `sdd update` plus immediate dry-run | installed-skill synchronization | Universal user skills are updated only through the package CLI and match package hashes. | passed; 4 updated across two reconciled passes, then 14 unchanged |
+| 2026-07-23 | `npm run check` after S2/S3 remediation | required aggregate gate | The complete CLI, mutation, orphan-audit, package-contract, and help surfaces remain coherent after concurrency and topology fixes. | passed; 212 tests plus CLI help |
+| 2026-07-23 | `sdd validate sdd-skills --workspace . --json` | artifact integrity | Both active Changes and `SDD-E001` have current maps, evidence, and statuses. | passed; 0 errors, 1 intentional large-story warning |
 
 ## Manual Feedback
 
@@ -173,22 +175,22 @@ status: in_progress
 
 ## Blockers / Open Questions
 
-- Current blockers: S2 repository collision/concurrent initialization and S3 planned-path confinement remain implementation findings from the cumulative review.
+- Implementation blockers: none. A fresh independent review remains required before closeout.
 - Accepted maintainability gap: the highest-risk evidence-row logic now lives in `src/epic-evidence.js` and mutation/diagnostic cases have focused suites, but the established end-to-end workspace fixture remains coupled to `test/cli.test.js`. Extracting the full Epic validator integration fixture is deferred rather than mixing a broad test-harness move into this safety Change.
 
 ## Review Handoff Candidate
 
 - Historical candidate `a7eeb06` was invalidated by the cumulative review and is not a current review watermark.
 - Current integration target: `main@7e9a2bef9811f623583232c554417ae08ddc9373`.
-- Current candidate source commit: pending S2/S3 remediation.
-- Intended implementation fully committed: no; S2/R2-S5 and S3/R2-S2/R2-S3 remain gaps.
-- Required risk, fan-out, environment, verification, and integration rows still pending or blocked: concurrent initialization, synthetic ownership collision, planned-path confinement, and the final cumulative candidate gates.
-- Fresh-context failure-seeking passes completed: historical passes are retained as evidence; new adversarial and cumulative passes are required after remediation.
+- Current candidate source commit: `082d311` before final documentation reconciliation.
+- Intended implementation fully committed: yes; `be2d2e5`, `bec4004`, and `fcdfe66` resolve S2/R2-S5 and S3/R2-S2/R2-S3.
+- Required risk, fan-out, environment, and verification rows: focused adversarial tests, aggregate package check, and structural validation are current; independent review remains pending.
+- Fresh-context failure-seeking passes completed: earlier review findings are resolved by focused adversarial fixtures; a new independent review must assess the cumulative candidate.
 
 ## Closeout
 
 - Change status: in_progress
-- Epic files updated: current S2/S3 gaps and partial state reconciled; implementation/evidence rows remain pending.
+- Epic files updated: S2 and S3 implementation, evidence, and Story Index states are reconciled as implemented/verified.
 - Story labels/references and Requirement/Scenario IDs current: yes
 - Implemented By maps current: yes
 - Scenario-mapped Verified By maps current: yes; scoped Change+Epic validation passed with zero findings
@@ -197,14 +199,14 @@ status: in_progress
 - Release communication current: README, canonical workflow, templates, and CHANGELOG reconciled; no release requested
 - `sdd-review` verdict: `changes-requested` on historical snapshot `c477e4a`; fresh review required after remediation.
 - Review record: `review.md`.
-- `review.md` findings resolved: shared S1/S5 findings yes; S2/S3 findings no.
+- `review.md` findings resolved: yes; the three S2/S3 findings have focused proof and current aggregate validation.
 - Planning updates resolved: yes
-- Implementation risk and confirmation rows resolved: no; three S2/S3 rows remain.
-- Pattern parity and stateful transition rows resolved: no; concurrent first initialization remains.
-- Evidence-claim integrity checked: existing proof retained; current gaps are explicit and unverified.
+- Implementation risk and confirmation rows resolved: yes; contention, synthetic ownership, and planned-path escape checks pass.
+- Pattern parity and stateful transition rows resolved: yes; repository initialization now uses the existing mutation lock and synthetic artifacts remain repository-local.
+- Evidence-claim integrity checked: current focused and aggregate proof is recorded.
 - Decision fan-out reconciled: yes
 - Verification environment obligations resolved: yes; all local CLI/filesystem/package gates executed
-- Immutable review handoff candidate: pending.
+- Immutable review handoff candidate: pending final documentation-only reconciliation and guarded transition.
 - Manual UI confirmation status: not applicable
 - Rendered UI verification status: not applicable
 - PR / merge state: no PR or merge requested

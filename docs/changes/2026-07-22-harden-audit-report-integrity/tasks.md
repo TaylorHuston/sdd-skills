@@ -5,11 +5,11 @@ status: in_progress
 
 ## Resume Here
 
-- Last completed action: independent `/sdd-review` reviewed `develop@373aff7`, passed the complete deterministic and rendered-UI gates, and reproduced three additional S1/R4 integrity defects plus the existing cross-Change S2/S3 gaps.
-- Next action: `/sdd-apply` the consolidated report-integrity findings in `review.md`, then apply the separately owned S2/S3 remediation in `2026-07-20-harden-cli-trust-boundaries` before creating one cumulative review candidate.
+- Last completed action: Apply resolved the three S1/R4 defects and the separately owned S2/S3 remediation; the full source gate now passes with 212 tests.
+- Next action: complete the cumulative documentation reconciliation, transition both Changes to `in_review`, then run a fresh independent `/sdd-review`.
 - Active branch/ref: reviewed source `develop@373aff7a202cfa851c1c6dcf5bf3137f66958b29`; target `main@7e9a2bef9811f623583232c554417ae08ddc9373`; merge base `a670fa28ebfd4df175217b60a74d92cfee520c74`.
 - Expected dirty files: safe review remediation in README, CHANGELOG, this ledger, and `review.md` until the review-record commit; clean afterward.
-- Known blockers: the separately owned S2/S3 repository collision, concurrent initialization, and planned-path confinement gaps. All three current S1/R4 review findings now fail closed.
+- Known blockers: implementation blockers are resolved. Fresh independent review and owner UI confirmation remain before closeout.
 
 ## Task Checklist
 
@@ -59,7 +59,7 @@ status: in_progress
 - [x] 5.2 Refresh managed skills only through `sdd update`, then verify with `sdd doctor`.
 - [ ] 5.3 Record one immutable cumulative review-handoff candidate shared by both active Changes.
 - [ ] 5.4 Transition to `in_review` only after implementation, evidence, Epic truth, aggregate/integration gates, and rendered verification are current.
-- [x] 5.5 Run a fresh independent `/sdd-review`; do not reuse the `c477e4a` verdict after material remediation.
+- [ ] 5.5 Run a fresh independent `/sdd-review`; do not reuse the `373aff7` verdict after material remediation.
 - [ ] 5.6 Keep manual UI confirmation `pending user` until the owner confirms the exact final Steel candidate.
 - [ ] 5.7 Do not push, create a PR, merge, close, tag, publish, or release without the owning workflow and current authorization.
 
@@ -112,6 +112,8 @@ status: in_progress
 | 2026-07-23 | `node --test --test-name-pattern='(duplicate governing options|accepts quoted repository paths)' test/cli.test.js` | focused automated test | S1/R4-S4 rejects duplicate governing report options while preserving quoted exact repository paths. | passed; 2 tests |
 | 2026-07-23 | `node --test --test-name-pattern='(incoherent non-aligned|coherent current Epic verification report|aligned Epic verification report with current findings)' test/cli.test.js` | focused automated test | S1/R4-S6 rejects missing result-appropriate findings and unrecognized current-check outcomes while retaining coherent report acceptance. | passed; 3 tests |
 | 2026-07-23 | `node --test --test-name-pattern='(symlinked Epic verification report file|external Epic verification reviews directory|coherent current Epic verification report)' test/cli.test.js` | focused automated test | S1/R4-S7 rejects and counts a symlinked report file while preserving valid and external-directory behavior. | passed; 3 tests |
+| 2026-07-23 | `npm run check` after cumulative S1/S2/S3 remediation | required aggregate gate | The complete package behavior and CLI help surface remain coherent after all review findings are addressed. | passed; 212 tests plus CLI help |
+| 2026-07-23 | `sdd validate sdd-skills --workspace . --json` | structural integrity | Both active Changes and `SDD-E001` reconcile to current implementation and scenario evidence. | passed; 0 errors, 1 intentional large-story warning |
 
 ## Manual Feedback
 
@@ -145,7 +147,7 @@ status: in_progress
 | S5 immutable Git selection | User-controlled baseline cannot become a Git option or hang the workflow. | Option injection writes outside the repo; subprocess never returns. | `rev-parse --verify --end-of-options`, immutable commit, option barrier, timeout probes. | Exact no-side-effect option-injection and fake-Git timeout tests pass. | proved |
 | S6 workflow contracts | Planning/Apply/Review/Design/Interactive guidance, templates, doctrine, and tests agree on end-state behavior. | Broad string tests pass while one workflow stops early or omits a required final report. | Exact package contract assertions plus semantic source inspection. | Seven ordered semantic tests cover complete operative clauses and canonical mirror parity. | proved |
 | S7 public guide | Current source remains readable, navigable, accessible, and truthful across representative states. | Source checks miss invalid DOM, interaction fallback, overflow, or visual regression. | Visual Verification Matrix plus static DOM/ID/fragment checks. | Static contracts and the full rendered matrix pass on immutable candidate `666de8f`. | proved |
-| Cross-Change integration | Every defect has one owner and both ledgers identify the same final candidate. | Duplicate fixes, stale watermarks, or incompatible Epic updates. | Compare both task/review records before each handoff. | S1/S5/S6/S7 are proved here; S2/S3 remain explicitly assigned to the earlier Change. | blocked on earlier Change |
+| Cross-Change integration | Every defect has one owner and both ledgers identify the same final candidate. | Duplicate fixes, stale watermarks, or incompatible Epic updates. | Compare both task/review records before each handoff. | S1/S5/S6/S7 are proved here; S2/S3 were resolved in the earlier Change and both ledgers now record the same aggregate gate. | reconciled; fresh review pending |
 
 ## Pattern Parity Matrix
 
@@ -179,7 +181,7 @@ status: in_progress
 | Date | Decision / Discovery | End-State Consequence | Affected Surfaces To Reconcile | Evidence / Artifact Updates | Status |
 |---|---|---|---|---|---|
 | 2026-07-23 | Add S6 and S7 rather than expanding S5. | Workflow delivery and public-guide behavior gain predictable durable owners. | Epic Story Index, maps/gaps/evidence, skills, site, README, changelog, Change/review records | S6/S7 maps, exact tests, and rendered evidence reconciled | reconciled |
-| 2026-07-23 | Keep S2/S3 findings in the earlier active Change. | One implementation owner per defect while both Changes share a final candidate. | both Changes, S2/S3 Epic evidence, aggregate/integration gates | coordination and exact restart recorded; implementation remains | blocked on earlier Change |
+| 2026-07-23 | Keep S2/S3 findings in the earlier active Change. | One implementation owner per defect while both Changes share a final candidate. | both Changes, S2/S3 Epic evidence, aggregate/integration gates | `be2d2e5`, `bec4004`, and `fcdfe66` resolve the assigned defects; both ledgers record the cumulative gate. | reconciled; fresh review pending |
 | 2026-07-23 | Treat template and runtime as one canonical report contract. | S1 runtime and S5 workflow/template cannot drift independently. | validator, templates/assets, package tests, Epic maps, docs | template-derived 18-gate fixture and exact scope tests pass | reconciled |
 | 2026-07-23 | Public guide is a user-facing package surface. | S7 requires deterministic rendered evidence and owner acceptance. | `site/`, Epic, README/changelog, visual/manual ledgers | source contracts and committed-candidate browser matrix pass; owner preference remains pending | reconciled technically |
 | 2026-07-23 | Universal bundled scripts must not publish local compile artifacts. | S5 owns a clean portable audit package in addition to runtime Git safety. | package manifest, package test, package dry run, S5 map/evidence | bytecode exclusions and exact proof added | reconciled |
@@ -232,52 +234,52 @@ status: in_progress
 ## Blockers / Open Questions
 
 - Planning blockers: none.
-- Implementation blockers: three current S1/R4 findings in `review.md` and the earlier trust-boundary Change's S2/S3 gaps must be remediated before review handoff.
-- Coordination constraint: do not transition this Change to `in_review` until the earlier Change's S2/S3 findings are resolved or explicitly removed from the cumulative candidate.
+- Implementation blockers: none.
+- Coordination constraint: transition both active Changes together so their shared review candidate has one lifecycle state.
 
 ## Review Handoff Candidate
 
 - Integration target / merge base: production target `main`; merge base `a670fa28ebfd4df175217b60a74d92cfee520c74`.
-- Candidate source commit: reviewed source `373aff7`; invalidated for readiness by current review findings.
+- Candidate source commit: `082d311` before final documentation-only reconciliation.
 - Source differs from target when implementation changed: yes.
-- Intended implementation fully committed: no; S1/R4 retains three current gaps while S5/S6/S7 remain complete.
+- Intended implementation fully committed: yes; S1/R4, S2, and S3 remediation commits are all on `develop`.
 - Unrelated dirty state preserved: yes; all formerly dirty Steel product files were confirmed in-scope and committed in `666de8f`.
 - Commit-sensitive generated-contract / diff / integration checks: package/template parity, package dry run, skill validation, diff checks, scoped validation, reverse traceability, and merge-tree aggregate checks passed.
-- Verification Scope Decision and aggregate candidate evidence: source `02759fe` passed 206 tests plus CLI help; exact prospective integration tree `3b6c505b` passed the same gate.
-- Post-gate evidence-only changes classified and affected checks rerun: current Epic/ledger-only reconciliation requires scoped validation, reverse traceability, diff checks, and the final integration-tree rerun.
-- Prospective integration tree and required gate evidence: tree `3b6c505b` via temporary commit `4b39fe4` passed a fresh install, 206 tests, and CLI help.
-- Required risk, fan-out, environment, or verification rows still pending or blocked: only cross-Change S2/S3 implementation owned by `2026-07-20-harden-cli-trust-boundaries`.
-- Pattern parity, boundary contract, and stateful transition matrices reconciled or not applicable with reason: S1 command-option and report-file boundaries now have findings; cumulative state also remains blocked on earlier S2/S3.
+- Verification Scope Decision and aggregate candidate evidence: `npm run check` passed 212 tests plus CLI help after S1/S2/S3 remediation.
+- Post-gate evidence-only changes classified and affected checks rerun: final Epic/ledger reconciliation has scoped structural validation; independent review will assess the final candidate.
+- Prospective integration tree and required gate evidence: historical tree evidence is superseded by the current source-candidate gate; rerun if a material `develop -> main` integration tree differs before release.
+- Required risk, fan-out, environment, or verification rows still pending or blocked: independent review and owner UI confirmation only.
+- Pattern parity, boundary contract, and stateful transition matrices reconciled: report option semantics, report-file containment, initialization, topology, and planned-path boundaries have focused proof.
 - Capability authority, content-budget/provenance conservation, and filesystem mutation-order proof reconciled or not applicable: Git/filesystem boundaries required; content budget not applicable.
-- Evidence claims falsified against exact tests, assertions, routes, or observations: review falsified three S1/R4 completion claims; S5/S6/S7 claims remain proved.
-- Fresh-context failure-seeking passes completed: artifact/trace, code/security, exact evidence, deterministic tooling, and independent rendered UI passes completed; a new review is required after S1/S2/S3 remediation.
+- Evidence claims falsified against exact tests, assertions, routes, or observations: prior review findings are now covered by focused adversarial tests and the aggregate source gate.
+- Fresh-context failure-seeking passes completed: a prior independent review discovered the resolved defects; a new review is required after the cumulative remediation.
 
 ## Closeout
 
-- Change status: in_progress; transition to `in_review` is blocked by separately owned cumulative S2/S3 findings.
-- Epic files updated: S1 is partial with three current report-integrity gaps; S2/S3 remain partial; S5/S6/S7 retain current implementation and evidence.
+- Change status: in_progress; ready for guarded transition to `in_review` after final documentation reconciliation.
+- Epic files updated: S1/S2/S3 and S5/S6/S7 are implemented and verified; no current implementation gaps remain.
 - Story labels/references and Requirement/Scenario IDs current: yes.
-- Implemented By maps current: yes, with explicit S1/S2/S3 implementation gaps.
+- Implemented By maps current: yes.
 - One canonical implementation and verification map per Story: yes.
 - Primary anchors inspected as behavior-owning definitions/registrations rather than incidental occurrences: yes.
-- Scenario-mapped Verified By maps current: yes, with explicit S1/S2/S3 verification gaps.
+- Scenario-mapped Verified By maps current: yes.
 - Superseded earlier Epic truth reconciled: yes.
 - README/current-state docs and active/closed Change claims reconciled: current Change and release communication yes; earlier Change is updated to retain S2/S3 ownership.
 - ADR status: not applicable.
 - Release communication current: changelog and public guide match current S1/S5/S6/S7 truth.
 - `sdd-review` verdict: `changes-requested` on source `373aff7`; fresh review required after remediation.
 - Review record: `review.md`.
-- `review.md` findings resolved: no; three current-Change S1/R4 findings and three earlier-Change S2/S3 gaps remain.
+- `review.md` findings resolved: yes; all six recorded implementation findings now have focused proof.
 - Planning updates resolved: yes after planned transition.
-- Implementation risk and confirmation rows resolved: no; S1 report-integrity and cross-Change S2/S3 blockers remain.
-- Pattern parity, boundary contract, and stateful transition rows resolved: no; report option semantics, report-file containment, and cumulative S2/S3 remain.
-- Capability authority, content-budget/provenance conservation, and filesystem mutation-order proof resolved: no.
-- Evidence-claim integrity checked: yes; three S1/R4 claims were reopened as gaps.
-- Decision fan-out reconciled: yes except the explicitly blocked earlier-Change implementation.
+- Implementation risk and confirmation rows resolved: yes.
+- Pattern parity, boundary contract, and stateful transition rows resolved: yes.
+- Capability authority, content-budget/provenance conservation, and filesystem mutation-order proof resolved: yes or not applicable as recorded.
+- Evidence-claim integrity checked: yes; all reopened S1/R4 claims now have exact tests.
+- Decision fan-out reconciled: yes.
 - Verification environment obligations resolved: yes for current scope.
-- Verification Scope Decision current and required candidate gates passed: aggregate source, package, traceability, and rendered gates passed, but code/security findings invalidate readiness.
-- Immutable review handoff candidate: none; reviewed source `373aff7` has current findings and the shared candidate remains blocked on S2/S3.
-- Tested integration candidate matches actual integrated tree, or rerun recorded: historical prospective tree `3b6c505b` passed before review findings; no current integration candidate is certifiable.
+- Verification Scope Decision current and required candidate gates passed: current aggregate source and structural gates pass; independent review remains required.
+- Immutable review handoff candidate: pending final documentation-only reconciliation and guarded transition.
+- Tested integration candidate matches actual integrated tree, or rerun recorded: rerun is required before release if the eventual integration tree differs materially.
 - Manual UI confirmation status: pending user.
 - Rendered UI verification status: current source `373aff7` independently passed the full matrix.
 - PR / merge state: no current PR/merge action authorized.

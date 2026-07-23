@@ -57,7 +57,7 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 
 | Story | Implementation | Verification | Capability | Last Verified | Notes |
 |---|---|---|---|---|---|
-| S1 | partial | partial | Validate navigable behavior and real evidence. | 2026-07-23 | Existing structure, anchor, report, metadata, and focused-read checks pass; three report-integrity edge cases remain explicit gaps. |
+| S1 | implemented | verified | Validate navigable behavior and real evidence. | 2026-07-23 | Structure, anchors, evidence, report integrity, metadata, and focused reads fail closed with current proof. |
 | S2 | implemented | verified | Mutate only inside physical owner boundaries and recover safely. | 2026-07-23 | Physical boundaries, recovery, and first-initialization contention now fail closed. |
 | S3 | implemented | verified | Reject ambiguous topology and lifecycle routing. | 2026-07-23 | Synthetic-ID collisions and lexical/physical planned-path escapes now fail closed. |
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
@@ -408,8 +408,8 @@ The CLI SHALL atomically replace configuration and installation-lock files, seri
 
 ### Story S3: Unambiguous Topology And Lifecycle Routing
 
-Implementation: partial
-Verification: partial
+Implementation: implemented
+Verification: verified
 Created: 2026-07-20
 Modified: 2026-07-23
 Last verified: 2026-07-23
