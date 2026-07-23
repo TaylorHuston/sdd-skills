@@ -3449,6 +3449,30 @@ test("validate rejects an external Epic verification reviews directory", async (
   assert.ok(result.findings.some((finding) => finding.code === "UNSAFE_EPIC_VERIFY_REPORT_PATH"));
 });
 
+test("validate rejects a symlinked Epic verification report file", async (t) => {
+  const root = await createMappedWorkspace();
+  const external = await mkdtemp(join(tmpdir(), "sdd-report-file-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => rm(external, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  const report = await writeEpicVerificationReport(root, "sample-web");
+  const externalReport = join(external, "external-epic-verify.md");
+  await writeFile(externalReport, await readFile(report, "utf8"), "utf8");
+  await rm(report);
+  await symlink(externalReport, report);
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, false);
+  assert.equal(result.summary.epicVerificationReports, 1);
+  assert.ok(result.findings.some((finding) => finding.code === "UNSAFE_EPIC_VERIFY_REPORT_PATH"));
+});
+
 test("validate reports typed Epic verification paths without crashing", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));

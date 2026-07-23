@@ -1,4 +1,4 @@
-import { readFile, readdir } from "node:fs/promises";
+import { lstat, readFile, readdir } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { parseDocument } from "yaml";
 
@@ -202,9 +202,19 @@ export async function validateEpicVerifyReports({
     };
   }
 
-  const entries = (await readdir(reviewsPath, { withFileTypes: true }))
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
-    .sort((left, right) => left.name.localeCompare(right.name));
+  const entries = [];
+  const unsafeReportPaths = [];
+  for (const entry of await readdir(reviewsPath, { withFileTypes: true })) {
+    if (!entry.name.endsWith(".md")) continue;
+    const path = join(reviewsPath, entry.name);
+    const stat = await lstat(path);
+    if (!stat.isFile() || !(await isPathPhysicallyInside(reviewsPath, path))) {
+      unsafeReportPaths.push(path);
+      continue;
+    }
+    entries.push(entry);
+  }
+  entries.sort((left, right) => left.name.localeCompare(right.name));
   const reports = [];
   const malformedReports = [];
   const missingSchemaReports = [];
@@ -239,6 +249,15 @@ export async function validateEpicVerifyReports({
     artifactType: "epic-verification-report",
     artifactId: epicId,
   };
+  for (const path of unsafeReportPaths) {
+    findings.push(finding(
+      "error",
+      "UNSAFE_EPIC_VERIFY_REPORT_PATH",
+      reportDisplayPath(repository.resolvedPath, repositoryRoot, path),
+      "Epic verification report files must be regular files physically inside their reviews directory.",
+      context,
+    ));
+  }
   const reportByPath = new Map(reports.map((report) => [resolve(report.path), report]));
   const predecessorByReport = new Map();
   const successorsByPredecessor = new Map();
@@ -523,6 +542,7 @@ export async function validateEpicVerifyReports({
     reports: reports.length
       + malformedReports.length
       + missingSchemaReports.length
-      + unknownReports.length,
+      + unknownReports.length
+      + unsafeReportPaths.length,
   };
 }

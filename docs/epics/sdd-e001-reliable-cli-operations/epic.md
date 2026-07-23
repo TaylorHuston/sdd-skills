@@ -157,7 +157,7 @@ The CLI SHALL validate versioned Epic verification reports as current-state audi
 
 ###### Scenario R4-S7: Malformed Or External Report Identity
 
-- WHEN report identity fields have invalid types or the reviews directory resolves outside the physical repository
+- WHEN report identity fields have invalid types, the reviews directory resolves outside the physical repository, or a report-shaped entry is symlinked or nonregular
 - THEN validation returns deterministic findings without crashing or trusting the external artifact.
 
 ##### Requirement R5: Git-Relative Epic Metadata Freshness
@@ -199,6 +199,7 @@ Map every Requirement to its primary governing location after implementation. `p
 | S1/R3-S3 | `src/commands/validate.js#validateRepository` | support | Narrows focused Epic directories before opening artifacts. |
 | S1/R3 | `skills/sdd-orphan-audit/scripts/sdd_orphan_audit.py#parse_epic_refs` | support | Keeps reverse traceability aligned with canonical path-plus-anchor evidence rows. |
 | S1/R4 | `src/epic-verify-report.js#validateEpicVerifyReports` | primary | Validates versioned report identity, current-result coherence, remediation sections, and predecessor containment. |
+| S1/R4-S7 | `src/epic-verify-report.js#validateEpicVerifyReports` | primary | Counts and rejects report-shaped entries that are symlinked, nonregular, or physically outside the reviews directory. |
 | S1/R4 | `src/epic-verify-report.js#CANONICAL_GATES` | support | Keeps aligned-report coverage synchronized with the canonical shipped scorecard. |
 | S1/R4-S4 | `src/epic-verify-report.js#commandHasUniqueOptionValue` | support | Requires report checks to carry exactly one exact Epic, repository, and immutable baseline option value. |
 | S1/R4-S4 | `src/epic-verify-report.js#orphanAuditHasRepositoryRoot` | support | Binds reverse-inventory proof to the exact repository root instead of accepting another checkout. |
@@ -210,7 +211,6 @@ Map every Requirement to its primary governing location after implementation. `p
 
 #### Implementation Gaps
 
-- S1/R4-S7: a symlinked Markdown report file inside a contained reviews directory is silently ignored instead of producing a fail-closed path finding.
 
 #### Verified By
 
@@ -256,6 +256,7 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 | S1/R4-S6 | Automated test `test/cli.test.js#validate rejects incoherent non-aligned Epic verification reports` | `changes-requested` requires a current REQUIRED finding and recognized check results; `blocked` requires a current BLOCKING finding. | Passing 2026-07-23 |
 | S1/R4-S7 | Automated test `test/cli.test.js#validate fails closed on malformed raw report identity` | Malformed raw kind/schema identity cannot evade report validation. | Passing 2026-07-23 |
 | S1/R4-S7 | Automated test `test/cli.test.js#validate rejects an external Epic verification reviews directory` | A physically external reviews directory cannot supply trusted report artifacts. | Passing 2026-07-23 |
+| S1/R4-S7 | Automated test `test/cli.test.js#validate rejects a symlinked Epic verification report file` | A symlinked report-shaped entry is counted and rejected instead of silently disappearing from audit validation. | Passing 2026-07-23 |
 | S1/R4-S7 | Automated test `test/cli.test.js#validate reports typed Epic verification paths without crashing` | Invalid typed path fields produce deterministic findings rather than exceptions. | Passing 2026-07-23 |
 | S1/R4-S2 | Automated test `test/cli.test.js#validate rejects successor result discontinuity` | A successor's initial result must continue from its predecessor's current result. | Passing 2026-07-23 |
 | S1/R5-S1 | Automated test `test/cli.test.js#validate changed-from rejects substantive Epic edits with stale modified metadata` | Working-tree Epic changes require advanced `modified` metadata relative to the selected baseline. | Passing 2026-07-22 |
@@ -265,7 +266,6 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 
 #### Verification Gaps
 
-- S1/R4-S7: no automated case places a symlinked Markdown report file inside an otherwise contained reviews directory.
 
 #### Story Notes
 

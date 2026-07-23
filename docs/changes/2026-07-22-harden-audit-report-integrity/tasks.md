@@ -9,7 +9,7 @@ status: in_progress
 - Next action: `/sdd-apply` the consolidated report-integrity findings in `review.md`, then apply the separately owned S2/S3 remediation in `2026-07-20-harden-cli-trust-boundaries` before creating one cumulative review candidate.
 - Active branch/ref: reviewed source `develop@373aff7a202cfa851c1c6dcf5bf3137f66958b29`; target `main@7e9a2bef9811f623583232c554417ae08ddc9373`; merge base `a670fa28ebfd4df175217b60a74d92cfee520c74`.
 - Expected dirty files: safe review remediation in README, CHANGELOG, this ledger, and `review.md` until the review-record commit; clean afterward.
-- Known blockers: symlinked report-file disappearance and the separately owned S2/S3 repository collision, concurrent initialization, and planned-path confinement gaps. Duplicate governing options and incoherent non-aligned reports now fail closed.
+- Known blockers: the separately owned S2/S3 repository collision, concurrent initialization, and planned-path confinement gaps. All three current S1/R4 review findings now fail closed.
 
 ## Task Checklist
 
@@ -79,6 +79,7 @@ status: in_progress
 | 2026-07-23 | Final trust-boundary remediation | bounded S1 and code/security reviewers plus main | report validator/tests, orphan-audit script/tests, Epic evidence | Report commands, result coherence, identity, physical containment, and lineage fail closed; every changed-surface Git query is required and fail closed. | `02759fe` |
 | 2026-07-23 | S1/R4-S4 duplicate option scope | main; TDD | report validator, CLI tests, S1 Epic truth | Aligned report proof now rejects duplicate governing `--epic`, `--repo`, and `--changed-from` options instead of accepting an earlier value that downstream parsers would override. | `6a72ebd` |
 | 2026-07-23 | S1/R4-S6 non-aligned coherence | main; TDD | report validator, CLI tests, S1 Epic truth | Non-aligned reports now require the finding category implied by their result and recognized outcomes for every current check. | `6dfd4c5` |
+| 2026-07-23 | S1/R4-S7 report-file containment | main; TDD | report validator, CLI tests, S1 Epic truth | Report-shaped entries are rechecked as regular and physically contained before reading; symlinked or nonregular entries remain counted and produce a fail-closed finding. | commit pending |
 
 ## Verification Ledger
 
@@ -110,6 +111,7 @@ status: in_progress
 | 2026-07-23 | independent review of `373aff7` | full review wave | Current artifacts, code/security boundaries, exact evidence, aggregate/package gates, reverse traceability, and current rendered UI. | changes-requested; three new S1/R4 defects and three known S2/S3 gaps |
 | 2026-07-23 | `node --test --test-name-pattern='(duplicate governing options|accepts quoted repository paths)' test/cli.test.js` | focused automated test | S1/R4-S4 rejects duplicate governing report options while preserving quoted exact repository paths. | passed; 2 tests |
 | 2026-07-23 | `node --test --test-name-pattern='(incoherent non-aligned|coherent current Epic verification report|aligned Epic verification report with current findings)' test/cli.test.js` | focused automated test | S1/R4-S6 rejects missing result-appropriate findings and unrecognized current-check outcomes while retaining coherent report acceptance. | passed; 3 tests |
+| 2026-07-23 | `node --test --test-name-pattern='(symlinked Epic verification report file|external Epic verification reviews directory|coherent current Epic verification report)' test/cli.test.js` | focused automated test | S1/R4-S7 rejects and counts a symlinked report file while preserving valid and external-directory behavior. | passed; 3 tests |
 
 ## Manual Feedback
 
