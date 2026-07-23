@@ -3386,19 +3386,40 @@ test("validate rejects spoofed report check commands", async (t) => {
 });
 
 test("validate rejects incoherent non-aligned Epic verification reports", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  await writeCanonicalEpic(root, "sample-web");
-  const report = await writeEpicVerificationReport(root, "sample-web", {
-    result: "changes-requested",
-    gateResult: "pass",
-  });
-  await writeFile(report, (await readFile(report, "utf8"))
-    .replace("- Current report finding.", "- None."), "utf8");
-  const result = await validateArtifacts(root, { spaceId: "sample", repositories: ["sample-web"], epicId: "SAMPLE-E001" });
-  assert.equal(result.valid, false);
-  assert.ok(result.findings.some((finding) => finding.code === "EPIC_VERIFY_RESULT_CONTRADICTION"));
+  const cases = [
+    {
+      result: "changes-requested",
+      gateResult: "findings",
+      mutate(source) {
+        return source
+          .replace("### BLOCKING", "### UNSCOPED")
+          .replace("### REQUIRED", "### OTHER")
+          .replace("| pass | Current artifact shape.", "| invented | Current artifact shape.");
+      },
+    },
+    {
+      result: "blocked",
+      gateResult: "blocked",
+      mutate(source) {
+        return source.replace("### BLOCKING\n\n- None.", "### BLOCKING\n\n- None.\n\n### REQUIRED\n\n- Current report finding.");
+      },
+    },
+  ];
+
+  for (const { result: reportResult, gateResult, mutate } of cases) {
+    const root = await createMappedWorkspace();
+    t.after(() => rm(root, { recursive: true, force: true }));
+    await initWorkspace(root);
+    await writeCanonicalEpic(root, "sample-web");
+    const report = await writeEpicVerificationReport(root, "sample-web", {
+      result: reportResult,
+      gateResult,
+    });
+    await writeFile(report, mutate(await readFile(report, "utf8")), "utf8");
+    const result = await validateArtifacts(root, { spaceId: "sample", repositories: ["sample-web"], epicId: "SAMPLE-E001" });
+    assert.equal(result.valid, false, `${reportResult} requires coherent current findings and checks`);
+    assert.ok(result.findings.some((finding) => finding.code === "EPIC_VERIFY_RESULT_CONTRADICTION"));
+  }
 });
 
 test("validate fails closed on malformed raw report identity", async (t) => {

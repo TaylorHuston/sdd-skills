@@ -93,6 +93,18 @@ function currentFindingIsNone(lines, heading) {
   return entries.length === 1 && /^-\s+None\.$/i.test(entries[0]);
 }
 
+function currentFindingHasEntry(lines, heading) {
+  if (!lines) return false;
+  const start = lines.findIndex((line) => line.trim() === `### ${heading}`);
+  if (start < 0) return false;
+  const content = lines.slice(start + 1);
+  const end = content.findIndex((line) => /^#{1,3}\s+/.test(line));
+  return content
+    .slice(0, end < 0 ? content.length : end)
+    .map((line) => line.trim())
+    .some((line) => /^-\s+(?!None\.$)\S/i.test(line));
+}
+
 function hasSection(source, heading) {
   return sectionLines(source, heading) !== null;
 }
@@ -387,15 +399,18 @@ export async function validateEpicVerifyReports({
       const expectedGate = frontmatter.result === "blocked" ? "blocked" : "findings";
       const hasExpectedGate = gates.some((row) => (row[1] ?? "").toLowerCase() === expectedGate);
       const currentFindings = sectionLines(source, "Current Findings");
-      const hasCurrentFinding = !currentFindingIsNone(currentFindings, "BLOCKING")
-        || !currentFindingIsNone(currentFindings, "REQUIRED");
+      const hasResultAppropriateFinding = frontmatter.result === "blocked"
+        ? currentFindingHasEntry(currentFindings, "BLOCKING")
+        : currentFindingHasEntry(currentFindings, "REQUIRED");
       const checks = tableRows(sectionLines(source, "Current Tests And Checks"));
-      if (!completeGateCoverage || !hasExpectedGate || !hasCurrentFinding || checks.length === 0) {
+      const checksHaveValidResults = checks.length > 0 && checks.every((row) =>
+        Boolean(row[0]?.trim()) && GATE_RESULTS.has((row[1] ?? "").toLowerCase()));
+      if (!completeGateCoverage || !hasExpectedGate || !hasResultAppropriateFinding || !checksHaveValidResults) {
         findings.push(finding(
           "error",
           "EPIC_VERIFY_RESULT_CONTRADICTION",
           displayPath,
-          "A non-aligned report must have a complete scorecard, a result-appropriate current gate, current blocking or required findings, and current checks.",
+          "A non-aligned report must have a complete scorecard, a result-appropriate current gate and finding, and current checks with recognized results.",
           context,
         ));
       }

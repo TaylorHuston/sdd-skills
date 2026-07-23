@@ -153,7 +153,7 @@ The CLI SHALL validate versioned Epic verification reports as current-state audi
 ###### Scenario R4-S6: Incoherent Non-Aligned Result
 
 - WHEN a blocked or changes-requested report omits the complete scorecard, result-appropriate findings, blocked gate, or current checks
-- THEN validation rejects the internally incomplete report instead of treating non-alignment as an evidence exemption.
+- THEN validation rejects the internally incomplete report instead of treating non-alignment as an evidence exemption; current checks require recognized results.
 
 ###### Scenario R4-S7: Malformed Or External Report Identity
 
@@ -210,7 +210,6 @@ Map every Requirement to its primary governing location after implementation. `p
 
 #### Implementation Gaps
 
-- S1/R4-S6: a non-aligned report can omit current finding headings and use an arbitrary check/result row while still satisfying coherence validation.
 - S1/R4-S7: a symlinked Markdown report file inside a contained reviews directory is silently ignored instead of producing a fail-closed path finding.
 
 #### Verified By
@@ -254,7 +253,7 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 | S1/R4-S4 | Automated test `test/cli.test.js#validate accepts quoted repository paths in aligned proof` | Exact repository scoping remains portable when command arguments require shell quoting. | Passing 2026-07-23 |
 | S1/R4-S4 | Automated test `test/cli.test.js#validate rejects duplicate governing options in aligned report proof` | Repeated `--epic`, `--repo`, or `--changed-from` options cannot misrepresent last-wins downstream command scope. | Passing 2026-07-23 |
 | S1/R4-S5 | Automated test `test/cli.test.js#validate rejects spoofed report check commands` | Required command text embedded inside another executable or argument cannot certify a report. | Passing 2026-07-23 |
-| S1/R4-S6 | Automated test `test/cli.test.js#validate rejects incoherent non-aligned Epic verification reports` | Non-aligned results still require the complete scorecard, checks, and result-appropriate current findings. | Passing 2026-07-23 |
+| S1/R4-S6 | Automated test `test/cli.test.js#validate rejects incoherent non-aligned Epic verification reports` | `changes-requested` requires a current REQUIRED finding and recognized check results; `blocked` requires a current BLOCKING finding. | Passing 2026-07-23 |
 | S1/R4-S7 | Automated test `test/cli.test.js#validate fails closed on malformed raw report identity` | Malformed raw kind/schema identity cannot evade report validation. | Passing 2026-07-23 |
 | S1/R4-S7 | Automated test `test/cli.test.js#validate rejects an external Epic verification reviews directory` | A physically external reviews directory cannot supply trusted report artifacts. | Passing 2026-07-23 |
 | S1/R4-S7 | Automated test `test/cli.test.js#validate reports typed Epic verification paths without crashing` | Invalid typed path fields produce deterministic findings rather than exceptions. | Passing 2026-07-23 |
@@ -266,7 +265,6 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 
 #### Verification Gaps
 
-- S1/R4-S6: no automated case removes both current finding headings and supplies an unrelated check with an invalid result.
 - S1/R4-S7: no automated case places a symlinked Markdown report file inside an otherwise contained reviews directory.
 
 #### Story Notes
