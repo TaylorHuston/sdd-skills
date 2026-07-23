@@ -5,11 +5,11 @@ status: in_progress
 
 ## Resume Here
 
-- Last completed action: independent `/sdd-review` completed against cumulative snapshot `c477e4a` and recorded two blocking plus six required findings for this Change in `review.md`.
-- Next action: use `/sdd-apply` to correct the validator/template contract, repository-only topology, report validation, initialization race, planning containment, orphan-audit Git boundary, and missing lineage evidence.
-- Active branch/ref: `develop`; the original implementation is already present in `main@7e9a2be`, while the cumulative working tree remains uncommitted.
-- Expected dirty files: current product work belongs to the follow-up Change; this review added only review records and safe Epic/site corrections.
-- Known blockers: the current implementation findings and required adversarial proof.
+- Last completed action: the follow-up Apply resolved shared S1 report integrity, S5 orphan-audit Git handling, lineage proof, workflow/site ownership, package gates, and reverse traceability through `develop@1485103`.
+- Next action: apply this Change's remaining S2/S3 findings: synthetic repository-ID collision, concurrent initialization, and owner-relative planned-path confinement; then rerun the cumulative 197-test source/integration gates.
+- Active branch/ref: `develop@1485103`; the original implementation remains in `main@7e9a2be`.
+- Expected dirty files: only evidence-ledger reconciliation until the next S2/S3 Apply begins.
+- Known blockers: three current S2/S3 implementation defects and their adversarial proof; the S1/S5/S6/S7 findings are resolved by the follow-up Change and must not be duplicated here.
 
 ## Task Checklist
 
@@ -167,7 +167,7 @@ status: in_progress
 
 ## Blockers / Open Questions
 
-- No blocker remains for independent review.
+- Current blockers: S2 repository collision/concurrent initialization and S3 planned-path confinement remain implementation findings from the cumulative review.
 - Accepted maintainability gap: the highest-risk evidence-row logic now lives in `src/epic-evidence.js` and mutation/diagnostic cases have focused suites, but the established end-to-end workspace fixture remains coupled to `test/cli.test.js`. Extracting the full Epic validator integration fixture is deferred rather than mixing a broad test-harness move into this safety Change.
 
 ## Review Handoff Candidate

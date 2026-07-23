@@ -38,19 +38,19 @@ changes-requested
 
 ### BLOCKING
 
-- [ ] `src/epic-verify-report.js:27` and `docs/templates/epic-verify-report.md:50` - The validator defines 17 canonical gates while both shipped templates define 18. A report completed from the package template cannot reach `aligned`. Recommendation: make one canonical gate definition authoritative across validator, templates, assets, and a template-derived contract test.
+- [x] `src/epic-verify-report.js:27` and `docs/templates/epic-verify-report.md:50` - Resolved in `3d7bffa`: runtime and the real shipped template share the 18-gate contract, exercised by a template-derived aligned fixture.
 - [ ] `src/workspace.js:91` - Repository-only context can overwrite an existing same-ID Idea and replace global artifact defaults. Existing mapped repositories can then resolve to the unmapped repository's artifact directories. Recommendation: reject synthetic-ID collisions and retain repository-specific artifacts only on the synthetic repository entry.
-- [ ] `docs/changes/2026-07-22-harden-audit-report-integrity/proposal.md:14` - The Change declares only S1 and S5 ownership, while the cumulative candidate ships behavior changes in Apply, Review, Change, Design, Interactive, and the public site. Recommendation: replan the Change so every accepted behavior has a durable Story owner, or split the extra behavior into a separately tracked Change/Epic.
+- [x] `docs/changes/2026-07-22-harden-audit-report-integrity/proposal.md:14` - Resolved through replan and `666de8f`: S6 owns workflow execution and S7 owns the public methodology reference with exact maps and proof.
 
 ### REQUIRED
 
-- [ ] `src/epic-verify-report.js:124` - A report with `kind: sdd-epic-verify-report` but no schema disappears from validation. Recommendation: treat a recognized kind with a missing schema as malformed and add a negative test.
-- [ ] `src/epic-verify-report.js:253` - An aligned report can cite validation and orphan-audit rows for another Epic. Recommendation: require the current repository and `--epic <epicId>` scope and add a falsification test.
+- [x] `src/epic-verify-report.js:124` - Resolved in `3d7bffa`: recognized schema-less reports produce a deterministic finding and remain counted.
+- [x] `src/epic-verify-report.js:253` - Resolved in `3d7bffa`: exact Epic, repository, and audited-ref option values are required, including a prefix-confusable repository regression.
 - [ ] `src/commands/init-installation.js:140` - Concurrent repository initialization can report success to both writers while silently retaining one. Recommendation: serialize initialization or use expected-absence publication/CAS and test the race.
 - [ ] `src/config.js:428` and `src/commands/validate.js:1145` - `planning.plannedChangesDirectory` can escape its planning owner. Recommendation: restrict owner-relative artifact directories and defensively verify physical containment before reads.
-- [ ] `skills/sdd-orphan-audit/scripts/sdd_orphan_audit.py:56` - Raw `--changed-from` input is passed to Git before an option barrier and subprocesses have no timeout. A probe created a file outside the audited repository through Git option injection. Recommendation: resolve the ref through `rev-parse --verify --end-of-options`, use the immutable commit with `--`, and bound every subprocess.
-- [ ] `docs/epics/sdd-e001-reliable-cli-operations/epic.md:127` - S1/R4-S2 claims rejection of self-referential and non-versioned predecessors, but its evidence only covers missing and external predecessors. Recommendation: add focused tests/evidence or downgrade verification and record both gaps.
-- [ ] `docs/changes/2026-07-22-harden-audit-report-integrity/tasks.md:1` - The ledger lacks the scope decision, risk/fan-out, pattern/boundary/stateful, environment, immutable handoff, and visual-verification records required by the implemented scope. Recommendation: rebuild these sections during `/sdd-change --replan`.
+- [x] `skills/sdd-orphan-audit/scripts/sdd_orphan_audit.py:56` - Resolved in `3d7bffa`: baselines resolve through an option barrier to immutable commits and every Git subprocess is bounded; no-side-effect injection and fake-Git timeout tests pass.
+- [x] `docs/epics/sdd-e001-reliable-cli-operations/epic.md:127` - Resolved in `3d7bffa`: exact self-referential and non-versioned predecessor tests now back S1/R4-S2.
+- [x] `docs/changes/2026-07-22-harden-audit-report-integrity/tasks.md:1` - Resolved through replan and Apply: all required risk, fan-out, environment, candidate, and visual records are populated with current evidence.
 
 ### SUGGESTION
 
@@ -172,3 +172,4 @@ changes-requested
 - 2026-07-22: Deep cumulative review created for both active Changes. Verdict `changes-requested`; safe anchor and UI fixes applied; planning and implementation findings routed back to their owning workflows.
 - 2026-07-22: Post-fix recheck passed `npm run check` (179/179), both scoped SDD validations (0 errors, 0 warnings), `sdd doctor`, `git diff --check`, JavaScript syntax, fragment integrity, package dry run (106 files), dependency audit (0 vulnerabilities), and the focused desktop/mobile rendered regression. Reverse traceability still reports 22 unowned source candidates, as expected for the unresolved planning finding.
 - 2026-07-23: `/sdd-change --replan` resolved the planning shape by retaining S1/S5, planning S6 Reliable Workflow Execution and S7 Accessible Public Methodology Reference, and leaving S2/S3 remediation with the earlier active Change. Proposal, design, and tasks passed scoped validation and returned to `planned`; implementation, Epic reconciliation, and fresh review remain required.
+- 2026-07-23: `/sdd-apply` resolved every S1/S5/S6/S7 finding, committed the Steel site and durable ownership, refreshed the managed orphan-audit skill through `sdd update`, passed 197 source and prospective-integration tests, eliminated reverse-traceability gaps, and verified the committed UI matrix. The historical verdict remains `changes-requested` because the earlier Change still owns unresolved S2/S3 findings; a fresh independent review is required after those are applied.

@@ -40,17 +40,17 @@ This Change was reviewed as part of the cumulative `v0.11.0` candidate. The comp
 
 ### BLOCKING
 
-- [ ] `src/epic-verify-report.js:27` and `docs/templates/epic-verify-report.md:50` - The validator's 17 canonical gates cannot accept the shipped 18-gate report template. Recommendation: unify the canonical contract and test a real template-derived aligned report.
+- [x] `src/epic-verify-report.js:27` and `docs/templates/epic-verify-report.md:50` - Resolved by the follow-up Change in `3d7bffa`; runtime and the real shipped template share an 18-gate contract.
 - [ ] `src/workspace.js:91` - Repository-only context can replace an existing same-ID Idea and global artifact defaults, redirecting unrelated mapped repositories. Recommendation: reject the collision and keep artifacts local to the synthetic repository.
 
 ### REQUIRED
 
-- [ ] `src/epic-verify-report.js:124` - Removing the schema from a recognized report kind makes the report disappear. Recommendation: reject it as malformed.
-- [ ] `src/epic-verify-report.js:253` - An unrelated Epic's checks can certify an aligned report. Recommendation: enforce current Epic and repository scope.
+- [x] `src/epic-verify-report.js:124` - Resolved by the follow-up Change in `3d7bffa`; recognized schema-less reports fail deterministically.
+- [x] `src/epic-verify-report.js:253` - Resolved by the follow-up Change in `3d7bffa`; aligned proof requires exact current Epic, repository, and audited-ref scope.
 - [ ] `src/commands/init-installation.js:140` - Concurrent initialization can report two successes and retain one writer. Recommendation: lock or publish with expected absence.
 - [ ] `src/config.js:428` and `src/commands/validate.js:1145` - `plannedChangesDirectory` can escape its planning owner. Recommendation: enforce relative configuration and physical containment.
-- [ ] `skills/sdd-orphan-audit/scripts/sdd_orphan_audit.py:56` - `--changed-from` permits Git option injection and subprocesses are unbounded. Recommendation: validate/resolve the ref, add `--`, and add timeouts.
-- [ ] `docs/epics/sdd-e001-reliable-cli-operations/epic.md:127` - Add proof for self-referential and non-versioned predecessors or downgrade S1/R4-S2 verification.
+- [x] `skills/sdd-orphan-audit/scripts/sdd_orphan_audit.py:56` - Resolved by the follow-up Change in `3d7bffa`; immutable ref resolution, option barriers, bounded Git children, and adversarial tests pass.
+- [x] `docs/epics/sdd-e001-reliable-cli-operations/epic.md:127` - Resolved by the follow-up Change in `3d7bffa`; self-referential and non-versioned predecessor tests now back the Scenario.
 - [ ] `docs/changes/2026-07-20-harden-cli-trust-boundaries/tasks.md:173` - Reconcile the review handoff with the actual merge into `main@7e9a2be` and the current cumulative candidate.
 
 ### SUGGESTION
@@ -149,3 +149,4 @@ Not applicable to the declared scope of this Change. The follow-up Change owns t
 
 - 2026-07-22: Deep cumulative review created. Verdict `changes-requested`; implementation findings require `/sdd-apply`.
 - 2026-07-22: Post-fix recheck passed `npm run check` (179/179), scoped SDD validation (0 errors, 0 warnings), `sdd doctor`, package/diff checks, and the shared rendered regression; current implementation and ownership findings remain open.
+- 2026-07-23: Follow-up Apply resolved the shared S1/S5 and ownership findings, passed 197-test source and prospective-integration gates, and left only this Change's S2/S3 repository ownership, concurrent initialization, and planned-path confinement findings open.
