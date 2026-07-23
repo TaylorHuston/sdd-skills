@@ -4,6 +4,8 @@
 
 changes-requested
 
+This scorecard and verdict are the immutable historical review of candidate `c477e4a`. Later Apply logs/checkmarks record remediation progress but do not replace this reviewed watermark. A fresh independent review must produce the current scorecard after the remaining S2/S3 findings are resolved.
+
 This Change was reviewed as part of the cumulative `v0.11.0` candidate. The complete bundle, UI matrix, branch evidence, and release-candidate analysis are recorded in [`../2026-07-22-harden-audit-report-integrity/review.md`](../2026-07-22-harden-audit-report-integrity/review.md).
 
 ## Gate Scorecard

@@ -4,6 +4,8 @@
 
 changes-requested
 
+This scorecard and verdict are the immutable historical review of candidate `c477e4a`. Later Apply logs/checkmarks record remediation progress but do not replace this reviewed watermark. A fresh independent review must produce the current scorecard after the separately owned S2/S3 findings are resolved.
+
 ## Gate Scorecard
 
 | Gate | Result | Notes |

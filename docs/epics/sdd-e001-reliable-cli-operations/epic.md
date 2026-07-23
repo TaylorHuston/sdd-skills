@@ -58,8 +58,8 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 | Story | Implementation | Verification | Capability | Last Verified | Notes |
 |---|---|---|---|---|---|
 | S1 | implemented | verified | Validate navigable behavior and real evidence. | 2026-07-23 | Structure, anchors, scoped report coherence, metadata freshness, and focused reads are enforced. |
-| S2 | implemented | verified | Mutate only inside physical owner boundaries and recover safely. | 2026-07-20 | Atomic state, locking, commit checks, and recovery reporting are enforced. |
-| S3 | implemented | verified | Reject ambiguous topology and lifecycle routing. | 2026-07-20 | Shape, physical ownership, planning, and collision ambiguity are rejected. |
+| S2 | partial | partial | Mutate only inside physical owner boundaries and recover safely. | 2026-07-23 | Existing mutation safety is proved; concurrent first initialization remains an explicit gap. |
+| S3 | partial | partial | Reject ambiguous topology and lifecycle routing. | 2026-07-23 | Existing topology checks pass; synthetic-ID collision and owner-relative planning containment remain explicit gaps. |
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
 | S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-23 | Reports are versioned; PR/release paths are classified and rechecked; Git baselines are immutable and bounded. |
 | S6 | implemented | verified | Carry workflow work through a complete evidence-backed handoff. | 2026-07-23 | Shipped workflow contracts and their mirrored records have exact semantic package-contract proof. |
@@ -249,11 +249,11 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 
 ### Story S2: Safe And Recoverable Mutation
 
-Implementation: implemented
-Verification: verified
+Implementation: partial
+Verification: partial
 Created: 2026-07-20
-Modified: 2026-07-20
-Last verified: 2026-07-20
+Modified: 2026-07-23
+Last verified: 2026-07-23
 
 As a developer, I want filesystem mutations to stay inside their physical owner and preserve concurrent work, so that setup and lifecycle commands cannot silently damage unrelated data.
 
@@ -292,6 +292,11 @@ The CLI SHALL compare the commit-time Change state with the state it prepared an
 - WHEN an in-review Change is reopened after close preflight
 - THEN close aborts and preserves the reopened Change in its active location.
 
+###### Scenario R2-S5: Concurrent First Initialization
+
+- WHEN two processes initialize the same repository before either portable contract exists
+- THEN at most one initialization succeeds and the other reports the conflict without losing either writer's accepted durable state.
+
 ##### Requirement R3: Atomic Durable State And Recovery Reporting
 
 The CLI SHALL atomically replace configuration and installation-lock files, serialize managed updates, and report rollback failures with the resulting state.
@@ -325,7 +330,7 @@ The CLI SHALL atomically replace configuration and installation-lock files, seri
 
 #### Implementation Gaps
 
-- None.
+- S2/R2-S5: first repository initialization does not yet serialize or publish with expected absence; two writers can report success while only one result remains.
 
 #### Verified By
 
@@ -367,7 +372,7 @@ The CLI SHALL atomically replace configuration and installation-lock files, seri
 
 #### Verification Gaps
 
-- None.
+- S2/R2-S5: add a deterministic concurrent-initialization fixture that proves one winner, one actionable conflict, and no silent writer loss.
 
 #### Story Notes
 
@@ -376,11 +381,11 @@ The CLI SHALL atomically replace configuration and installation-lock files, seri
 
 ### Story S3: Unambiguous Topology And Lifecycle Routing
 
-Implementation: implemented
-Verification: verified
+Implementation: partial
+Verification: partial
 Created: 2026-07-20
-Modified: 2026-07-20
-Last verified: 2026-07-20
+Modified: 2026-07-23
+Last verified: 2026-07-23
 
 As a developer, I want invalid or unmapped topology rejected before artifact creation, so that commands cannot invent ownership or leave duplicate Change truth.
 
@@ -409,6 +414,16 @@ The CLI SHALL reject unknown configuration keys, duplicate physical repository o
 - WHEN different configured spellings resolve to one repository, an unknown key is present, or artifact roles overlap invalidly
 - THEN configuration validation reports the exact invariant before operational commands continue.
 
+###### Scenario R2-S2: Synthetic Repository ID Collision
+
+- WHEN repository-only context derives an ID already owned by an Idea or another configured entry
+- THEN context resolution rejects the collision instead of replacing global artifact ownership with synthetic repository defaults.
+
+###### Scenario R2-S3: Planned Path Escapes Its Owner
+
+- WHEN `plannedChangesDirectory` is absolute, traverses upward, or resolves physically outside its planning owner
+- THEN configuration and artifact reads reject it before inspecting or mutating the external path.
+
 ##### Requirement R3: Cross-Location Change Collision
 
 The CLI SHALL refuse a planned Change ID that already exists in any selected repository's active or closed roots.
@@ -430,7 +445,8 @@ The CLI SHALL refuse a planned Change ID that already exists in any selected rep
 
 #### Implementation Gaps
 
-- None.
+- S3/R2-S2: repository-only context can still replace an existing same-ID Idea and its global artifact defaults.
+- S3/R2-S3: `plannedChangesDirectory` is not yet constrained to an owner-relative physically contained path.
 
 #### Verified By
 
@@ -444,7 +460,8 @@ The CLI SHALL refuse a planned Change ID that already exists in any selected rep
 
 #### Verification Gaps
 
-- None.
+- S3/R2-S2: add a same-ID Idea/repository collision fixture proving existing ownership remains unchanged.
+- S3/R2-S3: add lexical and symlink escape fixtures proving configuration and artifact discovery fail closed without external reads or writes.
 
 #### Story Notes
 
@@ -688,7 +705,11 @@ The Interactive workflow SHALL create the minimum shared Change artifacts, apply
 | Requirement / Scenario | Location / Anchor | Kind | Responsibility |
 |---|---|---|---|
 | S6/R1 | `skills/sdd-change/SKILL.md#Replan Mode` | primary | Governs review-driven replanning, guarded lifecycle transitions, dated planning updates, and the exact Apply restart. |
-| S6/R1 | `docs/templates/tasks.md#Decision Fan-Out Ledger` | support | Carries decisions, environments, verification scope, visual checks, and immutable candidate obligations into delivery. |
+| S6/R1 | `docs/templates/tasks.md#Decision Fan-Out Ledger` | support | Carries planning decisions and their affected surfaces into delivery. |
+| S6/R1 | `docs/templates/tasks.md#Verification Environment` | support | Records required setups and safety boundaries before evidence is claimed. |
+| S6/R1 | `docs/templates/tasks.md#Verification Scope Decision` | support | Records aggregate and prospective-integration candidate obligations. |
+| S6/R1 | `docs/templates/tasks.md#Visual Verification Matrix` | support | Records proportional rendered states and interactions for UI-bearing work. |
+| S6/R1 | `docs/templates/tasks.md#Review Handoff Candidate` | support | Carries immutable candidate identity and remaining obligations into review. |
 | S6/R2 | `skills/sdd-apply/SKILL.md#Persistence invariant` | primary | Defines full Apply as an outcome request that continues until review readiness or a genuine stop. |
 | S6/R2-S1 | `skills/sdd-apply/SKILL.md#Commit cadence invariant` | primary | Makes a verified artifact-reconciled phase commit part of each completed slice. |
 | S6/R2 | `skills/sdd-apply/references/risk-closure.md#Phase Commit` | support | Defines coherent green phase boundaries and immutable handoff behavior. |
@@ -698,7 +719,11 @@ The Interactive workflow SHALL create the minimum shared Change artifacts, apply
 | S6/R4 | `skills/sdd-apply/SKILL.md#Apply Loop` | primary | Requires direct rendered inspection of current UI source during implementation. |
 | S6/R4 | `skills/sdd-review/SKILL.md#Review Gates` | primary | Keeps deterministic rendered verification distinct from owner manual confirmation. |
 | S6/R5 | `skills/sdd-apply/SKILL.md#Verification And Implementation Self-Check` | primary | Runs risk-shaped implementation closure and evidence reconciliation. |
-| S6/R5 | `skills/sdd-apply/references/risk-closure.md#Evidence Claim Integrity` | support | Defines parity, boundary, state, authority, provenance, mutation, and evidence-falsification checks. |
+| S6/R5 | `skills/sdd-apply/references/risk-closure.md#Pattern Parity` | support | Requires sibling implementations to preserve shared policy and lifecycle shape. |
+| S6/R5 | `skills/sdd-apply/references/risk-closure.md#Boundary Contracts` | support | Requires exact boundary, adapter, failure, and retry mapping. |
+| S6/R5 | `skills/sdd-apply/references/risk-closure.md#Stateful Transitions` | support | Requires concurrent and durable state interleavings to be proved. |
+| S6/R5 | `skills/sdd-apply/references/risk-closure.md#Authority, Budget, And Mutation Safety` | support | Requires authority, provenance, budget, and filesystem mutation invariants. |
+| S6/R5 | `skills/sdd-apply/references/risk-closure.md#Evidence Claim Integrity` | support | Requires exact claimed-boundary evidence to survive falsification. |
 | S6/R5 | `skills/sdd-review/SKILL.md#Systematic Review Search` | primary | Independently falsifies claimed behavior and evidence across the candidate. |
 | S6/R6 | `skills/sdd-interactive/SKILL.md#Workflow` | primary | Implements a trimmed shared-artifact session with immediate Apply-style execution and routing for broader scope. |
 
@@ -792,7 +817,7 @@ The guide SHALL use the shared Steel semantic identity as restrained documentati
 | S7/R3-S1 | `site/site.js#copyButton?.addEventListener` | primary | Copies the command or selects it on clipboard failure and exposes temporary feedback. |
 | S7/R3 | `site/styles.css#:focus-visible` | support | Provides visible focus and touch-sized interactive treatment. |
 | S7/R4 | `site/styles.css#UI Foundations: Steel identity profile` | primary | Implements the Steel semantic palette and restrained documentation composition. |
-| S7/R4-S1 | `site/styles.css#@media (prefers-reduced-motion: reduce)` | support | Reduces smooth scrolling and transition duration while preserving state. |
+| S7/R4-S1 | `site/styles.css#@media (prefers-reduced-motion: reduce)` | primary | Reduces smooth scrolling and transition duration while preserving state. |
 
 #### Implementation Gaps
 
@@ -808,9 +833,9 @@ The guide SHALL use the shared Steel semantic identity as restrained documentati
 | S7/R1-S1 | Automated test `test/site.test.js#public guide separates portable methodology from package implementation and preserves durable Story semantics` | Portable method sections and a canonical durable Story example precede package-specific implementation. | Passing 2026-07-23 |
 | S7/R2-S1 | Automated test `test/site.test.js#public guide has unique fragment targets and sequential navigable sections` | IDs are unique, same-page fragments resolve, and skip/document navigation targets exist. | Passing 2026-07-23 |
 | S7/R3-S1, S7/R4-S1 | Automated test `test/site.test.js#public guide preserves clipboard fallback feedback and reduced-motion behavior` | Source retains selectable announced clipboard fallback, focus treatment, and reduced-motion rules. | Passing 2026-07-23 |
-| S7/R2-S1 | Manual runtime inspection of committed candidate `666de8f` at 1440×900, 768×1024, 375×812, 320×812, and 812×375 | Navigation remains reachable, mobile controls measure 44px, long content is contained, and every viewport has equal document scroll/client width. | Passing 2026-07-23 |
-| S7/R3-S1 | Manual runtime inspection of committed candidate `666de8f` with clipboard denial and keyboard skip-link interaction | Clipboard failure selects the command, announces `Selected`, and the visible skip link moves focus to `main-content`. | Passing 2026-07-23 |
-| S7/R4-S1 | Manual runtime inspection of committed candidate `666de8f` with reduced-motion emulation and direct screenshot review | Scroll behavior becomes `auto`, transitions reduce to `0.00001s`, active navigation remains intact, and the restrained Steel composition remains readable. | Passing 2026-07-23 |
+| S7/R2-S1 | Deterministic rendered inspection of committed candidate `666de8f` at 1440×900, 768×1024, 375×812, 320×812, and 812×375 | Navigation remains reachable, mobile controls measure 44px, long content is contained, and every viewport has equal document scroll/client width. | Passing 2026-07-23 |
+| S7/R3-S1 | Deterministic browser interaction on committed candidate `666de8f` with clipboard denial and keyboard skip-link interaction | Clipboard failure selects the command, announces `Selected`, and the visible skip link moves focus to `main-content`. | Passing 2026-07-23 |
+| S7/R4-S1 | Deterministic rendered inspection of committed candidate `666de8f` with reduced-motion emulation and direct screenshot review | Scroll behavior becomes `auto`, transitions reduce to `0.00001s`, active navigation remains intact, and the restrained Steel composition remains readable. | Passing 2026-07-23 |
 
 #### Verification Gaps
 

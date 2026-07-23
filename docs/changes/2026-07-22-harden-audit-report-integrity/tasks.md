@@ -153,8 +153,8 @@ status: in_progress
 
 | Start State | Trigger / Interleaving | Durable Invariant | Observer / Recovery Behavior | Focused Test Or Runtime Observation | Result |
 |---|---|---|---|---|---|
-| Review running required aggregate gate | command yields resumable session or exceeds progress interval | review remains active until command completes or genuinely blocks | user receives progress; session is resumed | yielded-command contract test or controlled shell observation | pending |
-| `--until-ready` has unresolved findings | remediation iteration reaches default cap of five | final report still includes full scorecard, cumulative remediation, and residual findings | caller receives `changes-requested`/`blocked`, never a partial success summary | packaged Review contract test | pending |
+| Review running required aggregate gate | command yields resumable session or exceeds progress interval | review remains active until command completes or genuinely blocks | user receives progress; session is resumed | `test/workflow-contracts.test.js#packaged Review resumes yielded commands and preserves the full until-ready report contract` | proved |
+| `--until-ready` has unresolved findings | remediation iteration reaches default cap of five | final report still includes full scorecard, cumulative remediation, and residual findings | caller receives `changes-requested`/`blocked`, never a partial success summary | `test/workflow-contracts.test.js#packaged Review resumes yielded commands and preserves the full until-ready report contract` | proved |
 | One-page navigation active | viewport/scroll/hash changes | one current location reflects the visible section without overflow | desktop/mobile navigation updates and remains keyboard reachable | browser matrix | passed on `666de8f` |
 | Copy interaction pending | clipboard succeeds or throws | command remains available and status resets after feedback | `Copied` or selected-text fallback is visible/announced | injected clipboard failure selected the full command and announced `Selected` | passed on `666de8f` |
 
@@ -184,13 +184,13 @@ status: in_progress
 - Project-defined aggregate command or authoritative constituent source: `npm run check`
 - Aggregate gate required before `in_review`: yes
 - Trigger or project-policy reason: cumulative scope crosses CLI validation, security-sensitive Git handling, multiple workflow capabilities, generated/template contracts, and browser-visible behavior.
-- Exact committed source candidate: implementation `20c4934`; evidence-only Epic/ledger reconciliation through `1485103`.
+- Exact committed source candidate: current implementation `83ff3a1`; later edits are artifact-only reconciliation.
 - Freshness and cache treatment: fresh local run on the immutable committed candidate; record 179-or-current test count and CLI-help result.
-- Aggregate result and meaningful execution/count evidence: `npm run check` passed 197 tests plus CLI help.
+- Aggregate result and meaningful execution/count evidence: `npm run check` passed 199 tests plus CLI help on `83ff3a1`.
 - Post-gate evidence-record-only changes and affected checks rerun: classify every later artifact-only edit and rerun scoped validation, diff checks, template parity, and any affected exact test.
 - Prospective integration gate required: yes when `develop -> main` produces a materially different tree.
-- Current target and prospective integration tree/ref: `main@7e9a2bef9811f623583232c554417ae08ddc9373`; final tree pending.
-- Integration-candidate result or reason source proof is reusable: pending merge-tree comparison.
+- Current target and prospective integration tree/ref: `main@7e9a2bef9811f623583232c554417ae08ddc9373`; prior tree `dee9095f` passed before the final S1 code correction and must be regenerated after the artifact reconciliation commit.
+- Integration-candidate result or reason source proof is reusable: pending final merge-tree rerun because `83ff3a1` changed runtime report validation.
 - Remote CI role: corroborating; local exact-candidate aggregate proof remains required before release handoff.
 
 ## Manual UI Confirmation
@@ -222,14 +222,14 @@ status: in_progress
 ## Review Handoff Candidate
 
 - Integration target / merge base: production target `main`; merge base `a670fa28ebfd4df175217b60a74d92cfee520c74`.
-- Candidate source commit: current evidence candidate `1485103`; implementation candidate `20c4934`.
+- Candidate source commit: implementation `83ff3a1`; final evidence-only reconciliation commit pending.
 - Source differs from target when implementation changed: yes.
 - Intended implementation fully committed: yes for this Change's S1/S5/S6/S7 scope.
 - Unrelated dirty state preserved: yes; all formerly dirty Steel product files were confirmed in-scope and committed in `666de8f`.
 - Commit-sensitive generated-contract / diff / integration checks: package/template parity, package dry run, skill validation, diff checks, scoped validation, reverse traceability, and merge-tree aggregate checks passed.
-- Verification Scope Decision and aggregate candidate evidence: source and materially different prospective integration candidates each passed 197 tests plus CLI help.
-- Post-gate evidence-only changes classified and affected checks rerun: Epic/ledger-only updates after the source aggregate passed scoped validation, package test, reverse traceability, and diff checks.
-- Prospective integration tree and required gate evidence: tree `dee9095fdc2158f8a82f8063a3ac9476dace42ee`; temporary commit `852d94d6d4eb32ca8ea2432e6eefb84b5ad39ec0`; fresh install and 197 tests plus CLI help passed.
+- Verification Scope Decision and aggregate candidate evidence: source `83ff3a1` passed 199 tests plus CLI help; final prospective integration rerun is pending after this artifact-only commit.
+- Post-gate evidence-only changes classified and affected checks rerun: current Epic/ledger-only reconciliation requires scoped validation, reverse traceability, diff checks, and the final integration-tree rerun.
+- Prospective integration tree and required gate evidence: prior tree `dee9095f` passed 197 tests; it is historical after `83ff3a1` and will be replaced by the final tree.
 - Required risk, fan-out, environment, or verification rows still pending or blocked: only cross-Change S2/S3 implementation owned by `2026-07-20-harden-cli-trust-boundaries`.
 - Pattern parity, boundary contract, and stateful transition matrices reconciled or not applicable with reason: all current-Change rows proved; cumulative state remains blocked on earlier S2/S3.
 - Capability authority, content-budget/provenance conservation, and filesystem mutation-order proof reconciled or not applicable: Git/filesystem boundaries required; content budget not applicable.
@@ -260,8 +260,8 @@ status: in_progress
 - Decision fan-out reconciled: yes except the explicitly blocked earlier-Change implementation.
 - Verification environment obligations resolved: yes for current scope.
 - Verification Scope Decision current and required candidate gates passed: yes.
-- Immutable review handoff candidate: not yet assignable across both Changes; current evidence watermark `1485103`.
-- Tested integration candidate matches actual integrated tree, or rerun recorded: prospective tree `dee9095f` was rerun and passed.
+- Immutable review handoff candidate: not yet assignable across both Changes; final current-Change evidence watermark pending this commit.
+- Tested integration candidate matches actual integrated tree, or rerun recorded: pending final merge-tree rerun after `83ff3a1`.
 - Manual UI confirmation status: pending user.
 - Rendered UI verification status: committed candidate `666de8f` passed the full matrix.
 - PR / merge state: no current PR/merge action authorized.
