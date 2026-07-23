@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: in_review
 ---
 # Tasks: Harden CLI Trust Boundaries
 
