@@ -1,46 +1,84 @@
 <!doctype html>
-<html lang="en" data-theme="mono">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Story-Driven Development is a methodology for keeping a durable, evidence-backed map from product behavior to implementation and tests.">
-    <meta name="theme-color" content="#0a0a0a">
-    <title>Story-Driven Development</title>
-    <link rel="stylesheet" href="./styles.css">
-    <script src="./site.js" defer></script>
-  </head>
-  <body>
-    <a class="skipLink" href="#main-content">Skip to content</a>
+<html lang="en" data-theme="steel">
 
-    <header class="siteHeader">
-      <a class="brand" href="#top" aria-label="Story-Driven Development home">
-        <span class="brandMark" aria-hidden="true">S</span>
-        <span>Story-Driven Development</span>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description"
+    content="Story-Driven Development is a methodology for keeping a durable, evidence-backed map from product behavior to implementation and tests.">
+  <meta name="theme-color" content="#09090b">
+  <title>Story-Driven Development</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./site.js" defer></script>
+</head>
+
+<body>
+  <a class="skipLink" href="#main-content">Skip to content</a>
+
+  <header class="siteHeader">
+    <a class="brand" href="#top" aria-label="Story-Driven Development home">
+      <span class="brandMark" aria-hidden="true">S</span>
+      <span>Story-Driven Development</span>
+    </a>
+    <span class="headerContext">Documentation</span>
+    <nav class="mobileNav" aria-label="Page sections">
+      <a href="#problem" data-nav-group="method">Method</a>
+      <a href="#implementation" data-nav-group="implementation">Implementation</a>
+    </nav>
+    <div class="headerActions">
+      <a class="githubLink" href="https://github.com/TaylorHuston/sdd-skills" aria-label="SDD Skills on GitHub">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M12 .7a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2.23c-3.22.7-3.9-1.37-3.9-1.37-.52-1.34-1.28-1.7-1.28-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.57-.29-5.27-1.28-5.27-5.69 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.47.11-3.05 0 0 .97-.31 3.16 1.18a10.97 10.97 0 0 1 5.75 0c2.2-1.49 3.16-1.18 3.16-1.18.63 1.58.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.42-2.71 5.39-5.29 5.68.42.36.79 1.06.79 2.14v3.17c0 .31.21.68.8.56A11.5 11.5 0 0 0 12 .7Z">
+          </path>
+        </svg>
+        <span>GitHub</span>
       </a>
-      <nav class="siteNav" aria-label="Primary navigation">
-        <a href="#process">Process</a>
-        <a href="#traceability">Traceability</a>
-        <a href="#toolchain">Implementation</a>
-      </nav>
-      <div class="headerActions">
-        <a class="githubLink" href="https://github.com/TaylorHuston/sdd-skills">GitHub</a>
-      </div>
-    </header>
+    </div>
+  </header>
 
-    <main id="main-content">
+  <div class="docsShell">
+    <aside class="docsSidebar" aria-label="Documentation navigation">
+      <div class="sidebarGroup">
+        <p>Story-Driven Development</p>
+        <nav class="siteNav" aria-label="On this page">
+          <a href="#top"><span>00</span>Overview</a>
+          <a href="#problem"><span>01</span>Problem</a>
+          <a href="#model"><span>02</span>Model</a>
+          <a href="#process"><span>03</span>Workflow</a>
+          <a href="#traceability"><span>04</span>Traceability</a>
+          <a href="#example"><span>05</span>Example Epic</a>
+          <a href="#implementation"><span>06</span>Reference implementation</a>
+        </nav>
+      </div>
+      <div class="sidebarReference">
+        <p>References</p>
+        <a href="https://taylorhuston.me/2026/07/01/Story-Driven-Development.html">Original essay</a>
+        <a href="https://github.com/TaylorHuston/sdd-skills/blob/main/CHANGELOG.md">Changelog</a>
+        <a href="https://github.com/TaylorHuston/sdd-skills">Source repository</a>
+      </div>
+    </aside>
+
+      <main id="main-content" tabindex="-1">
       <section class="intro" id="top" aria-labelledby="page-title">
         <div class="introCopy">
-          <p class="eyebrow">A methodology for human and agent collaboration</p>
+          <p class="eyebrow">Guide / Methodology</p>
           <h1 id="page-title">Story-Driven Development</h1>
-          <p class="lede">Keep one durable, evidence-backed map from the behavior you intend to the code and tests that actually exist.</p>
+          <p class="lede">Give the next developer or coding agent a reliable answer to three questions:</p>
+          <ol>
+            <li>What exists</li>
+            <li>Where it lives</li>
+            <li>What proves it works</li>
+          </ol>
           <div class="introActions">
-            <a class="primaryAction" href="#process">See the process</a>
-            <a class="textAction" href="https://github.com/TaylorHuston/sdd-skills#quick-start">Explore this implementation</a>
+            <a href="https://taylorhuston.me/2026/07/01/Story-Driven-Development.html">Read the original essay <span
+                aria-hidden="true">↗</span></a>
+            <a href="https://github.com/TaylorHuston/sdd-skills">View the source <span aria-hidden="true">↗</span></a>
           </div>
         </div>
 
         <figure class="behaviorMap" aria-labelledby="map-caption">
-          <figcaption id="map-caption">The durable behavior map</figcaption>
+          <figcaption id="map-caption">How the pieces connect</figcaption>
           <div class="mapFlow" aria-label="Idea to verified evidence">
             <div class="mapNode mapNodePrimary">
               <span>01</span>
@@ -68,99 +106,270 @@
           </div>
           <div class="truthBar">
             <span class="statusIndicator" aria-hidden="true"></span>
-            <span>Current truth stays connected to implementation and evidence.</span>
+            <span>When the code changes, the map changes with it.</span>
           </div>
         </figure>
       </section>
 
       <section class="principleBand" aria-label="Core principle">
-        <p>There should never be a question of what is actually implemented.</p>
-        <span>Epics describe durable behavior. Evidence points to the code and tests. Drift is a finding, not folklore.</span>
+        <p>A developer should not have to reverse-engineer the whole app to find out what is already built.</p>
+        <span>The Epic says what the product does. Its evidence points to the code and tests. If those disagree, that is
+          work to fix.</span>
+      </section>
+
+      <section class="section problemSection" id="problem" aria-labelledby="problem-title">
+        <header class="sectionHeader">
+          <p class="sectionNumber">01 / Problem</p>
+          <div>
+            <h2 id="problem-title">Software changes faster than its explanation.</h2>
+            <p>AI coding agents can build quickly. Coming back a week later and figuring out what they actually built is
+              still harder than it should be.</p>
+          </div>
+        </header>
+
+        <div class="problemLayout">
+          <article class="problemThesis">
+            <p class="columnLabel">The annoying part comes later.</p>
+            <h3>Tickets and pull requests tell you what changed. They rarely tell you what the app does now.</h3>
+            <p>A ticket captures a plan. A pull request captures one slice of history. Both can be useful, but neither
+              is a dependable map of the current application.</p>
+            <p>Then the edge cases show up. The data model shifts. Review finds a better approach. A few patches later,
+              the plan and the code no longer agree, and answering a basic question means reading half the repo.</p>
+          </article>
+
+          <aside class="problemQuestions" aria-labelledby="questions-title">
+            <p class="columnLabel">What I want from a cold start</p>
+            <h3 id="questions-title">Five questions I should not have to rediscover</h3>
+            <ol>
+              <li><span aria-hidden="true">01</span>
+                <p>What behavior exists right now?</p>
+              </li>
+              <li><span aria-hidden="true">02</span>
+                <p>Why does that behavior exist?</p>
+              </li>
+              <li><span aria-hidden="true">03</span>
+                <p>Which code owns it?</p>
+              </li>
+              <li><span aria-hidden="true">04</span>
+                <p>What proves that it works?</p>
+              </li>
+              <li><span aria-hidden="true">05</span>
+                <p>Where should I start if it breaks or needs to change?</p>
+              </li>
+            </ol>
+          </aside>
+        </div>
+
+        <div class="rediscoveryBand" aria-label="Cost of missing context">
+          <div>
+            <span>For a developer</span>
+            <p>The first hour disappears into routes, services, stale layers, and tests that may prove the wrong thing.
+            </p>
+          </div>
+          <div>
+            <span>For an agent</span>
+            <p>The agent burns context and tokens reading half the repo before it can do useful work. That is a weak
+              place to start.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section modelSection" id="model" aria-labelledby="model-title">
+        <header class="sectionHeader">
+          <p class="sectionNumber">02 / Model</p>
+          <div>
+            <h2 id="model-title">Keep a durable map through every change.</h2>
+            <p>I keep the product's accepted behavior separate from the Change used to modify it. The plan can move when
+              implementation reality shows up. The end state, code ownership, and proof cannot quietly disappear.</p>
+          </div>
+        </header>
+
+        <ol class="modelLayers" aria-label="How Story-Driven Development preserves current truth">
+          <li>
+            <span class="modelIndex" aria-hidden="true">01</span>
+            <div>
+              <p class="columnLabel">Behavior</p>
+              <h3>Epics and Stories</h3>
+              <p>Explain what the user or operator can do and why it matters. They are durable current-state records:
+                when that behavior changes, the Story changes with it.</p>
+            </div>
+          </li>
+          <li>
+            <span class="modelIndex" aria-hidden="true">02</span>
+            <div>
+              <p class="columnLabel">Contract</p>
+              <h3>Requirements and Scenarios</h3>
+              <p>Spell out the rules and observable examples that make “done” testable.</p>
+            </div>
+          </li>
+          <li>
+            <span class="modelIndex" aria-hidden="true">03</span>
+            <div>
+              <p class="columnLabel">Ownership</p>
+              <h3>Implemented By</h3>
+              <p>Point the next developer at the routes, services, components, and other code that actually owns the
+                behavior.</p>
+            </div>
+          </li>
+          <li>
+            <span class="modelIndex" aria-hidden="true">04</span>
+            <div>
+              <p class="columnLabel">Proof</p>
+              <h3>Verified By</h3>
+              <p>Name the tests, checks, or manual scenarios that prove the behavior. “The build passed” is not enough.
+              </p>
+            </div>
+          </li>
+        </ol>
+
+        <aside class="storyConvention" aria-labelledby="story-convention-title">
+          <p class="columnLabel" id="story-convention-title">Why the canonical User Story?</p>
+          <p>I kept the familiar
+            <code>As a &lt;actor&gt;, I want to &lt;action&gt;, so that I can &lt;outcome&gt;.</code> shape because it
+            captures who the behavior serves, what they are trying to do, and why it matters. The implementation can
+            change while that journey stays durable. <a
+              href="https://taylorhuston.me/2026/07/01/Story-Driven-Development.html#why-story">The original essay
+              explains the choice in more detail.</a>
+          </p>
+        </aside>
+
+        <div class="changeRecord">
+          <div>
+            <p class="columnLabel">Durable behavior, temporary work</p>
+            <h3>A Change updates the Story. It does not replace it.</h3>
+          </div>
+          <p>Stories are not tasks that expire after implementation. When accepted behavior evolves, update the existing
+            Story, its Requirements and Scenarios, and its implementation and evidence maps to describe what is true
+            now. Create a new Story only for a genuinely distinct, durable user outcome. Once the work is finished, the
+            Change becomes history; the updated Story remains.</p>
+        </div>
+
+        <div class="modelEquation"
+          aria-label="Accepted behavior plus code ownership plus proof produces current application truth">
+          <span>Accepted behavior</span>
+          <b aria-hidden="true">+</b>
+          <span>Code ownership</span>
+          <b aria-hidden="true">+</b>
+          <span>Proof</span>
+          <b aria-hidden="true">=</b>
+          <strong>Current truth</strong>
+        </div>
+
+        <section class="recordsGuide" aria-labelledby="records-title">
+          <header class="recordsHeader">
+            <p class="columnLabel">Three records, three jobs</p>
+            <div>
+              <h3 id="records-title">These documents age differently, so I keep them separate.</h3>
+              <p>A PRD can guide the product for years. A Change becomes history as soon as the work is done. An Epic
+                has to keep changing with the application. Asking one document to do all three jobs is how the docs stop
+                being useful.</p>
+            </div>
+          </header>
+
+          <div class="recordTypes">
+            <article class="recordType recordPlanning">
+              <p class="recordIndex">01 / Planning</p>
+              <h4>What are we trying to build?</h4>
+              <p>Planning holds product direction, exploration, open questions, and possible work. It describes the
+                intent and constraints before the team has committed to a delivery path.</p>
+              <p class="recordNote">It can change or be abandoned without claiming that the product itself changed.</p>
+            </article>
+
+            <article class="recordType recordProject">
+              <p class="recordIndex">02 / Project</p>
+              <h4>What is true in the application now?</h4>
+              <p>Project records describe the system as it exists. Epics map accepted behavior to implementation and
+                evidence. ADRs preserve durable decisions. Supporting docs explain the system around them.</p>
+              <p class="recordNote">When behavior changes, its existing Story changes with it. These records are current
+                truth, not completed tasks or snapshots of the original plan.</p>
+            </article>
+
+            <article class="recordType recordChange">
+              <p class="recordIndex">03 / Changes</p>
+              <h4>How are we moving from here to there?</h4>
+              <p>A Change is the working record for one bounded move. It keeps the scope, intended end state, decisions,
+                work status, and verification together while implementation is still moving.</p>
+              <p class="recordNote">When delivery ends, it becomes history. Any durable result is reconciled into the
+                project records.</p>
+            </article>
+          </div>
+
+          <p class="recordsSummary">Planning gives a Change its purpose. The Change guides the move. Project records are
+            reconciled to what actually shipped, then the Change becomes history.</p>
+        </section>
       </section>
 
       <section class="section processSection" id="process" aria-labelledby="process-title">
         <header class="sectionHeader">
-          <p class="sectionNumber">01 / Process</p>
+          <p class="sectionNumber">03 / Workflow</p>
           <div>
-            <h2 id="process-title">A tool-neutral lifecycle</h2>
-            <p>SDD defines the outcomes each stage must preserve. Teams can realize them with files, databases, work trackers, agents, or a combination.</p>
+            <h2 id="process-title">A tool-neutral workflow</h2>
+            <p>The method does not depend on Markdown, a CLI, a particular tracker, or an agent runtime. What matters is
+              preserving the same outcome at each stage.</p>
           </div>
         </header>
-
-        <div class="methodNote">
-          <strong>The stage describes the method.</strong>
-          <span>The paired command shows how this package maps it into a local-first workflow.</span>
-        </div>
 
         <ol class="workflow">
           <li>
             <span class="stepIndex">01</span>
             <div class="stepBody">
               <h3>Explore</h3>
-              <p>Investigate a substantial product or technical question without prematurely turning it into implementation.</p>
+              <p>Work through the product or technical question before turning it into a build plan.</p>
             </div>
-            <div class="stepMapping"><span>Package</span><code>/sdd-explore</code></div>
           </li>
           <li>
             <span class="stepIndex">02</span>
             <div class="stepBody">
               <h3>Capture intent</h3>
-              <p>Record the desired outcome now. Delay technical planning until the work is close enough to begin.</p>
+              <p>Write down what should change. Save the technical plan until the work is close enough to begin.</p>
             </div>
-            <div class="stepMapping"><span>Package</span><code>/sdd-change --brief</code></div>
           </li>
           <li>
             <span class="stepIndex">03</span>
             <div class="stepBody">
               <h3>Plan just in time</h3>
-              <p>Refine Stories, Requirements, Scenarios, technical choices, and verification against current code.</p>
+              <p>Revisit the current code, then tighten the Stories, Requirements, Scenarios, technical choices, and
+                verification.</p>
             </div>
-            <div class="stepMapping"><span>Package</span><code>/sdd-change --plan</code></div>
           </li>
           <li>
             <span class="stepIndex">04</span>
             <div class="stepBody">
               <h3>Converge the experience</h3>
-              <p>For UI-bearing work, settle flow, responsive composition, states, accessibility, and visual direction.</p>
+              <p>If the work has a UI, settle the flow, responsive behavior, states, accessibility, and visual
+                direction.</p>
             </div>
-            <div class="stepMapping"><span>Package</span><code>/sdd-design --plan</code></div>
           </li>
           <li>
             <span class="stepIndex">05</span>
             <div class="stepBody">
               <h3>Commit to a work scope</h3>
-              <p>Make the implementation-ready plan visible to the people and systems responsible for delivery.</p>
+              <p>Put the implementation-ready plan where the people and systems doing the work can find it.</p>
             </div>
-            <div class="stepMapping"><span>Package</span><code>sdd change promote</code></div>
           </li>
           <li>
             <span class="stepIndex">06</span>
             <div class="stepBody">
               <h3>Implement in verified slices</h3>
-              <p>Work Requirement by Requirement, prefer BDD/TDD, and keep Epic truth current as implementation changes.</p>
+              <p>Build one Requirement at a time, prefer BDD/TDD, and keep the Epic current as the implementation
+                changes.</p>
             </div>
-            <div class="stepMapping"><span>Package</span><code>/sdd-apply</code></div>
           </li>
           <li>
             <span class="stepIndex">07</span>
             <div class="stepBody">
               <h3>Review independently</h3>
-              <p>Inspect every changed path, trace affected callers and contracts, combine configured analyzers with risk-shaped reasoning, and report technical readiness separately from manual acceptance.</p>
+              <p>Read the whole diff. Follow the affected callers and contracts, use the configured analyzers, and keep
+                manual acceptance as a separate gate.</p>
             </div>
-            <div class="stepMapping"><span>Package</span><code>/sdd-review</code></div>
           </li>
           <li>
             <span class="stepIndex">08</span>
             <div class="stepBody">
               <h3>Reconcile and deliver</h3>
-              <p>Confirm the behavior map reflects what shipped, preserve audit history and unresolved gaps, reconcile the exact delivery diff, and follow the team's acceptance and release policy.</p>
-            </div>
-            <div class="stepMapping stepCommands" aria-label="Package pull request and release skills">
-              <span>Package</span>
-              <div>
-                <code>/sdd-pr</code>
-                <code>/sdd-release</code>
-              </div>
+              <p>Update the existing Stories and their behavior maps to match what shipped. Add a Story only for a
+                distinct durable outcome. Keep unresolved gaps visible, verify the exact delivery diff, then follow the
+                team's release policy.</p>
             </div>
           </li>
         </ol>
@@ -168,10 +377,11 @@
 
       <section class="section traceSection" id="traceability" aria-labelledby="trace-title">
         <header class="sectionHeader">
-          <p class="sectionNumber">02 / Traceability</p>
+          <p class="sectionNumber">04 / Traceability</p>
           <div>
-            <h2 id="trace-title">The specification is a code map</h2>
-            <p>Each layer answers a different question, while stable references keep the path inspectable.</p>
+            <h2 id="trace-title">The specification should tell you where to start</h2>
+            <p>An ID is useful only if it leads from a behavior to the code that owns it and the evidence that proves
+              it.</p>
           </div>
         </header>
 
@@ -195,7 +405,7 @@
             <div class="traceRow">
               <span class="traceType">Scenario</span>
               <strong>How is that behavior observed?</strong>
-              <code>R2.1</code>
+              <code>R2-S1</code>
             </div>
           </div>
 
@@ -210,7 +420,7 @@
             <dl>
               <div>
                 <dt>Scenario</dt>
-                <dd><code>LC-001/S2/R2.1</code></dd>
+                <dd><code>LC-001/S2/R2-S1</code></dd>
               </div>
               <div>
                 <dt>Implementation</dt>
@@ -226,45 +436,290 @@
         </div>
       </section>
 
-      <section class="section toolchainSection" id="toolchain" aria-labelledby="toolchain-title">
+      <section class="section exampleSection" id="example" aria-labelledby="example-title">
         <header class="sectionHeader">
-          <p class="sectionNumber">03 / Implementation</p>
+          <p class="sectionNumber">05 / Example</p>
           <div>
-            <h2 id="toolchain-title">This package is one implementation of SDD</h2>
-            <p>The methodology does not require this repository, Markdown, a CLI, a particular tracker, or a specific agent runtime.</p>
+            <h2 id="example-title">A small Epic can still answer the important questions.</h2>
+            <p>This fictional note-saving capability has one Story and one Requirement. It shows the full path from
+              product intent to code ownership and proof without burying the shape in a large example.</p>
           </div>
         </header>
 
-        <div class="toolchainGrid">
-          <section class="toolColumn" aria-labelledby="concept-title">
-            <div class="columnLabel">Portable methodology</div>
-            <h3 id="concept-title">Story-Driven Development</h3>
+        <div class="documentFrame">
+          <div class="documentPath">
+            <code>Illustrative Epic / LC-001 Saved Notes</code>
+            <span>Rendered for readability</span>
+          </div>
+
+          <nav class="epicOutline" aria-label="Example Epic sections">
+            <span>In this Epic</span>
+            <a href="#epic-outcome">Outcome</a>
+            <a href="#epic-story">Story</a>
+            <a href="#epic-implementation">Ownership</a>
+            <a href="#epic-verification">Proof</a>
+          </nav>
+
+          <article class="epicDocument markdownBody" aria-labelledby="example-epic-title">
+            <h3 class="markdownTitle" id="example-epic-title">LC-001 Saved Notes</h3>
+
+            <h4 class="markdownSection">Product Context</h4>
             <ul>
-              <li>Describe accepted behavior durably</li>
-              <li>Map behavior to implementation and evidence</li>
-              <li>Plan close enough to implementation to stay useful</li>
-              <li>Reconcile documentation as reality changes</li>
-              <li>Treat unexplained drift as a finding</li>
+              <li>Product brief: <code>Notes</code></li>
+              <li>Related project doc: <code>Persistence overview</code></li>
+              <li>Related ADR: <code>ADR-0003 Durable note storage</code></li>
             </ul>
-          </section>
-          <section class="toolColumn" aria-labelledby="package-title">
-            <div class="columnLabel">Current reference implementation</div>
-            <h3 id="package-title">Local-first SDD toolchain</h3>
+            <p>Writers need their work to survive refreshes and later sessions without wondering whether the last edit
+              reached durable storage.</p>
+
+            <h4 class="markdownSection" id="epic-outcome">Outcome</h4>
+            <p>Signed-in writers can save a valid note and load the same content later. A failed save leaves their draft
+              intact and explains what happened.</p>
+
+            <h4 class="markdownSection">Current Scope</h4>
             <ul>
-              <li>Markdown Epics, Stories, Changes, and ADRs</li>
-              <li>Repository-local <code>docs/</code> conventions</li>
-              <li>User topology in <code>~/.sdd/</code></li>
-              <li>Portable repository <code>.sdd/</code> contracts</li>
-              <li>A deterministic CLI for structure and state</li>
-              <li>Agent skills for contextual judgment</li>
+              <li>Create and update one writer-owned note.</li>
+              <li>Report save state and reload persisted content.</li>
             </ul>
-          </section>
+
+            <h4 class="markdownSection">Deferred Scope</h4>
+            <ul>
+              <li>Sharing, version history, collaborative editing, and offline conflict resolution.</li>
+            </ul>
+
+            <h4 class="markdownSection">Candidate Stories</h4>
+            <p>None. Future ideas remain outside accepted Story truth until promoted.</p>
+
+            <h4 class="markdownSection">Story Index</h4>
+            <div class="markdownTable" role="region" aria-label="Story Index" tabindex="0">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Story</th>
+                    <th>Implementation</th>
+                    <th>Verification</th>
+                    <th>Capability</th>
+                    <th>Last Verified</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>S1</code></td>
+                    <td>implemented</td>
+                    <td>verified</td>
+                    <td>Save a note.</td>
+                    <td>2026-07-22</td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h4 class="markdownSection">Stories</h4>
+            <h5 class="markdownStory" id="epic-story">Story S1: Save a note</h5>
+            <p><strong>Implementation:</strong> implemented<br><strong>Verification:</strong>
+              verified<br><strong>Created:</strong> 2026-07-01<br><strong>Modified:</strong> 2026-07-22<br><strong>Last
+                verified:</strong> 2026-07-22</p>
+            <blockquote>As a writer, I want to save my note, so that I can return to the same work later.</blockquote>
+
+            <h6 class="markdownSubsection">Requirements And Scenarios</h6>
+            <p class="markdownRequirement" role="heading" aria-level="6">Requirement R1: Durable save</p>
+            <p>The application SHALL persist valid note content for the signed-in writer and preserve the current draft
+              when persistence fails.</p>
+
+            <p class="markdownScenario" role="heading" aria-level="6">Scenario R1-S1: Save and reload</p>
+            <ul>
+              <li><strong>WHEN</strong> the writer saves a valid title and body</li>
+              <li><strong>THEN</strong> the note is persisted and the saved state is shown</li>
+              <li><strong>AND</strong> reloading returns the same title and body</li>
+            </ul>
+
+            <p class="markdownScenario" role="heading" aria-level="6">Scenario R1-S2: Persistence rejects the save</p>
+            <ul>
+              <li><strong>WHEN</strong> storage rejects the save</li>
+              <li><strong>THEN</strong> the unsaved title and body remain in the editor</li>
+              <li><strong>AND</strong> the writer sees a retryable error</li>
+            </ul>
+
+            <h6 class="markdownSubsection" id="epic-implementation">Implemented By</h6>
+            <div class="markdownTable" role="region" aria-label="Implemented By" tabindex="0">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Requirement / Scenario</th>
+                    <th>Location / Anchor</th>
+                    <th>Kind</th>
+                    <th>Responsibility</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>S1/R1</code></td>
+                    <td><code>src/notes/save-note.ts#saveNote</code></td>
+                    <td>primary</td>
+                    <td>Owns validation, persistence, and the returned save state.</td>
+                  </tr>
+                  <tr>
+                    <td><code>S1/R1-S2</code></td>
+                    <td><code>src/notes/editor.ts#handleSaveFailure</code></td>
+                    <td>support</td>
+                    <td>Preserves the active draft and presents the retryable failure.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h6 class="markdownSubsection">Implementation Gaps</h6>
+            <ul>
+              <li>None.</li>
+            </ul>
+
+            <h6 class="markdownSubsection" id="epic-verification">Verified By</h6>
+            <div class="markdownTable" role="region" aria-label="Verified By" tabindex="0">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Requirement / Scenario</th>
+                    <th>Evidence</th>
+                    <th>Proves</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>S1/R1-S1</code></td>
+                    <td>Automated test <code>test/notes/save-note.test.ts#saves and reloads a note</code></td>
+                    <td>The persisted note is returned after a fresh load.</td>
+                    <td>Passing 2026-07-22</td>
+                  </tr>
+                  <tr>
+                    <td><code>S1/R1-S2</code></td>
+                    <td>Automated test <code>test/notes/save-note.test.ts#keeps edits when save fails</code></td>
+                    <td>An injected failure preserves content and exposes a retry.</td>
+                    <td>Passing 2026-07-22</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h6 class="markdownSubsection">Verification Gaps</h6>
+            <ul>
+              <li>None.</li>
+            </ul>
+
+            <h6 class="markdownSubsection">Story Notes</h6>
+            <ul>
+              <li><code>saveNote</code> owns the save contract. The editor is supporting UI behavior, not a second
+                implementation owner.</li>
+            </ul>
+
+            <h4 class="markdownSection">Cross-Story Concerns</h4>
+            <ul>
+              <li>The authenticated writer ID scopes ownership. The server assigns modification timestamps.</li>
+            </ul>
+
+            <h4 class="markdownSection">Open Decisions</h4>
+            <ul>
+              <li>None for the accepted scope.</li>
+            </ul>
+
+            <h4 class="markdownSection">Completion Criteria</h4>
+            <p>This Epic is healthy when:</p>
+            <ul>
+              <li>Story state matches its implementation and verification maps.</li>
+              <li>Both Scenarios have named proof.</li>
+              <li>No current implementation or verification gap is hidden.</li>
+              <li>Related Changes and documentation do not contradict this Epic.</li>
+            </ul>
+
+            <h4 class="markdownSection">Notes</h4>
+            <ul>
+              <li>Paths and test titles are illustrative. The important shape is the path from accepted behavior to
+                implementation ownership and proof.</li>
+            </ul>
+          </article>
         </div>
+
+        <p class="exampleNote">Real Epics will be bigger. The useful part stays the same: accepted behavior has an
+          owner, observable Scenarios have proof or an explicit gap, and the document describes the application as it
+          exists now.</p>
+      </section>
+
+      <section class="implementationBreak" id="implementation" aria-labelledby="implementation-title">
+        <p class="sectionNumber">Part 02 / Reference implementation</p>
+        <div>
+          <h2 id="implementation-title">How I implemented SDD</h2>
+          <p>Everything above this line is the method. What follows is my current local-first implementation: Markdown
+            artifacts, portable repository contracts, private user topology, a deterministic CLI, and agent skills.</p>
+        </div>
+      </section>
+
+      <section class="section toolchainSection" id="toolchain" aria-labelledby="toolchain-title">
+        <header class="sectionHeader">
+          <p class="sectionNumber">06 / Package</p>
+          <div>
+            <h2 id="toolchain-title">A local-first CLI and a set of agent skills</h2>
+            <p>The CLI owns structure, configuration, and deterministic state transitions. The skills handle the
+              contextual work: planning, implementation, review, reconciliation, and release judgment.</p>
+          </div>
+        </header>
+
+        <section class="defaultLayout" aria-labelledby="default-layout-title">
+          <div class="defaultLayoutHeader">
+            <p class="columnLabel">Default filesystem layout</p>
+            <div>
+              <h3 id="default-layout-title">The three record types get separate homes.</h3>
+              <p>Planning stays idea-owned and private by default. Project truth and active work live with the code.
+                <code>~/.sdd/config.yaml</code> maps those private relationships, while each repository commits its own
+                portable <code>.sdd/config.yaml</code>.
+              </p>
+            </div>
+          </div>
+
+          <div class="recordTypes implementationRecords">
+            <article class="recordType recordPlanning implementationRecord">
+              <p class="recordIndex">01 / Planning</p>
+              <h4>Idea-owned context</h4>
+              <pre aria-label="Default planning document layout"><code>&lt;planning-root&gt;/&lt;idea&gt;/
+  prd.md
+  exploration/
+  planned-changes/</code></pre>
+              <p class="recordNote">Product direction, exploratory notes, Change Briefs, and planned Change drafts stay
+                here until work is ready to enter a repository.</p>
+            </article>
+
+            <article class="recordType recordProject implementationRecord">
+              <p class="recordIndex">02 / Project</p>
+              <h4>Repository-owned truth</h4>
+              <pre aria-label="Default project document layout"><code>&lt;repository&gt;/docs/
+  epics/&lt;epic&gt;/epic.md
+  adrs/&lt;date&gt;-&lt;decision&gt;.md
+  audits/</code></pre>
+              <p class="recordNote">Epics hold durable behavior and evidence maps. ADRs keep lasting decisions. Audits
+                remain point-in-time advisory records.</p>
+            </article>
+
+            <article class="recordType recordChange implementationRecord">
+              <p class="recordIndex">03 / Changes</p>
+              <h4>Repository-owned work</h4>
+              <pre aria-label="Default Change document layout"><code>&lt;repository&gt;/docs/changes/
+  &lt;date&gt;-&lt;change&gt;/
+    proposal.md
+    design.md
+    tasks.md
+  closed/</code></pre>
+              <p class="recordNote">Promotion moves a planned Change here. Closeout moves it under
+                <code>docs/changes/closed/</code> after project truth has been reconciled.
+              </p>
+            </article>
+          </div>
+        </section>
 
         <div class="packageLayers">
           <div class="packageLayersHeading">
-            <p class="columnLabel">Inside this implementation</p>
-            <h3>Judgment where it matters. Automation where it helps.</h3>
+            <p class="columnLabel">Two layers share the work</p>
+            <h3>Some work should be deterministic. The rest needs judgment.</h3>
           </div>
           <div class="toolchainGrid">
             <section class="toolColumn" aria-labelledby="cli-title">
@@ -294,12 +749,38 @@
           </div>
         </div>
 
+        <section class="implementationWorkflow" aria-labelledby="implementation-workflow-title">
+          <div class="referenceHeading">
+            <p class="columnLabel">Method to package</p>
+            <div>
+              <h3 id="implementation-workflow-title">The general workflow maps to concrete entry points.</h3>
+              <p>The commands below are conveniences provided by this package. They implement the stages above; they do
+                not define the methodology.</p>
+            </div>
+          </div>
+          <ol class="workflowMap">
+            <li><span>01</span><strong>Explore</strong><code>/sdd-explore</code></li>
+            <li><span>02</span><strong>Capture intent</strong><code>/sdd-change --brief</code></li>
+            <li><span>03</span><strong>Plan just in time</strong><code>/sdd-change --plan</code></li>
+            <li><span>04</span><strong>Converge the experience</strong><code>/sdd-design --plan</code></li>
+            <li><span>05</span><strong>Commit to a work scope</strong><code>sdd change promote</code></li>
+            <li><span>06</span><strong>Implement in verified slices</strong><code>/sdd-apply</code></li>
+            <li class="workflowMapMulti"><span>07</span><strong>Review independently</strong>
+              <div><code>/sdd-review</code><code>/sdd-epic-verify</code></div>
+            </li>
+            <li class="workflowMapMulti"><span>08</span><strong>Reconcile and deliver</strong>
+              <div><code>/sdd-pr</code><code>/sdd-release</code></div>
+            </li>
+          </ol>
+        </section>
+
         <section class="referenceLifecycle" aria-labelledby="reference-lifecycle-title">
           <div class="referenceHeading">
             <p class="columnLabel">Optional component lifecycle</p>
             <div>
-              <h3 id="reference-lifecycle-title">Standardize after use, not before it.</h3>
-              <p>Shared catalogs can incubate reusable patterns without becoming mandatory application dependencies.</p>
+              <h3 id="reference-lifecycle-title">Standardize patterns after they survive real use.</h3>
+              <p>A shared catalog can incubate reusable patterns without turning them into mandatory application
+                dependencies.</p>
             </div>
           </div>
           <ol class="referenceFlow">
@@ -309,18 +790,21 @@
             <li><span>04</span><strong>Validate</strong><small>Prove it in a real consumer.</small></li>
             <li><span>05</span><strong>Standardize</strong><small>Promote only with evidence.</small></li>
           </ol>
-          <p class="referenceNote">Application-specific components and deliberate divergences remain valid outcomes.</p>
+          <p class="referenceNote">An application can still keep its own component or deliberately diverge. That is a
+            valid outcome.</p>
         </section>
 
         <div class="commandBlock">
           <div class="commandHeader">
             <span>Install once, initialize each repository</span>
-            <button class="copyButton" id="copy-command" type="button" data-copy="git clone https://github.com/TaylorHuston/sdd-skills.git&#10;cd sdd-skills&#10;npm install&#10;npm link&#10;sdd setup&#10;cd /path/to/repository&#10;sdd init&#10;sdd doctor" aria-label="Copy installation and initialization commands">
+            <button class="copyButton" id="copy-command" type="button"
+              data-copy="git clone https://github.com/TaylorHuston/sdd-skills.git&#10;cd sdd-skills&#10;npm install&#10;npm link&#10;sdd setup&#10;cd /path/to/repository&#10;sdd init&#10;sdd doctor"
+              aria-label="Copy installation and initialization commands">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
                 <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
               </svg>
-              <span>Copy</span>
+              <span aria-live="polite">Copy</span>
             </button>
           </div>
           <pre><code><span class="prompt">$</span> git clone https://github.com/TaylorHuston/sdd-skills.git
@@ -331,22 +815,29 @@
 <span class="prompt">$</span> cd /path/to/repository
 <span class="prompt">$</span> sdd init
 <span class="prompt">$</span> sdd doctor</code></pre>
-          <p class="commandNote"><strong>Pre-1.0 distribution:</strong> install from the GitHub checkout for now. A standard npm registry install is targeted for the 1.0 release.</p>
+          <p class="commandNote"><strong>Pre-1.0 distribution:</strong> install from the GitHub checkout for now. A
+            standard npm registry install is targeted for the 1.0 release. <a
+              href="https://github.com/TaylorHuston/sdd-skills/blob/main/CHANGELOG.md">See what changed <span
+                aria-hidden="true">→</span></a></p>
         </div>
       </section>
 
       <section class="closingBand" aria-labelledby="closing-title">
         <p class="sectionNumber">The North Star</p>
-        <h2 id="closing-title">Keep implemented behavior, code, and evidence in agreement.</h2>
-        <p>No stale planning wiki. No game of telephone. No mystery about where to begin when something breaks.</p>
-        <a class="primaryAction" href="https://github.com/TaylorHuston/sdd-skills">Read the documentation</a>
+        <h2 id="closing-title">Keep the map honest.</h2>
+        <p>That is the whole point. If the docs say one thing and the code does another, fix the disagreement. The next
+          developer should know where to begin.</p>
+        <a href="https://github.com/TaylorHuston/sdd-skills">Continue to the repository documentation <span
+            aria-hidden="true">→</span></a>
       </section>
     </main>
+  </div>
 
-    <footer class="siteFooter">
-      <span>Story-Driven Development</span>
-      <span>Methodology first. Tooling optional. Evidence-backed.</span>
-      <a href="https://github.com/TaylorHuston/sdd-skills">GitHub repository</a>
-    </footer>
-  </body>
+  <footer class="siteFooter">
+    <span>Story-Driven Development</span>
+    <span>Still evolving. The repository is the current source of truth.</span>
+    <a href="https://github.com/TaylorHuston/sdd-skills">GitHub repository</a>
+  </footer>
+</body>
+
 </html>

@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import os
 import json
+import math
+import os
 import re
 import subprocess
 import sys
@@ -51,9 +52,31 @@ LINK_RE = re.compile(r"\[[^\]]+\]\((?P<target>[^)]+)\)")
 BACKTICK_RE = re.compile(r"`([^`]+)`")
 GLOB_RE = re.compile(r"[*?\[]")
 FRONTMATTER_ID_RE = re.compile(r"^id:\s*['\"]?([^'\"\s]+)", re.MULTILINE)
+DEFAULT_GIT_TIMEOUT_SECONDS = 10.0
+MAX_GIT_TIMEOUT_SECONDS = 60.0
+GIT_TIMEOUT_ENV = "SDD_ORPHAN_AUDIT_GIT_TIMEOUT_SECONDS"
 
 
-def run_git_paths(root: Path, args: list[str]) -> list[str] | None:
+def git_timeout_seconds() -> float:
+    raw = os.environ.get(GIT_TIMEOUT_ENV)
+    if raw is None:
+        return DEFAULT_GIT_TIMEOUT_SECONDS
+    try:
+        timeout = float(raw)
+    except ValueError as error:
+        raise ValueError(
+            f"{GIT_TIMEOUT_ENV} must be a positive number of seconds."
+        ) from error
+    if not math.isfinite(timeout) or timeout <= 0 or timeout > MAX_GIT_TIMEOUT_SECONDS:
+        raise ValueError(
+            f"{GIT_TIMEOUT_ENV} must be greater than 0 and no more than "
+            f"{MAX_GIT_TIMEOUT_SECONDS:g} seconds."
+        )
+    return timeout
+
+
+def run_git_paths(root: Path, args: list[str], operation: str) -> list[str] | None:
+    timeout = git_timeout_seconds()
     try:
         result = subprocess.run(
             ["git", "-C", str(root), *args],
@@ -61,28 +84,90 @@ def run_git_paths(root: Path, args: list[str]) -> list[str] | None:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=False,
+            timeout=timeout,
         )
+    except subprocess.TimeoutExpired:
+        raise ValueError(
+            f"Git command timed out after {timeout:g} seconds while {operation}; "
+            f"verify Git is responsive and retry for: {root}"
+        ) from None
     except (OSError, subprocess.CalledProcessError):
         return None
     return [part.decode("utf-8", errors="replace") for part in result.stdout.split(b"\0") if part]
 
 
+def require_git_paths(root: Path, args: list[str], operation: str) -> list[str]:
+    paths = run_git_paths(root, args, operation)
+    if paths is None:
+        raise ValueError(
+            f"Git command failed while {operation}; "
+            f"verify Git repository state and retry for: {root}"
+        )
+    return paths
+
+
 def run_git_files(root: Path) -> list[str] | None:
-    cached = run_git_paths(root, ["ls-files", "-z", "--cached"])
+    cached = run_git_paths(
+        root,
+        ["ls-files", "-z", "--cached"],
+        "listing tracked files",
+    )
     if cached is None:
         return None
-    untracked = run_git_paths(root, ["ls-files", "-z", "--others", "--exclude-standard"]) or []
-    deleted = set(run_git_paths(root, ["ls-files", "-z", "--deleted"]) or [])
-    return sorted((set(cached) | set(untracked)) - deleted)
+    untracked = run_git_paths(
+        root,
+        ["ls-files", "-z", "--others", "--exclude-standard"],
+        "listing untracked files",
+    )
+    if untracked is None:
+        return None
+    deleted = run_git_paths(
+        root,
+        ["ls-files", "-z", "--deleted"],
+        "listing deleted files",
+    )
+    if deleted is None:
+        return None
+    return sorted((set(cached) | set(untracked)) - set(deleted))
 
 
 def changed_files(root: Path, ref: str, inventory: set[str]) -> list[str]:
-    committed = run_git_paths(root, ["diff", "--name-only", "-z", f"{ref}...HEAD", "--"])
-    if committed is None:
-        raise ValueError(f"Unable to resolve changed-file scope from Git ref: {ref}")
-    unstaged = run_git_paths(root, ["diff", "--name-only", "-z", "--"]) or []
-    staged = run_git_paths(root, ["diff", "--cached", "--name-only", "-z", "--"]) or []
-    untracked = run_git_paths(root, ["ls-files", "-z", "--others", "--exclude-standard"]) or []
+    resolved = run_git_paths(
+        root,
+        ["rev-parse", "--verify", "--end-of-options", f"{ref}^{{commit}}"],
+        "resolving the changed-file baseline",
+    )
+    if not resolved:
+        raise ValueError(
+            f"Unable to resolve changed-file scope from Git ref: {ref}; "
+            f"verify the ref and Git repository state, then retry for: {root}"
+        )
+    commit = resolved[0].strip()
+    if not re.fullmatch(r"[0-9a-fA-F]{40,64}", commit):
+        raise ValueError(
+            f"Unable to resolve changed-file scope from Git ref: {ref}; "
+            f"verify the ref and Git repository state, then retry for: {root}"
+        )
+    committed = require_git_paths(
+        root,
+        ["diff", "--name-only", "-z", "--end-of-options", f"{commit}...HEAD", "--"],
+        "comparing the changed-file baseline",
+    )
+    unstaged = require_git_paths(
+        root,
+        ["diff", "--name-only", "-z", "--"],
+        "listing unstaged changes",
+    )
+    staged = require_git_paths(
+        root,
+        ["diff", "--cached", "--name-only", "-z", "--"],
+        "listing staged changes",
+    )
+    untracked = require_git_paths(
+        root,
+        ["ls-files", "-z", "--others", "--exclude-standard"],
+        "listing untracked changes",
+    )
     return sorted((set(committed) | set(unstaged) | set(staged) | set(untracked)) & inventory)
 
 

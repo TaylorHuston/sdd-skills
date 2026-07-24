@@ -788,6 +788,8 @@ function configuredRepositories(config, selectedSpaces, requested) {
   const available = selectedSpaces.flatMap(([spaceId, space]) =>
     (space.repositories ?? []).map((repository) => ({
       ...repository,
+      ...(repository.id ? { id: repository.id } : {}),
+      ...(repository.artifacts ? { artifacts: repository.artifacts } : {}),
       spaceId,
       resolvedPath: normalizePath(resolveRepositoryPath(config, repository)),
     })),
@@ -1149,7 +1151,18 @@ async function validatePlannedChanges(workspaceRoot, config, selectedSpaces, { c
   for (const [spaceId, space] of selectedSpaces) {
     const planningPath = normalizePath(resolveIdeaPlanningPath(config, spaceId, space));
     const plannedRoot = normalizePath(join(planningPath, config.planning.plannedChangesDirectory));
+    const planningAbsoluteRoot = resolveWorkspacePath(workspaceRoot, planningPath);
     const plannedAbsoluteRoot = resolveWorkspacePath(workspaceRoot, plannedRoot);
+    if (!(await isPathPhysicallyInside(planningAbsoluteRoot, plannedAbsoluteRoot))) {
+      findings.push(finding(
+        "error",
+        "UNSAFE_ARTIFACT_PATH",
+        plannedRoot,
+        "Planned Changes directory resolves outside its planning owner.",
+        { spaceId, artifactType: "planned-change" },
+      ));
+      continue;
+    }
     const ids = (await listDirectories(plannedAbsoluteRoot)).filter((id) => !changeId || id === changeId);
     for (const id of ids) {
       changeLocations.push({ spaceId, changeId: id, path: normalizePath(join(plannedRoot, id)) });

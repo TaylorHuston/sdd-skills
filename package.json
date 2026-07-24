@@ -1,6 +1,6 @@
 {
   "name": "@taylorhuston/sdd",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "CLI and agent skills for Story-Driven Development.",
   "type": "module",
   "bin": {
@@ -17,6 +17,8 @@
     "schemas",
     "skills",
     "src",
+    "!**/__pycache__/**",
+    "!**/*.pyc",
     "!**/*.sync-conflict-*"
   ],
   "scripts": {

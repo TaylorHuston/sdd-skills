@@ -1,0 +1,201 @@
+# Review: Harden CLI Trust Boundaries
+
+## Historical Verdict
+
+changes-requested
+
+This scorecard and verdict are the immutable historical review of candidate `c477e4a`. Later Apply logs/checkmarks record remediation progress but do not replace this reviewed watermark. A fresh independent review must produce the current scorecard after the remaining S2/S3 findings are resolved.
+
+This Change was reviewed as part of the cumulative `v0.11.0` candidate. The complete bundle, UI matrix, branch evidence, and release-candidate analysis are recorded in [`../2026-07-22-harden-audit-report-integrity/review.md`](../2026-07-22-harden-audit-report-integrity/review.md).
+
+## Gate Scorecard
+
+| Gate | Result | Notes |
+|---|---|---|
+| Change artifacts | findings | The Epic evidence overstates one lineage Scenario and the ledger is stale after production integration. |
+| Change status | findings | Implementation invalidation requires `in_review` to return to `in_progress`. |
+| Epic truth | findings | S1/R4-S2 lacks proof for self-referential and non-versioned predecessors. |
+| Canonical map authority | pass | One current implementation and verification map per Story. |
+| Requirements and Scenarios | findings | Claimed lineage cases are not fully exercised. |
+| Story reference traceability | pass after safe fix | Two later S5 anchors were corrected in the shared Epic. |
+| Reverse traceability | findings | The cumulative candidate contains unowned workflow/site behavior; the follow-up Change owns replanning. |
+| Tests and verification | findings | Broad suite passes, but trust-boundary falsification exposed current defects. |
+| Verification scope and aggregate candidate | findings | Fresh aggregate pass does not override missing adversarial cases. |
+| Semantic anchor ownership | pass | Current mapped implementation anchors resolve. |
+| Evidence falsification | findings | Topology, concurrency, containment, and Git-option probes fail. |
+| Pattern conformance | findings | Validator and shipped report template disagree. |
+| Boundary contracts | findings | Repository artifact ownership and planning-path confinement can cross owners. |
+| Stateful transitions | findings | Concurrent repository initialization loses a writer. |
+| Rendered UI verification | not applicable | This Change's declared scope has no UI. |
+| Manual UI confirmation | not applicable | This Change's declared scope has no UI. |
+| Code review | findings | Two blocking and five required implementation defects remain across the cumulative code. |
+| Visual / UX consistency | not applicable | This Change's declared scope has no UI. |
+| Security review | findings | Option injection and cross-owner path risks remain. |
+| Documentation | findings | Review handoff and production-integration claims are stale. |
+| Idea repository / current-state truth | not applicable | Repository-only package. |
+| Release communication | findings | Shared cumulative ownership must be replanned before release. |
+| Branch and merge readiness | findings | Correctness findings block readiness. |
+| Prospective integration candidate | pass for conflict only | Conflict-free does not mean review-ready. |
+| PRD alignment | not applicable | No PRD governs this Change. |
+
+## Findings
+
+### BLOCKING
+
+- [x] `src/epic-verify-report.js:27` and `docs/templates/epic-verify-report.md:50` - Resolved by the follow-up Change in `3d7bffa`; runtime and the real shipped template share an 18-gate contract.
+- [ ] `src/workspace.js:91` - Repository-only context can replace an existing same-ID Idea and global artifact defaults, redirecting unrelated mapped repositories. Recommendation: reject the collision and keep artifacts local to the synthetic repository.
+
+### REQUIRED
+
+- [x] `src/epic-verify-report.js:124` - Resolved by the follow-up Change in `3d7bffa`; recognized schema-less reports fail deterministically.
+- [x] `src/epic-verify-report.js:253` - Resolved by the follow-up Change in `3d7bffa`; aligned proof requires exact current Epic, repository, and audited-ref scope.
+- [ ] `src/commands/init-installation.js:140` - Concurrent initialization can report two successes and retain one writer. Recommendation: lock or publish with expected absence.
+- [ ] `src/config.js:428` and `src/commands/validate.js:1145` - `plannedChangesDirectory` can escape its planning owner. Recommendation: enforce relative configuration and physical containment.
+- [x] `skills/sdd-orphan-audit/scripts/sdd_orphan_audit.py:56` - Resolved by the follow-up Change in `3d7bffa`; immutable ref resolution, option barriers, bounded Git children, and adversarial tests pass.
+- [x] `docs/epics/sdd-e001-reliable-cli-operations/epic.md:127` - Resolved by the follow-up Change in `3d7bffa`; self-referential and non-versioned predecessor tests now back the Scenario.
+- [ ] `docs/changes/2026-07-20-harden-cli-trust-boundaries/tasks.md:173` - Reconcile the review handoff with the actual merge into `main@7e9a2be` and the current cumulative candidate.
+
+### SUGGESTION
+
+- [ ] `src/commands/init.js:98` and `src/commands/init-installation.js:93` - Surface cleanup failures through the existing mutation-recovery error contract.
+
+## Verification Evidence
+
+| Command / Scenario | Evidence Type | Requirement / Scenario | Result | What It Proves |
+|---|---|---|---|---|
+| `npm run check` | aggregate candidate gate | cumulative candidate | pass; 179 tests | Existing suite remains green, but does not exercise the findings. |
+| 84 focused mutation, topology, report, lifecycle, and diagnostics tests | focused automated tests | S1-S4 | pass | Existing covered behavior remains stable. |
+| temporary report/topology/init/path/Git probes | adversarial falsification | S1-S3 trust boundaries | findings | Each current defect reproduced outside the existing suite. |
+| `sdd validate ... --change 2026-07-20-harden-cli-trust-boundaries --changed-from v0.11.0` | deterministic SDD gate | Change and Epic | initial findings | Two stale shared S5 anchors were found and safely corrected. |
+| changed-surface orphan audit | reverse traceability | cumulative candidate | findings | No broken mapped references; broader ownership gaps remain. |
+
+## Verification Scope And Candidate Gates
+
+- Project-defined aggregate command or authoritative constituent source: `npm run check`
+- Aggregate gate required: yes
+- Trigger or project-policy reason: trust-boundary and cross-command mutation changes.
+- Cache/freshness policy: fresh local execution.
+- Post-gate evidence-record-only changes and affected checks rerun: recorded in the cumulative review.
+
+| Stage | Exact Commit / Tree | Command | Meaningful Execution / Counts | Result |
+|---|---|---|---|---|
+| Reviewed source candidate | `c477e4aedbb118b88dac5f2a0d97b1e8bcbbe2df` / `cd1c5593e482c392a7cf80c9c59e6716ec75cfc9` | `npm run check` | 179 tests | pass with review findings |
+| Prospective integration candidate | `cd1c5593e482c392a7cf80c9c59e6716ec75cfc9` | merge-tree conflict check | byte-identical tree | conflict pass; correctness findings |
+| Actual integrated result | `main@7e9a2bef9811f623583232c554417ae08ddc9373` | history inspection | original implementation already merged | findings discovered post-integration |
+
+## Boundary And Conservation Review
+
+- Boundary Contract Matrix status and exact proof: findings for artifact ownership, planning containment, and Git argument handling.
+- Capability identifier issuer, scope, lifetime, and invalid-reuse proof: not applicable.
+- Content-budget and provider-visible provenance conservation: not applicable.
+- Filesystem ancestor/confinement validation before mutation and fail-closed no-write proof: current symlink/CAS tests pass; two additional boundary findings remain.
+
+## Rendered UI Verification
+
+Not applicable to the declared scope of this Change. The follow-up Change owns the cumulative site's rendered review.
+
+## Review Bundle
+
+- Source branch/ref: `develop@a670fa28ebfd4df175217b60a74d92cfee520c74` plus tracked working-tree content
+- Reviewed source commit: synthetic snapshot `c477e4aedbb118b88dac5f2a0d97b1e8bcbbe2df`
+- Target branch/ref: `main@7e9a2bef9811f623583232c554417ae08ddc9373`
+- Merge base: `a670fa28ebfd4df175217b60a74d92cfee520c74`
+- Changed files and diff stat: 74 files, 10,317 insertions, 1,278 deletions from `v0.11.0`
+- Conflict check: pass
+- Prospective integration tree: `cd1c5593e482c392a7cf80c9c59e6716ec75cfc9`
+- Dirty state: four pre-review product files plus review-authorized artifacts and safe fixes
+- Branch policy: production target; review does not authorize merge, push, close, release, or PR
+- Reverse-traceability result: no broken mapped refs; 22 cumulative source candidates need ownership classification
+
+## Reverse Traceability
+
+- Candidate scope: cumulative `v0.11.0` through reviewed snapshot.
+- Epic ownership reconciled: no; follow-up replanning owns the broader skill/site decision.
+- Support/generated/framework classifications: mirrored templates and non-behavioral assets only.
+- Stranded refactor surfaces checked: CLI modules, workflow skills, bundled scripts, site behavior, and tests.
+- Explicit gaps or tracked cleanup: current findings above and the follow-up review.
+
+## Discovery Wave
+
+| Pass | Reviewer | Result | Notes |
+|---|---|---|---|
+| Artifact truth and reverse traceability | independent subreview | findings | overstated evidence and stale ledger |
+| Code, verification, pattern, boundary, and state | independent subreview | findings | seven reproduced defects/gaps |
+| Security and mutation safety | independent subreview | findings | option injection and cross-owner boundaries |
+| UI / visual identity | independent browser review | not applicable here | recorded against follow-up Change |
+| Integration readiness | primary | findings | already integrated implementation needs correction |
+
+## Consolidated Remediation
+
+- Root causes addressed: two exact shared Epic anchors were corrected.
+- Safe-fix batch: evidence-anchor spelling only for this Change.
+- Deferred or unsafe findings: implementation defects, missing adversarial tests, ledger reconciliation.
+- Affected verification union: aggregate suite, scoped validation, reverse traceability, skill/package gates.
+- Regression-focused rereview: required after Apply.
+- New regressions introduced by remediation: none observed.
+
+## PR / Merge Readiness
+
+- Source branch: `develop`
+- Reviewed source commit: `c477e4aedbb118b88dac5f2a0d97b1e8bcbbe2df`
+- Target branch: `main`
+- Tested integration tree/ref: `cd1c5593e482c392a7cf80c9c59e6716ec75cfc9`
+- Actual integrated tree matches tested tree: no; `main` contains the earlier committed implementation but not current Steel/site work
+- Required aggregate rerun after drift: yes
+- Conflict check: pass
+- Commit state: cumulative candidate not fully committed
+- PR status: not requested
+- Merge status: earlier implementation merged; no current merge requested
+
+## Review Log
+
+- 2026-07-22: Deep cumulative review created. Verdict `changes-requested`; implementation findings require `/sdd-apply`.
+- 2026-07-22: Post-fix recheck passed `npm run check` (179/179), scoped SDD validation (0 errors, 0 warnings), `sdd doctor`, package/diff checks, and the shared rendered regression; current implementation and ownership findings remain open.
+- 2026-07-23: Follow-up Apply resolved the shared S1/S5 and ownership findings, passed 197-test source and prospective-integration gates, and left only this Change's S2/S3 repository ownership, concurrent initialization, and planned-path confinement findings open.
+
+## Current Re-Review — 2026-07-23
+
+### Verdict
+
+ready
+
+The historical `changes-requested` result above remains immutable evidence for `c477e4a`. The coordinated implementation candidate `6086e07` resolves its S2/S3 findings; the review-authorized record reconciliation is documentation-only and is revalidated with the companion Change. This Change remains `in_review`: readiness is technical, not authorization to close, release, merge, or push.
+
+### Current Gate Summary
+
+| Gate | Result | Notes |
+|---|---|---|
+| Change/Epic artifacts and traceability | pass | Scoped validation has 0 errors and the intentional large-Story warning only. |
+| Reverse traceability | pass after safe remediation | 27 candidates; zero unowned source, missing refs, or unverified tests after adding the two schema ownership anchors. |
+| Code, security, boundary, and transition review | pass | Independent review found no implementation defect; focused adversarial regressions pass. |
+| Aggregate source candidate | pass | `npm run check` passed 212 tests plus CLI help. |
+| Exact `develop -> main` integration candidate | pass | Conflict-free tree `8aed3a589d26751420a9c20a0f3a8ecc85657303` passed the aggregate gate before documentation-only reconciliation. |
+| Documentation and release communication | pass after safe remediation | README and CHANGELOG now state that planning paths are lexically and physically confined. |
+| Rendered UI and manual confirmation | pass / user confirmed | Site assets are unchanged from the full rendered matrix; current desktop/mobile rendering is clean, and the owner confirmed the companion Steel candidate for release on 2026-07-23. |
+| Branch and merge readiness | ready for release handoff | `main` is production; `/sdd-release`, not this review, owns any PR or release action. |
+
+### Current Review Log
+
+- 2026-07-23: Independent cumulative re-review found two missing schema ownership anchors and stale handoff/release wording. The safe record batch corrected them; no implementation or security finding remained.
+
+## PR Remediation Re-Review — 2026-07-24
+
+### Verdict
+
+ready for remote rereview
+
+`55f7b73` fixes the current PR's repository-only status regression: repository roots remain valid relative paths and `status` retains the repository's committed artifact layout. The aggregate source candidate is clean; this review does not authorize merge.
+
+### Evidence
+
+| Gate | Result |
+|---|---|
+| Aggregate package gate | `npm run check` passed 214 tests plus CLI help. |
+| Scoped structural validation | Both active Changes passed with 0 errors and one intentional large-Story warning each. |
+| Reverse traceability | `SDD-E001` audit found 29 candidates and zero ownership or verification gaps. |
+| Package/security | `npm pack --dry-run` listed 106 files; production audit reported 0 vulnerabilities. |
+| Exact integration tree | `git merge-tree --write-tree origin/main 55f7b73` produced `15429fcd8e10ab6172816302a6308c04edb6da87`, identical to the source tree. |
+
+### Review Log
+
+- 2026-07-24: Current PR feedback reproduced the repository-only status defect. TDD remediation added an exact CLI regression and passed all required local gates. A configured remote rereview is required after push.

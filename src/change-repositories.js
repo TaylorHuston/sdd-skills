@@ -8,6 +8,8 @@ function normalizePath(value) {
 export function resolvedActiveRepositories(config, space) {
   return (space.repositories ?? []).map((repository) => ({
     ...repository,
+    ...(repository.id ? { id: repository.id } : {}),
+    ...(repository.artifacts ? { artifacts: repository.artifacts } : {}),
     status: resolveWorkspaceStatus(repository.status),
     resolvedPath: normalizePath(resolveRepositoryPath(config, repository)),
   })).filter((repository) => repository.status === "active");
