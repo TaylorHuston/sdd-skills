@@ -5,11 +5,11 @@ status: in_review
 
 ## Resume Here
 
-- Last completed action: implementation was committed and both coordinated Changes entered `in_review` at `develop@6086e07`; the independent cumulative review is now reconciling its records.
-- Next action: complete the independent review, retain `in_review` until owner UI confirmation, then use `/sdd-release` for any production handoff.
-- Active branch/ref: review source `develop@6086e07`; target `main@7e9a2be`; merge base `a670fa2`.
-- Expected dirty files: only review-authorized Epic, ledger, review-record, and changelog reconciliation; the review will commit them as one safe batch.
-- Known blockers: no implementation blocker. Owner confirmation of the exact current documentation candidate remains pending before closeout or release action.
+- Last completed action: independent review passed at `develop@c9c3cb0`; the owner confirmed the exact Steel documentation candidate for release.
+- Next action: commit the confirmed `0.12.0` release metadata, push `develop`, and open the policy-defined `develop -> main` handoff PR.
+- Active branch/ref: release source `develop@c9c3cb0` before release metadata; target `main@7e9a2be`; merge base `a670fa2`.
+- Expected dirty files: only the confirmed release version, changelog, and acceptance/release records until the release-metadata commit.
+- Known blockers: none for release handoff; merge, tag, publish, deploy, and closeout remain outside this workflow's authority.
 
 ## Task Checklist
 
@@ -60,7 +60,7 @@ status: in_review
 - [x] 5.3 Record one immutable cumulative review-handoff candidate shared by both active Changes.
 - [x] 5.4 Transition to `in_review` only after implementation, evidence, Epic truth, aggregate/integration gates, and rendered verification are current.
 - [x] 5.5 Run a fresh independent `/sdd-review`; do not reuse the `373aff7` verdict after material remediation.
-- [ ] 5.6 Keep manual UI confirmation `pending user` until the owner confirms the exact final Steel candidate.
+- [x] 5.6 Owner confirmed the exact final Steel candidate for the `0.12.0` release handoff.
 - [ ] 5.7 Do not push, create a PR, merge, close, tag, publish, or release without the owning workflow and current authorization.
 
 ## Implementation Ledger
@@ -213,11 +213,12 @@ status: in_review
 
 ## Manual UI Confirmation
 
-- Status: pending user
+- Status: user confirmed
 - App URL / route: public/local one-page guide root.
-- Required setup or test data: exact final committed Steel site served locally or from the candidate deployment.
+- Required setup or test data: exact Steel site at `develop@c9c3cb0`, served locally or from the candidate deployment.
 - Steps for the user: inspect the problem/methodology first half, example Epic, package implementation half, desktop/mobile navigation, and copy command feedback.
 - Expected result: reads as restrained documentation; durable Story semantics and package boundaries are clear; navigation and copy interaction feel predictable.
+- Owner confirmation: 2026-07-23; accepted for the `0.12.0` release handoff.
 - Feedback that would change artifacts: content hierarchy, Story framing, visual identity, responsive/navigation behavior, or interaction feedback that no longer matches the accepted direction.
 
 ## Visual Verification Matrix
@@ -280,8 +281,8 @@ status: in_review
 - Verification Scope Decision current and required candidate gates passed: current aggregate source and structural gates pass; independent review remains required.
 - Immutable implementation handoff candidate: `6086e07`; the subsequent review-record commit is artifact-only and independently revalidated.
 - Tested integration candidate matches actual integrated tree, or rerun recorded: rerun is required before release if the eventual integration tree differs materially.
-- Manual UI confirmation status: pending user.
+- Manual UI confirmation status: user confirmed on 2026-07-23 for `develop@c9c3cb0`.
 - Rendered UI verification status: current source `373aff7` independently passed the full matrix.
-- PR / merge state: no current PR/merge action authorized.
+- PR / merge state: `/sdd-release` is authorized to open the `develop -> main` PR; merge remains unapproved.
 - Deferred scope accepted: legacy report rewrite, automatic baseline inference, optional favicon/touch polish.
 - Change moved to `docs/changes/closed/`: no.

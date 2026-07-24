@@ -171,7 +171,7 @@ The historical `changes-requested` result above remains immutable evidence for `
 | Aggregate source candidate | pass | `npm run check` passed 212 tests plus CLI help. |
 | Exact `develop -> main` integration candidate | pass | Conflict-free tree `8aed3a589d26751420a9c20a0f3a8ecc85657303` passed the aggregate gate before documentation-only reconciliation. |
 | Documentation and release communication | pass after safe remediation | README and CHANGELOG now state that planning paths are lexically and physically confined. |
-| Rendered UI and manual confirmation | pass / pending user | Site assets are unchanged from the full rendered matrix; current desktop/mobile rendering is clean. Owner confirmation remains pending in the companion Change. |
+| Rendered UI and manual confirmation | pass / user confirmed | Site assets are unchanged from the full rendered matrix; current desktop/mobile rendering is clean, and the owner confirmed the companion Steel candidate for release on 2026-07-23. |
 | Branch and merge readiness | ready for release handoff | `main` is production; `/sdd-release`, not this review, owns any PR or release action. |
 
 ### Current Review Log

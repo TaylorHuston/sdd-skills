@@ -171,7 +171,7 @@ The earlier `c477e4aedbb118b88dac5f2a0d97b1e8bcbbe2df` review remains historical
 
 ready
 
-The historical `changes-requested` verdict above is retained as evidence for `373aff7`. The coordinated implementation candidate `6086e07` resolves every recorded S1/R4, S2, and S3 finding. This review's record reconciliation is documentation-only and revalidated before its containing commit. Both Changes remain `in_review`; technical readiness does not authorize owner acceptance, release, PR creation, merge, push, or closeout.
+The historical `changes-requested` verdict above is retained as evidence for `373aff7`. The coordinated implementation candidate `6086e07` resolves every recorded S1/R4, S2, and S3 finding. This review's record reconciliation is documentation-only and revalidated before its containing commit. The owner confirmed the exact Steel candidate at `develop@c9c3cb0` on 2026-07-23. Both Changes remain `in_review`; the release workflow may open its PR, while merge and closeout remain separately authorized.
 
 ### Current Gate Scorecard
 
@@ -186,7 +186,7 @@ The historical `changes-requested` verdict above is retained as evidence for `37
 | Pattern, boundary, stateful-transition, and security review | pass | Independent code/security pass found no remaining actionable defect. |
 | Package and skill integrity | pass | `npm pack --dry-run` contains 106 expected files; 14 bundled skill files passed structural frontmatter validation. |
 | Rendered UI verification | pass | Full desktop/tablet/mobile/interactions matrix remains applicable because `site/` is unchanged since `666de8f`; current desktop and 375px rendering were directly inspected, with no horizontal overflow or console error. Only `/favicon.ico` returns 404. |
-| Manual UI confirmation | pending user | Owner confirmation of the exact Steel documentation candidate remains a release/closeout condition, not a technical defect. |
+| Manual UI confirmation | user confirmed | Owner confirmed the exact Steel documentation candidate at `develop@c9c3cb0` on 2026-07-23. |
 | Documentation and release communication | pass after safe remediation | README, CHANGELOG, Epic map, and both ledgers agree that owner-relative planned paths are enforced. |
 | Integration candidate | pass | `git merge-tree --write-tree main 6086e07` produced conflict-free tree `8aed3a589d26751420a9c20a0f3a8ecc85657303`; its aggregate gate passed. |
 | Branch and merge readiness | ready for release handoff | `develop` is technically ready; production policy requires `/sdd-release` for any PR/release action. |

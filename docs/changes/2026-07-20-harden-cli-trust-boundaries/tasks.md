@@ -5,11 +5,11 @@ status: in_review
 
 ## Resume Here
 
-- Last completed action: implementation was committed and both coordinated Changes entered `in_review` at `develop@6086e07`; the independent cumulative review is now reconciling its records.
-- Next action: complete the independent review, retain `in_review` while owner UI confirmation is pending, then use `/sdd-release` for any production handoff.
-- Active branch/ref: review source is `develop@6086e07`; target is `main@7e9a2be`; merge base is `a670fa2`.
-- Expected dirty files: only review-authorized Epic, ledger, review-record, and changelog reconciliation; the review will commit them as one safe batch.
-- Known blocker: no implementation blocker; independent review and the companion Change's owner UI confirmation govern closeout readiness.
+- Last completed action: independent review passed at `develop@c9c3cb0`; the owner confirmed the companion Steel documentation candidate for release.
+- Next action: commit the confirmed `0.12.0` release metadata, push `develop`, and open the policy-defined `develop -> main` handoff PR.
+- Active branch/ref: release source is `develop@c9c3cb0` before release metadata; target is `main@7e9a2be`; merge base is `a670fa2`.
+- Expected dirty files: only the confirmed release version, changelog, and acceptance/release records until the release-metadata commit.
+- Known blocker: none for release handoff; merge, tag, publish, deploy, and closeout remain outside this workflow's authority.
 
 ## Task Checklist
 
