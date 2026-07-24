@@ -5,11 +5,11 @@ status: in_review
 
 ## Resume Here
 
-- Last completed action: the complete implementation was committed as `a7eeb06` (`feat: harden SDD workflow and CLI operations`) after its final gates passed.
-- Next action: run independent `/sdd-review` against committed candidate `a7eeb06` and the recorded accepted maintainability gap.
-- Active branch/ref: `develop` at committed candidate `a7eeb06f1c551fa948dea1d4336ab056913ed7c1`.
-- Expected dirty files: current uncommitted files belong to the separate follow-up Change `2026-07-22-harden-audit-report-integrity`, not this Change.
-- Known blockers: none for independent review.
+- Last completed action: PR-review remediation passed the aggregate and repository-only status gates at `develop@55f7b73`.
+- Next action: push the remediation, obtain a fresh configured remote review, then reassess the production PR; merge, tag, publish, deploy, and closeout remain separately authorized.
+- Active branch/ref: release source is `develop@55f7b73`; target is `main@7e9a2be`; merge base is `a670fa2`.
+- Expected dirty files: review-record evidence only until its dedicated documentation commit.
+- Known blocker: fresh remote review is pending after the remediation push.
 
 ## Task Checklist
 
@@ -38,10 +38,13 @@ status: in_review
   - [x] R1 rejects symlink escape for install, artifact mutation, and evidence paths.
   - [x] R2 detects pre-commit and post-commit Change edits and reports retained recovery state.
   - [x] R3 atomically writes configuration/lock state, preserves modes, reclaims verified dead-owner locks, reports conservative manual recovery for alive/unknown ownership, serializes managed updates, and rolls workflow/skills back when lock commit fails.
+  - [x] R2-S5 serializes or CAS-publishes concurrent first repository initialization without silent writer loss.
 - [x] 3.3 `SDD-E001/S3` unambiguous topology and lifecycle routing.
   - [x] R1 refuses idea-owned Change creation and promotion from repository-only context.
   - [x] R2 rejects physical repository aliases, unknown keys, and invalid artifact overlap.
   - [x] R3 rejects planned Change IDs already active or closed in any target repository.
+  - [x] R2-S2 rejects synthetic repository IDs that collide with existing Idea/configuration ownership.
+  - [x] R2-S3 constrains `plannedChangesDirectory` lexically and physically to its planning owner.
 - [x] 3.4 `SDD-E001/S4` bounded, context-aware diagnostics.
   - [x] R1 ignores negated, historical, migration, imported-document, and quoted obsolete-guidance mentions while reporting affirmative/modal instructions.
   - [x] R2 bounds Git status and returns degraded per-repository results on timeout.
@@ -57,9 +60,9 @@ status: in_review
 
 ### 5. Review And Closeout
 
-- [x] 5.1 Commit the complete verified implementation.
+- [x] 5.1 Commit the complete verified S2/S3 remediation.
 - [x] 5.2 Transition to `in_review` after implementation is committed and the complete Apply self-check is clean.
-- [ ] 5.3 Run independent `/sdd-review`; do not close from Apply.
+- [x] 5.3 Run independent `/sdd-review`; do not close from Apply.
 
 ## Implementation Ledger
 
@@ -68,6 +71,11 @@ status: in_review
 | 2026-07-20 | Planning bootstrap | main; `sdd-change`, `sdd-apply` | audit, Change, `SDD-E001` | Accepted audit translated into adaptive end-state contract. | `a7eeb06` |
 | 2026-07-20 | Validator and topology hardening | main; TDD | validator, config/workspace, lifecycle commands, fixtures | Structural parity, real anchors, strict topology, focused reads, and planning ownership are enforced. | `a7eeb06` |
 | 2026-07-20 | Mutation and diagnostics hardening | main; security finding remediation | filesystem, locks, install transaction, lifecycle recovery, doctor/status | Physical boundaries, atomic state, recovery visibility, bounded Git, and guidance classification are enforced. | `a7eeb06` |
+| 2026-07-23 | S2/R2-S5 concurrent repository initialization | main; TDD | repository initialization, shared mutation lock, CLI test, S2 Epic truth | The first repository contract is published only while its physical owner lock is held; a simultaneous initializer receives `OPERATION_IN_PROGRESS` and cannot silently win later. | `be2d2e5` |
+| 2026-07-23 | S3/R2-S2 synthetic repository-ID collision | main; TDD | workspace context, repository selection, validation, CLI test, S3 Epic truth | A repository-only ID that belongs to an existing Idea fails deterministically, while repository-local artifact roots remain local to that synthetic context. | `bec4004` |
+| 2026-07-23 | S3/R2-S3 planned-path confinement | main; TDD | runtime config, checked schemas, validation preflight, CLI tests, S3 Epic truth | Absolute/traversing planned paths are invalid and symlink escapes are rejected before external planned Changes are listed. | `fcdfe66` |
+| 2026-07-23 | S3/R2-S3 schema/runtime parity | independent security review; TDD | runtime config, checked schemas, CLI test, S3 Epic truth | A Windows-style leading separator is rejected consistently by runtime validation and the published schemas. | `27a5efa` |
+| 2026-07-24 | S3/R2-S2 repository-only status routing | PR review remediation; TDD | workspace context, status, CLI test, S3 Epic truth | Repository-only `status` retains the committed artifact roots and reports active work without mutating global defaults. | current PR remediation |
 | 2026-07-20 | Fresh-review remediation | main plus independent review waves | validator helpers, transaction boundary, recovery races, migration rollback, package allowlist, docs/tests | Duplicate/mixed evidence bypasses, post-commit data loss, recreated-target overwrite, silent migration recovery failure, stale locks, internal package leakage, and doctrine drift resolved. | `a7eeb06` |
 | 2026-07-20 | User skill synchronization | package CLI | `/Users/taylor/.agents/skills` | `sdd update` updated Apply, Change, Epic Verify, and then Orphan Audit after its final parser correction; immediate final dry-run reported all 14 managed skills unchanged. | installed state only; no repository commit |
 
@@ -86,6 +94,8 @@ status: in_review
 | 2026-07-20 | fresh-context failure-seeking review | independent review | Review continued through validator, package, and mutation surfaces and rechecked remediations. | passed; no remaining blockers |
 | 2026-07-20 | changed-surface orphan audit | reverse traceability | Current Change runtime modules and test files resolve through `SDD-E001`; preserved pre-Change skill/template edits remain separate classification candidates. | passed; 21 implementation refs, 4 test refs, 0 missing refs, 0 unverified tests |
 | 2026-07-20 | `sdd update` plus immediate dry-run | installed-skill synchronization | Universal user skills are updated only through the package CLI and match package hashes. | passed; 4 updated across two reconciled passes, then 14 unchanged |
+| 2026-07-23 | `npm run check` after S2/S3 remediation | required aggregate gate | The complete CLI, mutation, orphan-audit, package-contract, and help surfaces remain coherent after concurrency and topology fixes. | passed; 212 tests plus CLI help |
+| 2026-07-23 | `sdd validate sdd-skills --workspace . --json` | artifact integrity | Both active Changes and `SDD-E001` have current maps, evidence, and statuses. | passed; 0 errors, 1 intentional large-story warning |
 
 ## Manual Feedback
 
@@ -167,42 +177,38 @@ status: in_review
 
 ## Blockers / Open Questions
 
-- No blocker remains for independent review.
+- Implementation blockers: none. This fresh independent review is recorded in `review.md`; a configured remote rereview remains pending after push.
 - Accepted maintainability gap: the highest-risk evidence-row logic now lives in `src/epic-evidence.js` and mutation/diagnostic cases have focused suites, but the established end-to-end workspace fixture remains coupled to `test/cli.test.js`. Extracting the full Epic validator integration fixture is deferred rather than mixing a broad test-harness move into this safety Change.
 
 ## Review Handoff Candidate
 
-- Integration target / merge base: `develop` baseline `b5590e8c89bab4d2916994d7a5a2a905e9d87ecc`
-- Candidate source commit: `a7eeb06f1c551fa948dea1d4336ab056913ed7c1`
-- Source differs from target when implementation changed: yes; verified working-tree diff against baseline
-- Intended implementation fully committed: yes; commit `a7eeb06` contains the complete verified Change.
-- Unrelated dirty state preserved: yes; the current dirty worktree belongs to the separate 2026-07-22 follow-up Change.
-- Commit-sensitive generated-contract / diff / integration checks: package, diff, coverage, skill, and scoped validation gates passed before commit.
-- Required risk, fan-out, environment, or verification rows still pending or blocked: none; only commit authorization and the accepted test-harness concentration gap remain
-- Pattern parity and stateful transition matrices reconciled or not applicable with reason: yes
-- Evidence claims falsified against exact tests, assertions, routes, or observations: yes; adversarial rows, symlinks, races, and injected recovery failures exercised
-- Fresh-context failure-seeking passes completed: yes; validator, package, and mutation reviews completed, their findings were remediated, and the final narrow rereview found no blockers
+- Historical candidate `a7eeb06` was invalidated by the cumulative review and is not a current review watermark.
+- Current integration target: `main@7e9a2bef9811f623583232c554417ae08ddc9373`.
+- Current candidate source commit: `55f7b73565cd1784d67dcf26f93b0c87feffd344`.
+- Intended implementation fully committed: yes; `be2d2e5`, `bec4004`, and `fcdfe66` resolve S2/R2-S5 and S3/R2-S2/R2-S3.
+- Required risk, fan-out, environment, and verification rows: focused adversarial tests, aggregate package check, structural validation, reverse traceability, and the exact integration-tree gate are current; this independent review records the result.
+- Fresh-context failure-seeking passes completed: independent artifact, code/security, and visual review passes assessed the cumulative candidate; no implementation finding remained.
 
 ## Closeout
 
 - Change status: in_review
-- Epic files updated: implementation, ownership, state, evidence, and recovery Scenarios reconciled
+- Epic files updated: S2 and S3 implementation, evidence, and Story Index states are reconciled as implemented/verified.
 - Story labels/references and Requirement/Scenario IDs current: yes
 - Implemented By maps current: yes
 - Scenario-mapped Verified By maps current: yes; scoped Change+Epic validation passed with zero findings
 - Superseded earlier Epic truth reconciled: not applicable; no earlier Epics
 - ADR status: not applicable
 - Release communication current: README, canonical workflow, templates, and CHANGELOG reconciled; no release requested
-- `sdd-review` verdict: pending
-- Review record: pending
-- `review.md` findings resolved: not applicable
+- `sdd-review` verdict: historical `changes-requested` snapshot `c477e4a` is retained; the current review result is recorded in `review.md` and this Change remains `in_review` pending release/closeout authority.
+- Review record: `review.md`.
+- `review.md` findings resolved: yes; the three S2/S3 findings have focused proof and current aggregate validation.
 - Planning updates resolved: yes
-- Implementation risk and confirmation rows resolved: yes
-- Pattern parity and stateful transition rows resolved: yes
-- Evidence-claim integrity checked: yes; focused tests, two fresh review waves, final narrow rereview, and scoped validation complete
+- Implementation risk and confirmation rows resolved: yes; contention, synthetic ownership, and planned-path escape checks pass.
+- Pattern parity and stateful transition rows resolved: yes; repository initialization now uses the existing mutation lock and synthetic artifacts remain repository-local.
+- Evidence-claim integrity checked: current focused and aggregate proof is recorded.
 - Decision fan-out reconciled: yes
 - Verification environment obligations resolved: yes; all local CLI/filesystem/package gates executed
-- Immutable review handoff candidate: `a7eeb06f1c551fa948dea1d4336ab056913ed7c1`
+- Immutable implementation handoff candidate: `55f7b73`; the subsequent review-record commit is artifact-only and independently revalidated.
 - Manual UI confirmation status: not applicable
 - Rendered UI verification status: not applicable
 - PR / merge state: no PR or merge requested

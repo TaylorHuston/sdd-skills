@@ -56,6 +56,7 @@ function resolvedRepositories(config, space) {
   for (const repository of space.repositories ?? []) {
     const resolved = {
       ...repository,
+      ...(repository.artifacts ? { artifacts: repository.artifacts } : {}),
       status: resolveWorkspaceStatus(repository.status),
       resolvedPath: resolveRepositoryPath(config, repository).split("\\").join("/"),
     };

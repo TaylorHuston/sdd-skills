@@ -1,5 +1,5 @@
 ---
-modified: 2026-07-22
+modified: 2026-07-23
 ---
 # Changelog
 
@@ -8,6 +8,8 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.12.0] - 2026-07-23
 
 ### Added
 
@@ -23,7 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Epic traceability now requires one authoritative current implementation/verification map per Story, behavior-owning primary anchors, narrower mapping for distinct governing boundaries, exact named test evidence instead of framework tokens, current-tense implemented Outcomes, and reconciliation of stale supporting docs and closed Change claims.
 - `sdd validate` now rejects competing prior/detailed/legacy Story traceability sections and generic automated evidence anchors such as `#it(`, `#test(`, and `#describe(`.
 - CLI validation now rejects empty v2 behavior structure, incomplete evidence rows, fabricated or unanchored source/test claims, external symlink evidence, and unrelated Epic reads during a focused validation.
-- Configuration and lifecycle commands now reject unknown keys, physical repository aliases, invalid artifact overlap, repository-only planning guesses, active/closed Change ID collisions, and physical path escapes.
+- Configuration and lifecycle commands now reject unknown keys, physical repository aliases, invalid repository-artifact overlap or escape, repository-only planning guesses, active/closed Change ID collisions, and planned Changes paths that lexically or physically escape their planning owner.
 - Managed configuration and lock writes are atomic, managed updates are serialized, lifecycle mutations detect commit-time drift and report incomplete recovery, guidance diagnostics ignore non-affirmative historical/negated examples, and Git status degrades after a bounded timeout.
 - `sdd validate` now checks v2 Story Index/body consistency, implementation and verification coverage, repository-relative implementation paths, gap contradictions, strict automated evidence paths, and oversized-Story review signals while retaining legacy Epic compatibility warnings.
 - SDD planning, apply, review, Epic verification, and orphan-audit guidance now treats cold-start code navigation as a required traceability outcome.
@@ -39,7 +41,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `/sdd-apply` now uses triggered Pattern Parity and Stateful Transition matrices for new sibling implementations and stateful surfaces, while `/sdd-review` adds independent pattern-conformance, transition, and evidence-falsification gates. New or high-risk evidence claims must identify exact test anchors and important assertions, survive test-discovery and boundary checks, and cannot rely on aggregate green commands or unsupported Scenario aggregation.
 - Planning, apply, and review now add triggered Boundary Contract coverage, concurrent and durable lifecycle interleavings, capability-authority and content-budget/provenance conservation, and filesystem ancestor/confinement validation before mutation.
 - `/sdd-release` now requires a fresh-context cumulative release-candidate review for initial, multi-Change, materially post-review, or high-risk combined diffs, while `/sdd-pr` and release handoffs track required/optional remote reviewer and check watermarks against exact PR heads.
-- The framework-free one-page guide now uses the shared UI Foundations Mono identity profile, canonical semantic tokens, restrained foundation geometry, and a single dark presentation instead of its legacy blue/orange light-and-dark theme model.
+- The framework-free one-page guide now uses the shared UI Foundations Steel identity profile, canonical semantic tokens, and a dark documentation shell with a persistent table of contents, bounded reading column, compact section hierarchy, and inline references. Narrative sections rely on type, spacing, and rules rather than stacks of decorative cards; contained surfaces are reserved for rendered documents, evidence, code, and controls. Its first half explains the context-loss problem, portable SDD model, general workflow, durable Story semantics, and a minimal complete Epic; it makes explicit that behavior changes update the existing Story and that new Stories represent distinct durable user outcomes rather than implementation tasks. Its second half documents this package's default layouts, CLI, agent skills, and lifecycle conventions. The page also adds responsive section navigation, active-location feedback, accessible touch targets and copy status, a navigable Epic outline, readable mobile type, and a sequential heading structure. It links to the original essay.
 
 ### Removed
 

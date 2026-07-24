@@ -137,6 +137,19 @@ export async function initRepository(
     });
   }
 
+  const options = { repositoryId, dryRun, userRoot, userConfig };
+  if (dryRun) return initRepositoryUnlocked(repositoryRoot, options);
+  return withWorkspaceMutationLock(
+    repositoryRoot,
+    () => initRepositoryUnlocked(repositoryRoot, options),
+  );
+}
+
+async function initRepositoryUnlocked(
+  repositoryRoot,
+  { repositoryId, dryRun, userRoot, userConfig },
+) {
+
   const targetConfigPath = getConfigPath(repositoryRoot);
   const targetConfigExists = await pathExists(targetConfigPath);
   const existingRepositoryConfig = await readRepositoryConfig(repositoryRoot);
