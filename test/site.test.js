@@ -52,10 +52,15 @@ test("public guide preserves clipboard fallback feedback and reduced-motion beha
   assert.match(html, /<button class="copyButton" id="copy-command"[\s\S]{0,500}data-copy="[^"]*sdd setup/);
   assert.match(html, /aria-live="polite"/);
   assert.match(script, /navigator\.clipboard\.writeText/);
+  assert.match(script, /const canSelectCommandText = Boolean\(/);
+  assert.match(script, /typeof selection\.removeAllRanges === "function"/);
+  assert.match(script, /typeof selection\.addRange === "function"/);
+  assert.match(script, /if \(canSelectCommandText\)/);
   assert.match(script, /range\.selectNodeContents\(commandText\)/);
   assert.match(script, /selection\.removeAllRanges\(\)/);
   assert.match(script, /selection\.addRange\(range\)/);
   assert.match(script, /label\.textContent = "Selected"/);
+  assert.match(script, /label\.textContent = "Copy failed"/);
   assert.match(script, /label\.textContent = "Copy"/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(styles, /scroll-behavior:\s*auto/);

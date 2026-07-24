@@ -853,7 +853,7 @@ The guide SHALL use the shared Steel semantic identity as restrained documentati
 | S7/R2 | `site/site.js#updateCurrentNavigation` | primary | Tracks the current visible section and synchronizes desktop and mobile navigation. |
 | S7/R2 | `site/styles.css#Documentation shell` | primary | Bounds the reading layout and contains responsive navigation, tables, and code examples. |
 | S7/R3 | `site/index.html#Skip to content` | primary | Defines keyboard bypass, canonical labels, command target, and announced feedback surface. |
-| S7/R3-S1 | `site/site.js#copyButton?.addEventListener` | primary | Copies the command or selects it on clipboard failure and exposes temporary feedback. |
+| S7/R3-S1 | `site/site.js#copyButton?.addEventListener` | primary | Copies the command or selects it on clipboard failure when selection is available; otherwise exposes temporary failure feedback without throwing. |
 | S7/R3 | `site/styles.css#:focus-visible` | support | Provides visible focus and touch-sized interactive treatment. |
 | S7/R4 | `site/styles.css#UI Foundations: Steel identity profile` | primary | Implements the Steel semantic palette and restrained documentation composition. |
 | S7/R4-S1 | `site/styles.css#@media (prefers-reduced-motion: reduce)` | primary | Reduces smooth scrolling and transition duration while preserving state. |
@@ -871,9 +871,9 @@ The guide SHALL use the shared Steel semantic identity as restrained documentati
 | S7/R4-S1 | Historical rendered review of candidate `c477e4a` with reduced-motion emulation | The prior Steel candidate reduced motion without losing active navigation state. | Provisional 2026-07-22 |
 | S7/R1-S1 | Automated test `test/site.test.js#public guide separates portable methodology from package implementation and preserves durable Story semantics` | Portable method sections and a canonical durable Story example precede package-specific implementation. | Passing 2026-07-23 |
 | S7/R2-S1 | Automated test `test/site.test.js#public guide has unique fragment targets and sequential navigable sections` | IDs are unique, same-page fragments resolve, and skip/document navigation targets exist. | Passing 2026-07-23 |
-| S7/R3-S1, S7/R4-S1 | Automated test `test/site.test.js#public guide preserves clipboard fallback feedback and reduced-motion behavior` | Source retains selectable announced clipboard fallback, focus treatment, and reduced-motion rules. | Passing 2026-07-23 |
+| S7/R3-S1, S7/R4-S1 | Automated test `test/site.test.js#public guide preserves clipboard fallback feedback and reduced-motion behavior` | Source retains selectable announced clipboard fallback when its DOM and selection APIs exist, announces a safe failure otherwise, and preserves focus and reduced-motion rules. | Passing 2026-07-23 |
 | S7/R2-S1 | Deterministic rendered inspection of committed candidate `666de8f` at 1440×900, 768×1024, 375×812, 320×812, and 812×375 | Navigation remains reachable, mobile controls measure 44px, long content is contained, and every viewport has equal document scroll/client width. | Passing 2026-07-23 |
-| S7/R3-S1 | Deterministic browser interaction on committed candidate `666de8f` with clipboard denial and keyboard skip-link interaction | Clipboard failure selects the command, announces `Selected`, and the visible skip link moves focus to `main-content`. | Passing 2026-07-23 |
+| S7/R3-S1 | Deterministic browser interaction on `site/site.js` clipboard-fallback remediation with clipboard denial, missing command text, and keyboard skip-link interaction | Clipboard denial selects the full command and announces `Selected` when selection is available; missing command text announces `Copy failed` without a runtime error; the visible skip link moves focus to `main-content`. | Passing 2026-07-23 |
 | S7/R4-S1 | Deterministic rendered inspection of committed candidate `666de8f` with reduced-motion emulation and direct screenshot review | Scroll behavior becomes `auto`, transitions reduce to `0.00001s`, active navigation remains intact, and the restrained Steel composition remains readable. | Passing 2026-07-23 |
 
 #### Verification Gaps

@@ -6,17 +6,32 @@ const trackedSections = [...document.querySelectorAll("main > section[id]")];
 
 copyButton?.addEventListener("click", async () => {
   const label = copyButton.querySelector("span");
+  if (!label) {
+    return;
+  }
 
   try {
     await navigator.clipboard.writeText(copyButton.dataset.copy);
     label.textContent = "Copied";
   } catch {
-    const selection = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(commandText);
-    selection.removeAllRanges();
-    selection.addRange(range);
-    label.textContent = "Selected";
+    const selection = window.getSelection?.();
+    const canSelectCommandText = Boolean(
+      commandText
+      && selection
+      && typeof document.createRange === "function"
+      && typeof selection.removeAllRanges === "function"
+      && typeof selection.addRange === "function",
+    );
+
+    if (canSelectCommandText) {
+      const range = document.createRange();
+      range.selectNodeContents(commandText);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      label.textContent = "Selected";
+    } else {
+      label.textContent = "Copy failed";
+    }
   }
 
   window.setTimeout(() => {
