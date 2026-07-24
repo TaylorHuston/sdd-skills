@@ -220,3 +220,26 @@ The historical `changes-requested` verdict above is retained as evidence for `37
 ### Current Review Log
 
 - 2026-07-23: Independent cumulative re-review discovered only safe traceability and documentation drift: two schema ownership rows, stale ledger watermarks, and stale public confinement wording. The single safe batch resolved them and regression checks remained green.
+
+## PR Remediation Re-Review — 2026-07-24
+
+### Verdict
+
+ready for remote rereview
+
+`55f7b73` resolves all current PR feedback: governing proof recognizes the supported equals-form CLI option syntax, repository-only status keeps committed artifact roots, public Change material no longer exposes a local path, and stale closeout wording is reconciled. The aggregate source candidate is clean; this review does not authorize merge.
+
+### Evidence
+
+| Gate | Result |
+|---|---|
+| Aggregate package gate | `npm run check` passed 214 tests plus CLI help. |
+| Scoped structural validation | Both active Changes passed with 0 errors and one intentional large-Story warning each. |
+| Reverse traceability | `SDD-E001` audit found 29 candidates and zero ownership or verification gaps. |
+| Package/security | `npm pack --dry-run` listed 106 files; production audit reported 0 vulnerabilities. |
+| Exact integration tree | `git merge-tree --write-tree origin/main 55f7b73` produced `15429fcd8e10ab6172816302a6308c04edb6da87`, identical to the source tree. |
+| Rendered UI | Reused the 2026-07-23 current-source matrix: no `site/` asset changed in this remediation. |
+
+### Review Log
+
+- 2026-07-24: Current PR feedback reproduced the report parser's equals-form gap. TDD remediation added exact syntax coverage; the companion status and record corrections passed every local release gate. A configured remote rereview is required after push.

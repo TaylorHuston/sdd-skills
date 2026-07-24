@@ -5,11 +5,11 @@ status: in_review
 
 ## Resume Here
 
-- Last completed action: independent review passed at `develop@c9c3cb0`; the owner confirmed the companion Steel documentation candidate for release.
-- Next action: commit the confirmed `0.12.0` release metadata, push `develop`, and open the policy-defined `develop -> main` handoff PR.
-- Active branch/ref: release source is `develop@c9c3cb0` before release metadata; target is `main@7e9a2be`; merge base is `a670fa2`.
-- Expected dirty files: only the confirmed release version, changelog, and acceptance/release records until the release-metadata commit.
-- Known blocker: none for release handoff; merge, tag, publish, deploy, and closeout remain outside this workflow's authority.
+- Last completed action: PR-review remediation passed the aggregate and repository-only status gates at `develop@55f7b73`.
+- Next action: push the remediation, obtain a fresh configured remote review, then reassess the production PR; merge, tag, publish, deploy, and closeout remain separately authorized.
+- Active branch/ref: release source is `develop@55f7b73`; target is `main@7e9a2be`; merge base is `a670fa2`.
+- Expected dirty files: review-record evidence only until its dedicated documentation commit.
+- Known blocker: fresh remote review is pending after the remediation push.
 
 ## Task Checklist
 
@@ -177,14 +177,14 @@ status: in_review
 
 ## Blockers / Open Questions
 
-- Implementation blockers: none. A fresh independent review remains required before closeout.
+- Implementation blockers: none. This fresh independent review is recorded in `review.md`; a configured remote rereview remains pending after push.
 - Accepted maintainability gap: the highest-risk evidence-row logic now lives in `src/epic-evidence.js` and mutation/diagnostic cases have focused suites, but the established end-to-end workspace fixture remains coupled to `test/cli.test.js`. Extracting the full Epic validator integration fixture is deferred rather than mixing a broad test-harness move into this safety Change.
 
 ## Review Handoff Candidate
 
 - Historical candidate `a7eeb06` was invalidated by the cumulative review and is not a current review watermark.
 - Current integration target: `main@7e9a2bef9811f623583232c554417ae08ddc9373`.
-- Current candidate source commit: `6086e07` before the review-authorized artifact-only reconciliation commit.
+- Current candidate source commit: `55f7b73565cd1784d67dcf26f93b0c87feffd344`.
 - Intended implementation fully committed: yes; `be2d2e5`, `bec4004`, and `fcdfe66` resolve S2/R2-S5 and S3/R2-S2/R2-S3.
 - Required risk, fan-out, environment, and verification rows: focused adversarial tests, aggregate package check, structural validation, reverse traceability, and the exact integration-tree gate are current; this independent review records the result.
 - Fresh-context failure-seeking passes completed: independent artifact, code/security, and visual review passes assessed the cumulative candidate; no implementation finding remained.
@@ -208,7 +208,7 @@ status: in_review
 - Evidence-claim integrity checked: current focused and aggregate proof is recorded.
 - Decision fan-out reconciled: yes
 - Verification environment obligations resolved: yes; all local CLI/filesystem/package gates executed
-- Immutable implementation handoff candidate: `6086e07`; the subsequent review-record commit is artifact-only and independently revalidated.
+- Immutable implementation handoff candidate: `55f7b73`; the subsequent review-record commit is artifact-only and independently revalidated.
 - Manual UI confirmation status: not applicable
 - Rendered UI verification status: not applicable
 - PR / merge state: no PR or merge requested

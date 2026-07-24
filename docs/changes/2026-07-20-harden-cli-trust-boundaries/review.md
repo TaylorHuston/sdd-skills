@@ -177,3 +177,25 @@ The historical `changes-requested` result above remains immutable evidence for `
 ### Current Review Log
 
 - 2026-07-23: Independent cumulative re-review found two missing schema ownership anchors and stale handoff/release wording. The safe record batch corrected them; no implementation or security finding remained.
+
+## PR Remediation Re-Review — 2026-07-24
+
+### Verdict
+
+ready for remote rereview
+
+`55f7b73` fixes the current PR's repository-only status regression: repository roots remain valid relative paths and `status` retains the repository's committed artifact layout. The aggregate source candidate is clean; this review does not authorize merge.
+
+### Evidence
+
+| Gate | Result |
+|---|---|
+| Aggregate package gate | `npm run check` passed 214 tests plus CLI help. |
+| Scoped structural validation | Both active Changes passed with 0 errors and one intentional large-Story warning each. |
+| Reverse traceability | `SDD-E001` audit found 29 candidates and zero ownership or verification gaps. |
+| Package/security | `npm pack --dry-run` listed 106 files; production audit reported 0 vulnerabilities. |
+| Exact integration tree | `git merge-tree --write-tree origin/main 55f7b73` produced `15429fcd8e10ab6172816302a6308c04edb6da87`, identical to the source tree. |
+
+### Review Log
+
+- 2026-07-24: Current PR feedback reproduced the repository-only status defect. TDD remediation added an exact CLI regression and passed all required local gates. A configured remote rereview is required after push.

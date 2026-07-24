@@ -5,11 +5,11 @@ status: in_review
 
 ## Resume Here
 
-- Last completed action: independent review passed at `develop@c9c3cb0`; the owner confirmed the exact Steel documentation candidate for release.
-- Next action: commit the confirmed `0.12.0` release metadata, push `develop`, and open the policy-defined `develop -> main` handoff PR.
-- Active branch/ref: release source `develop@c9c3cb0` before release metadata; target `main@7e9a2be`; merge base `a670fa2`.
-- Expected dirty files: only the confirmed release version, changelog, and acceptance/release records until the release-metadata commit.
-- Known blockers: none for release handoff; merge, tag, publish, deploy, and closeout remain outside this workflow's authority.
+- Last completed action: PR-review remediation passed aggregate, traceability, package, and integration gates at `develop@55f7b73`.
+- Next action: push the remediation, obtain a fresh configured remote review, then reassess the production PR; merge, tag, publish, deploy, and closeout remain separately authorized.
+- Active branch/ref: release source `develop@55f7b73`; target `main@7e9a2be`; merge base `a670fa2`.
+- Expected dirty files: review-record evidence only until its dedicated documentation commit.
+- Known blockers: fresh remote review is pending after the remediation push.
 
 ## Task Checklist
 
@@ -242,7 +242,7 @@ status: in_review
 ## Review Handoff Candidate
 
 - Integration target / merge base: production target `main`; merge base `a670fa28ebfd4df175217b60a74d92cfee520c74`.
-- Candidate source commit: `6086e07` before the review-authorized artifact-only reconciliation commit.
+- Candidate source commit: `55f7b73565cd1784d67dcf26f93b0c87feffd344`.
 - Source differs from target when implementation changed: yes.
 - Intended implementation fully committed: yes; S1/R4, S2, and S3 remediation commits are all on `develop`.
 - Unrelated dirty state preserved: yes; all formerly dirty Steel product files were confirmed in-scope and committed in `666de8f`.
@@ -280,7 +280,7 @@ status: in_review
 - Decision fan-out reconciled: yes.
 - Verification environment obligations resolved: yes for current scope.
 - Verification Scope Decision current and required candidate gates passed: current aggregate source and structural gates pass; the independent review is recorded ready.
-- Immutable implementation handoff candidate: `6086e07`; the subsequent review-record commit is artifact-only and independently revalidated.
+- Immutable implementation handoff candidate: `55f7b73`; the subsequent review-record commit is artifact-only and independently revalidated.
 - Tested integration candidate matches actual integrated tree, or rerun recorded: rerun is required before release if the eventual integration tree differs materially.
 - Manual UI confirmation status: user confirmed on 2026-07-23 for `develop@c9c3cb0`.
 - Rendered UI verification status: current source `373aff7` independently passed the full matrix.
