@@ -3,8 +3,8 @@ schema: sdd-epic-v2
 id: SDD-E001
 status: active
 created: 2026-07-20
-modified: 2026-07-23
-last_verified: 2026-07-23
+modified: 2026-07-24
+last_verified: 2026-07-24
 stories:
   - S1
   - S2
@@ -201,7 +201,7 @@ Map every Requirement to its primary governing location after implementation. `p
 | S1/R4 | `src/epic-verify-report.js#validateEpicVerifyReports` | primary | Validates versioned report identity, current-result coherence, remediation sections, and predecessor containment. |
 | S1/R4-S7 | `src/epic-verify-report.js#validateEpicVerifyReports` | primary | Counts and rejects report-shaped entries that are symlinked, nonregular, or physically outside the reviews directory. |
 | S1/R4 | `src/epic-verify-report.js#CANONICAL_GATES` | support | Keeps aligned-report coverage synchronized with the canonical shipped scorecard. |
-| S1/R4-S4 | `src/epic-verify-report.js#commandHasUniqueOptionValue` | support | Requires report checks to carry exactly one exact Epic, repository, and immutable baseline option value. |
+| S1/R4-S4 | `src/epic-verify-report.js#commandHasUniqueOptionValue` | support | Requires report checks to carry exactly one exact Epic, repository, and immutable baseline option value in either supported option syntax. |
 | S1/R4-S4 | `src/epic-verify-report.js#orphanAuditHasRepositoryRoot` | support | Binds reverse-inventory proof to the exact repository root instead of accepting another checkout. |
 | S1/R4-S5 | `src/epic-verify-report.js#isStructuralValidationCommand` | support | Accepts structural proof only when the parsed command starts with the approved executable and argument shape. |
 | S1/R4-S5 | `src/epic-verify-report.js#isOrphanAuditCommand` | support | Accepts reverse-inventory proof only when the parsed command starts with the approved executable and audit subcommand. |
@@ -251,6 +251,7 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 | S1/R4-S4 | Automated test `test/cli.test.js#validate rejects aligned proof scoped to another repository` | Alignment cannot use a prefix-confusable or otherwise different repository path. | Passing 2026-07-23 |
 | S1/R4-S4 | Automated test `test/cli.test.js#validate rejects orphan-audit proof scoped to another repository` | A current structural check cannot hide reverse-inventory proof run against another repository root. | Passing 2026-07-23 |
 | S1/R4-S4 | Automated test `test/cli.test.js#validate accepts quoted repository paths in aligned proof` | Exact repository scoping remains portable when command arguments require shell quoting. | Passing 2026-07-23 |
+| S1/R4-S4 | Automated test `test/cli.test.js#validate accepts equals-form governing options in aligned proof` | Aligned proof accepts `--option=value` syntax when the underlying validation and audit commands accept it. | Passing 2026-07-24 |
 | S1/R4-S4 | Automated test `test/cli.test.js#validate rejects duplicate governing options in aligned report proof` | Repeated `--epic`, `--repo`, or `--changed-from` options cannot misrepresent last-wins downstream command scope. | Passing 2026-07-23 |
 | S1/R4-S5 | Automated test `test/cli.test.js#validate rejects spoofed report check commands` | Required command text embedded inside another executable or argument cannot certify a report. | Passing 2026-07-23 |
 | S1/R4-S6 | Automated test `test/cli.test.js#validate rejects incoherent non-aligned Epic verification reports` | `changes-requested` requires a current REQUIRED finding and recognized check results; `blocked` requires a current BLOCKING finding. | Passing 2026-07-23 |
@@ -469,8 +470,9 @@ The CLI SHALL refuse a planned Change ID that already exists in any selected rep
 | S3/R2 | `src/config.js#validateConfig` | primary | Enforces schema-shape parity, artifact relationships, and owner-relative planned Changes paths. |
 | S3/R2-S3 | `schemas/user.schema.json#plannedChangesDirectory` | support | Publishes the user configuration contract that rejects non-owner-relative planned Changes paths. |
 | S3/R2-S3 | `schemas/workspace.schema.json#plannedChangesDirectory` | support | Publishes the workspace configuration contract that rejects non-owner-relative planned Changes paths. |
-| S3/R2 | `src/workspace.js#resolveWorkspaceContext` | primary | Rejects duplicate physical repository ownership, artifact ambiguity, and synthetic IDs that would collide with an existing Idea. |
+| S3/R2 | `src/workspace.js#resolveWorkspaceContext` | primary | Rejects duplicate physical repository ownership, artifact ambiguity, and synthetic IDs that would collide with an existing Idea while retaining repository-only configuration as a valid local context. |
 | S3/R2-S2 | `src/change-repositories.js#resolvedActiveRepositories` and `src/commands/validate.js#configuredRepositories` | support | Preserve repository-local artifact roots without mutating global defaults while synthetic context is resolved. |
+| S3/R2-S2 | `src/commands/status.js#resolvedRepositories` | support | Preserves repository-only artifact roots while building status results. |
 | S3/R2-S3 | `src/commands/validate.js#validatePlannedChanges` | primary | Rechecks physical containment before enumerating planned Changes. |
 | S3/R3 | `src/commands/change-create.js#createPlannedChange` | primary | Preflights selected repositories' active and closed roots. |
 
@@ -487,6 +489,7 @@ The CLI SHALL refuse a planned Change ID that already exists in any selected rep
 | S3/R2-S1 | Automated test `test/cli.test.js#runtime config validation rejects unknown keys and ambiguous artifact roots` | Runtime validation matches strict shapes and rejects overlap. | Passing 2026-07-20 |
 | S3/R2-S1 | Automated test `test/cli.test.js#context rejects physical aliases claimed as different repositories` | Two configured paths cannot claim one physical repository. | Passing 2026-07-20 |
 | S3/R2-S2 | Automated test `test/cli.test.js#context rejects a repository-only ID that collides with an existing Idea` | A same-ID repository-only contract is rejected without changing existing configuration ownership. | Passing 2026-07-23 |
+| S3/R2-S2 | Automated test `test/cli.test.js#status honors committed artifact paths for a repository-only checkout` | Repository-only status respects the committed artifact layout and reports its active Change. | Passing 2026-07-24 |
 | S3/R2-S3 | Automated test `test/cli.test.js#runtime config validation confines planned Change directories to their owner` | Absolute, leading-separator, home-relative, and parent-traversing planned Changes paths fail validation; nested owner-relative paths remain valid. | Passing 2026-07-23 |
 | S3/R2-S3 | Automated test `test/cli.test.js#validation rejects a planned Changes directory symlinked outside its owner` | Artifact validation refuses an external symlink before enumerating its Change directories. | Passing 2026-07-23 |
 | S3/R3-S1 | Automated test `test/cli.test.js#change create refuses IDs already active or closed in a selected repository` | Active and closed collisions fail even in dry-run before planning writes. | Passing 2026-07-20 |

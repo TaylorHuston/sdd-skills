@@ -80,6 +80,7 @@ status: in_review
 | 2026-07-23 | S1/R4-S4 duplicate option scope | main; TDD | report validator, CLI tests, S1 Epic truth | Aligned report proof now rejects duplicate governing `--epic`, `--repo`, and `--changed-from` options instead of accepting an earlier value that downstream parsers would override. | `6a72ebd` |
 | 2026-07-23 | S1/R4-S6 non-aligned coherence | main; TDD | report validator, CLI tests, S1 Epic truth | Non-aligned reports now require the finding category implied by their result and recognized outcomes for every current check. | `6dfd4c5` |
 | 2026-07-23 | S1/R4-S7 report-file containment | main; TDD | report validator, CLI tests, S1 Epic truth | Report-shaped entries are rechecked as regular and physically contained before reading; symlinked or nonregular entries remain counted and produce a fail-closed finding. | `62df63b` |
+| 2026-07-24 | S1/R4 governing-option syntax | PR review remediation; TDD | report parser, CLI test, S1 Epic truth | Aligned reports accept the same separated and equals-form scope options accepted by their underlying commands. | current PR remediation |
 
 ## Verification Ledger
 
@@ -268,7 +269,7 @@ status: in_review
 - README/current-state docs and active/closed Change claims reconciled: current Change and release communication yes; earlier Change is updated to retain S2/S3 ownership.
 - ADR status: not applicable.
 - Release communication current: changelog and public guide match current S1/S5/S6/S7 truth.
-- `sdd-review` verdict: historical `changes-requested` source `373aff7` is retained; the current review result is recorded in `review.md` and this Change remains `in_review` pending owner confirmation and release authority.
+- `sdd-review` verdict: historical `changes-requested` source `373aff7` is retained; the current review result is recorded in `review.md` and this Change remains `in_review` pending release authority.
 - Review record: `review.md`.
 - `review.md` findings resolved: yes; all six recorded implementation findings now have focused proof.
 - Planning updates resolved: yes after planned transition.
@@ -278,7 +279,7 @@ status: in_review
 - Evidence-claim integrity checked: yes; all reopened S1/R4 claims now have exact tests.
 - Decision fan-out reconciled: yes.
 - Verification environment obligations resolved: yes for current scope.
-- Verification Scope Decision current and required candidate gates passed: current aggregate source and structural gates pass; independent review remains required.
+- Verification Scope Decision current and required candidate gates passed: current aggregate source and structural gates pass; the independent review is recorded ready.
 - Immutable implementation handoff candidate: `6086e07`; the subsequent review-record commit is artifact-only and independently revalidated.
 - Tested integration candidate matches actual integrated tree, or rerun recorded: rerun is required before release if the eventual integration tree differs materially.
 - Manual UI confirmation status: user confirmed on 2026-07-23 for `develop@c9c3cb0`.

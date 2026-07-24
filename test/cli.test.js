@@ -1492,6 +1492,35 @@ test("context rejects a repository-only ID that collides with an existing Idea",
   assert.equal(await pathExists(join(repositoryRoot, "docs", "changes")), false);
 });
 
+test("status honors committed artifact paths for a repository-only checkout", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const repositoryRoot = join(root, "code", "repository-only-status");
+  const repositoryConfig = createRepositoryConfig("repository-only-status");
+  repositoryConfig.artifacts = {
+    activeChanges: "work/changes",
+    closedChanges: "work/closed-changes",
+    epics: "work/epics",
+    adrs: "work/adrs",
+    audits: "work/audits",
+  };
+  await mkdir(join(repositoryRoot, "work", "changes", "2026-07-24-custom-artifacts"), {
+    recursive: true,
+  });
+  await writeConfig(repositoryRoot, repositoryConfig);
+  await writeFile(
+    join(repositoryRoot, "work", "changes", "2026-07-24-custom-artifacts", "tasks.md"),
+    "---\nstatus: in_progress\n---\n# Tasks\n",
+    "utf8",
+  );
+
+  const result = await getStatus(repositoryRoot, "repository-only-status");
+
+  assert.equal(result.change.changeId, "2026-07-24-custom-artifacts");
+  assert.equal(result.repositoryActivity[0].activeChangeCount, 1);
+});
+
 test("status summarizes every Space and prefers its newest active Change", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -3357,6 +3386,33 @@ test("validate accepts quoted repository paths in aligned proof", async (t) => {
   await writeEpicVerificationReport(root, "sample-web", {
     evidenceRepository: '"code/sample-web"',
   });
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    epicId: "SAMPLE-E001",
+  });
+
+  assert.equal(result.valid, true);
+});
+
+test("validate accepts equals-form governing options in aligned proof", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  const report = await writeEpicVerificationReport(root, "sample-web");
+  await writeFile(
+    report,
+    (await readFile(report, "utf8"))
+      .replaceAll("--epic SAMPLE-E001", "--epic=SAMPLE-E001")
+      .replaceAll("--repo code/sample-web", "--repo=code/sample-web")
+      .replaceAll(
+        "--changed-from aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "--changed-from=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      ),
+    "utf8",
+  );
 
   const result = await validateArtifacts(root, {
     spaceId: "sample",

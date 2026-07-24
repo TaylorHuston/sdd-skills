@@ -149,8 +149,12 @@ function parseCommandTokens(command) {
 
 function commandHasUniqueOptionValue(command, option, value) {
   const tokens = parseCommandTokens(command);
-  const values = tokens.flatMap((token, index) =>
-    token === option ? [tokens[index + 1]] : []);
+  const prefix = `${option}=`;
+  const values = tokens.flatMap((token, index) => {
+    if (token === option) return [tokens[index + 1]];
+    if (token.startsWith(prefix)) return [token.slice(prefix.length)];
+    return [];
+  });
   return values.length === 1 && values[0] === value;
 }
 

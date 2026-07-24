@@ -77,7 +77,7 @@ export async function resolveWorkspaceContext(startPath) {
         rootId = `repository-${repositoryConfig.id}-${suffix}`;
         suffix += 1;
       }
-      config.repositories.roots[rootId] = repositoryRoot;
+      config.repositories.roots[rootId] = normalizeRelativePath(relative(workspaceRoot, repositoryRoot));
       const repositoryOnlySpace = {
         status: "active",
         repositories: [{

@@ -16,7 +16,7 @@ The accepted outcome is broader than report validation alone: the package should
 
 ## Target Repositories
 
-- `/Users/taylor/src/my-life/spaces/sdd-skills` (`sdd-skills`, repository-only context).
+- `sdd-skills` (repository-only context).
 
 ## Epic Actions
 
