@@ -2,7 +2,7 @@
 
 - Status: Proposed
 - Date: YYYY-MM-DD
-- Related change: `docs/changes/yyyy-mm-dd-change-name/`
+- Related Change ID: `yyyy-mm-dd-change-name`
 - Related Epics / Stories: TBD
 
 ## Context

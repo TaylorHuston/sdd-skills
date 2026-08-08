@@ -2,26 +2,26 @@ import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { assertValidChangeId } from "../change-id.js";
-import { resolvedActiveRepositories, selectRepositories } from "../change-repositories.js";
+import {
+  assertChangeStoreConfinement,
+  getActiveChangePath,
+  getClosedChangePath,
+  relativeChangeStorePath,
+} from "../change-store.js";
+import { repositoriesForMetadata, resolveRepositoryTargets } from "../change-repositories.js";
 import {
   CHANGE_STATUSES,
   canTransitionChangeStatus,
-  parseChangeStatus,
+  parseChangeMetadata,
   replaceChangeStatus,
 } from "../change-status.js";
-import {
-  assertValidConfig,
-  resolveRepositoryArtifacts,
-  resolveWorkspacePath,
-  resolveWorkspaceStatus,
-} from "../config.js";
+import { assertValidConfig, getUserRoot, resolveWorkspaceStatus } from "../config.js";
 import { resolveOperationConfiguration } from "../workspace.js";
 import { SddError } from "../errors.js";
-import { isDirectory, isPathPhysicallyInside, pathExists } from "../fs.js";
+import { isDirectory, pathExists } from "../fs.js";
+import { withWorkspaceMutationLock } from "../mutation.js";
 
-function normalizePath(value) {
-  return value.split("\\").join("/");
-}
+const CENTRAL_CHANGE_LOCK = Symbol("central-change-lock");
 
 function assertTransition(from, to) {
   if (!CHANGE_STATUSES.includes(from) || !CHANGE_STATUSES.includes(to)) {
@@ -46,17 +46,28 @@ export async function transitionChange(
   spaceId,
   changeId,
   {
-    repositories = [],
     from,
     to,
     dryRun = false,
     beforeCommit = null,
-    beforeRepositoryCommit = null,
+    userRoot = null,
+    lockToken = null,
   } = {},
 ) {
   assertValidChangeId(changeId);
   assertTransition(from, to);
-  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath);
+  userRoot ??= getUserRoot();
+  if (!dryRun && lockToken !== CENTRAL_CHANGE_LOCK) {
+    return withWorkspaceMutationLock(userRoot, () => transitionChange(startPath, spaceId, changeId, {
+      from,
+      to,
+      dryRun,
+      beforeCommit,
+      userRoot,
+      lockToken: CENTRAL_CHANGE_LOCK,
+    }));
+  }
+  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath, { userRoot });
   assertValidConfig(config, "transition a Change");
   const space = config.ideas[spaceId];
   if (!space) {
@@ -66,174 +77,106 @@ export async function transitionChange(
     });
   }
   if (resolveWorkspaceStatus(space.status) !== "active") {
-    throw new SddError(
-      `Space ${spaceId} is not active. Update its .sdd status before transitioning work.`,
-      { code: "SPACE_NOT_ACTIVE" },
-    );
+    throw new SddError(`Space ${spaceId} is not active. Update its .sdd status before transitioning work.`, {
+      code: "SPACE_NOT_ACTIVE",
+    });
   }
 
-  const selected = selectRepositories(
-    resolvedActiveRepositories(config, space),
-    repositories,
-    { allowNone: false },
-  );
-  const transitions = [];
-  for (const repository of selected) {
-    const artifacts = resolveRepositoryArtifacts(config, repository);
-    const repositoryPath = resolveWorkspacePath(workspaceRoot, repository.resolvedPath);
-    if (!(await isDirectory(repositoryPath))) {
-      throw new SddError(`Configured repository does not exist: ${repository.resolvedPath}`, {
-        code: "REPOSITORY_NOT_FOUND",
-      });
-    }
+  const changePath = getActiveChangePath(changeId, userRoot);
+  const closedPath = getClosedChangePath(changeId, userRoot);
+  await assertChangeStoreConfinement(changePath, userRoot);
+  await assertChangeStoreConfinement(closedPath, userRoot);
+  const displayPath = relativeChangeStorePath(changePath, userRoot);
+  if (await pathExists(closedPath)) {
+    throw new SddError(`Change ID exists in closed history: ${changeId}`, {
+      code: await isDirectory(changePath) ? "CHANGE_LOCATION_COLLISION" : "CHANGE_ALREADY_CLOSED",
+    });
+  }
+  if (!(await isDirectory(changePath))) {
+    throw new SddError(`Active Change does not exist: ${displayPath}`, { code: "CHANGE_NOT_FOUND" });
+  }
+  const tasksAbsolutePath = join(changePath, "tasks.md");
+  const tasksPath = relativeChangeStorePath(tasksAbsolutePath, userRoot);
+  if (!(await pathExists(tasksAbsolutePath))) {
+    throw new SddError(`Active Change is missing tasks.md: ${displayPath}`, {
+      code: "INCOMPLETE_CHANGE",
+    });
+  }
 
-    const changeRelativePath = normalizePath(
-      join(artifacts.activeChanges, changeId),
-    );
-    const changeAbsolutePath = join(repositoryPath, changeRelativePath);
-    const changePath = normalizePath(join(repository.resolvedPath, changeRelativePath));
-    const tasksAbsolutePath = join(changeAbsolutePath, "tasks.md");
-    const tasksPath = normalizePath(join(changePath, "tasks.md"));
-
-    if (!(await isPathPhysicallyInside(repositoryPath, changeAbsolutePath))) {
-      throw new SddError(`Active Change resolves outside its repository: ${changePath}`, {
-        code: "UNSAFE_ARTIFACT_PATH",
-      });
-    }
-    if (!(await isDirectory(changeAbsolutePath))) {
-      throw new SddError(`Active Change does not exist: ${changePath}`, {
-        code: "CHANGE_NOT_FOUND",
-      });
-    }
-    if (!(await pathExists(tasksAbsolutePath))) {
-      throw new SddError(`Active Change is missing tasks.md: ${changePath}`, {
-        code: "INCOMPLETE_CHANGE",
-      });
-    }
-
-    const source = await readFile(tasksAbsolutePath, "utf8");
-    const parsed = parseChangeStatus(source);
-    if (parsed.error) {
-      throw new SddError(`Cannot parse Change status in ${tasksPath}: ${parsed.error}`, {
-        code: "INVALID_CHANGE_STATUS",
-      });
-    }
-    if (parsed.status !== from) {
-      throw new SddError(`Change status no longer matches --from ${from}: ${tasksPath}`, {
-        code: "CHANGE_STATUS_MISMATCH",
-        details: [`Current status: ${parsed.status ?? "missing"}`],
-      });
-    }
-    const updatedSource = replaceChangeStatus(source, to);
-    if (updatedSource == null) {
-      throw new SddError(`Change must contain exactly one status field in ${tasksPath}.`, {
-        code: "INVALID_CHANGE_STATUS",
-      });
-    }
-    transitions.push({
-      ...repository,
-      path: changePath,
-      tasksPath,
-      tasksAbsolutePath,
-      source,
-      updatedSource,
-      from,
-      to,
+  const source = await readFile(tasksAbsolutePath, "utf8");
+  const metadata = parseChangeMetadata(source);
+  if (metadata.error) {
+    throw new SddError(`Cannot parse Change metadata in ${tasksPath}: ${metadata.error}`, {
+      code: "INVALID_CHANGE_METADATA",
+    });
+  }
+  if (metadata.space !== spaceId) {
+    throw new SddError(`Change belongs to Space ${metadata.space}, not ${spaceId}.`, {
+      code: "CHANGE_SPACE_MISMATCH",
+    });
+  }
+  const available = await resolveRepositoryTargets(workspaceRoot, config, space);
+  const selectedRepositories = repositoriesForMetadata(available, metadata.repositories);
+  if (metadata.status !== from) {
+    throw new SddError(`Change status no longer matches --from ${from}: ${tasksPath}`, {
+      code: "CHANGE_STATUS_MISMATCH",
+      details: [`Current status: ${metadata.status}`],
+    });
+  }
+  const updatedSource = replaceChangeStatus(source, to);
+  if (updatedSource === null) {
+    throw new SddError(`Change must contain exactly one status field in ${tasksPath}.`, {
+      code: "INVALID_CHANGE_STATUS",
     });
   }
 
   if (!dryRun) {
     const nonce = `${process.pid}-${Date.now()}`;
-    const staged = [];
-    const committed = [];
-    let succeeded = false;
+    const temporaryPath = join(dirname(tasksAbsolutePath), `.tasks.md.sdd-transition-${nonce}`);
+    const backupPath = join(dirname(tasksAbsolutePath), `.tasks.md.sdd-backup-${nonce}`);
+    await writeFile(temporaryPath, updatedSource, "utf8");
+    let committed = false;
     try {
-      for (const transition of transitions) {
-        const temporaryPath = join(
-          dirname(transition.tasksAbsolutePath),
-          `.tasks.md.sdd-transition-${nonce}`,
-        );
-        const backupPath = join(
-          dirname(transition.tasksAbsolutePath),
-          `.tasks.md.sdd-backup-${nonce}`,
-        );
-        await writeFile(temporaryPath, transition.updatedSource, "utf8");
-        staged.push({ ...transition, temporaryPath, backupPath });
-      }
-      if (beforeCommit) await beforeCommit({ transitions: staged });
-      for (const [index, transition] of staged.entries()) {
-        if (beforeRepositoryCommit) {
-          await beforeRepositoryCommit({ transition, index, transitions: staged });
-        }
-        const repositoryPath = resolveWorkspacePath(workspaceRoot, transition.resolvedPath);
-        if (!(await isPathPhysicallyInside(repositoryPath, transition.tasksAbsolutePath))) {
-          throw new SddError(`Active Change resolves outside its repository: ${transition.tasksPath}`, {
-            code: "UNSAFE_ARTIFACT_PATH",
-          });
-        }
-        await rename(transition.tasksAbsolutePath, transition.backupPath);
-        const commitSource = await readFile(transition.backupPath, "utf8");
-        if (commitSource !== transition.source) {
-          await rename(transition.backupPath, transition.tasksAbsolutePath);
-          throw new SddError(`Change changed during transition: ${transition.tasksPath}`, {
-            code: "CONCURRENT_CHANGE",
-          });
-        }
-        if (await pathExists(transition.tasksAbsolutePath)) {
-          throw new SddError(`Change was replaced during transition: ${transition.tasksPath}`, {
-            code: "CONCURRENT_CHANGE",
-            details: [`Original content retained at ${transition.backupPath}.`],
-          });
-        }
-        try {
-          await rename(transition.temporaryPath, transition.tasksAbsolutePath);
-          committed.push(transition);
-        } catch (error) {
-          await rename(transition.backupPath, transition.tasksAbsolutePath);
-          throw error;
-        }
-      }
-      succeeded = true;
-    } catch (error) {
-      const recoveryFailures = [];
-      for (const transition of committed.reverse()) {
-        try {
-          const currentSource = await readFile(transition.tasksAbsolutePath, "utf8");
-          if (currentSource !== transition.updatedSource) {
-            recoveryFailures.push(
-              `${transition.tasksPath}: newer content preserved; original retained at ${transition.backupPath}.`,
-            );
-            continue;
-          }
-          await rm(transition.tasksAbsolutePath, { force: true });
-          await rename(transition.backupPath, transition.tasksAbsolutePath);
-        } catch (recoveryError) {
-          recoveryFailures.push(`${transition.tasksPath}: ${recoveryError.message}`);
-        }
-      }
-      for (const transition of staged) {
-        if (!(await pathExists(transition.backupPath)) || await pathExists(transition.tasksAbsolutePath)) {
-          continue;
-        }
-        try {
-          await rename(transition.backupPath, transition.tasksAbsolutePath);
-        } catch (recoveryError) {
-          recoveryFailures.push(`${transition.tasksPath}: ${recoveryError.message}`);
-        }
-      }
-      if (recoveryFailures.length > 0) {
-        throw new SddError("Change transition failed and recovery was incomplete.", {
-          code: "MUTATION_RECOVERY_FAILED",
-          details: [`Original error: ${error.message}`, ...recoveryFailures],
+      if (beforeCommit) await beforeCommit({ tasksPath: tasksAbsolutePath, temporaryPath, backupPath });
+      await assertChangeStoreConfinement(tasksAbsolutePath, userRoot);
+      if (await pathExists(closedPath)) {
+        throw new SddError(`Change moved to closed history during transition: ${changeId}`, {
+          code: "CONCURRENT_CHANGE",
         });
+      }
+      await rename(tasksAbsolutePath, backupPath);
+      const commitSource = await readFile(backupPath, "utf8");
+      if (commitSource !== source) {
+        await rename(backupPath, tasksAbsolutePath);
+        throw new SddError(`Change changed during transition: ${tasksPath}`, {
+          code: "CONCURRENT_CHANGE",
+        });
+      }
+      try {
+        await rename(temporaryPath, tasksAbsolutePath);
+        committed = true;
+      } catch (error) {
+        await rename(backupPath, tasksAbsolutePath);
+        throw error;
+      }
+    } catch (error) {
+      if (committed && await pathExists(tasksAbsolutePath)) {
+        const currentSource = await readFile(tasksAbsolutePath, "utf8");
+        if (currentSource === updatedSource) {
+          await rm(tasksAbsolutePath, { force: true });
+          await rename(backupPath, tasksAbsolutePath);
+        } else {
+          throw new SddError("Change transition failed and recovery was incomplete.", {
+            code: "MUTATION_RECOVERY_FAILED",
+            details: [`Original error: ${error.message}`, `${tasksPath}: newer content preserved; original retained at ${backupPath}.`],
+          });
+        }
       }
       throw error;
     } finally {
-      for (const transition of staged) {
-        await rm(transition.temporaryPath, { force: true }).catch(() => {});
-        if (succeeded && await pathExists(transition.tasksAbsolutePath)) {
-          await rm(transition.backupPath, { force: true }).catch(() => {});
-        }
+      await rm(temporaryPath, { force: true }).catch(() => {});
+      if (await pathExists(tasksAbsolutePath) && await pathExists(backupPath)) {
+        await rm(backupPath, { force: true }).catch(() => {});
       }
     }
   }
@@ -241,13 +184,14 @@ export async function transitionChange(
   return {
     command: "change-transition",
     workspaceRoot,
+    userRoot,
     dryRun,
     spaceId,
     changeId,
     from,
     to,
-    repositories: transitions.map(
-      ({ tasksAbsolutePath, source, updatedSource, ...transition }) => transition,
-    ),
+    path: displayPath,
+    tasksPath,
+    repositories: selectedRepositories,
   };
 }

@@ -1,24 +1,34 @@
 import { join } from "node:path";
 
 import {
-  findWorkspaceRoot,
-  readConfig,
+  getUserRoot,
+  isSupportedLegacyConfig,
+  validateConfig,
   resolveIdeaPlanningPath,
   resolveRepositoryPath,
   resolveWorkspacePath,
-  validateConfig,
 } from "../config.js";
 import { isDirectory } from "../fs.js";
 import { inspectChangeStatuses } from "../change-status.js";
 import { inspectProjectGuidance } from "../guidance.js";
 import { inspectSkillInstallation } from "../skills.js";
 import { inspectWorkflowInstallation } from "../workflow.js";
-import { resolveOperationConfiguration } from "../workspace.js";
+import { findOperationConfiguration, resolveOperationConfiguration } from "../workspace.js";
 
-export async function diagnoseWorkspace(startPath) {
-  const workspaceRoot = await findWorkspaceRoot(startPath);
-  let config = await readConfig(workspaceRoot);
-  const findings = [...validateConfig(config)];
+export async function diagnoseWorkspace(startPath, { userRoot = null } = {}) {
+  let { workspaceRoot, config } = await findOperationConfiguration(
+    startPath,
+    userRoot ? { userRoot } : {},
+  );
+  const migrationPending = isSupportedLegacyConfig(config)
+    || (config.kind === "user" && config.migration?.sourceWorkspace);
+  const findings = migrationPending
+    ? [{
+        level: "error",
+        code: "CONFIG_MIGRATION_REQUIRED",
+        message: "SDD configuration migration is required. Run `sdd update` before using this installation.",
+      }]
+    : [...validateConfig(config)];
 
   if (findings.some((finding) => finding.level === "error")) {
     const counts = {
@@ -36,7 +46,10 @@ export async function diagnoseWorkspace(startPath) {
     };
   }
 
-  config = (await resolveOperationConfiguration(startPath)).config;
+  userRoot ??= getUserRoot();
+  const operation = await resolveOperationConfiguration(startPath, { userRoot });
+  workspaceRoot = operation.workspaceRoot;
+  config = operation.config;
 
   const checkDirectory = async (label, configuredPath, level = "warning") => {
     const exists = await isDirectory(resolveWorkspacePath(workspaceRoot, configuredPath));

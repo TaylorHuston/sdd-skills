@@ -5,8 +5,7 @@ import { parseArgs } from "node:util";
 import { configureWorkspace } from "./commands/configure.js";
 import { getWorkspaceContext } from "./commands/context.js";
 import { closeChange } from "./commands/change-close.js";
-import { createPlannedChange } from "./commands/change-create.js";
-import { promotePlannedChange } from "./commands/change-promote.js";
+import { createChange } from "./commands/change-create.js";
 import { transitionChange } from "./commands/change-transition.js";
 import { diagnoseWorkspace } from "./commands/doctor.js";
 import { createEpic } from "./commands/epic-create.js";
@@ -35,10 +34,9 @@ Usage:
   sdd status [space-id] [options] List Space status or show one Space in detail
   sdd validate [space-id] [options] Validate SDD artifact structure and references
   sdd epic create [options]       Scaffold a canonical Epic in one repository
-  sdd change create [options]     Scaffold a planned Change for a Space
-  sdd change promote [options]    Promote a planned Change into repository work
+  sdd change create [options]     Scaffold a central Change for a Space
   sdd change transition [options] Guard one active Change status transition
-  sdd change close [options]      Move an in-review Change into closed history
+  sdd change close [options]      Move an in-review Change into central closed history
   sdd --version                   Print the package version
 
 Setup options:
@@ -77,7 +75,7 @@ Status options:
 Validate options:
   --workspace <path>              Resolve SDD context from this path (default: current directory)
   --repo <path>                   Select a mapped repository; may be repeated
-  --change <change-id>            Validate one planned, active, or closed Change
+  --change <change-id>            Validate one active or closed Change
   --epic <epic-id>                Validate one Epic
   --changed-from <commit-ish>     Check Epic modified metadata against a Git baseline
   --json                          Emit machine-readable JSON
@@ -102,21 +100,12 @@ Change create options:
   --dry-run                       Report the scaffold without writing files
   --json                          Emit machine-readable JSON
 
-Change promote usage:
-  sdd change promote <space-id> <change-id> [options]
-
-Change promote options:
-  --workspace <path>              Resolve SDD context from this path (default: current directory)
-  --repo <path>                   Select a mapped repository; may be repeated
-  --dry-run                       Report the promotion without writing files
-  --json                          Emit machine-readable JSON
 
 Change transition usage:
   sdd change transition <space-id> <change-id> --from <status> --to <status> [options]
 
 Change transition options:
   --workspace <path>              Resolve SDD context from this path (default: current directory)
-  --repo <path>                   Select a mapped repository; may be repeated
   --from <status>                 Require the current active Change status
   --to <status>                   Set the next allowed active Change status
   --dry-run                       Report the transition without writing tasks.md
@@ -127,7 +116,6 @@ Change close usage:
 
 Change close options:
   --workspace <path>              Resolve SDD context from this path (default: current directory)
-  --repo <path>                   Select a mapped repository; may be repeated
   --dry-run                       Report the closeout without moving files
   --json                          Emit machine-readable JSON
 `;
@@ -136,19 +124,16 @@ const CHANGE_HELP = `SDD Change commands
 
 Usage:
   sdd change create <space-id> <slug> [options]
-  sdd change promote <space-id> <change-id> [options]
   sdd change transition <space-id> <change-id> --from <status> --to <status> [options]
   sdd change close <space-id> <change-id> [options]
 
 Commands:
-  create   Scaffold a private planned Change
-  promote  Move a proposed draft into repository work
+  create      Scaffold one canonical central Change
   transition  Guard and apply an allowed active Change status transition
-  close    Move an in-review Change into closed history
+  close       Move an in-review Change into central closed history
 
 Shared options:
-  --workspace <path>  Resolve the initialized workspace (default: current directory)
-  --repo <path>       Select a mapped repository; may be repeated
+  --workspace <path>  Resolve the initialized user installation (default: current directory)
   --dry-run           Report without writing files
   --json              Emit machine-readable JSON
 `;
@@ -226,21 +211,49 @@ function printWorkflowAction(workflow) {
 
 export function statusSummaryRows(result) {
   return result.spaces.flatMap((space) => {
-    const repositories = space.repositoryActivity;
-    if (repositories.length > 0) {
-      return repositories.map((repository) => {
-        const change = repository.activeChanges[0] ?? repository.change;
-        return [
-          space.spaceId,
-          space.status,
-          repository.status,
-          repository.role ?? "-",
-          change?.status ?? "-",
-          change?.changeId ?? "-",
-          repository.resolvedPath,
-          repository.activeChangeCount,
-        ];
-      });
+    const repositoryRows = space.repositoryActivity.map((repository) => {
+      const change = repository.activeChanges[0] ?? repository.change;
+      return [
+        space.spaceId,
+        space.status,
+        repository.status,
+        repository.role ?? "-",
+        change?.status ?? "-",
+        change?.changeId ?? "-",
+        repository.resolvedPath,
+        repository.activeChangeCount,
+      ];
+    });
+    const projectedRepositoryIds = new Set(
+      space.repositoryActivity.map((repository) => repository.id),
+    );
+    const spaceRows = space.activeChanges
+      .filter((change) => change.unresolvedRepositoryIds.length === 0
+        && !change.repositories.some((repositoryId) => projectedRepositoryIds.has(repositoryId)))
+      .map((change) => [
+        space.spaceId,
+        space.status,
+        "-",
+        "space",
+        change.status,
+        change.changeId,
+        change.repositories.join(",") || "-",
+        0,
+      ]);
+    const unresolvedRows = space.activeChanges
+      .filter((change) => change.unresolvedRepositoryIds.length > 0)
+      .map((change) => [
+        space.spaceId,
+        space.status,
+        "-",
+        "unresolved",
+        change.status,
+        change.changeId,
+        change.unresolvedRepositoryIds.join(","),
+        0,
+      ]);
+    if (repositoryRows.length + spaceRows.length + unresolvedRows.length > 0) {
+      return [...repositoryRows, ...spaceRows, ...unresolvedRows];
     }
     return [[space.spaceId, space.status, "-", "-", "-", "-", "-", 0]];
   });
@@ -273,6 +286,14 @@ function printStatus(result) {
       console.log("");
       console.log(`${space.spaceId} [${space.status}]`);
       console.log(`  Planning: ${space.planningPath}`);
+      console.log(`  Active Changes: ${space.activeChangeCount}`);
+      for (const change of space.activeChanges.filter(
+        (entry) => entry.unresolvedRepositoryIds.length > 0,
+      )) {
+        console.log(
+          `    Unresolved Change: ${change.changeId} [${change.status}] (${change.unresolvedRepositoryIds.join(", ")})`,
+        );
+      }
       if (space.repositoryActivity.length === 0) {
         console.log("  Repositories: none");
         continue;
@@ -300,6 +321,14 @@ function printStatus(result) {
 
   console.log(`Space: ${result.spaceId} [${result.status}]`);
   console.log(`Planning path: ${result.planningPath}`);
+  console.log(`Active Changes (${result.activeChangeCount}):`);
+  if (result.activeChangeCount === 0) console.log("  none");
+  for (const change of result.activeChanges) {
+    const unresolved = change.unresolvedRepositoryIds.length > 0
+      ? `; unresolved: ${change.unresolvedRepositoryIds.join(", ")}`
+      : "";
+    console.log(`  ${change.changeId} [${change.status}${unresolved}]`);
+  }
   if (result.repositoryDetails.length === 0) {
     console.log("Repositories: none");
     return;
@@ -362,6 +391,35 @@ function printHuman(result) {
   if (result.command === "update") {
     const label = result.mode === "user" ? "user SDD installation" : "legacy SDD workspace";
     console.log(`${result.dryRun ? "Would update" : "Updated"} ${label}: ${result.workspaceRoot}`);
+    if (result.migration.actions.length === 0) {
+      console.log("Legacy migration: no actions required.");
+    } else {
+      for (const action of result.migration.actions) {
+        const prefix = result.dryRun
+          ? `Would ${action.action}`
+          : action.action === "remove"
+            ? "Removed"
+            : action.action === "upgrade"
+              ? "Upgraded"
+              : action.action === "move"
+                ? "Moved"
+                : action.action === "consolidate"
+                  ? "Consolidated"
+                  : "Migrated";
+        if (action.kind === "change") {
+          console.log(
+            `${prefix} ${action.closed ? "closed " : ""}Change ${action.changeId}: ${action.from.join(", ")} -> ${action.to}`,
+          );
+        } else if (action.kind === "brief") {
+          console.log(`${prefix} Change Brief: ${action.from} -> ${action.to}`);
+        } else if (action.kind === "legacy-root") {
+          console.log(`${prefix} legacy root: ${action.path}`);
+        } else {
+          console.log(`${prefix} ${action.kind}: ${action.path} (${action.from} -> ${action.to})`);
+        }
+      }
+    }
+    for (const warning of result.migration.warnings) console.log(`Migration warning: ${warning}`);
     printWorkflowAction(result.workflow);
     printSkillActions(result.skills.actions);
     return;
@@ -422,7 +480,7 @@ function printHuman(result) {
     if (result.scope.changeId) console.log(`Change: ${result.scope.changeId}`);
     if (result.scope.epicId) console.log(`Epic: ${result.scope.epicId}`);
     console.log(
-      `Artifacts: ${result.summary.plannedChanges} planned Change(s), ${result.summary.changes} repository Change(s), ${result.summary.epics} Epic(s)`,
+      `Artifacts: ${result.summary.changes} Change(s), ${result.summary.epics} Epic(s)`,
     );
     for (const entry of result.findings) {
       console.log(`${entry.level.toUpperCase()} [${entry.code}] ${entry.path}: ${entry.message}`);
@@ -441,7 +499,7 @@ function printHuman(result) {
     return;
   }
   if (result.command === "change-create") {
-    console.log(`${result.dryRun ? "Would create" : "Created"} planned Change: ${result.changeId}`);
+    console.log(`${result.dryRun ? "Would create" : "Created"} Change: ${result.changeId}`);
     console.log(`Space: ${result.spaceId}`);
     console.log(`Path: ${result.path}`);
     console.log(
@@ -452,36 +510,25 @@ function printHuman(result) {
     console.log(`Files: ${result.files.join(", ")}`);
     return;
   }
-  if (result.command === "change-promote") {
-    console.log(`${result.dryRun ? "Would promote" : "Promoted"} planned Change: ${result.changeId}`);
-    console.log(`Space: ${result.spaceId}`);
-    console.log(`Source: ${result.sourcePath}${result.dryRun ? " (would remove)" : " (removed)"}`);
-    for (const repository of result.repositories) {
-      console.log(`Repository: ${repository.resolvedPath}${repository.role ? ` (${repository.role})` : ""}`);
-      console.log(`  Change: ${repository.path}`);
-    }
-    console.log(`Files: ${result.files.join(", ")}`);
-    return;
-  }
   if (result.command === "change-transition") {
     console.log(
       `${result.dryRun ? "Would transition" : "Transitioned"} Change: ${result.changeId} (${result.from} -> ${result.to})`,
     );
     console.log(`Space: ${result.spaceId}`);
-    for (const repository of result.repositories) {
-      console.log(`Repository: ${repository.resolvedPath}${repository.role ? ` (${repository.role})` : ""}`);
-      console.log(`  Tasks: ${repository.tasksPath}`);
-    }
+    console.log(`Tasks: ${result.tasksPath}`);
+    console.log(
+      `Repositories: ${result.repositories.map((repository) => repository.resolvedPath).join(", ") || "none"}`,
+    );
     return;
   }
   if (result.command === "change-close") {
     console.log(`${result.dryRun ? "Would close" : "Closed"} Change: ${result.changeId}`);
     console.log(`Space: ${result.spaceId}`);
-    for (const repository of result.repositories) {
-      console.log(`Repository: ${repository.resolvedPath}${repository.role ? ` (${repository.role})` : ""}`);
-      console.log(`  Source: ${repository.sourcePath}`);
-      console.log(`  Closed: ${repository.path}`);
-    }
+    console.log(`Source: ${result.sourcePath}`);
+    console.log(`Closed: ${result.path}`);
+    console.log(
+      `Repositories: ${result.repositories.map((repository) => repository.resolvedPath).join(", ") || "none"}`,
+    );
   }
 }
 
@@ -738,12 +785,12 @@ async function executeCommand(command, args) {
     if (["--help", "-h", "help"].includes(subcommand)) {
       return { help: true, helpText: CHANGE_HELP };
     }
-    if (!["create", "promote", "transition", "close"].includes(subcommand)) {
+    if (!["create", "transition", "close"].includes(subcommand)) {
       throw new SddError(
         subcommand ? `Unknown change command: ${subcommand}` : "change requires a subcommand.",
         {
           code: "USAGE",
-          details: ["Available commands: change create, change promote, change transition, change close"],
+          details: ["Available commands: change create, change transition, change close"],
         },
       );
     }
@@ -751,8 +798,9 @@ async function executeCommand(command, args) {
       args.slice(1),
       commandOptions({
         workspace: { type: "string" },
-        repo: { type: "string", multiple: true },
-        ...(subcommand === "create" ? { date: { type: "string" } } : {}),
+        ...(subcommand === "create"
+          ? { repo: { type: "string", multiple: true }, date: { type: "string" } }
+          : {}),
         ...(subcommand === "transition"
           ? { from: { type: "string" }, to: { type: "string" } }
           : {}),
@@ -766,20 +814,6 @@ async function executeCommand(command, args) {
         { code: "USAGE" },
       );
     }
-    if (subcommand === "promote") {
-      return {
-        result: await promotePlannedChange(
-          resolve(values.workspace ?? process.cwd()),
-          positionals[0],
-          positionals[1],
-          {
-            repositories: values.repo ?? [],
-            dryRun: values["dry-run"] ?? false,
-          },
-        ),
-        json: values.json ?? false,
-      };
-    }
     if (subcommand === "close") {
       return {
         result: await closeChange(
@@ -787,7 +821,6 @@ async function executeCommand(command, args) {
           positionals[0],
           positionals[1],
           {
-            repositories: values.repo ?? [],
             dryRun: values["dry-run"] ?? false,
           },
         ),
@@ -806,7 +839,6 @@ async function executeCommand(command, args) {
           positionals[0],
           positionals[1],
           {
-            repositories: values.repo ?? [],
             from: values.from,
             to: values.to,
             dryRun: values["dry-run"] ?? false,
@@ -816,7 +848,7 @@ async function executeCommand(command, args) {
       };
     }
     return {
-      result: await createPlannedChange(
+      result: await createChange(
         resolve(values.workspace ?? process.cwd()),
         positionals[0],
         positionals[1],

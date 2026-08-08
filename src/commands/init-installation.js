@@ -11,6 +11,8 @@ import {
   getConfigPath,
   getInstallLockPath,
   getUserRoot,
+  isSupportedLegacyConfig,
+  migrateConfig,
   readConfig,
   readRepositoryConfig,
   writeConfig,
@@ -128,10 +130,13 @@ export async function initRepository(
       code: "USER_SETUP_REQUIRED",
     });
   }
-
   const userConfig = await readConfig(userRoot);
-  assertValidConfig(userConfig, "initialize a repository");
-  if (userConfig.kind !== "user") {
+
+  const validatedUserConfig = isSupportedLegacyConfig(userConfig)
+    ? migrateConfig(userConfig, userRoot).config
+    : userConfig;
+  assertValidConfig(validatedUserConfig, "initialize a repository");
+  if (validatedUserConfig.kind !== "user") {
     throw new SddError("The user-level SDD configuration is not a user installation.", {
       code: "INVALID_USER_CONFIG",
     });

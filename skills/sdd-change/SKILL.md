@@ -11,9 +11,9 @@ Planning invariant: describe the accepted end state, observable behavior, durabl
 
 ## Authority And Project Profile
 
-Resolve the workspace, idea planning path, and target repositories with `sdd context <relevant-path> --json`. Read the `workflowPath` returned by `sdd context` completely before defining Change status, Stories, Requirements, Scenarios, evidence, or promotion state. If user setup is missing, direct the user to `sdd setup`; if a repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
+Resolve the user installation, Space, idea planning path, and target repositories with `sdd context <relevant-path> --json`. Read the `workflowPath` returned by `sdd context` completely before defining Change status, Stories, Requirements, Scenarios, evidence, or repository ownership. If user setup is missing, direct the user to `sdd setup`; if a repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
 
-Project guidance owns branch and write policy, release conventions, supporting docs, technology constraints, and specialist guidance. Canonical repository artifacts remain under `docs/changes/`, `docs/epics/`, and `docs/adrs/` unless the managed workflow explicitly changes that package-wide contract.
+The one canonical dated Change record lives under `~/.sdd/changes/`; target repositories are stable IDs in `tasks.md`, not copies of the Change. Project guidance owns branch and write policy, release conventions, supporting docs, technology constraints, and specialist guidance. Epics, ADRs, implementation, tests, and supporting docs remain repository-local under their canonical paths.
 
 Use `/sdd-interactive` when the user wants to create and immediately implement a small tracked change in one session.
 
@@ -23,7 +23,7 @@ Use exactly one mode:
 
 - `--brief`: capture durable product intent only. Do not perform technical planning.
 - `--plan`: create or finish an implementation-ready planned Change using current technical context.
-- `--replan`: revise an existing active repository Change after planning-level discovery.
+- `--replan`: revise an existing central active Change after planning-level discovery.
 
 When no flag is supplied, infer the mode only when the request is unambiguous. Ask whether the user wants to capture the outcome or plan implementation when that choice would materially change the work.
 
@@ -34,19 +34,19 @@ When no flag is supplied, infer the mode only when the request is unambiguous. A
 `--brief` writes one undated private file:
 
 ```text
-<planning-path>/<plannedChangesDirectory>/<change-slug>.md
+<planning-path>/change-briefs/<change-slug>.md
 ```
 
-Use `assets/brief-template.md`. A Change Brief has no Change `status`, does not appear in `sdd status`, does not authorize implementation, and is not accepted by `/sdd-apply` or `sdd change promote`.
+Use `assets/brief-template.md`. A Change Brief has no Change `status`, does not appear in `sdd status`, does not authorize implementation, and is not accepted by `/sdd-apply`.
 
 ### Planned Change
 
 `--plan` writes the canonical planned artifact set:
 
 ```text
-<planning-path>/<plannedChangesDirectory>/<yyyy-mm-dd-change-name>/proposal.md
-<planning-path>/<plannedChangesDirectory>/<yyyy-mm-dd-change-name>/design.md
-<planning-path>/<plannedChangesDirectory>/<yyyy-mm-dd-change-name>/tasks.md
+~/.sdd/changes/<yyyy-mm-dd-change-name>/proposal.md
+~/.sdd/changes/<yyyy-mm-dd-change-name>/design.md
+~/.sdd/changes/<yyyy-mm-dd-change-name>/tasks.md
 ```
 
 Use:
@@ -57,28 +57,28 @@ Use:
 - `assets/epic-template.md` for proposed new Epic shape
 - `/sdd-adr` and its ADR template for durable architecture decisions
 
-Assign the dated Change ID when planning begins, not when the brief is captured. Use `sdd change create <space-id> <slug>` for deterministic scaffolding when available.
+Assign the dated Change ID when planning begins, not when the brief is captured. Change IDs are globally unique across the user installation. Use `sdd change create <space-id> <slug>` with explicit `--repo` selections when needed; the command creates the one canonical central record and writes the Space and target repository IDs into `tasks.md`.
 
-After `sdd change promote <space-id> <change-id>`, `--plan` may reconcile each promoted repository copy in place. Promotion handles deterministic movement and path hygiene; this skill owns semantic repository-specific scope, Epic actions, design, tasks, dependencies, and coordination.
+`--plan` refines that central record in place. It owns semantic scope, target-repository responsibilities, Epic actions, design, tasks, dependencies, and cross-repository coordination without creating repository copies.
 
 ### Replanned Change
 
-`--replan` updates an existing active repository Change under `docs/changes/<change-id>/`. It never creates a private brief or a second Change for the same scope.
+`--replan` updates the existing central active Change under `~/.sdd/changes/<change-id>/`. It never creates a private brief, repository copy, or second Change for the same scope.
 
 ## Common Setup
 
-1. Resolve the Space and relevant repositories.
+1. Resolve the Space and every relevant target repository.
    - Prefer explicit paths and IDs from the user, then `sdd context`.
-   - Ask when an idea maps to multiple plausible repositories or ownership remains ambiguous.
-   - Do not write to the workflow root unless it is the intended project.
+   - Ask when multiple mapped repositories are plausible targets or ownership remains ambiguous.
+   - Do not write to the workflow root unless it is an intended target repository.
 2. Resolve the input.
-   - Accept a kebab-case slug, plain-language outcome, brief path, planned Change ID, or active Change path as appropriate to the mode.
+   - Accept a kebab-case slug, plain-language outcome, brief path, Change ID, or central active Change path as appropriate to the mode.
    - Derive a concise kebab-case slug from prose.
-   - For `--replan`, require an existing active Change and ask when multiple Changes could own the discovery.
+   - For `--replan`, require an existing central active Change and ask when multiple Changes could own the discovery.
 3. Load only mode-relevant context.
    - Read project guidance, PRD/Product Brief context, and relevant exploration notes when present.
    - Flag product-direction conflicts; recommend `/sdd-prd` when the disagreement is broader than one Change.
-   - Inspect legacy `changes/` only as migration input. Do not continue work there.
+   - Treat idea-owned planned folders and repository-local active or closed Change folders as migration input only. Do not continue work there; direct the user to `sdd update`.
 
 ## Brief Mode
 
@@ -101,21 +101,21 @@ Likely repositories may be listed as nonbinding context only. A brief can remain
 
 ## Plan Mode
 
-The outcome is a coherent planned Change that is ready to promote or, after promotion, ready to hand to `/sdd-apply`.
+The outcome is one coherent central planned Change that is ready to hand to `/sdd-apply`.
 
 1. Establish confirmed intent.
    - Prefer an existing Change Brief.
    - If no brief exists, first capture the brief-level outcome and ask the user to confirm it before technical planning. This may happen in the same invocation when the user explicitly requested `--plan`.
    - Treat the confirmed desired outcome and scope boundaries as the planning anchor. Do not silently narrow, broaden, or reinterpret them.
 2. Refresh current implementation context.
-   - Read project guidance, README, relevant docs, PRD, active and recent closed Changes, relevant Epics, current code, tests, contracts, and dependencies only as needed.
+   - Read project guidance, README, relevant docs, PRD, central active and recent closed Changes, relevant Epics, current code, tests, contracts, and dependencies only as needed.
    - Read code when needed to avoid fictional `Implemented By` or `Verified By` plans and to compare viable approaches.
    - When planning depends on version-sensitive library, framework, SDK, API, CLI, or cloud-platform behavior, prefer an available current-documentation capability such as Context7. Query the exact concept and installed version when known; otherwise use primary vendor documentation rather than relying on model memory.
 3. Create or continue the planned Change.
-   - For a new private plan, run `sdd change create <space-id> <slug>` with explicit `--repo` selections when needed.
+   - For a new plan, run `sdd change create <space-id> <slug>` with explicit `--repo` selections when needed. Confirm the globally unique ID, `space`, and stable `repositories` frontmatter before refinement.
    - For each new Epic named by the plan, run `sdd epic create <space-id> <epic-id> <slug>` against exactly one selected repository before refining the canonical scaffold. Do not hand-author a substitute Epic shape.
-   - For a promoted Change, update its repository copy in place and limit it to that repository's ownership and coordination obligations.
-   - Do not maintain duplicate planned and active Change truth after promotion.
+   - Update the one central Change in place. Divide repository-specific ownership and coordination obligations clearly while keeping shared scope, decisions, and lifecycle state in that record.
+   - Never create or maintain repository-local Change copies.
 4. Interview before finalizing.
    - Confirm Epic actions and capability-sized Story boundaries.
    - Refine observable Requirements and concrete happy-path, empty, failure, permission, recovery, integration, and security-sensitive Scenarios as relevant.
@@ -129,7 +129,7 @@ The outcome is a coherent planned Change that is ready to promote or, after prom
    - Ask before finalizing when material product, Story, contract, data, security, architecture, or verification choices remain unsettled.
 5. Write `proposal.md`.
    - Preserve the brief's why, desired outcome, scope boundaries, success signals, durable constraints, and open questions.
-   - Record target repositories, new or updated Epic directories, Story moves or replacements, impact, deferred scope, assumptions, and release-communication impact.
+   - Record stable target repository IDs matching `tasks.md` frontmatter, new or updated Epic directories in those repositories, Story moves or replacements, impact, deferred scope, assumptions, and release-communication impact.
 6. Write `design.md`.
    - Record the selected technical approach, alternatives, reconsideration triggers, client and application boundaries, important constraints, risks, and verification strategy.
    - Define each new or modified Epic's Stories, Requirements, Scenarios, independent implementation and verification state, behavior-mapped `Implemented By`, `Implementation Gaps`, scenario-mapped `Verified By`, and `Verification Gaps` using the canonical template.
@@ -143,7 +143,7 @@ The outcome is a coherent planned Change that is ready to promote or, after prom
    - Create an ADR candidate or Proposed ADR for durable architecture, API, client, data, integration, deployment, dependency, auth/security, state, or storage decisions future work should respect.
    - Do not create ADRs for ordinary, reversible implementation details.
 8. Write `tasks.md`.
-   - Start with `status: proposed`. Use only `proposed`, `planned`, `in_progress`, or `in_review`; folder location under `closed/` is the terminal state.
+   - Start with frontmatter containing `status: proposed`, the owning `space`, and the stable target `repositories` list. Use only `proposed`, `planned`, `in_progress`, or `in_review`; central folder location under `~/.sdd/changes/closed/` is the terminal state.
    - Keep tasks at end-state, artifact, Story/capability, verification, review, and closeout level rather than writing a file-by-file sequence or freezing an implementation order.
    - Seed the living Implementation Risk And Confirmation Matrix, Decision Fan-Out Ledger, Verification Environment table, and Verification Scope Decision with only the obligations currently knowable. Treat Pattern Parity, Boundary Contract, and Stateful Transition matrices as triggered Apply artifacts: mark known applicability when useful, but do not predict exhaustive sibling concerns, cross-layer mappings, or state interleavings before implementation. Maintain `Resume Here`, implementation and verification ledgers, blockers, manual confirmation, review record, release communication, PR/merge state, ADR state, deferred gaps, truth reconciliation, and closeout tasks.
 9. Validate and hand off.
@@ -151,8 +151,8 @@ The outcome is a coherent planned Change that is ready to promote or, after prom
    - Run `sdd validate <space-id> --change <change-id> --workspace <workspace-root> --json` and resolve deterministic errors. Inspect warnings; structural validity does not prove semantic completeness.
    - Re-read all artifacts and stop for a follow-up question when unresolved ambiguity would make Stories, Requirements, Scenarios, technical choices, or verification misleading.
    - When planning from a private brief, remove the source brief only after the validated `proposal.md` fully preserves its durable intent. Leave it intact if planning stops or fails.
-   - A private planned Change is ready for `sdd change promote`, not `/sdd-apply`. A reconciled promoted Change may proceed to `/sdd-apply`.
-   - When a UI-bearing Change still has material experience uncertainty, hand it to `/sdd-design --plan` before promotion or implementation. Use `/sdd-design --revise` only for an active implemented or partially implemented experience whose accepted behavior remains stable. Design readiness does not add a Change status or authorize code edits.
+   - A validated central Change in `planned` may proceed directly to `/sdd-apply`; there is no promotion stage or repository copy to reconcile.
+   - When a UI-bearing Change still has material experience uncertainty, hand it to `/sdd-design --plan` before implementation. Use `/sdd-design --revise` only for an implemented or partially implemented experience whose accepted behavior remains stable. Design readiness does not add a Change status or authorize code edits.
 
 ## Replan Mode
 
@@ -161,12 +161,12 @@ Use `--replan` when implementation, review, or manual feedback discovers a new o
 Do not use it for narrow defects, missing tests, stale evidence indexes, or routine implementation corrections that `/sdd-apply` can safely reconcile.
 
 1. Read the active Change, relevant Epic truth, implementation ledger, review or manual feedback, current code, tests, and failing or passing evidence needed to understand the discovery.
-2. For an active Change not already `proposed`, run `sdd change transition <space-id> <change-id> --from <current-status> --to proposed` with explicit repository selection when needed. Classify the discovery as `in-scope refinement`, `scope expansion`, `product drift`, `Epic ownership change`, `technical constraint`, or `follow-up change`.
+2. For a Change not already `proposed`, run `sdd change transition <space-id> <change-id> --from <current-status> --to proposed`. This compare-and-set mutates the one central `tasks.md`; do not transition repository targets independently. Classify the discovery as `in-scope refinement`, `scope expansion`, `product drift`, `Epic ownership change`, `technical constraint`, or `follow-up change`.
 3. Preserve the active Change when the discovery is required to achieve its accepted outcome. Recommend a new `/sdd-change --brief` for adjacent future work or `/sdd-prd` for changed product direction.
 4. Ask only the questions needed to resolve the discovery and define what must be true before implementation resumes.
 5. Update `proposal.md`, `design.md`, ADRs, and `tasks.md` wherever scope, behavior, approach, evidence, risks, decision fan-out, verification-environment obligations, or resume state changed. Keep existing Story, Requirement, and Scenario IDs stable unless the behavior is genuinely new; do not replace adaptive Apply work with a newly rigid implementation script.
 6. Add a dated `Planning Updates` entry with the discovery, classification, decisions, artifacts changed, and exact `/sdd-apply` restart point.
-7. Set `status: planned` only when the revised plan is coherent. For an active Change, use `sdd change transition <space-id> <change-id> --from proposed --to planned`; then run scoped `sdd validate`. Otherwise leave `status: proposed` and keep the unresolved planning decision explicit.
+7. Set `status: planned` only when the revised plan is coherent. Use `sdd change transition <space-id> <change-id> --from proposed --to planned`; then run scoped `sdd validate`. Otherwise leave `status: proposed` and keep the unresolved planning decision explicit.
 8. Do not edit application code or actual Epic files from this mode unless the user explicitly asks for that additional work.
 
 ## Artifact Rules
@@ -188,4 +188,4 @@ Do not use it for narrow defects, missing tests, stale evidence indexes, or rout
 
 ## Final Response
 
-Summarize the mode, artifact path, durable outcome or planned Epic actions, important open questions, validation state, and exact next workflow. For `--replan`, include the discovery classification and `/sdd-apply` restart point.
+Summarize the mode, central artifact path, owning Space, target repository IDs, durable outcome or planned Epic actions, important open questions, validation state, and exact next workflow. For `--replan`, include the discovery classification and `/sdd-apply` restart point.

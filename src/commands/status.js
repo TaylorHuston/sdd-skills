@@ -1,24 +1,26 @@
-import { readFile, readdir } from "node:fs/promises";
 import { execFile } from "node:child_process";
+import { readFile, readdir } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { parseDocument } from "yaml";
 
+import { listStoredChanges, relativeChangeStorePath } from "../change-store.js";
+import { resolveRepositoryTargets } from "../change-repositories.js";
+import {
+  CHANGE_STATUSES,
+  LEGACY_CHANGE_STATUSES,
+  parseChangeMetadata,
+} from "../change-status.js";
 import {
   assertValidConfig,
+  getUserRoot,
   relativeWorkspacePath,
-  resolveRepositoryArtifacts,
   resolveIdeaPlanningPath,
-  resolveRepositoryPath,
+  resolveRepositoryArtifacts,
   resolveWorkspaceStatus,
   resolveWorkspacePath,
 } from "../config.js";
 import { resolveOperationConfiguration } from "../workspace.js";
-import {
-  CHANGE_STATUSES,
-  LEGACY_CHANGE_STATUSES,
-  parseChangeStatus,
-} from "../change-status.js";
 import { SddError } from "../errors.js";
 import { isDirectory, pathExists } from "../fs.js";
 
@@ -29,9 +31,8 @@ function changeDate(name) {
 }
 
 function compareRecent(left, right) {
-  return (right.date ?? "").localeCompare(left.date ?? "") ||
-    right.changeId.localeCompare(left.changeId) ||
-    left.repository.localeCompare(right.repository);
+  return (right.date ?? "").localeCompare(left.date ?? "")
+    || right.changeId.localeCompare(left.changeId);
 }
 
 function parseFrontmatter(source) {
@@ -51,20 +52,6 @@ async function listDirectories(root) {
     .sort((left, right) => left.localeCompare(right));
 }
 
-function resolvedRepositories(config, space) {
-  const repositories = new Map();
-  for (const repository of space.repositories ?? []) {
-    const resolved = {
-      ...repository,
-      ...(repository.artifacts ? { artifacts: repository.artifacts } : {}),
-      status: resolveWorkspaceStatus(repository.status),
-      resolvedPath: resolveRepositoryPath(config, repository).split("\\").join("/"),
-    };
-    if (!repositories.has(resolved.resolvedPath)) repositories.set(resolved.resolvedPath, resolved);
-  }
-  return [...repositories.values()];
-}
-
 export async function readGitStatus(
   repositoryRoot,
   { command = "git", timeoutMs = 10_000 } = {},
@@ -82,7 +69,6 @@ export async function readGitStatus(
     let unstaged = 0;
     let untracked = 0;
     let conflicted = 0;
-
     for (const line of stdout.split(/\r?\n/)) {
       if (line.startsWith("# branch.head ")) {
         const value = line.slice("# branch.head ".length);
@@ -101,7 +87,6 @@ export async function readGitStatus(
         if (state[1] !== ".") unstaged += 1;
       }
     }
-
     return {
       available: true,
       branch,
@@ -128,57 +113,52 @@ export async function readGitStatus(
       error: error?.killed || error?.signal === "SIGTERM"
         ? "Git status timed out"
         : detail.includes("not a git repository")
-        ? "not a Git worktree"
-        : "Git status unavailable",
+          ? "not a Git worktree"
+          : "Git status unavailable",
     };
   }
 }
 
-async function readChange(workspaceRoot, repository, root, changeId, closed) {
-  const changePath = join(root, changeId);
-  const tasksPath = join(changePath, "tasks.md");
-  let storedStatus = null;
-  let statusError = null;
-  if (await pathExists(tasksPath)) {
-    const parsed = parseChangeStatus(await readFile(tasksPath, "utf8"));
-    storedStatus = typeof parsed.status === "string" ? parsed.status : null;
-    statusError = parsed.error;
-  } else {
-    statusError = "missing tasks.md";
+async function readCentralChanges(userRoot) {
+  const records = await listStoredChanges(userRoot);
+  const seen = new Set();
+  const changes = [];
+  for (const record of records) {
+    if (seen.has(record.changeId)) {
+      throw new SddError(`Change exists in both active and closed central locations: ${record.changeId}`, {
+        code: "CHANGE_LOCATION_COLLISION",
+      });
+    }
+    seen.add(record.changeId);
+    const tasksPath = join(record.path, "tasks.md");
+    if (!(await pathExists(tasksPath))) {
+      throw new SddError(`Change is missing tasks.md: ${relativeChangeStorePath(record.path, userRoot)}`, {
+        code: "INCOMPLETE_CHANGE",
+      });
+    }
+    const metadata = parseChangeMetadata(await readFile(tasksPath, "utf8"));
+    if (metadata.error) {
+      throw new SddError(
+        `Cannot parse Change metadata in ${relativeChangeStorePath(tasksPath, userRoot)}: ${metadata.error}`,
+        { code: "INVALID_CHANGE_METADATA" },
+      );
+    }
+    const statusValid = CHANGE_STATUSES.includes(metadata.status)
+      || (record.closed && LEGACY_CHANGE_STATUSES.includes(metadata.status));
+    changes.push({
+      changeId: record.changeId,
+      date: changeDate(record.changeId),
+      status: record.closed ? "closed" : statusValid ? metadata.status : "unknown",
+      storedStatus: metadata.status,
+      statusValid,
+      statusError: null,
+      closed: record.closed,
+      path: relativeChangeStorePath(record.path, userRoot),
+      spaceId: metadata.space,
+      repositories: [...metadata.repositories],
+    });
   }
-  const validStoredStatus = CHANGE_STATUSES.includes(storedStatus) ||
-    (closed && LEGACY_CHANGE_STATUSES.includes(storedStatus));
-  return {
-    changeId,
-    date: changeDate(changeId),
-    status: closed ? "closed" : validStoredStatus ? storedStatus : "unknown",
-    storedStatus,
-    statusValid: validStoredStatus,
-    statusError,
-    closed,
-    path: relativeWorkspacePath(workspaceRoot, changePath),
-    repository: repository.resolvedPath,
-    role: repository.role ?? null,
-    repositoryStatus: repository.status,
-  };
-}
-
-async function listChanges(workspaceRoot, config, repository) {
-  const repositoryRoot = resolveWorkspacePath(workspaceRoot, repository.resolvedPath);
-  const artifacts = resolveRepositoryArtifacts(config, repository);
-  const activeRoot = join(repositoryRoot, artifacts.activeChanges);
-  const closedRoot = join(repositoryRoot, artifacts.closedChanges);
-  const active = await Promise.all(
-    (await listDirectories(activeRoot))
-      .filter((name) => join(activeRoot, name) !== closedRoot)
-      .map((name) => readChange(workspaceRoot, repository, activeRoot, name, false)),
-  );
-  const closed = await Promise.all(
-    (await listDirectories(closedRoot)).map((name) =>
-      readChange(workspaceRoot, repository, closedRoot, name, true),
-    ),
-  );
-  return [...active, ...closed];
+  return changes.sort(compareRecent);
 }
 
 async function readEpic(workspaceRoot, repository, epicPath) {
@@ -194,6 +174,7 @@ async function readEpic(workspaceRoot, repository, epicPath) {
     status: typeof frontmatter.status === "string" ? frontmatter.status : null,
     path: relativeWorkspacePath(workspaceRoot, epicPath),
     repository: repository.resolvedPath,
+    repositoryId: repository.id,
     role: repository.role ?? null,
     repositoryStatus: repository.status,
   };
@@ -206,90 +187,9 @@ async function listEpics(workspaceRoot, config, repository) {
   const epics = [];
   for (const directory of await listDirectories(epicsRoot)) {
     const epicPath = join(epicsRoot, directory, "epic.md");
-    if (await pathExists(epicPath)) {
-      epics.push(await readEpic(workspaceRoot, repository, epicPath));
-    }
+    if (await pathExists(epicPath)) epics.push(await readEpic(workspaceRoot, repository, epicPath));
   }
   return epics;
-}
-
-async function buildSpace(
-  workspaceRoot,
-  config,
-  spaceId,
-  space,
-  {
-    detail = false,
-    includeInactiveRepositories = true,
-    gitCommand = "git",
-    gitTimeoutMs = 10_000,
-    gitConcurrency = 4,
-  } = {},
-) {
-  const selectedRepositories = resolvedRepositories(config, space)
-    .filter((repository) => includeInactiveRepositories || repository.status === "active");
-  const repositories = await mapWithConcurrency(
-    selectedRepositories,
-    gitConcurrency,
-    async (repository) => {
-        const repositoryRoot = resolveWorkspacePath(workspaceRoot, repository.resolvedPath);
-        return {
-          ...repository,
-          git: await readGitStatus(repositoryRoot, { command: gitCommand, timeoutMs: gitTimeoutMs }),
-        };
-      },
-  );
-  const changes = (await Promise.all(
-    repositories.map((repository) => listChanges(workspaceRoot, config, repository)),
-  )).flat().sort(compareRecent);
-  const activeChanges = changes.filter((change) => !change.closed);
-  const closedChanges = changes.filter((change) => change.closed);
-  const repositoryActivity = repositories.map((repository) => {
-    const repositoryChanges = changes.filter(
-      (change) => change.repository === repository.resolvedPath,
-    );
-    const repositoryActiveChanges = activeChanges.filter(
-      (change) => change.repository === repository.resolvedPath,
-    );
-    const repositoryClosedChanges = closedChanges.filter(
-      (change) => change.repository === repository.resolvedPath,
-    );
-    return {
-      ...repository,
-      activeChangeCount: repositoryActiveChanges.length,
-      activeChanges: repositoryActiveChanges,
-      recentChanges: repositoryClosedChanges.slice(0, 5),
-      change: (repositoryActiveChanges.length > 0 ? repositoryActiveChanges : repositoryChanges)[0] ?? null,
-    };
-  });
-  const selectedChange = (activeChanges.length > 0 ? activeChanges : changes)[0] ?? null;
-  const result = {
-    spaceId,
-    status: resolveWorkspaceStatus(space.status),
-    planningPath: space._repositoryOnly === true
-      ? null
-      : resolveIdeaPlanningPath(config, spaceId, space).split("\\").join("/"),
-    repositories,
-    activeChangeCount: activeChanges.length,
-    activeChanges,
-    recentChanges: closedChanges.slice(0, 5),
-    repositoryActivity,
-    change: selectedChange,
-  };
-  if (!detail) return result;
-
-  const epics = (await Promise.all(
-    repositories.map((repository) => listEpics(workspaceRoot, config, repository)),
-  )).flat().sort((left, right) => left.id.localeCompare(right.id) || left.repository.localeCompare(right.repository));
-  const repositoryDetails = repositoryActivity.map((repository) => ({
-    ...repository,
-    epics: epics.filter((epic) => epic.repository === repository.resolvedPath),
-  }));
-  return {
-    ...result,
-    epics,
-    repositoryDetails,
-  };
 }
 
 async function mapWithConcurrency(items, limit, worker) {
@@ -306,13 +206,106 @@ async function mapWithConcurrency(items, limit, worker) {
   return results;
 }
 
+async function buildSpace(
+  workspaceRoot,
+  config,
+  spaceId,
+  space,
+  centralChanges,
+  {
+    detail = false,
+    includeInactiveRepositories = true,
+    gitCommand = "git",
+    gitTimeoutMs = 10_000,
+    gitConcurrency = 4,
+  } = {},
+) {
+  const resolved = await resolveRepositoryTargets(workspaceRoot, config, space);
+  const selectedRepositories = resolved
+    .filter((repository) => includeInactiveRepositories || repository.status === "active");
+  const repositories = await mapWithConcurrency(
+    selectedRepositories,
+    gitConcurrency,
+    async (repository) => ({
+      ...repository,
+      git: await readGitStatus(resolveWorkspacePath(workspaceRoot, repository.resolvedPath), {
+        command: gitCommand,
+        timeoutMs: gitTimeoutMs,
+      }),
+    }),
+  );
+  const resolvedRepositoryIds = new Set(resolved.map((repository) => repository.id));
+  const allSpaceChanges = centralChanges
+    .filter((change) => change.spaceId === spaceId)
+    .map((change) => ({
+      ...change,
+      unresolvedRepositoryIds: change.repositories
+        .filter((repositoryId) => !resolvedRepositoryIds.has(repositoryId))
+        .sort((left, right) => left.localeCompare(right)),
+    }));
+  const changes = allSpaceChanges;
+  const unresolvedRepositoryIds = [...new Set(
+    changes.flatMap((change) => change.unresolvedRepositoryIds),
+  )].sort((left, right) => left.localeCompare(right));
+  const activeChanges = changes.filter((change) => !change.closed);
+  const closedChanges = changes.filter((change) => change.closed);
+  const repositoryActivity = repositories.map((repository) => {
+    const repositoryChanges = changes.filter((change) => change.repositories.includes(repository.id));
+    const repositoryActiveChanges = repositoryChanges.filter((change) => !change.closed);
+    const repositoryClosedChanges = repositoryChanges.filter((change) => change.closed);
+    return {
+      ...repository,
+      activeChangeCount: repositoryActiveChanges.length,
+      activeChanges: repositoryActiveChanges,
+      recentChanges: repositoryClosedChanges.slice(0, 5),
+      change: (repositoryActiveChanges.length > 0 ? repositoryActiveChanges : repositoryChanges)[0] ?? null,
+    };
+  });
+  const result = {
+    spaceId,
+    status: resolveWorkspaceStatus(space.status),
+    planningPath: space._repositoryOnly === true
+      ? null
+      : resolveIdeaPlanningPath(config, spaceId, space).split("\\").join("/"),
+    repositories,
+    activeChangeCount: activeChanges.length,
+    activeChanges,
+    recentChanges: closedChanges.slice(0, 5),
+    unresolvedRepositoryIds,
+    repositoryActivity,
+    change: (activeChanges.length > 0 ? activeChanges : changes)[0] ?? null,
+  };
+  if (!detail) return result;
+
+  const epics = (await Promise.all(
+    repositories.map((repository) => listEpics(workspaceRoot, config, repository)),
+  )).flat().sort((left, right) => left.id.localeCompare(right.id)
+    || left.repository.localeCompare(right.repository));
+  return {
+    ...result,
+    epics,
+    repositoryDetails: repositoryActivity.map((repository) => ({
+      ...repository,
+      epics: epics.filter((epic) => epic.repositoryId === repository.id),
+    })),
+  };
+}
+
 export async function getStatus(
   startPath,
   spaceId = null,
-  { includeAll = false, gitCommand = "git", gitTimeoutMs = 10_000, gitConcurrency = 4 } = {},
+  {
+    includeAll = false,
+    gitCommand = "git",
+    gitTimeoutMs = 10_000,
+    gitConcurrency = 4,
+    userRoot = null,
+  } = {},
 ) {
-  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath);
+  userRoot ??= getUserRoot();
+  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath, { userRoot });
   assertValidConfig(config, "read SDD status");
+  const centralChanges = await readCentralChanges(userRoot);
 
   if (spaceId !== null) {
     if (!Object.hasOwn(config.ideas, spaceId)) {
@@ -325,7 +318,8 @@ export async function getStatus(
       command: "status",
       mode: "space",
       workspaceRoot,
-      ...(await buildSpace(workspaceRoot, config, spaceId, config.ideas[spaceId], {
+      userRoot,
+      ...(await buildSpace(workspaceRoot, config, spaceId, config.ideas[spaceId], centralChanges, {
         detail: true,
         gitCommand,
         gitTimeoutMs,
@@ -338,7 +332,7 @@ export async function getStatus(
   for (const [id, space] of Object.entries(config.ideas).sort(([left], [right]) => left.localeCompare(right))) {
     if (space._repositoryOnly === true) continue;
     if (!includeAll && resolveWorkspaceStatus(space.status) !== "active") continue;
-    spaces.push(await buildSpace(workspaceRoot, config, id, space, {
+    spaces.push(await buildSpace(workspaceRoot, config, id, space, centralChanges, {
       includeInactiveRepositories: includeAll,
       gitCommand,
       gitTimeoutMs,
@@ -349,6 +343,7 @@ export async function getStatus(
     command: "status",
     mode: "summary",
     workspaceRoot,
+    userRoot,
     filter: includeAll ? "all" : "active",
     spaces,
   };

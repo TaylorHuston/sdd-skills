@@ -3,8 +3,8 @@ schema: sdd-epic-v2
 id: SDD-E001
 status: active
 created: 2026-07-20
-modified: 2026-07-24
-last_verified: 2026-07-24
+modified: 2026-08-07
+last_verified: 2026-08-07
 stories:
   - S1
   - S2
@@ -21,7 +21,7 @@ stories:
 
 - PRD: not applicable; this is a repository-only toolchain package.
 - Related docs: `README.md`, `docs/story-driven-development.md`, `docs/audits/2026-07-20-code-audit.md`
-- Related ADRs: none.
+- Related ADRs: `docs/adrs/2026-08-07-centralize-change-storage.md`.
 
 Developers and agents rely on the CLI and packaged skills as one toolchain. Deterministic results must be trustworthy, mutations must remain inside declared ownership, audit reports must distinguish current from historical state, and review/release handoffs must contain only classified scope.
 
@@ -58,12 +58,12 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 | Story | Implementation | Verification | Capability | Last Verified | Notes |
 |---|---|---|---|---|---|
 | S1 | implemented | verified | Validate navigable behavior and real evidence. | 2026-07-23 | Structure, anchors, evidence, report integrity, metadata, and focused reads fail closed with current proof. |
-| S2 | implemented | verified | Mutate only inside physical owner boundaries and recover safely. | 2026-07-23 | Physical boundaries, recovery, and first-initialization contention now fail closed. |
-| S3 | implemented | verified | Reject ambiguous topology and lifecycle routing. | 2026-07-23 | Synthetic-ID collisions and lexical/physical planned-path escapes now fail closed. |
+| S2 | implemented | verified | Mutate only inside physical owner boundaries and recover safely. | 2026-08-07 | Central lifecycle, migration, configuration, and managed-install mutations reject drift and preserve newer state. |
+| S3 | implemented | verified | Route one globally unique central Change across portable repository targets. | 2026-08-07 | Creation, lifecycle, physical confinement, and fail-closed automatic migration use one user-level store. |
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
 | S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-23 | Reports are versioned; PR/release paths are classified and rechecked; Git baselines are immutable and bounded. |
-| S6 | implemented | verified | Carry workflow work through a complete evidence-backed handoff. | 2026-07-23 | Shipped workflow contracts and their mirrored records have exact semantic package-contract proof. |
-| S7 | implemented | verified | Explain the portable method and package through accessible responsive documentation. | 2026-07-23 | Exact source contracts and current-commit rendered evidence pass; owner preference confirmation remains separately pending. |
+| S6 | implemented | verified | Carry one central multi-repository workflow through a complete evidence-backed handoff. | 2026-08-07 | Every shipped workflow shares one target set and one global lifecycle while preserving repository-owned truth. |
+| S7 | implemented | verified | Explain the portable method and package through accessible responsive documentation. | 2026-08-07 | The guide documents central Change ownership and automatic migration; prior rendered accessibility evidence remains current for unchanged layout behavior. |
 
 ## Stories
 
@@ -277,8 +277,8 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 Implementation: implemented
 Verification: verified
 Created: 2026-07-20
-Modified: 2026-07-23
-Last verified: 2026-07-23
+Modified: 2026-08-07
+Last verified: 2026-08-07
 
 As a developer, I want filesystem mutations to stay inside their physical owner and preserve concurrent work, so that setup and lifecycle commands cannot silently damage unrelated data.
 
@@ -302,15 +302,15 @@ The CLI SHALL compare the commit-time Change state with the state it prepared an
 - WHEN `tasks.md` changes after transition preflight but before replacement
 - THEN the transition restores the current content and reports concurrent modification.
 
-###### Scenario R2-S2: Concurrent Promotion Edit
+###### Scenario R2-S2: Concurrent Migration Source Edit
 
-- WHEN a planned draft changes while promotion copies are staged
-- THEN promotion aborts, removes staged destinations, and restores the latest draft.
+- WHEN a legacy Change source changes after migration preflight
+- THEN migration aborts before publication and preserves the newer source.
 
-###### Scenario R2-S3: Post-Commit Edit During Multi-Target Recovery
+###### Scenario R2-S3: Post-Publication Failure During Migration
 
-- WHEN a writer edits an already committed target before a later target fails
-- THEN rollback preserves that newer target content and reports the retained recovery state.
+- WHEN a later migration stage fails after central publication or configuration upgrade
+- THEN rollback restores prior sources and configs without overwriting newer destination content, or reports exact incomplete recovery.
 
 ###### Scenario R2-S4: Close-Time Status Drift
 
@@ -328,7 +328,7 @@ The CLI SHALL atomically replace configuration and installation-lock files, seri
 
 ###### Scenario R3-S1: Interrupted Or Failed Mutation
 
-- WHEN an update or multi-repository lifecycle step fails
+- WHEN an update, central lifecycle command, or managed installation step fails
 - THEN prior durable files remain parseable and the error identifies any recovery action that did not complete.
 
 #### Implemented By
@@ -338,10 +338,10 @@ The CLI SHALL atomically replace configuration and installation-lock files, seri
 | S2/R1 | `src/fs.js#isPathPhysicallyInside` | primary | Resolves existing ancestors before authorizing a child path. |
 | S2/R1 | `src/skills.js#applySkillSync` | support | Rechecks every managed-skill target immediately before mutation. |
 | S2/R1 | `src/config.js#writeConfig` | support | Refuses a configuration file below a symlinked external `.sdd` directory. |
-| S2/R1 | `src/commands/change-promote.js#assertNoSymlinks` | support | Prevents private or external draft content from entering a repository through nested symlinks. |
+| S2/R1 | `src/update-migration.js#collectTreeEntries` | support | Rejects symbolic links anywhere inside a legacy Change before migration reads or copies its content. |
 | S2/R2 | `src/commands/change-transition.js#transitionChange` | primary | Compares staged `tasks.md` with commit-time content and preserves concurrent edits. |
-| S2/R2 | `src/commands/change-promote.js#promotePlannedChange` | primary | Holds and hashes the draft while staging and committing promotion. |
-| S2/R2 | `src/commands/change-close.js#closeChange` | primary | Rechecks status and ownership at commit time and reports incomplete multi-target recovery. |
+| S2/R2 | `src/update-migration.js#applyUpdateMigration` | primary | Rechecks planned inputs, publishes without replacement, and rolls the multi-stage transaction back on failure. |
+| S2/R2 | `src/commands/change-close.js#closeChange` | primary | Rechecks central status and ownership at commit time. |
 | S2/R2-S5 | `src/commands/init-installation.js#initRepository` | primary | Serializes first repository-contract publication under the physical repository owner lock. |
 | S2/R2-S5 | `src/mutation.js#withWorkspaceMutationLock` | support | Exclusively reserves the repository mutation boundary and returns an actionable contention error. |
 | S2/R3 | `src/fs.js#writeFileAtomically` | primary | Durably replaces configuration and JSON lock state through a synced temporary file. |
@@ -349,11 +349,11 @@ The CLI SHALL atomically replace configuration and installation-lock files, seri
 | S2/R3 | `src/fs.js#replaceDirectoryAtomically` | primary | Exclusively reserves managed directories before publishing their staged contents. |
 | S2/R3 | `src/mutation.js#withWorkspaceMutationLock` | support | Serializes managed setup and update operations. |
 | S2/R3 | `src/installation.js#applyManagedInstallation` | support | Treats workflow, skill, and install-lock updates as one recoverable unit. |
-| S2/R3 | `src/commands/init.js#initWorkspace` | support | Restores the exact pre-migration configuration or reports retained migrated state when recovery fails. |
+| S2/R3 | `src/update-migration.js#applyUpdateMigration` | support | Coordinates central publication, config upgrades, legacy-source removal, rollback, and explicit incomplete recovery. |
 | S2/R3 | `src/commands/init-installation.js#setupInstallation` | support | Runs first-time user setup under the managed transaction and removes newly created durable state on failure. |
 | S2/R3 | `src/commands/update.js#updateWorkspace` | support | Serializes user and legacy updates through the shared managed-install transaction. |
 | S2/R3 | `src/workflow.js#applyWorkflowSync` | support | Applies, verifies, rolls back, and finalizes managed workflow replacement. |
-| S2/R3 | `src/commands/change-transition.js#MUTATION_RECOVERY_FAILED` | support | Reports original and recovery failures with affected paths. |
+| S2/R3 | `src/update-migration.js#rollbackTransaction` | support | Restores sources and configs conservatively and reports any state it cannot safely replace. |
 
 #### Implementation Gaps
 
@@ -367,11 +367,10 @@ The CLI SHALL atomically replace configuration and installation-lock files, seri
 | S2/R1-S1 | Automated test `test/cli.test.js#change transition rejects an active Change through an external symlink ancestor` | Lifecycle mutation refuses an external artifact root and preserves its contents. | Passing 2026-07-20 |
 | S2/R1-S1 | Automated test `test/cli.test.js#validate rejects implementation and test evidence that resolve outside the repository` | Evidence acceptance uses the same physical ownership rule. | Passing 2026-07-20 |
 | S2/R1-S1 | Automated test `test/mutation.test.js#fixed SDD mutation paths reject a symlinked config directory` | Workflow, configuration, and lock paths cannot escape through `.sdd`. | Passing 2026-07-20 |
-| S2/R1-S1 | Automated test `test/cli.test.js#change promote rejects symbolic links anywhere in the planned draft` | Promotion refuses nested links before copying private external content. | Passing 2026-07-20 |
+| S2/R1-S1 | Automated test `test/update-migration.test.js#migration preflight fails before writes for divergent copies, cross-Space IDs, destination conflicts, brief collisions, missing identities, and symlink escapes` | Migration rejects symbolic links inside legacy Changes before writing. | Passing 2026-08-07 |
 | S2/R2-S1 | Automated test `test/cli.test.js#change transition preserves a concurrent tasks edit` | Commit-time drift aborts and restores the latest `tasks.md`. | Passing 2026-07-20 |
-| S2/R2-S2 | Automated test `test/cli.test.js#change promote preserves a concurrent replacement of the planned draft` | Promotion aborts without a destination and retains the replacement draft. | Passing 2026-07-20 |
-| S2/R2-S3 | Automated test `test/cli.test.js#change transition preserves an edit made after an earlier repository commit` | A later failure does not erase newer content in an earlier repository. | Passing 2026-07-20 |
-| S2/R2-S3 | Automated test `test/cli.test.js#change promote preserves a destination edited after commit when a later destination fails` | Promotion recovery preserves an edited committed destination. | Passing 2026-07-20 |
+| S2/R2-S2 | Automated test `test/update-migration.test.js#migration detects commit-time drift and rolls published state back on a later failure` | A source edit after preflight aborts before publication and preserves the newer source. | Passing 2026-08-07 |
+| S2/R2-S3 | Automated test `test/update-migration.test.js#migration detects commit-time drift and rolls published state back on a later failure` | A later failure restores published central state, upgraded configs, and legacy sources while preserving concurrent destination edits. | Passing 2026-08-07 |
 | S2/R2-S4 | Automated test `test/cli.test.js#change close rechecks status at commit time` | Close refuses a Change reopened after preflight. | Passing 2026-07-20 |
 | S2/R2-S5 | Automated test `test/cli.test.js#repository init rejects concurrent first initialization without losing the winner` | One initial repository contract wins; the concurrent caller receives `OPERATION_IN_PROGRESS`, and no mutation lock remains. | Passing 2026-07-23 |
 | S2/R3-S1 | Automated test `test/mutation.test.js#atomic JSON writes leave one complete parseable document` | Competing lock writes leave one whole parseable document. | Passing 2026-07-20 |
@@ -393,10 +392,9 @@ The CLI SHALL atomically replace configuration and installation-lock files, seri
 | S2/R3-S1 | Automated test `test/mutation.test.js#skill replacement preserves an edit made inside the replacement window` | Directory replacement compares the moved target with the expected hash and preserves newer content. | Passing 2026-07-20 |
 | S2/R3-S1 | Automated test `test/mutation.test.js#file replacement preserves a target recreated at publish time` | Exclusive file publication cannot overwrite a target recreated after the original is moved. | Passing 2026-07-20 |
 | S2/R3-S1 | Automated test `test/mutation.test.js#directory replacement preserves a target recreated at publish time` | Exclusive directory reservation cannot overwrite a target recreated after the original is moved. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#failed installation after v1 migration restores the original config` | Installation failure restores the exact pre-migration configuration bytes. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#failed v1 config restoration reports incomplete recovery` | A failed config restore reports the retained migrated path and recovery failure. | Passing 2026-07-20 |
+| S2/R3-S1 | Automated test `test/update-migration.test.js#migration detects commit-time drift and rolls published state back on a later failure` | Central migration rollback restores the pre-transaction state and reports incomplete recovery instead of overwriting newer data. | Passing 2026-08-07 |
 | S2/R3-S1 | Automated test `test/cli.test.js#update refuses to overlap another managed mutation` | A held operation lock blocks updates without altering durable install state. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/cli.test.js#change transition reports incomplete rollback with the affected path` | Recovery failure returns an explicit code and affected repository path. | Passing 2026-07-20 |
+| S2/R3-S1 | Automated test `test/cli.test.js#change transition preserves a concurrent tasks edit` | Central lifecycle mutation returns a concurrent-change error and preserves the latest tasks content. | Passing 2026-08-07 |
 
 #### Verification Gaps
 
@@ -412,69 +410,112 @@ The CLI SHALL atomically replace configuration and installation-lock files, seri
 Implementation: implemented
 Verification: verified
 Created: 2026-07-20
-Modified: 2026-07-23
-Last verified: 2026-07-23
+Modified: 2026-08-07
+Last verified: 2026-08-07
 
-As a developer, I want invalid or unmapped topology rejected before artifact creation, so that commands cannot invent ownership or leave duplicate Change truth.
+As a developer, I want one globally unique Change record with explicit portable repository targets, so that lifecycle commands cannot invent ownership, split status across copies, or mutate outside user-local storage.
 
 #### Requirements And Scenarios
 
-##### Requirement R1: Repository-Only Planning Refusal
+##### Requirement R1: Portable Central Change Creation
 
-The CLI SHALL refuse idea-owned Change creation and promotion when repository context has no configured Idea/planning mapping.
+The CLI SHALL create one central Change under `~/.sdd/changes/<change-id>/`, record its owning Space and stable repository IDs in `tasks.md`, and allow repository-only Spaces when a portable repository contract provides identity.
 
-###### Scenario R1-S1: Unmapped Change Create
+###### Scenario R1-S1: Repository-Only Change Create
 
-- WHEN `change create` targets a repository-only synthetic Space
-- THEN it returns a mapping-required error and writes nothing.
+- WHEN `change create` targets a repository-only synthetic Space with a valid `.sdd/config.yaml` repository ID
+- THEN it creates one central Change with that Space and repository ID and writes no repository-local Change folder.
 
-###### Scenario R1-S2: Unmapped Change Promotion
+###### Scenario R1-S2: Ambiguous Repository Selection
 
-- WHEN `change promote` targets the same repository-only synthetic Space
-- THEN it returns the same mapping-required error before looking for or moving a private draft.
+- WHEN an Idea maps to multiple eligible repositories and no target set is supplied
+- THEN creation refuses to guess and writes nothing.
 
-##### Requirement R2: Strict Physical Configuration
+##### Requirement R2: Strict Physical Configuration And Storage
 
-The CLI SHALL reject unknown configuration keys, duplicate physical repository ownership, and artifact paths whose relationships are equal or invalidly overlap.
+The CLI SHALL reject unknown configuration keys, duplicate physical repository ownership, ambiguous repository IDs, and central Change paths that resolve outside the configured user root.
 
 ###### Scenario R2-S1: Alias Or Shape Ambiguity
 
-- WHEN different configured spellings resolve to one repository, an unknown key is present, or artifact roles overlap invalidly
+- WHEN different configured spellings resolve to one repository or an unknown configuration key is present
 - THEN configuration validation reports the exact invariant before operational commands continue.
 
-###### Scenario R2-S2: Synthetic Repository ID Collision
+###### Scenario R2-S2: Portable Repository ID Collision
 
-- WHEN repository-only context derives an ID already owned by an Idea or another configured entry
-- THEN context resolution rejects the collision instead of replacing global artifact ownership with synthetic repository defaults.
+- WHEN a repository contract ID is already claimed by another mapped repository
+- THEN context resolution rejects the collision instead of inventing another owner.
 
-###### Scenario R2-S3: Planned Path Escapes Its Owner
+###### Scenario R2-S3: Central Store Escapes Its Owner
 
-- WHEN `plannedChangesDirectory` is absolute, traverses upward, or resolves physically outside its planning owner
-- THEN configuration and artifact reads reject it before inspecting or mutating the external path.
+- WHEN `~/.sdd/changes` or a Change ancestor is symlinked outside the user root
+- THEN validation and lifecycle mutation reject the path before reading or writing the external target.
 
-##### Requirement R3: Cross-Location Change Collision
+###### Scenario R2-S4: Stale Change Target
 
-The CLI SHALL refuse a planned Change ID that already exists in any selected repository's active or closed roots.
+- WHEN a central Change names a repository ID that is absent from or owned by another Space
+- THEN validation rejects that ownership while Space status keeps the Change visible and identifies each unresolved target.
+
+##### Requirement R3: Global Change Identity And Lifecycle
+
+The CLI SHALL enforce globally unique dated Change IDs across active and closed central storage and SHALL mutate one status or folder location for the complete target set.
 
 ###### Scenario R3-S1: Existing Active Or Closed ID
 
-- WHEN `change create` would duplicate an active or closed Change ID
+- WHEN `change create` would duplicate an active or closed central Change ID
 - THEN normal and dry-run commands report the collision and write nothing.
+
+###### Scenario R3-S2: Compare-And-Set Transition
+
+- WHEN `change transition` receives the expected current status
+- THEN it updates the one central `tasks.md`; a stale expected status or concurrent edit leaves the record unchanged.
+
+###### Scenario R3-S3: Central Close
+
+- WHEN `change close` receives an `in_review` Change
+- THEN it moves the one record to `~/.sdd/changes/closed/<change-id>/` without writing a synthetic `closed` status.
+
+##### Requirement R4: Fail-Closed Legacy Migration
+
+`sdd update` SHALL preflight every legacy planned, active, and closed Change source plus undated Change Briefs before writing; consolidate only byte-identical copies; publish central records and fixed idea-local briefs atomically with config upgrades; and remain idempotent.
+
+###### Scenario R4-S1: Compatible Automatic Migration
+
+- WHEN legacy copies have unambiguous Space/repository ownership and identical content
+- THEN `sdd update` migrates them to the central store, moves undated briefs to `<planning-path>/change-briefs/`, removes retired sources, upgrades config, and a rerun performs no migration.
+
+###### Scenario R4-S2: Conflicting Legacy Sources
+
+- WHEN copies diverge, a Change ID crosses Spaces, target identity is missing, a destination conflicts, a brief collides, or a source escapes through a symlink
+- THEN preflight fails before any config, Change, brief, source, or managed installation write.
+
+###### Scenario R4-S3: Commit-Time Failure
+
+- WHEN a source changes after preflight or a later migration step fails
+- THEN the transaction rejects concurrent state and restores published central records, upgraded configs, and legacy sources without overwriting newer data.
+
+###### Scenario R4-S4: Process Interruption
+
+- WHEN the updater terminates after publishing a Change, brief, or configuration but before completing source retirement
+- THEN the next locked non-dry-run update recovers the durable transaction before replanning, while dry-run reports required recovery without mutating state.
 
 #### Implemented By
 
 | Requirement / Scenario | Location / Anchor | Kind | Responsibility |
 |---|---|---|---|
-| S3/R1 | `src/commands/change-create.js#createPlannedChange` | primary | Refuses planned Change creation without Idea planning ownership. |
-| S3/R1 | `src/commands/change-promote.js#promotePlannedChange` | support | Refuses promotion without the same planning ownership. |
-| S3/R2 | `src/config.js#validateConfig` | primary | Enforces schema-shape parity, artifact relationships, and owner-relative planned Changes paths. |
-| S3/R2-S3 | `schemas/user.schema.json#plannedChangesDirectory` | support | Publishes the user configuration contract that rejects non-owner-relative planned Changes paths. |
-| S3/R2-S3 | `schemas/workspace.schema.json#plannedChangesDirectory` | support | Publishes the workspace configuration contract that rejects non-owner-relative planned Changes paths. |
-| S3/R2 | `src/workspace.js#resolveWorkspaceContext` | primary | Rejects duplicate physical repository ownership, artifact ambiguity, and synthetic IDs that would collide with an existing Idea while retaining repository-only configuration as a valid local context. |
-| S3/R2-S2 | `src/change-repositories.js#resolvedActiveRepositories` and `src/commands/validate.js#configuredRepositories` | support | Preserve repository-local artifact roots without mutating global defaults while synthetic context is resolved. |
-| S3/R2-S2 | `src/commands/status.js#resolvedRepositories` | support | Preserves repository-only artifact roots while building status results. |
-| S3/R2-S3 | `src/commands/validate.js#validatePlannedChanges` | primary | Rechecks physical containment before enumerating planned Changes. |
-| S3/R3 | `src/commands/change-create.js#createPlannedChange` | primary | Preflights selected repositories' active and closed roots. |
+| S3/R1 | `src/commands/change-create.js#createChange` | primary | Creates the one central record and publishes Space/repository metadata in `tasks.md`. |
+| S3/R1 | `src/change-repositories.js#resolveRepositoryTargets` | support | Resolves stable mapped or repository-only target IDs without inventing repository-local Change ownership. |
+| S3/R2 | `src/config.js#validateConfig` | primary | Enforces current config shape, portable repository IDs, and physical ownership invariants. |
+| S3/R2 | `src/workspace.js#resolveWorkspaceContext` | primary | Rejects duplicate physical repositories and ambiguous portable identities while retaining valid repository-only context. |
+| S3/R2-S3 | `src/change-store.js#assertChangeStoreConfinement` | primary | Confines active and closed central paths to the configured user root. |
+| S3/R3 | `src/change-store.js#listStoredChanges` | primary | Provides one active/closed global inventory and rejects duplicate identity. |
+| S3/R3-S2 | `src/commands/change-transition.js#transitionChange` | primary | Applies compare-and-set status mutation to one central `tasks.md`. |
+| S3/R3-S3 | `src/commands/change-close.js#closeChange` | primary | Moves one `in_review` central Change into closed history. |
+| S3/R4 | `src/update-migration.js#planUpdateMigration` | primary | Discovers and validates the complete legacy source set before writes. |
+| S3/R4 | `src/update-migration.js#applyUpdateMigration` | primary | Stages, publishes, removes, rolls back, and reports one atomic migration transaction. |
+| S3/R4 | `src/commands/update.js#updateWorkspace` | support | Integrates mandatory migration with managed skill and workflow update. |
+| S3/R2-S4 | `src/commands/validate.js#validateCentralChanges` | primary | Rejects missing and cross-Space repository metadata for every central Change. |
+| S3/R2-S4 | `src/commands/status.js#buildSpace` | support | Keeps Space-owned Changes visible and reports unresolved target IDs when mappings drift. |
+| S3/R4-S4 | `src/update-migration.js#recoverUpdateMigration` | primary | Recovers a physically matched durable migration journal before a new plan reads configuration. |
 
 #### Implementation Gaps
 
@@ -484,15 +525,20 @@ The CLI SHALL refuse a planned Change ID that already exists in any selected rep
 
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
-| S3/R1-S1 | Automated test `test/cli.test.js#CLI init requires setup and creates only a portable repository contract` | Repository-only `change create --dry-run` returns `PLANNING_MAPPING_REQUIRED`. | Passing 2026-07-20 |
-| S3/R1-S2 | Automated test `test/cli.test.js#CLI init requires setup and creates only a portable repository contract` | Repository-only `change promote --dry-run` returns `PLANNING_MAPPING_REQUIRED`. | Passing 2026-07-20 |
-| S3/R2-S1 | Automated test `test/cli.test.js#runtime config validation rejects unknown keys and ambiguous artifact roots` | Runtime validation matches strict shapes and rejects overlap. | Passing 2026-07-20 |
-| S3/R2-S1 | Automated test `test/cli.test.js#context rejects physical aliases claimed as different repositories` | Two configured paths cannot claim one physical repository. | Passing 2026-07-20 |
-| S3/R2-S2 | Automated test `test/cli.test.js#context rejects a repository-only ID that collides with an existing Idea` | A same-ID repository-only contract is rejected without changing existing configuration ownership. | Passing 2026-07-23 |
-| S3/R2-S2 | Automated test `test/cli.test.js#status honors committed artifact paths for a repository-only checkout` | Repository-only status respects the committed artifact layout and reports its active Change. | Passing 2026-07-24 |
-| S3/R2-S3 | Automated test `test/cli.test.js#runtime config validation confines planned Change directories to their owner` | Absolute, leading-separator, home-relative, and parent-traversing planned Changes paths fail validation; nested owner-relative paths remain valid. | Passing 2026-07-23 |
-| S3/R2-S3 | Automated test `test/cli.test.js#validation rejects a planned Changes directory symlinked outside its owner` | Artifact validation refuses an external symlink before enumerating its Change directories. | Passing 2026-07-23 |
-| S3/R3-S1 | Automated test `test/cli.test.js#change create refuses IDs already active or closed in a selected repository` | Active and closed collisions fail even in dry-run before planning writes. | Passing 2026-07-20 |
+| S3/R1-S1 | Automated test `test/cli.test.js#change create scaffolds a planned Change for a selected repository` | Creation writes one central Change with Space/repository metadata and no repository-local lifecycle copy. | Passing 2026-08-07 |
+| S3/R1-S2 | Automated test `test/cli.test.js#change create refuses to guess among multiple mapped repositories` | Ambiguous target selection fails before writes. | Passing 2026-08-07 |
+| S3/R2-S1 | Automated tests `test/cli.test.js#runtime config validation rejects unknown keys` and `test/cli.test.js#context rejects physical aliases claimed as different repositories` | Runtime validation rejects unknown shape and duplicate physical ownership. | Passing 2026-08-07 |
+| S3/R2-S2 | Automated test `test/cli.test.js#context rejects a repository-only ID that collides with an existing Idea` | A duplicate portable ID cannot silently claim another owner. | Passing 2026-08-07 |
+| S3/R2-S3 | Automated tests `test/cli.test.js#validation rejects a central Change store symlinked outside its owner` and `test/cli.test.js#change transition rejects an active Change through an external symlink ancestor` | Reads and mutations cannot escape the user-owned central store. | Passing 2026-08-07 |
+| S3/R3-S1 | Automated tests `test/cli.test.js#change create infers a sole repository and refuses an existing Change` and `test/cli.test.js#validate reports an active and closed Change collision` | Active and closed central IDs are globally unique. | Passing 2026-08-07 |
+| S3/R3-S2 | Automated tests `test/cli.test.js#change transition updates an active Change with compare-and-set semantics` and `test/cli.test.js#change transition preserves a concurrent tasks edit` | Transition changes one expected status and preserves concurrent edits. | Passing 2026-08-07 |
+| S3/R3-S3 | Automated tests `test/cli.test.js#change close moves an in-review Change without writing a closed status` and `test/cli.test.js#change close rechecks status at commit time` | Close uses folder location as terminal state and rechecks the commit-time status. | Passing 2026-08-07 |
+| S3/R4-S1 | Automated test `test/update-migration.test.js#automatic update migration consolidates identical Changes, preserves briefs, upgrades configs, and reruns as a no-op` | Compatible legacy state migrates completely and idempotently. | Passing 2026-08-07 |
+| S3/R4-S2 | Automated test `test/update-migration.test.js#migration preflight fails before writes for divergent copies, cross-Space IDs, destination conflicts, brief collisions, missing identities, and symlink escapes` | Every named unsafe legacy condition fails before writes. | Passing 2026-08-07 |
+| S3/R4-S3 | Automated test `test/update-migration.test.js#migration detects commit-time drift and rolls published state back on a later failure` | Drift and injected failure preserve or restore the complete transaction. | Passing 2026-08-07 |
+| S3/R2-S4 | Automated tests `test/cli.test.js#validate rejects absent and cross-Space Change repository IDs deterministically` and `test/cli.test.js#status retains Space-owned Changes whose repository IDs no longer resolve` | Invalid ownership fails validation without hiding the Space-owned work from status. | Passing 2026-08-07 |
+| S3/R3-S1 | Automated test `test/cli.test.js#Space-scoped validation reports global Change collisions across metadata Spaces` | A Space projection cannot hide a globally conflicting active/closed ID. | Passing 2026-08-07 |
+| S3/R4-S4 | Automated test `test/update-migration.test.js#interrupted migration recovers durably before replanning` | Real child-process termination after Change, brief, and config publication recovers before replanning; tampered or foreign state fails closed. | Passing 2026-08-07 |
 
 #### Verification Gaps
 
@@ -500,7 +546,8 @@ The CLI SHALL refuse a planned Change ID that already exists in any selected rep
 
 #### Story Notes
 
-- Repository-only context remains valid for repository-local Epic, validation, status, and active Change operations.
+- Repository-only context is a valid portable owner when its repository contract supplies a stable ID.
+- Legacy repository Change folders and idea-local dated Change directories are migration inputs only; `sdd update` is the sole supported cutover path.
 
 ### Story S4: Bounded And Context-Aware Diagnostics
 
@@ -676,8 +723,8 @@ The published package SHALL include the orphan-audit source and universal bundle
 Implementation: implemented
 Verification: verified
 Created: 2026-07-23
-Modified: 2026-07-23
-Last verified: 2026-07-23
+Modified: 2026-08-07
+Last verified: 2026-08-07
 
 As a developer, I want SDD planning, implementation, and review workflows to carry work through a complete evidence-backed handoff, so that an agent does not stop at a partial task, a green command, or the first finding.
 
@@ -742,6 +789,16 @@ The Interactive workflow SHALL create the minimum shared Change artifacts, apply
 - WHEN a narrow change deserves a durable record but not a full planning pass
 - THEN `/sdd-interactive` creates the trimmed shared artifacts, applies and verifies the work, and routes broader scope back to `/sdd-change --plan`.
 
+##### Requirement R7: One Central Multi-Repository Workflow
+
+Planning, Apply, Review, PR, Release, and Space Status SHALL select one globally unique central Change, derive its full stable repository target set from `tasks.md`, keep repository-owned Epics/code/tests distinct, and perform lifecycle transition or close exactly once after every target passes its gate.
+
+###### Scenario R7-S1: Coordinated Multi-Repository Delivery
+
+- WHEN one Change targets multiple repositories
+- THEN every workflow uses the same central artifacts and repository-keyed evidence, never creates or selects a repository-local copy, and never treats one target's completion as global completion.
+
+
 #### Implemented By
 
 | Requirement / Scenario | Location / Anchor | Kind | Responsibility |
@@ -768,7 +825,12 @@ The Interactive workflow SHALL create the minimum shared Change artifacts, apply
 | S6/R5 | `skills/sdd-apply/references/risk-closure.md#Evidence Claim Integrity` | support | Requires exact claimed-boundary evidence to survive falsification. |
 | S6/R5 | `skills/sdd-review/SKILL.md#Systematic Review Search` | primary | Independently falsifies claimed behavior and evidence across the candidate. |
 | S6/R6 | `skills/sdd-interactive/SKILL.md#Workflow` | primary | Implements a trimmed shared-artifact session with immediate Apply-style execution and routing for broader scope. |
-
+| S6/R7 | `skills/sdd-change/SKILL.md#Common Setup` | primary | Creates and plans one central Change with stable target repository IDs. |
+| S6/R7 | `skills/sdd-apply/SKILL.md#Authority And Project Profile` | primary | Orchestrates implementation and the single global transition across the complete target set. |
+| S6/R7 | `skills/sdd-review/SKILL.md#Authority And Project Profile` | primary | Reviews all target repositories and records one consolidated verdict and closeout state. |
+| S6/R7 | `skills/sdd-pr/SKILL.md#Authority And Project Profile` | primary | Stewards the coordinated repository PR set without duplicating lifecycle ownership. |
+| S6/R7 | `skills/sdd-space-status/SKILL.md#Workflow` | support | Presents top-level unique Changes and repository-filtered projections without double-counting. |
+| S6/R7 | `skills/sdd-release/SKILL.md#Operating Sequence` | primary | Resolves release readiness from canonical central records and repository-specific gates. |
 #### Implementation Gaps
 
 - None.
@@ -790,6 +852,7 @@ The Interactive workflow SHALL create the minimum shared Change artifacts, apply
 | S6/R4-S1 | Automated test `test/workflow-contracts.test.js#packaged UI workflows reject source-only confidence without rendered current-source evidence` | Design, Apply, Review, templates, and doctrine consistently require current-source rendered evidence. | Passing 2026-07-23 |
 | S6/R5-S1 | Automated test `test/workflow-contracts.test.js#packaged evidence closure keeps high-risk Scenarios unverified when only an aggregate gate passes` | Risk closure and review require exact claimed-boundary proof beyond an aggregate green result. | Passing 2026-07-23 |
 | S6/R6-S1 | Automated test `test/workflow-contracts.test.js#packaged Interactive workflow tracks one lightweight request through an honest review handoff` | Interactive keeps trimmed shared artifacts, immediate tracked execution, validation, and honest handoff semantics. | Passing 2026-07-23 |
+| S6/R7-S1 | Automated test `test/workflow-contracts.test.js#packaged workflows coordinate one central Change across every target repository` | All delivery workflows share the central layout, full target-set invariant, repo-free global lifecycle, and projection semantics without legacy Change paths. | Passing 2026-08-07 |
 
 #### Verification Gaps
 
@@ -804,8 +867,8 @@ The Interactive workflow SHALL create the minimum shared Change artifacts, apply
 Implementation: implemented
 Verification: verified
 Created: 2026-07-23
-Modified: 2026-07-23
-Last verified: 2026-07-23
+Modified: 2026-08-07
+Last verified: 2026-08-07
 
 As a developer or coding agent, I want one readable public guide to explain the SDD problem, durable behavior model, general workflow, and package implementation, so that I can understand the method and find the correct entry point without reverse-engineering the repository.
 
@@ -847,6 +910,16 @@ The guide SHALL use the shared Steel semantic identity as restrained documentati
 - WHEN the user prefers reduced motion
 - THEN smooth scrolling and nonessential transition duration are reduced without breaking navigation feedback.
 
+##### Requirement R5: Canonical Change Lifecycle Documentation
+
+The public package documentation SHALL distinguish one user-level central Change record from repository-local Epic/code/test truth, explain repository projections and global lifecycle commands, and document `sdd update` as the automatic fail-closed migration path for legacy Changes and briefs.
+
+###### Scenario R5-S1: Legacy Workspace Upgrade
+
+- WHEN a developer reads the installation or lifecycle guide for an older workspace
+- THEN the guide directs them to preview and run `sdd update`, names compatible consolidation and blocking conflicts, and never instructs them to promote or maintain repository-local Change copies.
+
+
 #### Implemented By
 
 | Requirement / Scenario | Location / Anchor | Kind | Responsibility |
@@ -860,6 +933,8 @@ The guide SHALL use the shared Steel semantic identity as restrained documentati
 | S7/R3 | `site/styles.css#:focus-visible` | support | Provides visible focus and touch-sized interactive treatment. |
 | S7/R4 | `site/styles.css#UI Foundations: Steel identity profile` | primary | Implements the Steel semantic palette and restrained documentation composition. |
 | S7/R4-S1 | `site/styles.css#@media (prefers-reduced-motion: reduce)` | primary | Reduces smooth scrolling and transition duration while preserving state. |
+| S7/R5 | `README.md#Upgrading From 0.10.1 Or Earlier` | primary | Defines central ownership, fixed brief storage, global lifecycle commands, projections, and update migration behavior. |
+| S7/R5 | `site/index.html#Planning, project truth, and Changes have distinct owners.` | primary | Presents the same lifecycle and migration contract in the public guide. |
 
 #### Implementation Gaps
 
@@ -878,6 +953,7 @@ The guide SHALL use the shared Steel semantic identity as restrained documentati
 | S7/R2-S1 | Deterministic rendered inspection of committed candidate `666de8f` at 1440×900, 768×1024, 375×812, 320×812, and 812×375 | Navigation remains reachable, mobile controls measure 44px, long content is contained, and every viewport has equal document scroll/client width. | Passing 2026-07-23 |
 | S7/R3-S1 | Deterministic browser interaction on `site/site.js` clipboard-fallback remediation with clipboard denial, missing command text, and keyboard skip-link interaction | Clipboard denial selects the full command and announces `Selected` when selection is available; missing command text announces `Copy failed` without a runtime error; the visible skip link moves focus to `main-content`. | Passing 2026-07-23 |
 | S7/R4-S1 | Deterministic rendered inspection of committed candidate `666de8f` with reduced-motion emulation and direct screenshot review | Scroll behavior becomes `auto`, transitions reduce to `0.00001s`, active navigation remains intact, and the restrained Steel composition remains readable. | Passing 2026-07-23 |
+| S7/R5-S1 | Automated test `test/site.test.js#public guide documents central Change ownership and fail-closed automatic migration` | The guide names the central store, fixed brief directory, metadata ownership, projection semantics, and complete fail-closed migration contract without retired promotion guidance. | Passing 2026-08-07 |
 
 #### Verification Gaps
 
@@ -913,4 +989,4 @@ This Epic is healthy when:
 
 ## Notes
 
-- Active implementation records are `docs/changes/2026-07-20-harden-cli-trust-boundaries/` and `docs/changes/2026-07-22-harden-audit-report-integrity/`.
+- Active and closed implementation records live in the user-level central Change store. Historical repository-local Change directories are migration inputs and are removed by `sdd update`.

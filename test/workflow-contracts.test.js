@@ -60,8 +60,8 @@ test("packaged change replan preserves a coherent planned handoff and exact Appl
       /Do not use it for narrow defects, missing tests, stale evidence indexes, or routine implementation corrections that `\/sdd-apply` can safely reconcile\./,
     ],
     [
-      "guard the return to proposed before replanning",
-      /For an active Change not already `proposed`, run `sdd change transition <space-id> <change-id> --from <current-status> --to proposed` with explicit repository selection when needed\./,
+      "guard the repo-free return to proposed before replanning the central record",
+      /For a Change not already `proposed`, run `sdd change transition <space-id> <change-id> --from <current-status> --to proposed`\. This compare-and-set mutates the one central `tasks\.md`; do not transition repository targets independently\./,
     ],
     [
       "update every planning and resume artifact affected by the discovery",
@@ -72,8 +72,8 @@ test("packaged change replan preserves a coherent planned handoff and exact Appl
       /Add a dated `Planning Updates` entry with the discovery, classification, decisions, artifacts changed, and exact `\/sdd-apply` restart point\./,
     ],
     [
-      "return to planned only after coherence and scoped validation",
-      /Set `status: planned` only when the revised plan is coherent\. For an active Change, use `sdd change transition <space-id> <change-id> --from proposed --to planned`; then run scoped `sdd validate`\./,
+      "return the central record to planned only after coherence and scoped validation",
+      /Set `status: planned` only when the revised plan is coherent\. Use `sdd change transition <space-id> <change-id> --from proposed --to planned`; then run scoped `sdd validate`\./,
     ],
   ]);
 
@@ -99,6 +99,43 @@ test("packaged change replan preserves a coherent planned handoff and exact Appl
   ]);
 });
 
+test("packaged workflows coordinate one central Change across every target repository", async () => {
+  const [change, apply, review, pr, release, spaceStatus] = await Promise.all(
+    ["sdd-change", "sdd-apply", "sdd-review", "sdd-pr", "sdd-release", "sdd-space-status"].map(
+      (skill) => readPackageFile("skills", skill, "SKILL.md"),
+    ),
+  );
+
+  for (const source of [change, apply, review, pr, release, spaceStatus]) {
+    assert.doesNotMatch(source, /docs\/changes|planned-changes|sdd change promote/i);
+  }
+
+  assert.match(
+    change,
+    /one canonical dated Change record lives under `~\/\.sdd\/changes\/`[\s\S]*target repositories are stable IDs in `tasks\.md`, not copies/,
+  );
+  assert.match(
+    apply,
+    /stable repository IDs in the central `tasks\.md` frontmatter as the target set[\s\S]*transition <space-id> <change-id> --from in_progress --to in_review` once, with no `--repo`/,
+  );
+  assert.match(
+    review,
+    /derive the complete target set from `tasks\.md` frontmatter[\s\S]*Transition or close the central Change only once/,
+  );
+  assert.match(
+    pr,
+    /derive the complete target set from the central `tasks\.md`[\s\S]*A clean or merged PR never makes the Change globally complete by itself/,
+  );
+  assert.match(
+    release,
+    /top-level `sdd status <space-id> --json` output[\s\S]*canonical `~\/\.sdd\/changes\/\*\*` locations/,
+  );
+  assert.match(
+    spaceStatus,
+    /top-level `activeChanges` and `recentChanges` as the unique canonical Change inventories[\s\S]*not copies or independent lifecycle owners/,
+  );
+});
+
 test("packaged Apply continues after a verified slice and commits the phase before later work", async () => {
   const applySkill = await readPackageFile("skills", "sdd-apply", "SKILL.md");
 
@@ -116,8 +153,8 @@ test("packaged Apply continues after a verified slice and commits the phase befo
       /A completed phase, passing focused test, subagent handoff, commentary update, or ordinary fixable failure is not a terminal condition\./,
     ],
     [
-      "commit each completed verified reconciled phase before the next one",
-      /in default\/full mode, make a local commit after every completed, verified, artifact-reconciled Requirement\/Scenario phase before starting the next phase\./,
+      "commit each completed verified reconciled phase in every affected target before the next one",
+      /in default\/full mode, make a local commit in each affected target repository after every completed, verified, artifact-reconciled Requirement\/Scenario phase before starting the next phase\./,
     ],
     [
       "allow only explicit opt-outs or isolation constraints to defer that phase commit",
@@ -132,28 +169,28 @@ test("packaged Apply continues after a verified slice and commits the phase befo
       /A phase is the smallest committable slice that completes one Requirement, or a coherent subset of that Requirement's Scenarios, with verification evidence and artifact updates\./,
     ],
     [
-      "finish the phase commit before selecting later work",
-      /Finish each phase with its local commit before selecting or delegating the next phase\./,
+      "finish every participating repository commit and central ledger update before selecting later work",
+      /Finish each phase with its local commit in every participating repository and an updated central ledger before selecting or delegating the next phase\./,
     ],
   ]);
 
   const applyLoop = markdownSection(applySkill, "Apply Loop");
   assertContractClauses("Apply loop", applyLoop, [
     [
-      "keep incomplete implementation in progress",
-      /Keep `status: in_progress` while implementation, verification, remediation, or unresolved blockers remain\./,
+      "keep the global Change in progress while any target has unfinished handoff work",
+      /Keep global `status: in_progress` while any target repository still has implementation, verification, remediation, review-handoff preparation, or unresolved blockers\./,
     ],
     [
-      "commit an authorized verified commit-shaped slice",
-      /Commit locally when authorized, the slice is verified, and changes are commit-shaped\./,
+      "commit an authorized verified commit-shaped slice in every affected target",
+      /Commit locally in each affected target repository when authorized, the slice is verified, and its changes are commit-shaped\./,
     ],
     [
-      "loop to the next accepted slice after the phase boundary",
-      /In default\/full mode, loop back to the next pending Requirement or Scenario after every completed phase\./,
+      "loop across the central target set after each completed phase",
+      /In default\/full mode, loop back to the next pending Requirement or Scenario anywhere in the central target set after every completed phase\./,
     ],
     [
-      "continue until independent review readiness or a genuine stop condition",
-      /Continue until the Change is ready for independent `\/sdd-review` or a genuine stop condition is hit\./,
+      "continue until every target is independently review-ready and the central transition is complete",
+      /Continue until every target repository is ready for independent `\/sdd-review` and the central Change has transitioned once, or a genuine stop condition is hit\./,
     ],
   ]);
 
@@ -163,15 +200,15 @@ test("packaged Apply continues after a verified slice and commits the phase befo
     "references",
     "risk-closure.md",
   );
-  const phaseCommit = markdownSection(riskClosure, "Phase Commit");
+  const phaseCommit = markdownSection(riskClosure, "Phase Commits");
   assertContractClauses("Risk-closure phase commit", phaseCommit, [
     [
       "falsify exact evidence and reconcile gaps before committing",
-      /falsify the phase's important evidence claims against their exact tests, assertions, routes, or observations .* prove each applicable risk row or record its explicit gap .* update Epic truth, supporting docs, ledgers, and current-state claims/,
+      /falsify the phase's important evidence claims against their exact tests, assertions, routes, or observations[\s\S]*prove each applicable risk row or record its explicit gap[\s\S]*update repository-local Epic truth and supporting docs plus the central ledgers and current-state claims/,
     ],
     [
       "commit the coherent green slice before later work",
-      /commit the coherent green slice before beginning the next phase/,
+      /commit the coherent green slice in every participating repository before beginning the next phase/,
     ],
   ]);
 });
@@ -312,7 +349,7 @@ test("packaged Review resumes yielded commands and preserves the full until-read
     ],
     [
       "include every gate and the final reviewed watermark",
-      /complete gate scorecard covering every applicable Review Gate .* the final post-remediation reviewed source commit as the review watermark/,
+      /complete gate scorecard covering every applicable Review Gate[\s\S]*final post-remediation reviewed source commit per repository as the review watermarks/,
     ],
   ]);
 });
@@ -475,8 +512,8 @@ test("packaged evidence closure keeps high-risk Scenarios unverified when only a
   const verificationScope = markdownSection(canonicalTasks, "Verification Scope Decision");
   assertContractClauses("Verification Scope Decision", verificationScope, [
     [
-      "record focused proof separately from fresh exact-candidate aggregate and integration results",
-      /Keep focused behavior proof distinct from aggregate and integration-candidate proof\. .* Aggregate gate required before `in_review`: yes \/ no \/ pending .* Exact committed source candidate: .* Freshness and cache treatment: .* Aggregate result and meaningful execution\/count evidence: .* Prospective integration gate required: yes \/ no \/ pending/,
+      "record focused proof separately from by-repository aggregate and integration results",
+      /Keep focused behavior proof distinct from aggregate and integration-candidate proof\. .* Project-defined aggregate commands or authoritative constituent sources by repository: .* Aggregate gates required before `in_review`: yes \/ no \/ pending, by repository .* Exact committed source candidates by repository: .* Freshness and cache treatment: .* Aggregate results and meaningful execution\/count evidence: .* Prospective integration gates required: yes \/ no \/ pending, by repository/,
     ],
   ]);
 });
@@ -490,16 +527,16 @@ test("packaged Interactive workflow tracks one lightweight request through an ho
       /This skill is for tracked working sessions\. It is not a replacement for `\/sdd-change --plan` when the change needs substantial product scoping, architecture design, data\/auth\/API changes, migration planning, or cross-Epic coordination\./,
     ],
     [
-      "create the minimal durable Change artifacts and an in-progress cold-resume ledger",
-      /Create the lightweight change artifacts\. .* `proposal\.md`: record why the session exists, in-scope work, explicit out-of-scope work, known Epic\/Story impact, release-communication impact, and when to stop and route to `\/sdd-change --plan`\. .* `design\.md`: record the current understanding, high-level technical approach, alternatives or deferred approaches when relevant, affected Epic truth, and open questions\. .* `tasks\.md`: begin with `status: in_progress` YAML frontmatter and record `Resume Here`, the interactive request log, task checklist, implementation ledger, verification ledger, manual UI confirmation checklist, artifact updates, open questions, and closeout state\./,
+      "complete the central lightweight artifacts and preserve portable lifecycle metadata",
+      /Complete the lightweight central artifacts\. .* `proposal\.md`: record why the session exists, in-scope work, explicit out-of-scope work, known Epic\/Story impact, release-communication impact, target repositories, and when to stop and route to `\/sdd-change --plan`\. .* `design\.md`: record the current understanding, high-level technical approach, cross-repository boundaries or sequencing when applicable, alternatives or deferred approaches, affected Epic truth, and open questions\. .* `tasks\.md`: preserve the initial `status: proposed`, populate `space` and the complete stable `repositories` list, then record `Resume Here`, target responsibilities, coordination gates, the interactive request log, task checklist, implementation ledger, verification ledger, manual UI confirmation checklist, artifact updates, open questions, and closeout state\./,
     ],
     [
-      "stop scope expansion unless the user explicitly accepts it",
-      /If the user request would materially expand product scope, user-visible behavior, Epic ownership, data model, auth\/security model, public API, deployment behavior, or external-service state, stop and recommend `\/sdd-change --plan` unless the user explicitly accepts expanding the active change\./,
+      "leave the central record proposed when scope expands without acceptance",
+      /If the user request would materially expand product scope, user-visible behavior, Epic ownership, data model, auth\/security model, public API, deployment behavior, or external-service state, leave the central Change `proposed` and recommend `\/sdd-change --plan` unless the user explicitly accepts expanding it\./,
     ],
     [
-      "process and record one classified request at a time",
-      /Take one user request, manual-testing note, or tweak at a time\. .* Record it in `tasks\.md` before or immediately after acting\. .* Classify it as `cosmetic`, `defect`, `verification gap`, `artifact drift`, `requirement refinement`, `small in-scope behavior`, `scope expansion`, or `product drift`\./,
+      "process and record one classified repository-owned request at a time",
+      /Take one user request, manual-testing note, or tweak at a time\. .* Record it in the central `tasks\.md` before or immediately after acting, including the responsible repository ID\. .* Classify it as `cosmetic`, `defect`, `verification gap`, `artifact drift`, `requirement refinement`, `small in-scope behavior`, `scope expansion`, or `product drift`\./,
     ],
     [
       "require focused proof for defects and missing evidence",
@@ -510,12 +547,12 @@ test("packaged Interactive workflow tracks one lightweight request through an ho
       /For `requirement refinement`, update `design\.md` and the target Epic Requirement\/Scenario before or alongside implementation\. .* For `small in-scope behavior`, add or update the relevant Requirement\/Scenario, then implement and verify it\./,
     ],
     [
-      "reconcile implementation ownership, scenario proof, and release communication",
-      /Update affected Epic `Implementation`, behavior-mapped `Implemented By`, `Implementation Gaps`, `Verification`, scenario-mapped `Verified By`, and `Verification Gaps` when implementation or verification reality changes\. .* Update the project-defined release communication when project policy requires it\./,
+      "reconcile repository-local implementation ownership, scenario proof, and release communication",
+      /Update affected repository-local Epic `Implementation`, behavior-mapped `Implemented By`, `Implementation Gaps`, `Verification`, scenario-mapped `Verified By`, and `Verification Gaps` when implementation or verification reality changes\. .* Update the project-defined release communication when project policy requires it\./,
     ],
     [
-      "keep work in progress until it is actually ready for independent review",
-      /Keep status `in_progress` while work or remediation remains; set it to `in_review` when implementation is ready for independent review\. .* Recommend `\/sdd-review` before merge or closeout when code, user-visible behavior, security, data, or release state changed\./,
+      "keep the central Change in progress until every target is ready for independent review",
+      /Keep the central status `in_progress` while any target has implementation, verification, remediation, or unresolved coordination work\. Only after every targeted repository is ready for independent review, run `sdd change transition <space-id> <change-id> --from in_progress --to in_review` once, without `--repo`\. .* Recommend `\/sdd-review` before merge or closeout when code, user-visible behavior, security, data, or release state changed\./,
     ],
   ]);
 

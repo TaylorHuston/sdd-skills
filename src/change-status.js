@@ -1,13 +1,13 @@
-import { readFile, readdir } from "node:fs/promises";
-import { join, relative, resolve } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { parseDocument } from "yaml";
 
 import {
-  resolveRepositoryArtifacts,
-  resolveRepositoryPath,
-  resolveWorkspacePath,
-} from "./config.js";
-import { isDirectory, pathExists } from "./fs.js";
+  listStoredChanges,
+  relativeChangeStorePath,
+} from "./change-store.js";
+import { getUserRoot } from "./config.js";
+import { pathExists } from "./fs.js";
 
 export const CHANGE_STATUSES = Object.freeze([
   "proposed",
@@ -29,111 +29,136 @@ export const CHANGE_STATUS_TRANSITIONS = Object.freeze({
   in_review: Object.freeze(["proposed", "in_progress"]),
 });
 
+const REPOSITORY_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+
 export function canTransitionChangeStatus(from, to) {
   return CHANGE_STATUS_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
-export function replaceChangeStatus(source, nextStatus) {
+function frontmatterDocument(source) {
   const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
-  if (!match) return null;
-  const statusLines = [...match[1].matchAll(/^status:\s*.*$/gm)];
-  if (statusLines.length !== 1) return null;
+  if (!match) return { match: null, document: null, error: "missing YAML frontmatter" };
+  const document = parseDocument(match[1]);
+  if (document.errors.length > 0) {
+    return { match, document, error: document.errors[0].message };
+  }
+  const value = document.toJS();
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { match, document, error: "frontmatter must be a mapping" };
+  }
+  return { match, document, value, error: null };
+}
 
-  const updatedFrontmatter = match[1].replace(
+export function replaceChangeStatus(source, nextStatus) {
+  const parsed = frontmatterDocument(source);
+  if (parsed.error) return null;
+  const statusLines = [...parsed.match[1].matchAll(/^status:\s*.*$/gm)];
+  if (statusLines.length !== 1) return null;
+  const updatedFrontmatter = parsed.match[1].replace(
     /^status:\s*.*$/m,
     `status: ${nextStatus}`,
   );
-  const updatedBlock = match[0].replace(match[1], updatedFrontmatter);
-  return `${updatedBlock}${source.slice(match[0].length)}`;
+  const updatedBlock = parsed.match[0].replace(parsed.match[1], updatedFrontmatter);
+  return `${updatedBlock}${source.slice(parsed.match[0].length)}`;
 }
 
 export function parseChangeStatus(source) {
-  const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
-  if (!match) return { status: null, error: null };
+  const parsed = frontmatterDocument(source);
+  if (parsed.error === "missing YAML frontmatter") return { status: null, error: null };
+  if (parsed.error) return { status: null, error: parsed.error };
+  return { status: parsed.value.status ?? null, error: null };
+}
 
-  const document = parseDocument(match[1]);
-  if (document.errors.length > 0) {
-    return { status: null, error: document.errors[0].message };
+function validateOwnership(space, repositories) {
+  if (typeof space !== "string" || space.trim().length === 0) {
+    return "frontmatter space must be a non-empty Space ID";
   }
-  const frontmatter = document.toJS();
+  if (!Array.isArray(repositories)) {
+    return "frontmatter repositories must be a list of repository IDs";
+  }
+  const seen = new Set();
+  for (const repositoryId of repositories) {
+    if (typeof repositoryId !== "string" || !REPOSITORY_ID_PATTERN.test(repositoryId)) {
+      return "frontmatter repositories must contain portable lowercase repository IDs";
+    }
+    if (seen.has(repositoryId)) {
+      return `frontmatter repositories contains duplicate repository ID ${repositoryId}`;
+    }
+    seen.add(repositoryId);
+  }
+  return null;
+}
+
+export function parseChangeMetadata(source) {
+  const parsed = frontmatterDocument(source);
+  if (parsed.error) {
+    return { status: null, space: null, repositories: null, error: parsed.error };
+  }
+  if (typeof parsed.value.status !== "string" || parsed.value.status.length === 0) {
+    return {
+      status: parsed.value.status ?? null,
+      space: parsed.value.space ?? null,
+      repositories: parsed.value.repositories ?? null,
+      error: "frontmatter must contain exactly one non-empty status",
+    };
+  }
+  const ownershipError = validateOwnership(parsed.value.space, parsed.value.repositories);
   return {
-    status: frontmatter && typeof frontmatter === "object" ? frontmatter.status : null,
-    error: null,
+    status: parsed.value.status,
+    space: parsed.value.space ?? null,
+    repositories: parsed.value.repositories ?? null,
+    error: ownershipError,
   };
 }
 
-async function listChangeDirectories(root) {
-  if (!(await isDirectory(root))) return [];
-  const entries = await readdir(root, { withFileTypes: true });
-  return entries
-    .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
-    .map((entry) => join(root, entry.name))
-    .sort((left, right) => left.localeCompare(right));
+export function setChangeMetadata(source, { space, repositories }) {
+  if (validateOwnership(space, repositories)) return null;
+  const parsed = frontmatterDocument(source);
+  if (parsed.error || typeof parsed.value.status !== "string" || parsed.value.status.length === 0) {
+    return null;
+  }
+  parsed.document.set("space", space);
+  parsed.document.set("repositories", [...repositories]);
+  const updatedFrontmatter = parsed.document.toString({ lineWidth: 0 }).trimEnd();
+  const updatedBlock = parsed.match[0].replace(parsed.match[1], updatedFrontmatter);
+  return `${updatedBlock}${source.slice(parsed.match[0].length)}`;
 }
 
-async function inspectTasks(workspaceRoot, changePath, { historical = false } = {}) {
-  const tasksPath = join(changePath, "tasks.md");
-  const displayPath = relative(workspaceRoot, tasksPath);
-  if (!(await pathExists(tasksPath))) {
-    return [{ level: "error", message: `Change is missing tasks.md: ${displayPath}.` }];
-  }
-
-  const { status, error } = parseChangeStatus(await readFile(tasksPath, "utf8"));
-  if (error) {
-    return [{ level: "error", message: `Cannot parse Change status in ${displayPath}: ${error}` }];
-  }
-  if (status == null) {
-    return [{ level: "error", message: `Change is missing tasks.md status: ${displayPath}.` }];
-  }
-  if (!CHANGE_STATUSES.includes(status)) {
-    if (historical && LEGACY_CHANGE_STATUSES.includes(status)) return [];
-    return [{
-      level: "error",
-      message: `Invalid Change status ${JSON.stringify(status)} in ${displayPath}. Expected one of: ${CHANGE_STATUSES.join(", ")}.`,
-    }];
-  }
-  return [];
-}
-
-async function workspaceRepositoryPaths(workspaceRoot, config) {
-  const repositories = new Map();
-  for (const idea of Object.values(config.ideas ?? {})) {
-    for (const repository of idea.repositories ?? []) {
-      const path = resolveWorkspacePath(workspaceRoot, resolveRepositoryPath(config, repository));
-      repositories.set(path, { path, artifacts: resolveRepositoryArtifacts(config, repository) });
-    }
-  }
-  for (const repositoryRoot of Object.values(config.repositories?.roots ?? {})) {
-    const rootPath = resolveWorkspacePath(workspaceRoot, repositoryRoot);
-    if (!(await isDirectory(rootPath))) continue;
-    const entries = await readdir(rootPath, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.isDirectory() && !entry.name.startsWith(".")) {
-        const path = join(rootPath, entry.name);
-        if (!repositories.has(path)) {
-          repositories.set(path, { path, artifacts: config.repositoryArtifacts });
-        }
-      }
-    }
-  }
-  return [...repositories.values()].sort((left, right) => left.path.localeCompare(right.path));
-}
-
-export async function inspectChangeStatuses(workspaceRoot, config) {
+export async function inspectChangeStatuses(workspaceRoot, config, userRoot = getUserRoot()) {
   const findings = [];
-  for (const { path: repositoryPath, artifacts } of await workspaceRepositoryPaths(workspaceRoot, config)) {
-    if (!(await isDirectory(repositoryPath))) continue;
-    const activeRoot = join(repositoryPath, artifacts.activeChanges);
-    const closedRoot = join(repositoryPath, artifacts.closedChanges);
-
-    for (const changePath of await listChangeDirectories(activeRoot)) {
-      if (resolve(changePath) === resolve(closedRoot)) {
-        continue;
-      }
-      findings.push(...(await inspectTasks(workspaceRoot, changePath)));
+  const records = await listStoredChanges(userRoot);
+  const locations = new Map();
+  for (const record of records) {
+    const previous = locations.get(record.changeId);
+    if (previous) {
+      findings.push({
+        level: "error",
+        message: `Change exists in both active and closed central locations: ${record.changeId}.`,
+      });
+    } else {
+      locations.set(record.changeId, record);
     }
-    for (const changePath of await listChangeDirectories(closedRoot)) {
-      findings.push(...(await inspectTasks(workspaceRoot, changePath, { historical: true })));
+
+    const tasksPath = join(record.path, "tasks.md");
+    const displayPath = relativeChangeStorePath(tasksPath, userRoot);
+    if (!(await pathExists(tasksPath))) {
+      findings.push({ level: "error", message: `Change is missing tasks.md: ${displayPath}.` });
+      continue;
+    }
+    const metadata = parseChangeMetadata(await readFile(tasksPath, "utf8"));
+    if (metadata.error) {
+      findings.push({ level: "error", message: `Cannot parse Change metadata in ${displayPath}: ${metadata.error}` });
+      continue;
+    }
+    if (!CHANGE_STATUSES.includes(metadata.status)
+      && !(record.closed && LEGACY_CHANGE_STATUSES.includes(metadata.status))) {
+      findings.push({
+        level: "error",
+        message: `Invalid Change status ${JSON.stringify(metadata.status)} in ${displayPath}. Expected one of: ${CHANGE_STATUSES.join(", ")}.`,
+      });
+    }
+    if (!Object.hasOwn(config.ideas ?? {}, metadata.space)) {
+      findings.push({ level: "error", message: `Change references unknown Space ${metadata.space}: ${displayPath}.` });
     }
   }
   return findings;

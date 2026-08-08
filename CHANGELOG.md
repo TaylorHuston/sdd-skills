@@ -1,5 +1,5 @@
 ---
-modified: 2026-07-23
+modified: 2026-08-07
 ---
 # Changelog
 
@@ -8,6 +8,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+
+- Added one canonical user-level Change store at `~/.sdd/changes/`, globally unique Change IDs, and `tasks.md` ownership metadata for the Space and target repositories.
+
+### Changed
+
+- `sdd update` now preflights and automatically migrates compatible legacy planned, repository-active, and repository-closed Changes plus undated briefs, retains supported workspace locators until commit, consolidates identical copies, recovers interrupted transactions from durable journals, and fails without writes on divergent, cross-Space, unsafe-path, missing-identity, or ambiguous-target conflicts.
+- Planning, Apply, Review, PR, Release, Interactive, Epic verification, audits, and Space status now share one central Change record and treat repository entries only as stable targets or filtered projections.
+- Status and validation now keep Space-owned Changes visible when repository mappings go stale, reject unresolved repository ownership, and report global active/closed ID collisions even through scoped projections.
+- Update recovery now treats durable journals as untrusted replay hints: every destructive path is re-authorized against current topology and physical identity, malformed configured paths fail before filesystem access, and an interruption between configuration backup and publication restores the original before replanning.
+- `/sdd-release` now records repository-keyed candidates, checks, authorization, and handoffs for the complete target set, with one aggregate coordination and closeout gate.
+
+### Removed
+
+- Removed `sdd change promote` and repository-configured Change roots; transition and close now operate once on the canonical central record.
 
 ## [0.12.0] - 2026-07-23
 

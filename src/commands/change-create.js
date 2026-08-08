@@ -1,19 +1,21 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import {
-  assertValidConfig,
-  relativeWorkspacePath,
-  resolveIdeaPlanningPath,
-  resolveRepositoryArtifacts,
-  resolveWorkspaceStatus,
-  resolveWorkspacePath,
-} from "../config.js";
+  getActiveChangePath,
+  getChangesRoot,
+  getClosedChangePath,
+  relativeChangeStorePath,
+  assertChangeStoreConfinement,
+} from "../change-store.js";
+import { setChangeMetadata } from "../change-status.js";
+import { resolveRepositoryTargets, selectRepositories } from "../change-repositories.js";
+import { assertValidConfig, getUserRoot, resolveWorkspaceStatus } from "../config.js";
 import { resolveOperationConfiguration } from "../workspace.js";
-import { resolvedActiveRepositories, selectRepositories } from "../change-repositories.js";
 import { PACKAGE_ROOT } from "../constants.js";
 import { SddError } from "../errors.js";
-import { isPathPhysicallyInside, pathExists } from "../fs.js";
+import { pathExists } from "../fs.js";
+import { withWorkspaceMutationLock } from "../mutation.js";
 
 const TEMPLATE_FILES = Object.freeze([
   ["proposal.md", join(PACKAGE_ROOT, "skills", "sdd-change", "assets", "proposal-template.md")],
@@ -21,9 +23,7 @@ const TEMPLATE_FILES = Object.freeze([
   ["tasks.md", join(PACKAGE_ROOT, "skills", "sdd-change", "assets", "tasks-template.md")],
 ]);
 
-function normalizePath(value) {
-  return value.split("\\").join("/");
-}
+const CENTRAL_CHANGE_LOCK = Symbol("central-change-lock");
 
 function changeTitle(slug) {
   return slug
@@ -39,64 +39,71 @@ function isValidDate(value) {
   const month = Number(match[2]);
   const day = Number(match[3]);
   const date = new Date(Date.UTC(year, month - 1, day));
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
-  );
+  return date.getUTCFullYear() === year
+    && date.getUTCMonth() === month - 1
+    && date.getUTCDate() === day;
 }
 
-function renderTemplate(source, { title, changeId, plannedPath, repositories }) {
+function renderTemplate(source, { title, changeId, changePath, spaceId, repositories }) {
   const repositoryLines = repositories.length > 0
-    ? repositories.map(
-      (repository) => `- \`${repository.resolvedPath}\`${repository.role ? ` (${repository.role})` : ""}`,
-    )
+    ? repositories.map((repository) =>
+      `- \`${repository.id}\` — \`${repository.resolvedPath}\`${repository.role ? ` (${repository.role})` : ""}`)
     : ["- None selected; this Space has no mapped implementation repository yet."];
   let rendered = source
     .replaceAll("CHANGE TITLE", title)
-    .replaceAll("yyyy-mm-dd-change-name", changeId);
+    .replaceAll("yyyy-mm-dd-change-name", changeId)
+    .replaceAll("SPACE_ID", spaceId);
 
   if (rendered.startsWith("# Proposal:")) {
     rendered = rendered.replace(
-      "## Target Repositories\n\n- TBD.",
+      /## Target Repositories\n\n- Stable repository IDs matching `tasks\.md` frontmatter: TBD\./,
       `## Target Repositories\n\n${repositoryLines.join("\n")}`,
     );
-    rendered = rendered.replace(
-      "- Planned location: not applicable",
-      `- Planned location: \`${plannedPath}\``,
-    );
   }
-  if (rendered.startsWith("---\nstatus: proposed\n---")) {
+  if (/^---\r?\n/.test(rendered)) {
     rendered = rendered.replace(
       /- Expected dirty files: `[^`]+`/,
-      `- Expected dirty files: \`${plannedPath}/\``,
+      `- Expected dirty files: repositories targeted by \`${changePath}\``,
     );
+    const withMetadata = setChangeMetadata(rendered, {
+      space: spaceId,
+      repositories: repositories.map((repository) => repository.id),
+    });
+    if (withMetadata !== null) rendered = withMetadata;
   }
   return rendered;
 }
 
-export async function createPlannedChange(
+export async function createChange(
   startPath,
   spaceId,
   slug,
-  { date = null, repositories = [], dryRun = false } = {},
+  {
+    date = null,
+    repositories = [],
+    dryRun = false,
+    userRoot = null,
+    lockToken = null,
+  } = {},
 ) {
-  const { workspaceRoot, config, context } = await resolveOperationConfiguration(startPath);
-  assertValidConfig(config, "create a planned Change");
+  userRoot ??= getUserRoot();
+  if (!dryRun && lockToken !== CENTRAL_CHANGE_LOCK) {
+    return withWorkspaceMutationLock(userRoot, () => createChange(startPath, spaceId, slug, {
+      date,
+      repositories,
+      dryRun,
+      userRoot,
+      lockToken: CENTRAL_CHANGE_LOCK,
+    }));
+  }
+  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath, { userRoot });
+  assertValidConfig(config, "create a Change");
   const space = config.ideas[spaceId];
   if (!space) {
     throw new SddError(`Unknown Space ID: ${spaceId}`, {
       code: "SPACE_NOT_FOUND",
       details: Object.keys(config.ideas).sort().map((id) => `Available Space ID: ${id}`),
     });
-  }
-  if (space._repositoryOnly === true || (
-    context.kind === "repository" && context.spaceId === spaceId && context.planningPath === null
-  )) {
-    throw new SddError(
-      `Space ${spaceId} has no configured Idea planning mapping for a planned Change.`,
-      { code: "PLANNING_MAPPING_REQUIRED" },
-    );
   }
   if (resolveWorkspaceStatus(space.status) !== "active") {
     throw new SddError(`Space ${spaceId} is not active. Update its .sdd status before creating work.`, {
@@ -119,69 +126,43 @@ export async function createPlannedChange(
   }
 
   const changeId = `${selectedDate}-${slug}`;
-  const selectedRepositories = selectRepositories(
-    resolvedActiveRepositories(config, space),
-    repositories,
-  );
-  const planningPath = resolveIdeaPlanningPath(config, spaceId, space);
-  const plannedPath = normalizePath(
-    join(planningPath, config.planning.plannedChangesDirectory, changeId),
-  );
-  const absolutePath = resolveWorkspacePath(workspaceRoot, plannedPath);
-  const ideaPlanningRoot = resolveWorkspacePath(workspaceRoot, planningPath);
-  if (!(await isPathPhysicallyInside(ideaPlanningRoot, absolutePath))) {
-    throw new SddError(`Planned Change resolves outside its configured Idea planning root: ${plannedPath}`, {
-      code: "UNSAFE_ARTIFACT_PATH",
+  const availableRepositories = await resolveRepositoryTargets(workspaceRoot, config, space, {
+    activeOnly: true,
+  });
+  const selectedRepositories = selectRepositories(availableRepositories, repositories);
+  const absolutePath = getActiveChangePath(changeId, userRoot);
+  const closedPath = getClosedChangePath(changeId, userRoot);
+  await assertChangeStoreConfinement(absolutePath, userRoot);
+  await assertChangeStoreConfinement(closedPath, userRoot);
+  if (await pathExists(absolutePath) || await pathExists(closedPath)) {
+    throw new SddError(`Change ID already exists in central active or closed history: ${changeId}`, {
+      code: "CHANGE_EXISTS",
     });
   }
-  if (await pathExists(absolutePath)) {
-    throw new SddError(`Planned Change already exists: ${plannedPath}`, { code: "CHANGE_EXISTS" });
-  }
-  for (const repository of selectedRepositories) {
-    const repositoryPath = resolveWorkspacePath(workspaceRoot, repository.resolvedPath);
-    const artifacts = resolveRepositoryArtifacts(config, repository);
-    for (const [location, root] of [
-      ["active", artifacts.activeChanges],
-      ["closed", artifacts.closedChanges],
-    ]) {
-      const collisionPath = join(repositoryPath, root, changeId);
-      if (await pathExists(collisionPath)) {
-        throw new SddError(
-          `Change already exists in ${location} repository history: ${normalizePath(join(repository.resolvedPath, root, changeId))}`,
-          { code: "CHANGE_EXISTS" },
-        );
-      }
-    }
-  }
+
   const title = changeTitle(slug);
   const files = TEMPLATE_FILES.map(([name]) => name);
-
+  const displayPath = relativeChangeStorePath(absolutePath, userRoot);
   if (!dryRun) {
-    const parent = dirname(absolutePath);
-    const temporaryPath = join(parent, `.${changeId}.sdd-new-${process.pid}-${Date.now()}`);
-    await mkdir(parent, { recursive: true });
+    const changesRoot = getChangesRoot(userRoot);
+    const temporaryPath = join(changesRoot, `.${changeId}.sdd-new-${process.pid}-${Date.now()}`);
+    await mkdir(changesRoot, { recursive: true });
+    await assertChangeStoreConfinement(temporaryPath, userRoot);
     await mkdir(temporaryPath);
     try {
       for (const [name, templatePath] of TEMPLATE_FILES) {
         const source = await readFile(templatePath, "utf8");
-        await writeFile(
-          join(temporaryPath, name),
-          renderTemplate(source, {
-            title,
-            changeId,
-            plannedPath,
-            repositories: selectedRepositories,
-          }),
-          "utf8",
-        );
+        await writeFile(join(temporaryPath, name), renderTemplate(source, {
+          title,
+          changeId,
+          changePath: displayPath,
+          spaceId,
+          repositories: selectedRepositories,
+        }), "utf8");
       }
-      if (!(await isPathPhysicallyInside(ideaPlanningRoot, absolutePath))) {
-        throw new SddError(`Planned Change resolves outside its configured Idea planning root: ${plannedPath}`, {
-          code: "UNSAFE_ARTIFACT_PATH",
-        });
-      }
-      if (await pathExists(absolutePath)) {
-        throw new SddError(`Planned Change appeared during creation: ${plannedPath}`, {
+      await assertChangeStoreConfinement(absolutePath, userRoot);
+      if (await pathExists(absolutePath) || await pathExists(closedPath)) {
+        throw new SddError(`Change ID appeared during creation: ${changeId}`, {
           code: "CONCURRENT_CHANGE",
         });
       }
@@ -195,11 +176,12 @@ export async function createPlannedChange(
   return {
     command: "change-create",
     workspaceRoot,
+    userRoot,
     dryRun,
     spaceId,
     changeId,
     title,
-    path: relativeWorkspacePath(workspaceRoot, absolutePath),
+    path: displayPath,
     repositories: selectedRepositories,
     files,
   };

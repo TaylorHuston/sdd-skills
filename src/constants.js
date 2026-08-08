@@ -10,16 +10,18 @@ export const CONFIG_DIRECTORY_NAME = ".sdd";
 export const CONFIG_FILE_NAME = "config.yaml";
 export const INSTALL_LOCK_FILE_NAME = "install-lock.json";
 export const WORKFLOW_RELATIVE_PATH = ".sdd/story-driven-development.md";
-export const CONFIG_VERSION = 2;
-export const SCHEMA_VERSION = "sdd-v2";
-export const USER_CONFIG_VERSION = 1;
-export const USER_SCHEMA_VERSION = "sdd-user-v1";
-export const REPOSITORY_CONFIG_VERSION = 1;
-export const REPOSITORY_SCHEMA_VERSION = "sdd-repository-v1";
+export const CONFIG_VERSION = 3;
+export const SCHEMA_VERSION = "sdd-v3";
+export const USER_CONFIG_VERSION = 2;
+export const USER_SCHEMA_VERSION = "sdd-user-v2";
+export const REPOSITORY_CONFIG_VERSION = 2;
+export const REPOSITORY_SCHEMA_VERSION = "sdd-repository-v2";
+
+export const CHANGES_DIRECTORY_NAME = "changes";
+export const CLOSED_CHANGES_DIRECTORY_NAME = "closed";
+export const CHANGE_BRIEFS_DIRECTORY_NAME = "change-briefs";
 
 export const DEFAULT_ARTIFACT_PATHS = Object.freeze({
-  activeChanges: "docs/changes",
-  closedChanges: "docs/changes/closed",
   epics: "docs/epics",
   adrs: "docs/adrs",
   audits: "docs/audits",

@@ -9,7 +9,9 @@ Find likely orphaned code/tests and SDD traceability gaps without brute-force re
 
 ## Authority And Project Profile
 
-Resolve the workspace and repository with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before classifying traceability or artifact-authority gaps. Enforce Epics under `docs/epics/`, changes under `docs/changes/`, and audit reports under `docs/audits/` inside the resolved repository. Project guidance owns source, generated-file, test, and analyzer conventions. If user setup is missing, direct the user to `sdd setup`; if the repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
+Resolve the workspace, Space ID, selected repository, and its stable repository ID with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before classifying traceability or artifact-authority gaps. Run `sdd status <space-id> --json` and use the selected repository's filtered `activeChanges` and `recentChanges` projection to select any relevant unique top-level central Change records.
+
+Keep Epics under `docs/epics/` and audit reports under `docs/audits/` in the resolved repository. Each dated Change lives once under `~/.sdd/changes/<change-id>/`, or under `~/.sdd/changes/closed/<change-id>/` after close, and is read only when its metadata targets the selected repository and it explains likely drift. Legacy planned or repository-local active/closed Change paths are migration input only: direct the user to `sdd update` and do not treat them as live owners. Project guidance owns source, generated-file, test, and analyzer conventions. If user setup is missing, direct the user to `sdd setup`; if the repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
 
 This is a report-first audit. It can identify candidates, confidence levels, and recommended follow-up workflows, but it must not delete code, remove tests, rewrite Epics, or make cleanup commits unless the user explicitly asks for a separate follow-up change.
 
@@ -41,7 +43,7 @@ Before auditing, read:
 - project-local `AGENTS.md`, especially branch policy and generated-file guidance
 - parent or workspace guidance when the project points to it
 - `docs/epics/*/epic.md`
-- active and recent `docs/changes/**/{proposal.md,design.md,tasks.md,review.md}` only when they explain likely drift
+- central active and recent `proposal.md`, `design.md`, `tasks.md`, and `review.md` selected through the target repository's `sdd status` projection, only when they explain likely drift
 - project README, test docs, package scripts, framework config, and configured release communication when they affect inventory or cleanup risk
 
 Check git status before writing a report. Preserve unrelated dirty files. Do not stage, commit, push, merge, deploy, or mutate external services.
@@ -50,7 +52,7 @@ Check git status before writing a report. Preserve unrelated dirty files. Do not
 
 1. Locate the application root.
    - Prefer an explicit path.
-   - Otherwise use the nearest repo with `.git/`, `docs/epics/`, `docs/changes/`, `package.json`, or framework config.
+   - Otherwise use the nearest repo with `.git/`, `docs/epics/`, `package.json`, or framework config.
    - Do not audit the whole workspace tree unless that tree is the intended target.
 2. Run the universal traceability script.
    - Use `scripts/sdd_orphan_audit.py <app-root> --format markdown` for a human summary.
@@ -107,6 +109,7 @@ Possible future extensions:
 Include:
 
 - app root and git root
+- stable repository ID and central Change records inspected
 - audit date
 - commands run
 - Epic evidence coverage summary

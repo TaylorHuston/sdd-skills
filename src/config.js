@@ -165,6 +165,12 @@ function normalizePath(value) {
 export function createRepositoryRootMap(paths) {
   const roots = {};
   for (const [index, path] of paths.entries()) {
+    if (typeof path !== "string" || !path || path.includes("\0")) {
+      throw new SddError("Legacy repository roots must be non-empty paths without NUL bytes.", {
+        code: "INVALID_CONFIG",
+        details: [`repositories.roots[${index}] is invalid.`],
+      });
+    }
     const baseId =
       basename(path)
         .toLowerCase()
@@ -181,17 +187,38 @@ export function createRepositoryRootMap(paths) {
   return roots;
 }
 
-function toRepositoryReference(workspaceRoot, repository, repositoryRoots) {
-  const repositoryPath = resolveWorkspacePath(workspaceRoot, repository.path);
+function commonAncestor(paths) {
+  if (paths.length === 0) return null;
+  let ancestor = resolve(paths[0]);
+  for (const path of paths.slice(1)) {
+    const absolutePath = resolve(path);
+    while (ancestor !== absolutePath && !isPathInside(ancestor, absolutePath)) {
+      const parent = dirname(ancestor);
+      if (parent === ancestor) break;
+      ancestor = parent;
+    }
+  }
+  return ancestor;
+}
+
+function toRepositoryReference(workspaceRoot, repository, repositoryRoots, referenceRoot = workspaceRoot) {
+  const repositoryPath = isAbsolute(repository.path)
+    ? resolve(repository.path)
+    : resolve(referenceRoot, repository.path);
   const matches = Object.entries(repositoryRoots)
     .map(([root, path]) => ({ root, path, absolutePath: resolveWorkspacePath(workspaceRoot, path) }))
-    .filter((entry) => isPathInside(entry.absolutePath, repositoryPath))
+    .filter((entry) =>
+      entry.absolutePath === repositoryPath || isPathInside(entry.absolutePath, repositoryPath))
     .sort((left, right) => right.absolutePath.length - left.absolutePath.length);
 
   const role = repository.role ? { role: repository.role } : {};
   const status = { status: resolveWorkspaceStatus(repository.status) };
   if (matches.length === 0) {
-    return { path: normalizePath(repository.path), ...role, ...status };
+    const path = repositoryPath === resolve(workspaceRoot)
+      || isPathInside(resolve(workspaceRoot), repositoryPath)
+      ? relative(resolve(workspaceRoot), repositoryPath)
+      : repositoryPath;
+    return { path: normalizePath(path), ...role, ...status };
   }
   const match = matches[0];
   return {
@@ -208,6 +235,11 @@ export async function importIdeas(workspaceRoot, planningRoot, repositoryRoots) 
     return {};
   }
 
+  const absoluteRepositoryRoots = Object.values(repositoryRoots)
+    .map((path) => resolveWorkspacePath(workspaceRoot, path));
+  const repositoryReferenceRoot = absoluteRepositoryRoots.length > 0
+    ? commonAncestor([absolutePlanningRoot, ...absoluteRepositoryRoots])
+    : workspaceRoot;
   const entries = await readdir(absolutePlanningRoot, { withFileTypes: true });
   const directories = entries
     .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
@@ -223,7 +255,7 @@ export async function importIdeas(workspaceRoot, planningRoot, repositoryRoots) 
       const frontmatter = parseFrontmatter(await readFile(manifestPath, "utf8"), manifestPath);
       status = WORKSPACE_STATUSES.includes(frontmatter.status) ? frontmatter.status : "active";
       repositories = normalizeRepositoryEntries(frontmatter.repositories).map((repository) =>
-        toRepositoryReference(workspaceRoot, repository, repositoryRoots),
+        toRepositoryReference(workspaceRoot, repository, repositoryRoots, repositoryReferenceRoot),
       );
     }
     ideas[directory.name] = {
@@ -265,7 +297,6 @@ export async function createInitialConfig(
     },
     planning: {
       root: detectedPlanningRoot,
-      plannedChangesDirectory: "planned-changes",
     },
     repositories: {
       roots: repositoryRootMap,
@@ -345,6 +376,9 @@ export async function createUserConfigFromWorkspace(
     },
     repositoryArtifacts: { ...migrated.repositoryArtifacts },
     ideas,
+    ...(isSupportedLegacyConfig(source)
+      ? { migration: { sourceWorkspace: resolve(workspaceRoot) } }
+      : {}),
   };
   assertValidConfig(config, "create the user installation from a legacy workspace");
   return config;
@@ -360,47 +394,111 @@ export function createRepositoryConfig(repositoryId) {
   };
 }
 
+export function isSupportedLegacyConfig(config) {
+  return Boolean(
+    config
+    && typeof config === "object"
+    && !Array.isArray(config)
+    && (
+      (config.kind === "user"
+        && config.version === 1
+        && config.schema === "sdd-user-v1")
+      || (config.kind === undefined
+        && config.version === 2
+        && config.schema === "sdd-v2")
+      || (config.kind === undefined
+        && config.version === 1
+        && config.schema === "sdd-v1")
+    )
+  );
+}
+
+export function isSupportedLegacyRepositoryConfig(config) {
+  return Boolean(
+    config
+    && typeof config === "object"
+    && !Array.isArray(config)
+    && config.kind === "repository"
+    && config.version === 1
+    && config.schema === "sdd-repository-v1"
+  );
+}
+
+function currentArtifactPaths(artifacts) {
+  return Object.fromEntries(
+    Object.keys(DEFAULT_ARTIFACT_PATHS).map((key) => [key, artifacts?.[key]]),
+  );
+}
+
+export function migrateRepositoryConfig(config) {
+  if (!isSupportedLegacyRepositoryConfig(config)) {
+    return { config, migratedFrom: null };
+  }
+  return {
+    migratedFrom: config.version,
+    config: {
+      kind: "repository",
+      version: REPOSITORY_CONFIG_VERSION,
+      schema: REPOSITORY_SCHEMA_VERSION,
+      id: config.id,
+      artifacts: currentArtifactPaths(config.artifacts),
+    },
+  };
+}
+
 export function migrateConfig(config, workspaceRoot) {
-  if (config?.version !== 1 || config?.schema !== "sdd-v1") {
+  if (!isSupportedLegacyConfig(config)) {
     return { config, migratedFrom: null };
   }
 
-  const legacyRoots = Array.isArray(config.repositories?.roots) ? config.repositories.roots : [];
-  const repositoryRoots = createRepositoryRootMap(legacyRoots);
-  const planningRoot = config.planning?.root;
-  const ideas = {};
+  let normalized = config;
+  if (config.version === 1 && config.schema === "sdd-v1") {
+    const legacyRoots = Array.isArray(config.repositories?.roots) ? config.repositories.roots : [];
+    const repositoryRoots = createRepositoryRootMap(legacyRoots);
+    const planningRoot = config.planning?.root;
+    const ideas = {};
 
-  for (const [ideaId, idea] of Object.entries(config.ideas ?? {})) {
-    const migratedIdea = {
-      status: resolveWorkspaceStatus(idea?.status),
-      repositories: [],
-    };
-    if (typeof idea?.planning === "string" && typeof planningRoot === "string") {
-      const absolutePlanningRoot = resolve(workspaceRoot, planningRoot);
-      const absoluteIdeaPlanning = resolve(workspaceRoot, idea.planning);
-      if (isPathInside(absolutePlanningRoot, absoluteIdeaPlanning)) {
-        const relativePlanning = normalizePath(relative(absolutePlanningRoot, absoluteIdeaPlanning));
-        if (relativePlanning !== ideaId) {
-          migratedIdea.planning = relativePlanning;
+    for (const [ideaId, idea] of Object.entries(config.ideas ?? {})) {
+      const migratedIdea = {
+        status: resolveWorkspaceStatus(idea?.status),
+        repositories: [],
+      };
+      if (typeof idea?.planning === "string" && typeof planningRoot === "string") {
+        const absolutePlanningRoot = resolve(workspaceRoot, planningRoot);
+        const absoluteIdeaPlanning = resolve(workspaceRoot, idea.planning);
+        if (isPathInside(absolutePlanningRoot, absoluteIdeaPlanning)) {
+          const relativePlanning = normalizePath(relative(absolutePlanningRoot, absoluteIdeaPlanning));
+          if (relativePlanning !== ideaId) {
+            migratedIdea.planning = relativePlanning;
+          }
+        } else {
+          migratedIdea.planningPath = normalizePath(idea.planning);
         }
-      } else {
-        migratedIdea.planningPath = normalizePath(idea.planning);
       }
+      migratedIdea.repositories = (idea?.repositories ?? []).map((repository) =>
+        toRepositoryReference(workspaceRoot, repository, repositoryRoots),
+      );
+      ideas[ideaId] = migratedIdea;
     }
-    migratedIdea.repositories = (idea?.repositories ?? []).map((repository) =>
-      toRepositoryReference(workspaceRoot, repository, repositoryRoots),
-    );
-    ideas[ideaId] = migratedIdea;
-  }
-
-  return {
-    migratedFrom: 1,
-    config: {
+    normalized = {
       ...config,
-      version: CONFIG_VERSION,
-      schema: SCHEMA_VERSION,
       repositories: { roots: repositoryRoots },
       ideas,
+    };
+  }
+
+  const userConfig = normalized.kind === "user";
+  return {
+    migratedFrom: config.version,
+    config: {
+      ...(userConfig ? { kind: "user" } : {}),
+      version: userConfig ? USER_CONFIG_VERSION : CONFIG_VERSION,
+      schema: userConfig ? USER_SCHEMA_VERSION : SCHEMA_VERSION,
+      skills: normalized.skills,
+      planning: { root: normalized.planning?.root },
+      repositories: normalized.repositories,
+      repositoryArtifacts: currentArtifactPaths(normalized.repositoryArtifacts),
+      ideas: normalized.ideas,
     },
   };
 }
@@ -425,9 +523,14 @@ export function validateConfig(config) {
       if (!allowed.includes(key)) error(`${label} contains unknown key: ${key}.`);
     }
   };
+  const containsNullByte = (value) => typeof value === "string" && value.includes("\0");
   const validatePath = (label, path) => {
     if (typeof path !== "string" || !path) {
       error(`${label} must be a non-empty path.`);
+      return false;
+    }
+    if (containsNullByte(path)) {
+      error(`${label} must not contain NUL bytes.`);
       return false;
     }
     if (!userConfig && (
@@ -440,25 +543,15 @@ export function validateConfig(config) {
     }
     return true;
   };
-  const validateOwnerRelativePath = (label, path) => {
-    if (typeof path !== "string" || !path) {
-      error(`${label} must be a non-empty path.`);
-      return false;
-    }
-    if (
-      isAbsolute(path) ||
-      /^[\\/]/.test(path) ||
-      /^[A-Za-z]:[\\/]/.test(path) ||
-      path === "~" ||
-      path.startsWith("~/") ||
-      path.startsWith("~\\") ||
-      path.split(/[\\/]/).includes("..")
-    ) {
+  const validateRelativePath = (label, path) => {
+    if (!validatePath(label, path)) return false;
+    if (isAbsolute(path) || path.split(/[\\/]/).includes("..")) {
       error(`${label} must be relative and cannot traverse to a parent directory.`);
       return false;
     }
     return true;
   };
+
 
   if (!config || typeof config !== "object" || Array.isArray(config)) {
     return [{ level: "error", message: "Configuration must be a YAML mapping." }];
@@ -467,12 +560,21 @@ export function validateConfig(config) {
     "Configuration",
     config,
     userConfig
-      ? ["kind", "version", "schema", "skills", "planning", "repositories", "repositoryArtifacts", "ideas"]
+      ? ["kind", "version", "schema", "skills", "planning", "repositories", "repositoryArtifacts", "ideas", "migration"]
       : ["version", "schema", "skills", "planning", "repositories", "repositoryArtifacts", "ideas"],
   );
   rejectUnknownKeys("skills", config.skills, ["directory"]);
-  rejectUnknownKeys("planning", config.planning, ["root", "plannedChangesDirectory"]);
+  rejectUnknownKeys("planning", config.planning, ["root"]);
   rejectUnknownKeys("repositories", config.repositories, ["roots"]);
+  if (config.migration !== undefined) {
+    if (!userConfig || !config.migration || typeof config.migration !== "object"
+      || Array.isArray(config.migration)) {
+      error("migration must be a mapping in a user configuration.");
+    } else {
+      rejectUnknownKeys("migration", config.migration, ["sourceWorkspace"]);
+      validatePath("migration.sourceWorkspace", config.migration.sourceWorkspace);
+    }
+  }
   const expectedVersion = userConfig ? USER_CONFIG_VERSION : CONFIG_VERSION;
   const expectedSchema = userConfig ? USER_SCHEMA_VERSION : SCHEMA_VERSION;
   if (config.version !== expectedVersion) {
@@ -483,16 +585,18 @@ export function validateConfig(config) {
   }
   validatePath("skills.directory", config.skills?.directory);
   validatePath("planning.root", config.planning?.root);
-  validateOwnerRelativePath("planning.plannedChangesDirectory", config.planning?.plannedChangesDirectory);
   if (
     !config.repositories?.roots ||
     typeof config.repositories.roots !== "object" ||
     Array.isArray(config.repositories.roots) ||
     (!userConfig && Object.keys(config.repositories.roots).length === 0)
   ) {
-    error("repositories.roots must contain at least one named path for a legacy workspace.");
+    error("repositories.roots must contain at least one named path for a workspace configuration.");
   } else {
     for (const [rootId, path] of Object.entries(config.repositories.roots)) {
+      if (containsNullByte(rootId)) {
+        error("repositories.roots keys must not contain NUL bytes.");
+      }
       validatePath(`repositories.roots.${rootId}`, path);
     }
   }
@@ -505,7 +609,7 @@ export function validateConfig(config) {
   } else {
     rejectUnknownKeys("repositoryArtifacts", config.repositoryArtifacts, Object.keys(DEFAULT_ARTIFACT_PATHS));
     for (const key of Object.keys(DEFAULT_ARTIFACT_PATHS)) {
-      validatePath(`repositoryArtifacts.${key}`, config.repositoryArtifacts[key]);
+      validateRelativePath(`repositoryArtifacts.${key}`, config.repositoryArtifacts[key]);
     }
     validateArtifactRelationships(config.repositoryArtifacts, "repositoryArtifacts", error);
   }
@@ -514,8 +618,8 @@ export function validateConfig(config) {
   } else {
     const claimedRepositories = new Map();
     for (const [ideaId, idea] of Object.entries(config.ideas)) {
-      if (!ideaId) {
-        error("ideas keys must be non-empty Space IDs.");
+      if (!ideaId || containsNullByte(ideaId)) {
+        error("ideas keys must be non-empty and must not contain NUL bytes.");
         continue;
       }
       if (!idea || typeof idea !== "object" || Array.isArray(idea)) {
@@ -527,7 +631,7 @@ export function validateConfig(config) {
         error(`ideas.${ideaId}.status must be one of: ${WORKSPACE_STATUSES.join(", ")}.`);
       }
       if (idea.planning !== undefined) {
-        validatePath(`ideas.${ideaId}.planning`, idea.planning);
+        validateRelativePath(`ideas.${ideaId}.planning`, idea.planning);
       }
       if (idea.planningPath !== undefined) {
         validatePath(`ideas.${ideaId}.planningPath`, idea.planningPath);
@@ -549,7 +653,9 @@ export function validateConfig(config) {
           repository,
           ["root", "path", "role", "status"],
         );
-        validatePath(`ideas.${ideaId}.repositories path`, repository.path);
+        const repositoryPathValid = repository.root !== undefined
+          ? validateRelativePath(`ideas.${ideaId}.repositories path`, repository.path)
+          : validatePath(`ideas.${ideaId}.repositories path`, repository.path);
         if (repository.root !== undefined) {
           if (typeof repository.root !== "string" || !repository.root) {
             error(`ideas.${ideaId}.repositories root must be a non-empty name.`);
@@ -565,6 +671,17 @@ export function validateConfig(config) {
             `ideas.${ideaId}.repositories status must be one of: ${WORKSPACE_STATUSES.join(", ")}.`,
           );
         }
+        if (containsNullByte(repository.root)) {
+          error(`ideas.${ideaId}.repositories root must not contain NUL bytes.`);
+        }
+        if (
+          !repositoryPathValid
+          || containsNullByte(repository.root)
+          || (
+            repository.root !== undefined
+            && typeof config.repositories?.roots?.[repository.root] !== "string"
+          )
+        ) continue;
         const resolvedRepository =
           repository.root && Object.hasOwn(config.repositories?.roots ?? {}, repository.root)
             ? resolveRepositoryPath(config, repository)
@@ -611,8 +728,9 @@ export function validateRepositoryConfig(config) {
     rejectUnknownKeys("artifacts", config.artifacts, Object.keys(DEFAULT_ARTIFACT_PATHS));
     for (const key of Object.keys(DEFAULT_ARTIFACT_PATHS)) {
       const path = config.artifacts[key];
-      if (typeof path !== "string" || !path || isAbsolute(path) || path.split(/[\\/]/).includes("..")) {
-        error(`artifacts.${key} must be a repository-relative path.`);
+      if (typeof path !== "string" || !path || path.includes("\0")
+        || isAbsolute(path) || path.split(/[\\/]/).includes("..")) {
+        error(`artifacts.${key} must be a repository-relative path without NUL bytes.`);
       }
     }
     validateArtifactRelationships(config.artifacts, "artifacts", error);
@@ -621,10 +739,13 @@ export function validateRepositoryConfig(config) {
 }
 
 function validateArtifactRelationships(artifacts, label, error) {
-  const entries = Object.entries(DEFAULT_ARTIFACT_PATHS).map(([key]) => [
-    key,
-    normalizePath(resolve("/", artifacts[key] ?? ".")),
-  ]);
+  const entries = Object.entries(DEFAULT_ARTIFACT_PATHS)
+    .filter(([key]) =>
+      typeof artifacts[key] === "string" && !artifacts[key].includes("\0"))
+    .map(([key]) => [
+      key,
+      normalizePath(resolve("/", artifacts[key])),
+    ]);
   for (const [key, path] of entries) {
     if (path === "/") error(`${label}.${key} must not own the repository root.`);
   }
@@ -632,9 +753,6 @@ function validateArtifactRelationships(artifacts, label, error) {
     for (let rightIndex = leftIndex + 1; rightIndex < entries.length; rightIndex += 1) {
       const [leftKey, leftPath] = entries[leftIndex];
       const [rightKey, rightPath] = entries[rightIndex];
-      const allowedClosedChild = leftKey === "activeChanges" && rightKey === "closedChanges"
-        && dirname(rightPath) === leftPath;
-      if (allowedClosedChild) continue;
       if (leftPath === rightPath || isPathInside(leftPath, rightPath) || isPathInside(rightPath, leftPath)) {
         error(`${label}.${leftKey} and ${label}.${rightKey} overlap invalidly.`);
       }
@@ -643,6 +761,11 @@ function validateArtifactRelationships(artifacts, label, error) {
 }
 
 export function assertValidRepositoryConfig(config) {
+  if (isSupportedLegacyRepositoryConfig(config)) {
+    throw new SddError("Repository configuration migration is required. Run `sdd update` before using this repository.", {
+      code: "CONFIG_MIGRATION_REQUIRED",
+    });
+  }
   const errors = validateRepositoryConfig(config).filter((finding) => finding.level === "error");
   if (errors.length) {
     throw new SddError("Cannot use an invalid SDD repository configuration.", {
@@ -654,6 +777,11 @@ export function assertValidRepositoryConfig(config) {
 }
 
 export function assertValidConfig(config, operation = "use this workspace") {
+  if (isSupportedLegacyConfig(config)) {
+    throw new SddError("SDD configuration migration is required. Run `sdd update` before using this installation.", {
+      code: "CONFIG_MIGRATION_REQUIRED",
+    });
+  }
   const errors = validateConfig(config).filter((finding) => finding.level === "error");
   if (errors.length > 0) {
     throw new SddError(`Cannot ${operation} with an invalid SDD workspace configuration.`, {

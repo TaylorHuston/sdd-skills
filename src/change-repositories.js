@@ -1,18 +1,64 @@
-import { resolveRepositoryPath, resolveWorkspaceStatus } from "./config.js";
+import {
+  assertValidRepositoryConfig,
+  readRepositoryConfig,
+  resolveRepositoryPath,
+  resolveWorkspacePath,
+  resolveWorkspaceStatus,
+} from "./config.js";
 import { SddError } from "./errors.js";
 
 function normalizePath(value) {
   return value.split("\\").join("/");
 }
 
-export function resolvedActiveRepositories(config, space) {
-  return (space.repositories ?? []).map((repository) => ({
+function resolvedRepository(config, repository) {
+  return {
     ...repository,
     ...(repository.id ? { id: repository.id } : {}),
     ...(repository.artifacts ? { artifacts: repository.artifacts } : {}),
     status: resolveWorkspaceStatus(repository.status),
     resolvedPath: normalizePath(resolveRepositoryPath(config, repository)),
-  })).filter((repository) => repository.status === "active");
+  };
+}
+
+// Epic creation still selects by mapped path and does not need portable identity.
+export function resolvedActiveRepositories(config, space) {
+  return (space.repositories ?? [])
+    .map((repository) => resolvedRepository(config, repository))
+    .filter((repository) => repository.status === "active");
+}
+
+export async function resolveRepositoryTargets(
+  workspaceRoot,
+  config,
+  space,
+  { activeOnly = false } = {},
+) {
+  const targets = [];
+  const claimedIds = new Map();
+  for (const repository of space.repositories ?? []) {
+    const resolved = resolvedRepository(config, repository);
+    if (activeOnly && resolved.status !== "active") continue;
+    const repositoryRoot = resolveWorkspacePath(workspaceRoot, resolved.resolvedPath);
+    const repositoryConfig = await readRepositoryConfig(repositoryRoot);
+    if (!repositoryConfig) {
+      throw new SddError(`Mapped repository has no portable SDD repository identity: ${resolved.resolvedPath}`, {
+        code: "REPOSITORY_ID_REQUIRED",
+        details: ["Run `sdd init` in the repository before targeting it from a Change."],
+      });
+    }
+    assertValidRepositoryConfig(repositoryConfig);
+    const previous = claimedIds.get(repositoryConfig.id);
+    if (previous && previous !== resolved.resolvedPath) {
+      throw new SddError(`Repository ID ${repositoryConfig.id} is claimed by multiple mapped repositories.`, {
+        code: "REPOSITORY_ID_COLLISION",
+        details: [previous, resolved.resolvedPath],
+      });
+    }
+    claimedIds.set(repositoryConfig.id, resolved.resolvedPath);
+    targets.push({ ...resolved, id: repositoryConfig.id, artifacts: repositoryConfig.artifacts });
+  }
+  return targets;
 }
 
 export function selectRepositories(available, requested, { allowNone = true } = {}) {
@@ -25,22 +71,42 @@ export function selectRepositories(available, requested, { allowNone = true } = 
     }
     throw new SddError("This Space maps to multiple repositories; select at least one with --repo.", {
       code: "REPOSITORY_REQUIRED",
-      details: available.map((repository) => `Available repository: ${repository.resolvedPath}`),
+      details: available.map((repository) =>
+        `Available repository: ${repository.id ? `${repository.id} (${repository.resolvedPath})` : repository.resolvedPath}`),
     });
   }
 
   const selected = new Map();
   for (const value of requested) {
     const matches = available.filter(
-      (repository) => repository.resolvedPath === value || repository.path === value,
+      (repository) => repository.id === value
+        || repository.resolvedPath === value
+        || repository.path === value,
     );
     if (matches.length !== 1) {
       throw new SddError(`Unknown repository for this Space: ${value}`, {
         code: "REPOSITORY_NOT_FOUND",
-        details: available.map((repository) => `Available repository: ${repository.resolvedPath}`),
+        details: available.map((repository) =>
+          `Available repository: ${repository.id ? `${repository.id} (${repository.resolvedPath})` : repository.resolvedPath}`),
       });
     }
-    selected.set(matches[0].resolvedPath, matches[0]);
+    selected.set(matches[0].id ?? matches[0].resolvedPath, matches[0]);
   }
   return [...selected.values()];
+}
+
+export function repositoriesForMetadata(available, repositoryIds) {
+  const byId = new Map(available.map((repository) => [repository.id, repository]));
+  const selected = [];
+  for (const repositoryId of repositoryIds) {
+    const repository = byId.get(repositoryId);
+    if (!repository) {
+      throw new SddError(`Change references an unknown repository ID for its Space: ${repositoryId}`, {
+        code: "REPOSITORY_NOT_FOUND",
+        details: available.map((entry) => `Available repository: ${entry.id} (${entry.resolvedPath})`),
+      });
+    }
+    selected.push(repository);
+  }
+  return selected;
 }

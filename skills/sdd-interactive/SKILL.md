@@ -9,7 +9,7 @@ Create the smallest useful SDD change record, then immediately work through the 
 
 ## Authority And Project Profile
 
-Resolve the workspace, idea-owned planning path, and target implementation repository with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before creating or reconciling SDD artifacts. Use the resolved topology unless project guidance declares an explicit exception, then create the change under `docs/changes/` and reconcile Epics under `docs/epics/` inside the implementation repository. Project guidance owns branch and commit policy, verification commands, supporting-doc requirements, release conventions, technology constraints, and permissions. If user setup is missing, direct the user to `sdd setup`; if the repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
+Resolve the workspace, Space, idea-owned planning path, and every target implementation repository with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before creating or reconciling SDD artifacts. The dated Change is one user-level record under `~/.sdd/changes/<change-id>/`; its `tasks.md` names the Space and stable portable repository IDs. Epics, ADRs, implementation, tests, and supporting docs remain in their owning repositories. Project guidance in every target repository owns branch and commit policy, verification commands, supporting-doc requirements, release conventions, technology constraints, and permissions. If user setup is missing, direct the user to `sdd setup`; if a target repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
 
 This skill is for tracked working sessions. It is not a replacement for `/sdd-change --plan` when the change needs substantial product scoping, architecture design, data/auth/API changes, migration planning, or cross-Epic coordination.
 
@@ -17,44 +17,46 @@ Delegation authorization: invoking `/sdd-interactive`, naming `sdd-interactive`,
 
 ## Output
 
-Create or update:
+Create or update the one canonical record:
 
 ```text
-<project-root>/docs/changes/<yyyy-mm-dd-change-name>/proposal.md
-<project-root>/docs/changes/<yyyy-mm-dd-change-name>/design.md
-<project-root>/docs/changes/<yyyy-mm-dd-change-name>/tasks.md
+~/.sdd/changes/<yyyy-mm-dd-change-name>/proposal.md
+~/.sdd/changes/<yyyy-mm-dd-change-name>/design.md
+~/.sdd/changes/<yyyy-mm-dd-change-name>/tasks.md
 ```
 
-Use existing artifacts when the session continues an active change. Keep `tasks.md` as the live ledger for requests, decisions, verification, and resume state.
+Use existing central artifacts when the session continues an active Change. Keep `tasks.md` as the shared live ledger for requests, decisions, repository responsibilities, verification, coordination, and resume state. Never create a repository-local Change copy.
 
 ## Workflow
 
-1. Select the project and change.
-   - Prefer an explicit project path or change name from the user.
-   - Otherwise use the nearest application root with `.git/`, `package.json`, `docs/`, `AGENTS.md`, or existing `docs/changes/`.
-   - Do not write to the workflow root unless the workflow root itself is the intended project.
-   - Derive a short kebab-case change name and prefix it with today's local shell date: `yyyy-mm-dd-<change-name>`.
-   - If a matching active change exists, continue it only when the user's intent clearly matches that change.
+1. Select the Space, central Change, and target repositories.
+   - Prefer an explicit Space, repository path, or Change ID from the user.
+   - Otherwise resolve the nearest intended application repository, then use its configured Space and mapped repositories. Do not write Change artifacts to the workflow package or an implementation repository.
+   - Inspect the detailed status result's top-level `activeChanges` to find a possible continuation. A per-repository entry is only a filtered projection of that same central record, not another Change to select or edit.
+   - If a matching active Change exists, continue it only when the user's intent clearly matches that Change and its target repository set.
+   - For a new session, derive a short kebab-case slug and run `sdd change create <space-id> <slug>`, repeating `--repo <repository-id>` for every intended target. Use stable portable repository IDs from the repository contracts; do not put absolute paths or display names in `tasks.md`.
+   - Let the command assign the globally unique dated Change ID and create `~/.sdd/changes/<change-id>/`. Do not hand-create a dated folder or create one record per repository.
 2. Load the minimum required context.
-   - Read project-local `AGENTS.md`, branch policy, `README.md`, package/test scripts, and relevant development guidelines before editing.
+   - Read project-local `AGENTS.md`, branch policy, `README.md`, package/test scripts, and relevant development guidelines in every target repository before editing it.
    - Read root `developer-guide.md` when present and development work is involved.
-   - Read the project-defined release communication when the change may affect it.
-   - Read target `docs/epics/*/epic.md` files when existing behavior, Requirements, Scenarios, or Story ownership may be affected.
-   - Scan active `docs/epics/**/epic.md` files for existing Story labels/references and legacy Story IDs before adding or renumbering any Story.
-   - Check git status in every repo that may change and preserve unrelated dirty files.
-3. Create the lightweight change artifacts.
-   - `proposal.md`: record why the session exists, in-scope work, explicit out-of-scope work, known Epic/Story impact, release-communication impact, and when to stop and route to `/sdd-change --plan`.
-   - `design.md`: record the current understanding, high-level technical approach, alternatives or deferred approaches when relevant, affected Epic truth, and open questions.
-   - `tasks.md`: begin with `status: in_progress` YAML frontmatter and record `Resume Here`, the interactive request log, task checklist, implementation ledger, verification ledger, manual UI confirmation checklist, artifact updates, open questions, and closeout state.
-   - Keep these short. For a small UI tweak, a few bullets are enough.
-4. Confirm the scope boundary.
-   - Summarize the intended working-session scope before code edits.
-   - Ask only questions needed to avoid wrong or risky edits.
-   - Do not ask scope-expanding questions as though they are part of this session.
-   - If the user request would materially expand product scope, user-visible behavior, Epic ownership, data model, auth/security model, public API, deployment behavior, or external-service state, stop and recommend `/sdd-change --plan` unless the user explicitly accepts expanding the active change.
+   - Read each target's project-defined release communication when the change may affect it.
+   - Read target repository `docs/epics/*/epic.md` files when existing behavior, Requirements, Scenarios, or Story ownership may be affected.
+   - Scan affected repositories' active `docs/epics/**/epic.md` files for existing Story labels/references and legacy Story IDs before adding or renumbering any Story.
+   - Check git status in every target repository and preserve unrelated dirty files.
+3. Complete the lightweight central artifacts.
+   - Fill the scaffold created by `sdd change create`; do not replace it with a separately authored repository record.
+   - `proposal.md`: record why the session exists, in-scope work, explicit out-of-scope work, known Epic/Story impact, release-communication impact, target repositories, and when to stop and route to `/sdd-change --plan`.
+   - `design.md`: record the current understanding, high-level technical approach, cross-repository boundaries or sequencing when applicable, alternatives or deferred approaches, affected Epic truth, and open questions.
+   - `tasks.md`: preserve the initial `status: proposed`, populate `space` and the complete stable `repositories` list, then record `Resume Here`, target responsibilities, coordination gates, the interactive request log, task checklist, implementation ledger, verification ledger, manual UI confirmation checklist, artifact updates, open questions, and closeout state.
+   - Keep these short. For a small UI tweak, a few bullets are enough, but every targeted repository must have an explicit responsibility and readiness state.
+4. Confirm the scope boundary and enter implementation status.
+   - Summarize the intended working-session scope, target repository set, ownership split, and any ordering dependency before code edits.
+   - Ask only questions needed to avoid wrong or risky edits. Do not ask scope-expanding questions as though they are part of this session.
+   - If the user request would materially expand product scope, user-visible behavior, Epic ownership, data model, auth/security model, public API, deployment behavior, or external-service state, leave the central Change `proposed` and recommend `/sdd-change --plan` unless the user explicitly accepts expanding it.
+   - Once the lightweight plan is coherent, run `sdd change transition <space-id> <change-id> --from proposed --to planned` once on the central record. Immediately before the first implementation edit, run `sdd change transition <space-id> <change-id> --from planned --to in_progress` once. Neither command accepts or needs `--repo`; never transition repository targets independently or hand-edit past a lifecycle state.
 5. Enter the interactive apply loop.
    - Take one user request, manual-testing note, or tweak at a time.
-   - Record it in `tasks.md` before or immediately after acting.
+   - Record it in the central `tasks.md` before or immediately after acting, including the responsible repository ID.
    - Classify it as `cosmetic`, `defect`, `verification gap`, `artifact drift`, `requirement refinement`, `small in-scope behavior`, `scope expansion`, or `product drift`.
    - For `cosmetic` changes, make the smallest safe edit, verify the affected surface, and record why no Epic truth changed.
    - For `defect` changes, add or update a focused failing-first test/check when practical, fix the defect, verify, and update scenario-mapped Story evidence.
@@ -63,6 +65,7 @@ Use existing artifacts when the session continues an active change. Keep `tasks.
    - For `requirement refinement`, update `design.md` and the target Epic Requirement/Scenario before or alongside implementation.
    - For `small in-scope behavior`, add or update the relevant Requirement/Scenario, then implement and verify it.
    - For `scope expansion` or `product drift`, stop unless the user explicitly accepts the expansion in this change.
+   - For work spanning repositories, respect recorded ordering and boundary dependencies, keep each repository's implementation and evidence distinct in the shared ledger, and do not call the request complete until every required target slice is complete.
 6. Follow development discipline.
    - Use BDD/TDD for changed behavior when practical: write or update focused tests/checks first, confirm failure for the expected reason when useful, implement, then rerun verification.
    - Do not force tests for pure copy, styling, or documentation edits where a visual/manual check is the right proof.
@@ -78,7 +81,7 @@ Use existing artifacts when the session continues an active change. Keep `tasks.
    - Record only concrete consequences that changed implementation, verification, artifacts, or stop conditions; do not maintain a skills-considered inventory.
    - Validate important subagent claims before updating durable truth or committing.
 8. Reconcile durable truth.
-   - Update affected Epic `Implementation`, behavior-mapped `Implemented By`, `Implementation Gaps`, `Verification`, scenario-mapped `Verified By`, and `Verification Gaps` when implementation or verification reality changes. Every implemented Requirement needs a concrete repository-relative primary code location and stable symbol or searchable anchor.
+   - Update affected repository-local Epic `Implementation`, behavior-mapped `Implemented By`, `Implementation Gaps`, `Verification`, scenario-mapped `Verified By`, and `Verification Gaps` when implementation or verification reality changes. Every implemented Requirement needs a concrete repository-relative primary code location and stable symbol or searchable anchor.
    - Keep Epic `Verified By` as a scenario-mapped evidence index. Record chronological command output in `tasks.md` instead; broad gates are supporting evidence unless mapped to named behavior.
    - Distinguish evidence types where useful: focused automated tests, broad supporting gates, deterministic E2E, live-provider playtests, manual UI confirmation, and debug/log inspection.
    - Search affected Epic Stories for older Requirements, Scenarios, implementation/verification state, `Implemented By`, `Implementation Gaps`, `Verified By`, or `Verification Gaps` this quick change supersedes, and reconcile them before claiming completion.
@@ -87,16 +90,16 @@ Use existing artifacts when the session continues an active change. Keep `tasks.
    - Update the project-defined release communication when project policy requires it.
    - Keep public release communication human-facing; do not include internal SDD ledgers, private planning context, secrets, or speculative roadmap promises.
 9. Close the working session.
-   - Run `sdd validate <space-id> --change <change-id> --repo <resolved-repository-path> --workspace <workspace-root> --json`; resolve deterministic errors introduced by the session and classify warnings. The lightweight artifact shape may omit full `/sdd-change --plan` detail, but it must still satisfy the validator's shared core contract.
-   - Run focused verification for every changed behavior and broader checks when risk warrants.
+   - Run `sdd validate <space-id> --change <change-id> --repo <repository-id> [--repo <repository-id> ...] --workspace <workspace-root> --json`, filtering the one central record through every target repository needed for the session; resolve deterministic errors introduced by the session and classify warnings. A repository filter selects contextual Epic and repository surfaces, not a Change copy. The lightweight artifact shape may omit full `/sdd-change --plan` detail, but it must still satisfy the validator's shared core contract.
+   - Run focused verification for every changed behavior in every affected target and broader checks when risk warrants.
    - For browser-visible or otherwise user-facing app changes, walk the user through what to manually confirm in the UI: app URL, setup state, routes, clicks/inputs, expected results, failure signs, and what feedback would change Requirements, Scenarios, or implementation.
    - Record that walkthrough in `tasks.md` under `Manual UI Confirmation`. If no manual UI confirmation applies, record why.
    - Record manual confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
-   - Refresh `tasks.md` with the final resume state, changed files, verification evidence, manual confirmation status, release-communication status, review record state, PR/merge state, unresolved gaps, accepted deferred gaps, and commit candidates or commits.
-   - Keep status `in_progress` while work or remediation remains; set it to `in_review` when implementation is ready for independent review.
+   - Refresh the central `tasks.md` with the final resume state, per-repository changed files and verification evidence, manual confirmation status, release-communication status, review record state, PR/merge/release state, coordination gates, unresolved gaps, accepted deferred gaps, and commit candidates or commits.
+   - Keep the central status `in_progress` while any target has implementation, verification, remediation, or unresolved coordination work. Only after every targeted repository is ready for independent review, run `sdd change transition <space-id> <change-id> --from in_progress --to in_review` once, without `--repo`.
    - Recommend `/sdd-review` before merge or closeout when code, user-visible behavior, security, data, or release state changed.
    - Do not run `sdd change close` unless the user explicitly asks or the closeout path is already authorized by the active workflow.
-   - When the user asks to close, finish, merge-and-close, or otherwise complete the change, first confirm `tasks.md` has `status: in_review`, a passing review record, no contradictory Resume Here, checklist, manual confirmation, release communication, PR/merge, deferred-gap, or folder-location claims, and no proposal/design/tasks/review text still says completed work is not implemented, not verified, or pending unless clearly historical. Then use `sdd change close <space-id> <change-id>` with the resolved workspace and repository selections instead of moving the folder manually.
+   - When the user asks to close, finish, merge-and-close, or otherwise complete the Change, first confirm the one `tasks.md` remains `status: in_review`, every targeted repository has met its review, manual-confirmation, release-communication, PR/merge, and accepted-gap gates, and no Resume Here, checklist, proposal, design, task, or review text contradicts completion. Then run `sdd change close <space-id> <change-id> --workspace <workspace-root>` exactly once. Do not pass `--repo`, close targets independently, or move the folder manually. The resulting `~/.sdd/changes/closed/<change-id>/` location is the closed state; `tasks.md` retains `status: in_review`.
 
 ## Artifact Shape
 
@@ -146,11 +149,18 @@ Use this minimum structure when creating new artifacts. Treat these as trimmed s
 
 ```markdown
 ---
-status: in_progress
+status: proposed
+space: <space-id>
+repositories:
+  - <stable-repository-id>
 ---
 # Tasks: <Title>
 
 ## Resume Here
+
+## Target Repository Coordination
+| Repository ID | Responsibility | Current Slice / Dependency | Required Gate | State |
+|---|---|---|---|---|
 
 ## Interactive Log
 | Time | Request / Feedback | Classification | Files / Artifacts | Verification |
@@ -176,11 +186,12 @@ status: in_progress
 
 ## Closeout
 - Review record:
+- Per-repository readiness:
 - Manual UI confirmation status:
 - Release communication status:
-- PR / merge state:
+- PR / merge / release state:
 - Deferred gaps accepted:
-- Folder state:
+- Central Change location:
 ```
 
 ## Stop Conditions
@@ -199,7 +210,7 @@ Stop and ask, or recommend `/sdd-change --plan`, when the session reveals:
 
 Summarize:
 
-- change folder path
+- canonical central Change folder path
 - requests handled
 - artifacts and Epics updated
 - tests or checks run

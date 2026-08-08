@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 
 import {
   assertValidConfig,
+  getUserRoot,
   resolveRepositoryArtifacts,
   relativeWorkspacePath,
   resolveWorkspacePath,
@@ -52,9 +53,15 @@ export async function createEpic(
   spaceId,
   epicId,
   slug,
-  { date = null, repositories = [], dryRun = false } = {},
+  {
+    date = null,
+    repositories = [],
+    dryRun = false,
+    userRoot = null,
+  } = {},
 ) {
-  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath);
+  userRoot ??= getUserRoot();
+  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath, { userRoot });
   assertValidConfig(config, "create an Epic");
   const space = config.ideas[spaceId];
   if (!space) {

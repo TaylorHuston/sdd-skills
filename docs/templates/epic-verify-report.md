@@ -19,6 +19,7 @@ supersedes: null
 - Initial result: `blocked`
 - Current result: `blocked`
 - App root:
+- Stable repository ID:
 - Epic:
 - Audited ref:
 - Verified ref:
@@ -48,7 +49,7 @@ Use only `pass`, `findings`, `blocked`, or `not applicable`. `aligned` requires 
 | Implementation drift | blocked | Replace with the current result. |
 | Verification strength | blocked | Replace with the current result. |
 | Aggregate/runtime verification scope | blocked | Record the required exact-ref gate or why it is not applicable. |
-| Supporting truth freshness | blocked | Check Outcome tense, README/current-state docs, and active/closed Change claims. |
+| Supporting truth freshness | blocked | Check Outcome tense, README/current-state docs, and central active/closed Change claims. |
 | Change status traceability | blocked | Replace with the current result. |
 | Docs and product alignment | blocked | Replace with the current result. |
 | Security and data safety | blocked | Replace with the current result. |
@@ -102,7 +103,7 @@ Use only `pass`, `findings`, `blocked`, or `not applicable`. `aligned` requires 
 
 | Command / Scenario | Result | Proves | Notes |
 |---|---|---|---|
-| `sdd validate <space-id> --epic <epic-id> --repo <repository> --changed-from <audited-ref> --json` | blocked | Deterministic current Epic/report shape, IDs, traceability, evidence, artifact links, and Git-relative `modified` freshness. | Required structural baseline. |
+| `sdd validate <space-id> --epic <epic-id> --repo <stable-repository-id> --changed-from <audited-ref> --json` | blocked | Deterministic current Epic/report shape, IDs, traceability, evidence, artifact links, and Git-relative `modified` freshness. | Required structural baseline. |
 | `python3 <sdd-orphan-audit-script> <app-root> --epic <epic-id> --format json` | blocked | Full reverse inventory of implementation and test candidates against Epic evidence. | Required; skipping blocks `aligned`. |
 | Project-defined aggregate command or authoritative equivalent | blocked / not applicable | Current runtime confidence across the audited scope on `verified_ref`. | Record meaningful execution/count and cache/freshness evidence, or the not-applicable reason. |
 | TBD | blocked | TBD | Mark required checks explicitly. |
@@ -132,7 +133,8 @@ Use only `pass`, `findings`, `blocked`, or `not applicable`. `aligned` requires 
 ## Evidence Inspected
 
 - Epic:
-- Change artifacts:
+- Repository status / Change projection:
+- Central Change records inspected:
 - Code:
 - Tests:
 - Anchor definitions/registrations and exact assertions opened:

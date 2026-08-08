@@ -11,9 +11,9 @@ The discussion may concern product direction, user needs, business model, visual
 
 ## Authority And Space Ownership
 
-Resolve the idea-owned planning root and related implementation repositories from the nearest workspace `.sdd/config.yaml`. When the `sdd` CLI is available, prefer `sdd context <relevant-path> --json` and use its idea, planning, repository, role, and related-repository results. If the workspace is not initialized or the CLI is unavailable, use project guidance and explicit relationship metadata; ask when ownership remains ambiguous. Never assume fixed workspace directory names. One idea may relate to zero, one, or many repositories; inspect only those relevant to the discussion.
+Resolve the idea-owned planning root, Space ID, and related implementation repositories with their stable repository IDs from the nearest workspace `.sdd/config.yaml`. When the `sdd` CLI is available, prefer `sdd context <relevant-path> --json` and use its idea, planning, repository, role, and related-repository results. If the workspace is not initialized or the CLI is unavailable, use project guidance and explicit relationship metadata; ask when ownership remains ambiguous. Never assume fixed workspace directory names. One idea may relate to zero, one, or many repositories; inspect only those relevant to the discussion.
 
-When the discussion depends on artifact authority, Epic or Story truth, Requirements and Scenarios, evidence, Change status, or repository artifact locations, read the `workflowPath` returned by `sdd context` completely. If user setup is missing, direct the user to `sdd setup`; if the repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation. Do not require SDD artifacts merely to discuss a space.
+When the discussion depends on artifact authority, Epic or Story truth, Requirements and Scenarios, evidence, Change status, or repository artifact locations, read the `workflowPath` returned by `sdd context` completely. Run `sdd status <space-id> --json`, use the relevant repositories' filtered projections to select the corresponding unique top-level central active or recent Change records, and read only records whose `tasks.md` metadata targets those repositories. Treat legacy planned or repository-local active/closed Change paths as migration input and direct the user to `sdd update`; do not use them as live context. If user setup is missing, direct the user to `sdd setup`; if the repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation. Do not require SDD artifacts merely to discuss a space.
 
 Do not implement application code in this mode. Reading files, searching code, conducting research, sketching options, and maintaining the exploration record are allowed. If the user wants implementation, route the settled outcome to the appropriate execution workflow.
 
@@ -50,7 +50,7 @@ Orient lightly instead of auditing everything. Read only what can materially inf
 
 - the idea's README, PRD/Product Brief, project brief, prior explorations, and related private notes
 - relevant `AGENTS.md`, README, architecture, style, testing, or operating guidance in related repositories
-- active or closed changes when prior implementation decisions matter
+- central active or closed Changes selected through `sdd status` and relevant repository metadata when prior implementation decisions matter
 - Epic specs when current or proposed behavior matters
 - code and tests when the question depends on implementation reality
 - external sources when the question requires current research
@@ -71,7 +71,7 @@ space: <space>
 created: yyyy-mm-dd
 updated: yyyy-mm-dd
 related_repositories:
-  - <repository, when relevant>
+  - <stable repository ID, when relevant>
 ---
 
 # <Topic>
@@ -126,12 +126,12 @@ The exploration record remains source context. When a stronger artifact becomes 
 | Conclusion | Preferred Destination |
 |---|---|
 | Durable product purpose, audience, principles, scope, market, or monetization direction | Idea-owned PRD/Product Brief through `/sdd-prd` |
-| A bounded desired outcome that may wait before implementation | A private Change Brief through `/sdd-change --brief` |
-| A bounded change ready for current product and technical planning | A Planned Change through `/sdd-change --plan` |
-| A UI-bearing planned or active Change that needs an approved flow, responsive composition, state contract, accessibility behavior, or visual direction | The existing Change through `/sdd-design` |
-| Technical approach, alternatives, risks, constraints, or verification strategy for an active change | The change's `design.md` |
+| A bounded desired outcome that may wait before implementation | An undated private Change Brief at `<planning-path>/change-briefs/<change-slug>.md` through `/sdd-change --brief` |
+| A bounded change ready for current product and technical planning | One central Change at `~/.sdd/changes/<change-id>/` through `/sdd-change --plan`; new records are created with `sdd change create` |
+| A UI-bearing planned or active Change that needs an approved flow, responsive composition, state contract, accessibility behavior, or visual direction | The existing central Change through `/sdd-design` |
+| Technical approach, alternatives, risks, constraints, or verification strategy for an active Change | The central Change's `design.md` |
 | Durable architecture, data, dependency, integration, deployment, security, storage, or cross-cutting repository decision | `docs/adrs/yyyy-mm-dd-<decision-title>.md` through `/sdd-adr` |
-| Work item, blocker, resume state, implementation note, or verification result for an active change | The change's `tasks.md` |
+| Work item, blocker, resume state, implementation note, or verification result for an active Change | The central Change's `tasks.md` |
 | Unsettled or contextual insight that should remain private planning context | Continue in the exploration record |
 
 When an exploration produces a stronger artifact, link or mention that destination from `Possible Next Steps` or `Meaningful Developments`. Do not treat the exploration record as canonical Epic, Story, Requirement, implementation, or verification truth.
@@ -140,7 +140,7 @@ When an exploration produces a stronger artifact, link or mention that destinati
 
 - Do not implement application code.
 - Do not edit Epic specs unless the user explicitly asks to apply a settled change through an appropriate workflow.
-- Do not create a Change Brief, `proposal.md`, `design.md`, or `tasks.md` unless the user asks to capture, plan, or update a change.
+- Do not create a Change Brief outside `<planning-path>/change-briefs/<change-slug>.md`, or hand-create a central `proposal.md`, `design.md`, or `tasks.md`; use the authorized `/sdd-change` workflow and `sdd change create` for a new dated Change.
 - Do not create an ADR unless the user asks to capture or draft the architecture decision.
 - Do not pressure the user to formalize; offer the appropriate destination and continue or pause.
 - Keep exploration records in private idea-owned planning docs, not public application docs.

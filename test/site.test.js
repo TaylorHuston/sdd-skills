@@ -28,6 +28,22 @@ test("public guide separates portable methodology from package implementation an
   assert.doesNotMatch(html, /Scenario R\d+\.\d+/);
 });
 
+test("public guide documents central Change ownership and fail-closed automatic migration", async () => {
+  const { html } = await readSite();
+
+  assert.match(html, /User-owned work/);
+  assert.match(html, /~\/\.sdd\/changes\//);
+  assert.match(html, /change-briefs\//);
+  assert.match(html, /tasks\.md[\s\S]{0,200}Space and target repositories/);
+  assert.match(html, /During upgrades,[\s\S]{0,120}<code>sdd update<\/code>[\s\S]{0,120}complete fail-closed preflight/);
+  assert.match(html, /consolidates identical legacy copies/);
+  assert.match(html, /aborts without writes/);
+  assert.match(html, /<code>sdd validate --change<\/code>/);
+  assert.doesNotMatch(html, /sdd change promote/);
+  assert.doesNotMatch(html, /planned-changes\//);
+  assert.doesNotMatch(html, /docs\/changes/);
+});
+
 test("public guide has unique fragment targets and sequential navigable sections", async () => {
   const { html } = await readSite();
   const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);

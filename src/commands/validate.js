@@ -5,12 +5,14 @@ import { parseDocument } from "yaml";
 import {
   CHANGE_STATUSES,
   LEGACY_CHANGE_STATUSES,
-  parseChangeStatus,
+  parseChangeMetadata,
 } from "../change-status.js";
 import { isValidChangeId } from "../change-id.js";
+import { listStoredChanges, relativeChangeStorePath } from "../change-store.js";
+import { resolveRepositoryTargets } from "../change-repositories.js";
 import {
   assertValidConfig,
-  resolveIdeaPlanningPath,
+  getUserRoot,
   resolveRepositoryArtifacts,
   resolveRepositoryPath,
   resolveWorkspacePath,
@@ -784,52 +786,44 @@ async function listDirectories(path, { exclude = [] } = {}) {
     .sort();
 }
 
-function configuredRepositories(config, selectedSpaces, requested) {
-  const available = selectedSpaces.flatMap(([spaceId, space]) =>
-    (space.repositories ?? []).map((repository) => ({
-      ...repository,
-      ...(repository.id ? { id: repository.id } : {}),
-      ...(repository.artifacts ? { artifacts: repository.artifacts } : {}),
-      spaceId,
-      resolvedPath: normalizePath(resolveRepositoryPath(config, repository)),
-    })),
-  );
-
-  if (requested.length === 0) {
-    return [...new Map(available.map((repository) => [repository.resolvedPath, repository])).values()];
+async function configuredRepositories(workspaceRoot, config, selectedSpaces, requested) {
+  const available = [];
+  for (const [spaceId, space] of selectedSpaces) {
+    for (const repository of await resolveRepositoryTargets(workspaceRoot, config, space)) {
+      available.push({ ...repository, spaceId });
+    }
   }
+  const unique = [...new Map(available.map((repository) => [repository.id, repository])).values()];
+  if (requested.length === 0) return { available, selected: unique };
 
   const selected = new Map();
   for (const value of requested) {
-    const matches = available.filter(
-      (repository) => repository.path === value || repository.resolvedPath === value,
+    const matches = unique.filter(
+      (repository) => repository.id === value
+        || repository.path === value
+        || repository.resolvedPath === value,
     );
     if (matches.length !== 1) {
       throw new SddError(`Unknown repository for validation: ${value}`, {
         code: "REPOSITORY_NOT_FOUND",
-        details: available.map((repository) => `Available repository: ${repository.resolvedPath}`),
+        details: unique.map((repository) =>
+          `Available repository: ${repository.id} (${repository.resolvedPath})`),
       });
     }
-    selected.set(matches[0].resolvedPath, matches[0]);
+    selected.set(matches[0].id, matches[0]);
   }
-  return [...selected.values()];
+  return { available, selected: [...selected.values()] };
 }
 
 async function validateChange({
-  spaceId,
-  repository = null,
   changeId,
   displayRoot,
   changePath,
-  planned = false,
   historical = false,
-  repositoryRoot = null,
-  artifactRoots = [],
 }) {
   const findings = [];
+  let metadata = null;
   const context = {
-    spaceId,
-    ...(repository ? { repository } : {}),
     artifactType: "change",
     artifactId: changeId,
   };
@@ -855,7 +849,7 @@ async function validateChange({
     const unresolved = TEMPLATE_PLACEHOLDERS.filter((placeholder) => source.includes(placeholder));
     if (unresolved.length > 0) {
       findings.push(finding(
-        planned || historical ? "warning" : "error",
+        historical ? "warning" : "error",
         "UNRESOLVED_TEMPLATE_PLACEHOLDER",
         displayPath,
         `Unresolved template placeholders: ${unresolved.join(", ")}.`,
@@ -881,42 +875,36 @@ async function validateChange({
     }
 
     if (fileName === "tasks.md") {
-      const { status, error } = parseChangeStatus(source);
-      if (error) {
-        findings.push(finding("error", "INVALID_CHANGE_STATUS", displayPath, `Cannot parse Change status: ${error}`, context));
-      } else if (historical && LEGACY_CHANGE_STATUSES.includes(status)) {
-        // Closed history keeps the status vocabulary that was valid when it closed.
-      } else if (!CHANGE_STATUSES.includes(status)) {
-        findings.push(finding("error", "INVALID_CHANGE_STATUS", displayPath, `Expected one of: ${CHANGE_STATUSES.join(", ")}.`, context));
-      } else if (planned && !["proposed", "planned"].includes(status)) {
+      metadata = parseChangeMetadata(source);
+      if (metadata.error) {
         findings.push(finding(
           "error",
-          "CHANGE_STATUS_LOCATION_MISMATCH",
+          "INVALID_CHANGE_METADATA",
           displayPath,
-          `Private planned Changes must use status proposed or planned, found ${status}.`,
+          `Cannot parse Change metadata: ${metadata.error}`,
           context,
+        ));
+      } else if (historical && LEGACY_CHANGE_STATUSES.includes(metadata.status)) {
+        // Closed history keeps the status vocabulary that was valid when it closed.
+      } else if (!CHANGE_STATUSES.includes(metadata.status)) {
+        findings.push(finding(
+          "error",
+          "INVALID_CHANGE_STATUS",
+          displayPath,
+          `Expected one of: ${CHANGE_STATUSES.join(", ")}.`,
+          { ...context, spaceId: metadata.space },
         ));
       }
     }
-    if (repositoryRoot) {
-      findings.push(...await validateArtifactLinks(
-        source,
-        absolutePath,
-        displayPath,
-        repositoryRoot,
-        artifactRoots,
-        context,
-      ));
-    }
   }
-  return findings;
+  return { findings, metadata };
 }
 
 async function validateRepository(
   workspaceRoot,
   config,
   repository,
-  { changeId, epicId, changedFrom } = {},
+  { centralChanges = [], changeId, epicId, changedFrom } = {},
 ) {
   const findings = [];
   const repositoryPath = resolveWorkspacePath(workspaceRoot, repository.resolvedPath);
@@ -926,71 +914,22 @@ async function validateRepository(
         spaceId: repository.spaceId,
         repository: repository.resolvedPath,
       })],
-      changes: 0,
       epics: 0,
       epicVerificationReports: 0,
-      changeLocations: [],
     };
   }
 
   const artifacts = resolveRepositoryArtifacts(config, repository);
-  const activeRoot = join(repositoryPath, artifacts.activeChanges);
-  const closedRoot = join(repositoryPath, artifacts.closedChanges);
-  const artifactRoots = [
-    artifacts.activeChanges,
-    artifacts.closedChanges,
-    artifacts.epics,
-  ].map(normalizePath);
-  const closedIsNested = dirname(closedRoot) === activeRoot;
-  const activeIds = epicId
-    ? []
-    : await listDirectories(activeRoot, { exclude: closedIsNested ? [basename(closedRoot)] : [] });
-  const closedIds = epicId ? [] : await listDirectories(closedRoot);
-  const collisions = activeIds.filter((id) => closedIds.includes(id));
-  for (const id of collisions) {
-    if (!changeId || id === changeId) {
-      findings.push(finding(
-        "error",
-        "CHANGE_LOCATION_COLLISION",
-        normalizePath(join(repository.resolvedPath, artifacts.activeChanges, id)),
-        "Change exists in both active and closed locations.",
-        {
-          spaceId: repository.spaceId,
-          repository: repository.resolvedPath,
-          artifactType: "change",
-          artifactId: id,
-        },
-      ));
-    }
-  }
-  const candidates = [
-    ...activeIds.map((id) => ({ id, location: artifacts.activeChanges, path: join(activeRoot, id) })),
-    ...closedIds.map((id) => ({ id, location: artifacts.closedChanges, path: join(closedRoot, id) })),
-  ].filter((candidate) => !changeId || candidate.id === changeId);
-
-  for (const candidate of candidates) {
-    findings.push(...await validateChange({
-      spaceId: repository.spaceId,
-      repository: repository.resolvedPath,
-      changeId: candidate.id,
-      displayRoot: normalizePath(join(repository.resolvedPath, candidate.location, candidate.id)),
-      changePath: candidate.path,
-      historical: candidate.location === artifacts.closedChanges,
-      repositoryRoot: repositoryPath,
-      artifactRoots,
-    }));
-  }
-
+  const artifactRoots = Object.values(artifacts).map(normalizePath);
+  const targetedChanges = centralChanges.filter((record) =>
+    record.metadata?.repositories?.includes(repository.id));
   const affectedEpicDirectories = new Set();
   if (changeId) {
-    for (const candidate of candidates) {
-      const proposalPath = join(candidate.path, "proposal.md");
+    for (const record of targetedChanges) {
+      const proposalPath = join(record.path, "proposal.md");
       if (!(await pathExists(proposalPath))) continue;
       const proposal = await readFile(proposalPath, "utf8");
-      for (const directory of declaredEpicDirectories(
-        proposal,
-        artifacts.epics,
-      )) {
+      for (const directory of declaredEpicDirectories(proposal, artifacts.epics)) {
         affectedEpicDirectories.add(directory);
       }
     }
@@ -1132,51 +1071,102 @@ async function validateRepository(
   }
   return {
     findings,
-    changes: candidates.length,
     epics,
     epicVerificationReports,
-    changeLocations: candidates.map((candidate) => ({
-      spaceId: repository.spaceId,
-      repository: repository.resolvedPath,
-      changeId: candidate.id,
-      path: normalizePath(join(repository.resolvedPath, candidate.location, candidate.id)),
-    })),
   };
 }
 
-async function validatePlannedChanges(workspaceRoot, config, selectedSpaces, { changeId } = {}) {
+async function validateCentralChanges(
+  userRoot,
+  selectedSpaceIds,
+  { changeId, availableRepositories = [], configuredSpaceIds = new Set() } = {},
+) {
   const findings = [];
-  const changeLocations = [];
-  let plannedChanges = 0;
-  for (const [spaceId, space] of selectedSpaces) {
-    const planningPath = normalizePath(resolveIdeaPlanningPath(config, spaceId, space));
-    const plannedRoot = normalizePath(join(planningPath, config.planning.plannedChangesDirectory));
-    const planningAbsoluteRoot = resolveWorkspacePath(workspaceRoot, planningPath);
-    const plannedAbsoluteRoot = resolveWorkspacePath(workspaceRoot, plannedRoot);
-    if (!(await isPathPhysicallyInside(planningAbsoluteRoot, plannedAbsoluteRoot))) {
+  const changes = [];
+  const locations = new Map();
+  let records;
+  try {
+    records = await listStoredChanges(userRoot);
+  } catch (error) {
+    if (error instanceof SddError && error.code === "UNSAFE_ARTIFACT_PATH") {
       findings.push(finding(
         "error",
         "UNSAFE_ARTIFACT_PATH",
-        plannedRoot,
-        "Planned Changes directory resolves outside its planning owner.",
-        { spaceId, artifactType: "planned-change" },
+        ".sdd/changes",
+        "Central Change store resolves outside the user SDD directory.",
+        { artifactType: "change" },
       ));
+      return { findings, changes };
+    }
+    throw error;
+  }
+  for (const record of records) {
+    if (changeId && record.changeId !== changeId) continue;
+    const previous = locations.get(record.changeId);
+    if (previous) {
+      findings.push(finding(
+        "error",
+        "CHANGE_LOCATION_COLLISION",
+        relativeChangeStorePath(record.path, userRoot),
+        `Change exists in active and closed central locations: ${record.changeId}.`,
+        { artifactType: "change", artifactId: record.changeId },
+      ));
+    } else {
+      locations.set(record.changeId, record);
+    }
+    const result = await validateChange({
+      changeId: record.changeId,
+      displayRoot: relativeChangeStorePath(record.path, userRoot),
+      changePath: record.path,
+      historical: record.closed,
+    });
+    if (result.metadata?.space && !configuredSpaceIds.has(result.metadata.space)) {
+      findings.push(finding(
+        "error",
+        "SPACE_NOT_FOUND",
+        relativeChangeStorePath(join(record.path, "tasks.md"), userRoot),
+        `Change references unknown Space ID ${result.metadata.space}.`,
+        {
+          artifactType: "change",
+          artifactId: record.changeId,
+          spaceId: result.metadata.space,
+        },
+      ));
+    }
+    if (
+      selectedSpaceIds
+      && result.metadata?.space
+      && !selectedSpaceIds.has(result.metadata.space)
+    ) {
       continue;
     }
-    const ids = (await listDirectories(plannedAbsoluteRoot)).filter((id) => !changeId || id === changeId);
-    for (const id of ids) {
-      changeLocations.push({ spaceId, changeId: id, path: normalizePath(join(plannedRoot, id)) });
-      findings.push(...await validateChange({
-        spaceId,
-        changeId: id,
-        displayRoot: normalizePath(join(plannedRoot, id)),
-        changePath: join(plannedAbsoluteRoot, id),
-        planned: true,
-      }));
+    findings.push(...result.findings);
+    changes.push({ ...record, metadata: result.metadata });
+    if (!result.metadata?.error && Array.isArray(result.metadata.repositories)) {
+      const ownedRepositoryIds = new Set(
+        availableRepositories
+          .filter((repository) => repository.spaceId === result.metadata.space)
+          .map((repository) => repository.id),
+      );
+      for (const repositoryId of [...result.metadata.repositories]
+        .sort((left, right) => left.localeCompare(right))) {
+        if (ownedRepositoryIds.has(repositoryId)) continue;
+        findings.push(finding(
+          "error",
+          "REPOSITORY_NOT_FOUND",
+          relativeChangeStorePath(join(record.path, "tasks.md"), userRoot),
+          `Change references repository ID ${repositoryId}, which is not owned by Space ${result.metadata.space}.`,
+          {
+            artifactType: "change",
+            artifactId: record.changeId,
+            spaceId: result.metadata.space,
+            repositoryId,
+          },
+        ));
+      }
     }
-    plannedChanges += ids.length;
   }
-  return { findings, plannedChanges, changeLocations };
+  return { findings, changes };
 }
 
 export async function validateArtifacts(
@@ -1187,9 +1177,11 @@ export async function validateArtifacts(
     changeId = null,
     epicId = null,
     changedFrom = null,
+    userRoot = null,
   } = {},
 ) {
-  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath);
+  userRoot ??= getUserRoot();
+  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath, { userRoot });
   assertValidConfig(config, "validate SDD artifacts");
   if (changeId && epicId) {
     throw new SddError("Use either --change or --epic, not both.", { code: "USAGE" });
@@ -1207,48 +1199,37 @@ export async function validateArtifacts(
     selectedSpaces = [[spaceId, space]];
   }
 
-  const selectedRepositories = configuredRepositories(config, selectedSpaces, repositories);
-  const findings = [];
-  const planned = epicId
-    ? { findings: [], plannedChanges: 0, changeLocations: [] }
-    : await validatePlannedChanges(workspaceRoot, config, selectedSpaces, { changeId });
-  findings.push(...planned.findings);
-  let changes = 0;
+  const selectedSpaceIds = spaceId ? new Set([spaceId]) : null;
+  const repositorySelection = await configuredRepositories(
+    workspaceRoot,
+    config,
+    selectedSpaces,
+    repositories,
+  );
+  const central = epicId
+    ? { findings: [], changes: [] }
+    : await validateCentralChanges(userRoot, selectedSpaceIds, {
+        changeId,
+        availableRepositories: repositorySelection.available,
+        configuredSpaceIds: new Set(Object.keys(config.ideas)),
+      });
+  const selectedRepositories = repositorySelection.selected;
+  const findings = [...central.findings];
   let epics = 0;
   let epicVerificationReports = 0;
-  const repositoryChangeLocations = [];
   for (const repository of selectedRepositories) {
     const result = await validateRepository(workspaceRoot, config, repository, {
+      centralChanges: central.changes,
       changeId,
       epicId,
       changedFrom,
     });
     findings.push(...result.findings);
-    changes += result.changes;
     epics += result.epics;
     epicVerificationReports += result.epicVerificationReports;
-    repositoryChangeLocations.push(...result.changeLocations);
   }
 
-  for (const plannedLocation of planned.changeLocations) {
-    const promoted = repositoryChangeLocations.filter((location) =>
-      location.spaceId === plannedLocation.spaceId && location.changeId === plannedLocation.changeId);
-    if (promoted.length > 0) {
-      findings.push(finding(
-        "error",
-        "CHANGE_LOCATION_COLLISION",
-        plannedLocation.path,
-        `Change exists in planning and repository locations: ${promoted.map((entry) => entry.path).join(", ")}.`,
-        {
-          spaceId: plannedLocation.spaceId,
-          artifactType: "change",
-          artifactId: plannedLocation.changeId,
-        },
-      ));
-    }
-  }
-
-  if (changeId && changes === 0 && planned.plannedChanges === 0) {
+  if (changeId && central.changes.length === 0) {
     findings.push(finding("error", "ARTIFACT_NOT_FOUND", changeId, `Change was not found: ${changeId}.`, {
       spaceId,
       artifactType: "change",
@@ -1278,8 +1259,7 @@ export async function validateArtifacts(
     valid: errors === 0,
     summary: {
       repositories: selectedRepositories.length,
-      plannedChanges: planned.plannedChanges,
-      changes,
+      changes: central.changes.length,
       epics,
       epicVerificationReports,
       errors,

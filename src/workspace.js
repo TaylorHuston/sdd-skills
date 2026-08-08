@@ -1,10 +1,11 @@
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 import {
   assertValidConfig,
   assertValidRepositoryConfig,
   findRepositoryRoot,
   findWorkspaceRoot,
+  getUserRoot,
   readConfig,
   readRepositoryConfig,
   resolveIdeaPlanningPath,
@@ -20,12 +21,46 @@ import { isPathInside, isPathPhysicallyInside, resolvePhysicalPath } from "./fs.
 function normalizeRelativePath(value) {
   return value.split(sep).join("/") || ".";
 }
+export async function findOperationConfiguration(
+  startPath,
+  { userRoot = getUserRoot() } = {},
+) {
+  const sourceWorkspaceRoot = await findWorkspaceRoot(startPath);
+  const sourceConfig = structuredClone(await readConfig(sourceWorkspaceRoot));
+  let workspaceRoot = sourceWorkspaceRoot;
+  let config = sourceConfig;
+  if (resolve(workspaceRoot) !== resolve(userRoot) && sourceConfig.kind !== "user") {
+    try {
+      const userConfig = structuredClone(await readConfig(userRoot));
+      if (userConfig?.kind === "user") {
+        workspaceRoot = userRoot;
+        config = userConfig;
+      }
+    } catch (error) {
+      if (error?.code !== "WORKSPACE_NOT_INITIALIZED") throw error;
+    }
+  }
+  return { workspaceRoot, config, sourceWorkspaceRoot, sourceConfig };
+}
 
-export async function resolveWorkspaceContext(startPath) {
+export async function resolveWorkspaceContext(
+  startPath,
+  { userRoot = getUserRoot(), authoritativeConfig = null } = {},
+) {
   const targetPath = resolve(startPath);
-  const workspaceRoot = await findWorkspaceRoot(targetPath);
-  const config = structuredClone(await readConfig(workspaceRoot));
+  const { workspaceRoot, config } = authoritativeConfig
+    ? { workspaceRoot: userRoot, config: structuredClone(authoritativeConfig) }
+    : await findOperationConfiguration(targetPath, { userRoot });
   assertValidConfig(config, "resolve workspace context");
+  if (config.kind === "user" && config.migration?.sourceWorkspace) {
+    throw new SddError(
+      "Legacy workspace migration is pending. Run `sdd update` before using this installation.",
+      {
+        code: "CONFIG_MIGRATION_REQUIRED",
+        details: [`Migration source: ${config.migration.sourceWorkspace}`],
+      },
+    );
+  }
   const physicalRepositoryOwners = new Map();
   for (const [ideaId, idea] of Object.entries(config.ideas ?? {})) {
     for (const repository of idea.repositories ?? []) {
@@ -77,7 +112,7 @@ export async function resolveWorkspaceContext(startPath) {
         rootId = `repository-${repositoryConfig.id}-${suffix}`;
         suffix += 1;
       }
-      config.repositories.roots[rootId] = normalizeRelativePath(relative(workspaceRoot, repositoryRoot));
+      config.repositories.roots[rootId] = resolve(repositoryRoot);
       const repositoryOnlySpace = {
         status: "active",
         repositories: [{
@@ -120,9 +155,6 @@ export async function resolveWorkspaceContext(startPath) {
         for (let rightIndex = leftIndex + 1; rightIndex < artifactEntries.length; rightIndex += 1) {
           const [leftKey, leftPath] = artifactEntries[leftIndex];
           const [rightKey, rightPath] = artifactEntries[rightIndex];
-          const allowedClosedChild = leftKey === "activeChanges" && rightKey === "closedChanges"
-            && dirname(rightPath) === leftPath;
-          if (allowedClosedChild) continue;
           if (isPathInside(leftPath, rightPath) || isPathInside(rightPath, leftPath)) {
             throw new SddError("Cannot resolve context with overlapping physical artifact roots.", {
               code: "INVALID_CONFIG",
@@ -201,7 +233,21 @@ export async function resolveWorkspaceContext(startPath) {
   };
 }
 
-export async function resolveOperationConfiguration(startPath) {
-  const context = await resolveWorkspaceContext(startPath);
-  return { workspaceRoot: context.workspaceRoot, config: context.config, context };
+export async function resolveOperationConfiguration(
+  startPath,
+  { userRoot = getUserRoot() } = {},
+) {
+  const canonicalConfig = structuredClone(await readConfig(userRoot));
+  assertValidConfig(canonicalConfig, "resolve the user SDD installation");
+  const context = await resolveWorkspaceContext(startPath, {
+    userRoot,
+    authoritativeConfig: canonicalConfig,
+  });
+  return {
+    workspaceRoot: userRoot,
+    userRoot,
+    config: context.config,
+    canonicalConfig,
+    context,
+  };
 }

@@ -48,4 +48,4 @@ last_reviewed: YYYY-MM-DD
 
 ## Open Questions
 
-`Product-level questions that still need a decision. Technical questions belong in SDD design.md, ADRs, Epic docs, tasks.md, or app docs unless they directly affect product identity.`
+`Product-level questions that still need a decision. Technical questions belong in a central Change's design.md or tasks.md, repository-local ADRs or Epic docs, or app docs unless they directly affect product identity.`

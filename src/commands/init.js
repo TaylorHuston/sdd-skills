@@ -7,7 +7,6 @@ import {
   getConfigDirectory,
   getConfigPath,
   getInstallLockPath,
-  migrateConfig,
   readConfig,
   writeConfig,
 } from "../config.js";
@@ -39,13 +38,9 @@ async function initWorkspaceUnlocked(
     force = false,
     dryRun = false,
     writeLock = null,
-    restoreConfig = writeFileAtomically,
   } = {},
 ) {
   const existing = await pathExists(getConfigPath(workspaceRoot));
-  const originalConfigSource = existing
-    ? await readFile(getConfigPath(workspaceRoot), "utf8")
-    : null;
   const requestedOverrides = [planningRoot, repositoryRoots, skillsDirectory].some(
     (value) => value !== undefined,
   );
@@ -62,7 +57,7 @@ async function initWorkspaceUnlocked(
         repositoryRoots,
         skillsDirectory,
       });
-  const { config, migratedFrom } = migrateConfig(loadedConfig, workspaceRoot);
+  const config = loadedConfig;
 
   assertValidConfig(config, "initialize");
 
@@ -71,14 +66,12 @@ async function initWorkspaceUnlocked(
   const ignorePath = `${getConfigDirectory(workspaceRoot)}/.gitignore`;
   const ignoreExists = await pathExists(ignorePath);
   let createdIgnore = false;
-  let migratedConfigSource = null;
   let workflow;
   let skills;
   try {
     if (!dryRun) {
-      if (!existing || migratedFrom) {
-        const writtenSource = await writeConfig(workspaceRoot, config);
-        if (migratedFrom) migratedConfigSource = writtenSource;
+      if (!existing) {
+        await writeConfig(workspaceRoot, config);
       }
       if (!existing) {
         await mkdir(getConfigDirectory(workspaceRoot), { recursive: true });
@@ -105,32 +98,6 @@ async function initWorkspaceUnlocked(
         await rm(ignorePath, { force: true }).catch(() => {});
       }
     }
-    if (!dryRun && existing && migratedFrom && originalConfigSource !== null) {
-      const configPath = getConfigPath(workspaceRoot);
-      const currentConfigSource = await readFile(configPath, "utf8").catch(() => null);
-      if (migratedConfigSource !== null && currentConfigSource === migratedConfigSource) {
-        try {
-          await restoreConfig(configPath, originalConfigSource);
-        } catch (recoveryError) {
-          throw new SddError("Installation failed and the migrated configuration could not be restored.", {
-            code: "MUTATION_RECOVERY_FAILED",
-            details: [
-              `Original error: ${error.message}`,
-              `Retained migrated configuration: ${configPath}`,
-              `Restore error: ${recoveryError.message}`,
-            ],
-          });
-        }
-      } else if (migratedConfigSource !== null && currentConfigSource !== migratedConfigSource) {
-        throw new SddError("Installation failed after the migrated configuration changed concurrently.", {
-          code: "MUTATION_RECOVERY_FAILED",
-          details: [
-            `Original error: ${error.message}`,
-            `Newer configuration preserved: ${configPath}`,
-          ],
-        });
-      }
-    }
     throw error;
   }
 
@@ -138,7 +105,7 @@ async function initWorkspaceUnlocked(
     command: "init",
     workspaceRoot,
     created: !existing,
-    migratedFrom,
+    migratedFrom: null,
     dryRun,
     configPath: getConfigPath(workspaceRoot),
     ideasImported: Object.keys(config.ideas ?? {}).length,

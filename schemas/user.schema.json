@@ -6,8 +6,8 @@
   "required": ["kind", "version", "schema", "skills", "planning", "repositories", "repositoryArtifacts", "ideas"],
   "properties": {
     "kind": { "const": "user" },
-    "version": { "const": 1 },
-    "schema": { "const": "sdd-user-v1" },
+    "version": { "const": 2 },
+    "schema": { "const": "sdd-user-v2" },
     "skills": {
       "type": "object",
       "required": ["directory"],
@@ -16,14 +16,9 @@
     },
     "planning": {
       "type": "object",
-      "required": ["root", "plannedChangesDirectory"],
+      "required": ["root"],
       "properties": {
-        "root": { "type": "string", "minLength": 1 },
-        "plannedChangesDirectory": {
-          "type": "string",
-          "minLength": 1,
-          "pattern": "^(?![\\\\/]|[A-Za-z]:[\\\\/]|~(?:[\\\\/]|$))(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
-        }
+        "root": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },
@@ -35,6 +30,14 @@
           "type": "object",
           "additionalProperties": { "type": "string", "minLength": 1 }
         }
+      },
+      "additionalProperties": false
+    },
+    "migration": {
+      "type": "object",
+      "required": ["sourceWorkspace"],
+      "properties": {
+        "sourceWorkspace": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },

@@ -34,7 +34,7 @@ Do not claim a reasoning level the runtime cannot select. Record the actual dele
 1. Resolve the git root and read project-local `AGENTS.md` plus referenced guidance.
 2. Check branch, HEAD, worktrees, submodules, and dirty state. Include current tracked and untracked work in the snapshot unless the user selects a committed revision. Never stash, reset, switch branches, or clean files for an audit.
 3. Identify the stack, package boundaries, entry points, tests, generated/vendor/build paths, and project-native verification commands.
-4. If the repository has `.sdd/config.yaml`, run `sdd context <target> --json`, read its returned `workflowPath`, and include SDD traceability. If SDD setup is unavailable or unhealthy, report that limitation rather than blocking the conventional code audit.
+4. If the repository has `.sdd/config.yaml`, run `sdd context <target> --json`, read its returned `workflowPath`, resolve the Space and stable repository ID, then run `sdd status <space-id> --json`. Use the selected repository's filtered `activeChanges` and `recentChanges` projection to select corresponding unique top-level central records, and read only records whose metadata targets that repository and materially informs the audit. Treat legacy planned or repository-local active/closed Change paths as migration input and direct the user to `sdd update`; never use them as live traceability owners. If SDD setup is unavailable or unhealthy, report that limitation rather than blocking the conventional code audit.
 5. Pin every reviewer to the same repository, scope, HEAD SHA, and working-tree state. Reviewers must not read each other's conclusions.
 
 Exclude dependencies, generated output, vendored code, caches, coverage artifacts, and build output unless their configuration or checked-in contents are themselves part of the risk.
@@ -55,7 +55,7 @@ Add reviewers only when relevant:
 - **UI/UX and accessibility** for user-visible interfaces.
 - **Operations and delivery** for deployment, migrations, background work, infrastructure, or production-sensitive configuration.
 - **Stack specialist** when an available skill or specialist can materially improve framework-specific analysis.
-- **SDD traceability** for an SDD-managed repository. Use current Epics and, when useful, the packaged orphan-audit script as evidence; do not duplicate a full Epic verification.
+- **SDD traceability** for an SDD-managed repository. Use current repository-local Epics, relevant central Changes selected through repository status/metadata, and, when useful, the packaged orphan-audit script as evidence; do not duplicate a full Epic verification.
 
 For small scopes, combine compatible charters while preserving independent perspectives. For large repositories, inventory the architecture first, assign reviewers bounded hotspots or package groups, and ensure every material boundary has an owner. Do not equate more agents with better coverage.
 

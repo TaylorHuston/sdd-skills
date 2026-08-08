@@ -24,7 +24,7 @@ Read:
 - canonical managed SDD workflow named by the orchestrator
 - canonical Epic template named by the orchestrator, usually `assets/epic-template.md`
 - the Epic file
-- relevant PRD/Product Brief, docs, ADRs, change artifacts, and current-state docs named in scope
+- relevant PRD/Product Brief, docs, ADRs, central Change records supplied from the selected repository's status projection, and current-state docs named in scope
 - the full Epic-scoped reverse-traceability inventory and project-specific exclusion conventions
 
 ## Checks
@@ -33,7 +33,7 @@ Evaluate:
 
 - The Epic supports the SDD north star: an evidence-backed map from product behavior to implementation files and verification evidence.
 - Epic/Story truth remains the durable answer to "what is actually implemented?"; accepted behavior is not represented only in code, chat, reports, generated indexes, README text, or change ledgers.
-- Artifact authority is respected: implementation/tests reveal reality, Epics record accepted truth, active changes are working records, and PRDs/product docs guide intent.
+- Artifact authority is respected: implementation/tests reveal reality, Epics record accepted truth, central active Changes are working records, and PRDs/product docs guide intent.
 - SDD anti-patterns are absent: new Stories are not used to dodge stale truth, scope expansion is not hidden in design/tasks/code, generated indexes are not hand-maintained as canonical truth, and Change status is not contradictory.
 - Epic Description, Outcome, Current Scope, Deferred Scope, Cross-Story Concerns, Open Decisions, Notes, and Completion Criteria match the embedded Stories.
 - Story set is complete enough to fulfill the Epic's stated behavior, product/docs claims, and observable runtime surface; missing Stories are explicit findings.
@@ -55,8 +55,8 @@ Evaluate:
 - PRD/product direction and public docs do not contradict the Epic.
 - The Epic is usable for future `/sdd-change --plan`, `/sdd-apply`, and `/sdd-review` work.
 - The orchestrator's full Epic-scoped reverse inventory accounts for relevant behavior-bearing source/tests and reviews support/framework/generated exclusions; unowned candidates are classified rather than silently ignored or treated as deletion approval.
-- Related active Change folders use only `proposed`, `planned`, `in_progress`, or `in_review` in `tasks.md`, treat folder location under `closed/` as closed, allow historical closed Changes to retain formerly valid status values, and do not contradict that lifecycle state when used as evidence.
-- Related active or closed change folders do not still claim accepted work is not implemented, not verified, implementation pending, verification pending, or manually accepted under obsolete status vocabulary.
+- Related central active Change records use only `proposed`, `planned`, `in_progress`, or `in_review` in `tasks.md`; location under `~/.sdd/changes/closed/<change-id>/` means closed. Historical closed Changes may retain formerly valid status values.
+- Related central active or closed Change records do not contradict their lifecycle state or still claim accepted work is not implemented, not verified, implementation pending, verification pending, or manually accepted under obsolete status vocabulary. For a multi-repository Change, repository-specific ledger state and global transition/close state must agree.
 - Manual confirmation status uses canonical vocabulary: `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
 
 ## Report Back

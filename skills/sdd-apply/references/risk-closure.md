@@ -123,29 +123,29 @@ Treat environment readiness as continuous state, not a one-time planning questio
 - Before marking the affected phase verified, either run the required evidence, obtain an explicit accepted gap when permitted, or stop on the unresolved obligation.
 - Never reinterpret a safety wrapper's refusal as application proof.
 
-## Phase Commit
+## Phase Commits
 
-Before committing a completed phase:
+Before completing a phase in any target repository:
 
-- reconcile newly visible risks and decision fan-out
+- reconcile newly visible repository-specific and cross-repository risks, dependencies, and decision fan-out in the one central `tasks.md`
 - reconcile triggered Pattern Parity and Stateful Transition rows
 - reconcile triggered Boundary Contract rows and applicable authority, budget, and mutation-safety proof
 - falsify the phase's important evidence claims against their exact tests, assertions, routes, or observations
 - prove each applicable risk row or record its explicit gap
 - confirm required evidence environments for this phase actually ran
-- update Epic truth, supporting docs, ledgers, and current-state claims
-- commit the coherent green slice before beginning the next phase
-- run generated-contract or commit-sensitive checks against the committed state when applicable
+- update repository-local Epic truth and supporting docs plus the central ledgers and current-state claims
+- commit the coherent green slice in every participating repository before beginning the next phase, or record repository-qualified commit candidates when commits are not authorized
+- run generated-contract or commit-sensitive checks against each committed repository state when applicable
 
 ## Immutable Review Handoff
 
-Before transitioning to `in_review`:
+Before transitioning the central Change once to `in_review`:
 
-- identify the exact source commit and integration target
-- require the source commit to contain the implementation and differ from the target when implementation changed
-- leave no intended implementation only in the working tree; preserve unrelated dirty state separately and explicitly
-- pass commit-sensitive generated-contract, diff, and integration checks
-- leave no required risk, fan-out, environment, or verification row silently pending or blocked
-- run fresh-context failure-seeking passes against the committed diff for pattern parity, boundary-contract preservation, concurrent/durable state transitions, evidence-claim integrity, authority/budget/mutation safety, decision fan-out/supporting truth, and environment/integration readiness
+- identify every target repository's stable ID, exact source commit, and integration target
+- require each source commit to contain that repository's implementation and differ from its target when implementation changed
+- leave no intended implementation only in any working tree; preserve unrelated dirty state separately and explicitly by repository
+- pass repository-specific commit-sensitive generated-contract, diff, and integration checks plus any accepted cross-repository compatibility gate
+- leave no required risk, dependency, fan-out, environment, verification, review, PR, or release row silently pending or blocked for any target
+- run repository-scoped fresh-context failure-seeking passes against each committed diff and a cross-repository pass when shared contracts or sequencing require it
 
-This Apply-side gate reduces predictable review churn. It does not replace independent `/sdd-review`.
+Only after every target satisfies these rows may the orchestrator run the global transition, without `--repo`. This Apply-side gate reduces predictable review churn. It does not replace independent `/sdd-review`.

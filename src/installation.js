@@ -13,6 +13,7 @@ export async function applyManagedInstallation(
     workflowPlan = null,
     dryRun = false,
     beforeLockCommit = null,
+    onFailure = null,
     writeLock = writeFileAtomically,
   },
 ) {
@@ -65,6 +66,16 @@ export async function applyManagedInstallation(
         }
       } catch (recoveryError) {
         recoveryFailures.push(`Installation lock recovery failed: ${recoveryError.message}`);
+      }
+    }
+    if (!dryRun && onFailure) {
+      try {
+        await onFailure(error);
+      } catch (recoveryError) {
+        recoveryFailures.push(
+          recoveryError.message,
+          ...(recoveryError.details ?? []),
+        );
       }
     }
     if (recoveryFailures.length > 0) {

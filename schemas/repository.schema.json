@@ -6,15 +6,13 @@
   "required": ["kind", "version", "schema", "id", "artifacts"],
   "properties": {
     "kind": { "const": "repository" },
-    "version": { "const": 1 },
-    "schema": { "const": "sdd-repository-v1" },
+    "version": { "const": 2 },
+    "schema": { "const": "sdd-repository-v2" },
     "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
     "artifacts": {
       "type": "object",
-      "required": ["activeChanges", "closedChanges", "epics", "adrs", "audits"],
+      "required": ["epics", "adrs", "audits"],
       "properties": {
-        "activeChanges": { "type": "string", "minLength": 1 },
-        "closedChanges": { "type": "string", "minLength": 1 },
         "epics": { "type": "string", "minLength": 1 },
         "adrs": { "type": "string", "minLength": 1 },
         "audits": { "type": "string", "minLength": 1 }

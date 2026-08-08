@@ -110,7 +110,13 @@ export async function hashFile(path) {
 export async function replaceFileAtomically(
   source,
   target,
-  { expectedHash, beforePublish = null } = {},
+  {
+    expectedHash,
+    beforeReplace = null,
+    afterBackup = null,
+    beforePublish = null,
+    afterPublish = null,
+  } = {},
 ) {
   const parent = dirname(target);
   const name = basename(target);
@@ -122,6 +128,7 @@ export async function replaceFileAtomically(
   await mkdir(parent, { recursive: true });
   try {
     await cp(source, temporary);
+    if (beforeReplace) await beforeReplace({ temporary, target, backup });
     if (targetExists) {
       await rename(target, backup);
       if (expectedHash !== undefined && await hashFile(backup) !== expectedHash) {
@@ -134,8 +141,10 @@ export async function replaceFileAtomically(
         code: "CONCURRENT_CHANGE",
       });
     }
+    if (afterBackup) await afterBackup({ temporary, target, backup });
     if (beforePublish) await beforePublish({ temporary, target, backup });
     await link(temporary, target);
+    if (afterPublish) await afterPublish({ temporary, target, backup });
     await rm(temporary, { force: true });
   } catch (error) {
     const recoveryFailures = [];

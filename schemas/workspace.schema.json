@@ -5,10 +5,8 @@
   "$defs": {
     "repositoryArtifacts": {
       "type": "object",
-      "required": ["activeChanges", "closedChanges", "epics", "adrs", "audits"],
+      "required": ["epics", "adrs", "audits"],
       "properties": {
-        "activeChanges": { "type": "string", "minLength": 1 },
-        "closedChanges": { "type": "string", "minLength": 1 },
         "epics": { "type": "string", "minLength": 1 },
         "adrs": { "type": "string", "minLength": 1 },
         "audits": { "type": "string", "minLength": 1 }
@@ -49,8 +47,8 @@
   "type": "object",
   "required": ["version", "schema", "skills", "planning", "repositories", "repositoryArtifacts", "ideas"],
   "properties": {
-    "version": { "const": 2 },
-    "schema": { "const": "sdd-v2" },
+    "version": { "const": 3 },
+    "schema": { "const": "sdd-v3" },
     "skills": {
       "type": "object",
       "required": ["directory"],
@@ -61,14 +59,9 @@
     },
     "planning": {
       "type": "object",
-      "required": ["root", "plannedChangesDirectory"],
+      "required": ["root"],
       "properties": {
-        "root": { "type": "string", "minLength": 1 },
-        "plannedChangesDirectory": {
-          "type": "string",
-          "minLength": 1,
-          "pattern": "^(?![\\\\/]|[A-Za-z]:[\\\\/]|~(?:[\\\\/]|$))(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
-        }
+        "root": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": false
     },

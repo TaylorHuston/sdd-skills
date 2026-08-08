@@ -105,7 +105,7 @@ This is the Story's only authoritative current verification map. For automated e
 #### Story Notes
 
 - Durable context future implementers need.
-- Avoid chronological command history here; put command logs in change `tasks.md`.
+- Avoid chronological command history here; put command logs in the central Change's `tasks.md`.
 
 ## Cross-Story Concerns
 
@@ -129,7 +129,7 @@ This Epic is healthy when:
 - `Verified By` maps concrete evidence to Requirements/Scenarios; automated evidence uses an existing repository-relative `path#exact test title or stable anchor`, and `Proves` names the important assertion or observation.
 - Automated evidence does not use generic framework syntax anchors, and the cited proof actually asserts every mapped Scenario.
 - `Verification Gaps` are real, current, and explicit.
-- Related changes, docs, indexes, reviews, and release communication do not contradict this Epic.
+- Related central Changes, docs, indexes, reviews, and release communication do not contradict this Epic.
 
 ## Notes
 

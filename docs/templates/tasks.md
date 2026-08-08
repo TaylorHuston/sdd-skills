@@ -1,5 +1,8 @@
 ---
 status: proposed
+space: <space-id>
+repositories:
+  - <repository-id>
 ---
 # Tasks: CHANGE TITLE
 
@@ -7,8 +10,8 @@ status: proposed
 
 - Last completed action: change artifacts drafted
 - Next action: review proposal, design, and tasks
-- Active branch/ref: unknown
-- Expected dirty files: `docs/changes/yyyy-mm-dd-change-name/`
+- Active branches / refs by repository: unknown
+- Expected dirty files: `~/.sdd/changes/yyyy-mm-dd-change-name/` plus repository-local implementation, Epic, ADR, test, and supporting-doc files grouped by target repository
 - Known blockers: none identified yet
 
 ## Task Checklist
@@ -69,33 +72,33 @@ status: proposed
 ### 6. Review And Closeout
 
 - [ ] 6.1 Update the project-defined release communication when `proposal.md` says release-communication impact is required or TBD.
-- [ ] 6.2 Run `sdd-review` as the local PR gate for Requirements, Scenarios, Epic truth, tests, security, docs, release communication, ADR consistency, and branch readiness.
-- [ ] 6.3 Record review outcome as a `review.md` path, a clean review recorded in this ledger, or an explicit user-approved review waiver.
+- [ ] 6.2 Run `sdd-review` as the local PR gate across every target repository for Requirements, Scenarios, Epic truth, tests, security, docs, release communication, ADR consistency, and branch readiness.
+- [ ] 6.3 Record each target repository's review outcome in the one central `review.md`, or record a clean review in this ledger or an explicit user-approved review waiver.
 - [ ] 6.4 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
 - [ ] 6.5 Record manual UI confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
 - [ ] 6.6 Confirm proposal/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
 - [ ] 6.7 Confirm machine-readable Change status agrees with Resume Here, checklist, review, manual confirmation, release communication, ADR, PR/merge, deferred-gap, and folder-location claims.
 - [ ] 6.8 Keep `status: in_review` while independent review and closeout gates are underway.
-- [ ] 6.9 Before `in_review`, record an immutable candidate commit, confirm intended implementation is committed, pass commit-sensitive contract/diff checks and every required aggregate candidate gate on that exact commit, and leave no required risk, fan-out, environment, or verification obligation silently pending.
-- [ ] 6.10 Before integration or closeout, resolve whether the current target produces a materially different prospective integration tree. When required, run the aggregate gate against that exact tree; after integration, confirm the actual tree matches or rerun before closing.
-- [ ] 6.11 Create a PR or merge only after `sdd-review` is ready and the app branch policy plus user authorization allow it.
-- [ ] 6.12 After review/PR/merge/acceptance and required integration-candidate proof are complete and `status: in_review` remains accurate, run `sdd change close` for this Space and Change instead of writing a `closed` status.
+- [ ] 6.9 Before `in_review`, record an immutable candidate commit for every target repository, confirm intended implementation is committed, pass commit-sensitive contract/diff checks and every required aggregate candidate gate on each exact candidate, and leave no required risk, fan-out, environment, or verification obligation silently pending.
+- [ ] 6.10 Before integration or closeout, resolve whether each repository's current target produces a materially different prospective integration tree. When required, run the aggregate gate against that exact tree; after integration, confirm the actual tree matches or rerun before closing.
+- [ ] 6.11 Create a PR or merge in a target repository only after its `sdd-review` result is ready and that repository's branch policy plus user authorization allow it.
+- [ ] 6.12 After every target repository's review/PR/merge/acceptance and required integration-candidate proof are complete and `status: in_review` remains accurate, run `sdd change close <space-id> <change-id>` once instead of writing a `closed` status.
 
 ## Implementation Ledger
 
 Record meaningful Requirement, Scenario, enabling, or delegated slices as they happen. Keep entries short.
 
-| Date | Slice | Agent / Guidance | Files / Areas | Result | Commit / Ref |
-|---|---|---|---|---|---|
-| YYYY-MM-DD | EPIC-ID/S1 R1/R1-S1 TBD | main or subagent TBD | TBD | TBD | TBD |
+| Date | Repository | Slice | Agent / Guidance | Files / Areas | Result | Commit / Ref |
+|---|---|---|---|---|---|---|
+| YYYY-MM-DD | repository-id | EPIC-ID/S1 R1/R1-S1 TBD | main or subagent TBD | TBD | TBD | TBD |
 
 ## Verification Ledger
 
 Record proof as it happens. Keep chronological command output here; summarize only durable scenario-mapped evidence into Epic `Verified By`. Do not blur deterministic E2E, live-provider playtests, manual UI confirmation, broad gates, and debug/log inspection into one evidence bucket.
 
-| Date | Check | Evidence Type | What It Proves | Result |
-|---|---|---|---|---|
-| YYYY-MM-DD | TBD | focused automated test / aggregate candidate gate / integration-candidate gate / broad supporting gate / deterministic E2E / live-provider playtest / manual UI confirmation / debug-log inspection | EPIC-ID/S1 R1/R1-S1 or candidate scope | TBD |
+| Date | Repository | Check | Evidence Type | What It Proves | Result |
+|---|---|---|---|---|---|
+| YYYY-MM-DD | repository-id | TBD | focused automated test / aggregate candidate gate / integration-candidate gate / broad supporting gate / deterministic E2E / live-provider playtest / manual UI confirmation / debug-log inspection | EPIC-ID/S1 R1/R1-S1 or candidate scope | TBD |
 
 ## Manual Feedback
 
@@ -173,16 +176,16 @@ Track environment readiness continuously. Missing setup may allow unrelated safe
 
 Keep focused behavior proof distinct from aggregate and integration-candidate proof. Resolve command names and required constituents from project guidance rather than imposing one universal stack.
 
-- Project-defined aggregate command or authoritative constituent source:
-- Aggregate gate required before `in_review`: yes / no / pending
-- Trigger or project-policy reason:
-- Exact committed source candidate:
+- Project-defined aggregate commands or authoritative constituent sources by repository:
+- Aggregate gates required before `in_review`: yes / no / pending, by repository
+- Trigger or project-policy reasons:
+- Exact committed source candidates by repository:
 - Freshness and cache treatment:
-- Aggregate result and meaningful execution/count evidence:
+- Aggregate results and meaningful execution/count evidence:
 - Post-gate evidence-record-only changes and affected checks rerun:
-- Prospective integration gate required: yes / no / pending
-- Current target and prospective integration tree/ref:
-- Integration-candidate result or reason source proof is reusable:
+- Prospective integration gates required: yes / no / pending, by repository
+- Current targets and prospective integration trees/refs:
+- Integration-candidate results or reasons source proof is reusable:
 - Remote CI role: required / corroborating / unavailable / not applicable
 
 ## Manual UI Confirmation
@@ -208,15 +211,15 @@ Required for UI-bearing changes. If not applicable, record why.
 
 ## Review Handoff Candidate
 
-- Integration target / merge base:
-- Candidate source commit:
-- Source differs from target when implementation changed: yes / no / not applicable
-- Intended implementation fully committed: yes / no / commits disabled with reason
-- Unrelated dirty state preserved:
+- Repository-specific integration targets / merge bases:
+- Candidate source commits by repository:
+- Source differs from target where implementation changed: yes / no / not applicable
+- Intended implementation fully committed in every target repository: yes / no / commits disabled with reason
+- Unrelated dirty state preserved in every target repository:
 - Commit-sensitive generated-contract / diff / integration checks:
-- Verification Scope Decision and aggregate candidate evidence:
+- Verification Scope Decision and aggregate candidate evidence by repository:
 - Post-gate evidence-only changes classified and affected checks rerun:
-- Prospective integration tree and required gate evidence:
+- Prospective integration trees and required gate evidence by repository:
 - Required risk, fan-out, environment, or verification rows still pending or blocked:
 - Pattern parity, boundary contract, and stateful transition matrices reconciled or not applicable with reason:
 - Capability authority, content-budget/provenance conservation, and filesystem mutation-order proof reconciled or not applicable:
@@ -233,7 +236,7 @@ Required for UI-bearing changes. If not applicable, record why.
 - Primary anchors inspected as behavior-owning definitions/registrations rather than incidental occurrences:
 - Scenario-mapped Verified By maps current:
 - Superseded earlier Epic truth reconciled:
-- README/current-state docs and active/closed Change claims reconciled:
+- README/current-state docs and central active/closed Change claims reconciled:
 - ADR status:
 - Release communication current:
 - `sdd-review` verdict:
@@ -248,9 +251,9 @@ Required for UI-bearing changes. If not applicable, record why.
 - Verification environment obligations resolved:
 - Verification Scope Decision current and required candidate gates passed:
 - Immutable review handoff candidate:
-- Tested integration candidate matches actual integrated tree, or rerun recorded:
+- PR / merge state by repository:
 - Manual UI confirmation status:
 - Rendered UI verification status:
 - PR / merge state:
 - Deferred scope accepted:
-- Change moved to `docs/changes/closed/`:
+- Change moved to `~/.sdd/changes/closed/yyyy-mm-dd-change-name/`:

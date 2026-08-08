@@ -651,7 +651,7 @@
         <div>
           <h2 id="implementation-title">How I implemented SDD</h2>
           <p>Everything above this line is the method. What follows is my current local-first implementation: Markdown
-            artifacts, portable repository contracts, private user topology, a deterministic CLI, and agent skills.</p>
+            artifacts, portable repository contracts, private user topology, one central user-level Change store, a deterministic CLI, and agent skills.</p>
         </div>
       </section>
 
@@ -669,10 +669,11 @@
           <div class="defaultLayoutHeader">
             <p class="columnLabel">Default filesystem layout</p>
             <div>
-              <h3 id="default-layout-title">The three record types get separate homes.</h3>
-              <p>Planning stays idea-owned and private by default. Project truth and active work live with the code.
-                <code>~/.sdd/config.yaml</code> maps those private relationships, while each repository commits its own
-                portable <code>.sdd/config.yaml</code>.
+              <h3 id="default-layout-title">Planning, project truth, and Changes have distinct owners.</h3>
+              <p>Planning stays Space-owned and private. Durable project truth lives with the code. Every dated Change
+                lives once under <code>~/.sdd/changes/</code>. <code>~/.sdd/config.yaml</code> maps the private
+                relationships, while each repository commits its portable identity and artifact paths in
+                <code>.sdd/config.yaml</code>.
               </p>
             </div>
           </div>
@@ -680,13 +681,13 @@
           <div class="recordTypes implementationRecords">
             <article class="recordType recordPlanning implementationRecord">
               <p class="recordIndex">01 / Planning</p>
-              <h4>Idea-owned context</h4>
-              <pre aria-label="Default planning document layout"><code>&lt;planning-root&gt;/&lt;idea&gt;/
+              <h4>Space-owned context</h4>
+              <pre aria-label="Default planning document layout"><code>&lt;planning-path&gt;/
   prd.md
   exploration/
-  planned-changes/</code></pre>
-              <p class="recordNote">Product direction, exploratory notes, Change Briefs, and planned Change drafts stay
-                here until work is ready to enter a repository.</p>
+  change-briefs/</code></pre>
+              <p class="recordNote">Product direction, exploratory notes, and undated Change Briefs stay here. A brief
+                is not a Change and carries no lifecycle status.</p>
             </article>
 
             <article class="recordType recordProject implementationRecord">
@@ -702,16 +703,21 @@
 
             <article class="recordType recordChange implementationRecord">
               <p class="recordIndex">03 / Changes</p>
-              <h4>Repository-owned work</h4>
-              <pre aria-label="Default Change document layout"><code>&lt;repository&gt;/docs/changes/
+              <h4>User-owned work</h4>
+              <pre aria-label="Default Change document layout"><code>~/.sdd/changes/
   &lt;date&gt;-&lt;change&gt;/
     proposal.md
     design.md
     tasks.md
-  closed/</code></pre>
-              <p class="recordNote">Promotion moves a planned Change here. Closeout moves it under
-                <code>docs/changes/closed/</code> after project truth has been reconciled.
+  closed/
+    &lt;date&gt;-&lt;change&gt;/</code></pre>
+              <p class="recordNote"><code>sdd change create</code> writes one canonical record whose
+                <code>tasks.md</code> names its Space and target repositories. Closeout moves that folder once under
+                <code>~/.sdd/changes/closed/</code> after project truth has been reconciled.
               </p>
+              <p class="recordNote">During upgrades, <code>sdd update</code> retains the legacy source until commit,
+                performs a complete fail-closed preflight, consolidates identical legacy copies, recovers interrupted
+                transactions, and aborts without writes for divergent, cross-Space, unsafe, missing-identity, or ambiguous-target input.</p>
             </article>
           </div>
         </section>
@@ -728,10 +734,11 @@
               <ul>
                 <li>Install user skills and map private topology</li>
                 <li>Initialize portable repository contracts</li>
-                <li>Scaffold Changes and Epics</li>
-                <li>Validate artifacts, audit-report coherence, and optional Git-relative freshness</li>
-                <li>Report status across repositories</li>
-                <li>Guard lifecycle transitions</li>
+                <li>Scaffold canonical Changes and repository-owned Epics</li>
+                <li>Validate artifacts, ownership metadata, audit-report coherence, and optional Git-relative freshness</li>
+                <li>Report central Change status across mapped repositories</li>
+                <li>Preflight and safely migrate compatible legacy Change locations during update</li>
+                <li>Guard one-record lifecycle transitions</li>
               </ul>
             </section>
             <section class="toolColumn" aria-labelledby="skills-title">
@@ -763,7 +770,7 @@
             <li><span>02</span><strong>Capture intent</strong><code>/sdd-change --brief</code></li>
             <li><span>03</span><strong>Plan just in time</strong><code>/sdd-change --plan</code></li>
             <li><span>04</span><strong>Converge the experience</strong><code>/sdd-design --plan</code></li>
-            <li><span>05</span><strong>Commit to a work scope</strong><code>sdd change promote</code></li>
+            <li><span>05</span><strong>Commit to a work scope</strong><code>sdd validate --change</code></li>
             <li><span>06</span><strong>Implement in verified slices</strong><code>/sdd-apply</code></li>
             <li class="workflowMapMulti"><span>07</span><strong>Review independently</strong>
               <div><code>/sdd-review</code><code>/sdd-epic-verify</code></div>

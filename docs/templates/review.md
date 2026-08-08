@@ -1,5 +1,14 @@
 # Review: CHANGE TITLE
 
+## Review Scope
+
+- Central Change: `~/.sdd/changes/yyyy-mm-dd-change-name/`
+- Space: `<space-id>`
+- Target repository IDs: `<repository-id, ...>`
+- Repositories reviewed: `<repository-id, ...>`
+
+This record is the one review record for the central Change. The verdict and Gate Scorecard aggregate every target repository; `ready` requires every applicable repository-scoped gate to pass. Prefix findings with the repository ID and repeat repository-scoped bundles where targets have different refs, commands, evidence, PR state, or release obligations.
+
 ## Verdict
 
 changes-requested | blocked | ready
@@ -9,7 +18,7 @@ changes-requested | blocked | ready
 | Gate | Result | Notes |
 |---|---|---|
 | Change artifacts | TBD | TBD |
-| Change status | TBD | `proposed` / `planned` / `in_progress` / `in_review`; folder path means closed. |
+| Change status | TBD | `proposed` / `planned` / `in_progress` / `in_review`; central location under `~/.sdd/changes/closed/` means closed. |
 | Epic truth | TBD | TBD |
 | Canonical map authority | TBD | One current implementation map and one current verification map per Story. |
 | Requirements and Scenarios | TBD | TBD |
@@ -28,7 +37,7 @@ changes-requested | blocked | ready
 | Visual / UX consistency | TBD | TBD |
 | Security review | TBD | TBD |
 | Documentation | TBD | TBD |
-| Idea repository / current-state truth | TBD | TBD |
+| Space / repository current-state truth | TBD | TBD |
 | Release communication | TBD | TBD |
 | Branch and merge readiness | TBD | TBD |
 | Prospective integration candidate | TBD | Exact tree/ref and required aggregate result, or why source-candidate proof is reusable. |
@@ -50,23 +59,23 @@ changes-requested | blocked | ready
 
 ## Verification Evidence
 
-| Command / Scenario | Evidence Type | Requirement / Scenario | Result | What It Proves |
-|---|---|---|---|---|
-| TBD | focused automated test / aggregate candidate gate / integration-candidate gate / broad supporting gate / deterministic E2E / live-provider playtest / manual UI confirmation / debug-log inspection | EPIC-ID/S1 R1/R1-S1 or candidate scope | TBD | TBD |
+| Repository | Command / Scenario | Evidence Type | Requirement / Scenario | Result | What It Proves |
+|---|---|---|---|---|---|
+| repository-id | TBD | focused automated test / aggregate candidate gate / integration-candidate gate / broad supporting gate / deterministic E2E / live-provider playtest / manual UI confirmation / debug-log inspection | EPIC-ID/S1 R1/R1-S1 or candidate scope | TBD | TBD |
 
 ## Verification Scope And Candidate Gates
 
-- Project-defined aggregate command or authoritative constituent source:
-- Aggregate gate required: yes / no
+- Project-defined aggregate commands or authoritative constituent sources by repository:
+- Aggregate gates required by repository: yes / no
 - Trigger or project-policy reason:
 - Cache/freshness policy:
 - Post-gate evidence-record-only changes and affected checks rerun:
 
-| Stage | Exact Commit / Tree | Command | Meaningful Execution / Counts | Result |
-|---|---|---|---|---|
-| Reviewed source candidate | TBD | TBD | TBD | pass / findings / blocked / not applicable |
-| Prospective integration candidate | TBD | TBD | TBD | pass / findings / blocked / reusable source proof |
-| Actual integrated result | TBD | TBD | matches tested tree / rerun evidence / pending | pass / findings / blocked / not applicable |
+| Repository | Stage | Exact Commit / Tree | Command | Meaningful Execution / Counts | Result |
+|---|---|---|---|---|---|
+| repository-id | Reviewed source candidate | TBD | TBD | TBD | pass / findings / blocked / not applicable |
+| repository-id | Prospective integration candidate | TBD | TBD | TBD | pass / findings / blocked / reusable source proof |
+| repository-id | Actual integrated result | TBD | TBD | matches tested tree / rerun evidence / pending | pass / findings / blocked / not applicable |
 
 ## Boundary And Conservation Review
 
@@ -82,6 +91,8 @@ changes-requested | blocked | ready
 | TBD | desktop / mobile | TBD | project browser/screenshot tooling / runtime browser / rendered preview or fixture / manual browser capture | TBD | clean / findings / not applicable | pass / findings / blocked / not applicable |
 
 ## Review Bundle
+
+Repeat this bundle for every target repository and identify the stable repository ID.
 
 - Source branch/ref:
 - Reviewed source commit:
@@ -133,6 +144,8 @@ changes-requested | blocked | ready
 - New regressions introduced by remediation: none / list
 
 ## PR / Merge Readiness
+
+Record this readiness block for every target repository. A ready aggregate verdict does not collapse distinct branches, commits, PRs, or integration targets.
 
 - Source branch:
 - Reviewed source commit:

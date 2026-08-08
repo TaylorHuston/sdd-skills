@@ -74,6 +74,106 @@ test("workspace mutation lock recovers a stale dead-owner lock", async (t) => {
   assert.equal(await pathExists(lockPath), false);
 });
 
+test("stale lock reclamation admits only one contender", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-stale-lock-contenders-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const lockPath = join(root, ".sdd", "mutation.lock");
+  await mkdir(join(root, ".sdd"), { recursive: true });
+  await writeFile(lockPath, `${JSON.stringify({
+    pid: 99_999_999,
+    token: "stale",
+    createdAt: "2026-01-01T00:00:00.000Z",
+  })}\n`);
+
+  let observedCount = 0;
+  let releaseObserved;
+  const bothObserved = new Promise((resolve) => {
+    releaseObserved = resolve;
+  });
+  const afterStaleLockObserved = async () => {
+    observedCount += 1;
+    if (observedCount === 2) releaseObserved();
+    await bothObserved;
+  };
+  let signalQuarantined;
+  const quarantined = new Promise((resolve) => {
+    signalQuarantined = resolve;
+  });
+  let releaseQuarantine;
+  const quarantineHeld = new Promise((resolve) => {
+    releaseQuarantine = resolve;
+  });
+  let entered = 0;
+  const options = {
+    afterStaleLockObserved,
+    afterStaleLockQuarantined: async () => {
+      signalQuarantined();
+      await quarantineHeld;
+    },
+  };
+  const contenders = [
+    withWorkspaceMutationLock(root, async () => {
+      entered += 1;
+      return "first";
+    }, options),
+    withWorkspaceMutationLock(root, async () => {
+      entered += 1;
+      return "second";
+    }, options),
+  ];
+  const outcomes = contenders.map((contender) => contender.then(
+    (value) => ({ status: "fulfilled", value }),
+    (reason) => ({ status: "rejected", reason }),
+  ));
+
+  await quarantined;
+  const rejected = await Promise.race(outcomes.map((outcome) => outcome.then(
+    (result) => result.status === "rejected" ? result.reason : null,
+  )));
+  assert.equal(rejected.code, "OPERATION_IN_PROGRESS");
+  assert.equal(entered, 0);
+  releaseQuarantine();
+  const settled = await Promise.all(outcomes);
+
+  assert.equal(settled.filter((result) => result.status === "fulfilled").length, 1);
+  assert.equal(settled.filter((result) => result.status === "rejected").length, 1);
+  assert.equal(entered, 1);
+  assert.equal(await pathExists(lockPath), false);
+});
+
+test("stale lock reclamation preserves a replacement that wins the observation race", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-stale-lock-replaced-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const lockPath = join(root, ".sdd", "mutation.lock");
+  await mkdir(join(root, ".sdd"), { recursive: true });
+  await writeFile(lockPath, `${JSON.stringify({
+    pid: 99_999_999,
+    token: "stale",
+    createdAt: "2026-01-01T00:00:00.000Z",
+  })}\n`);
+  const replacement = `${JSON.stringify({
+    pid: process.pid,
+    token: "replacement",
+    createdAt: new Date().toISOString(),
+  })}\n`;
+  let entered = false;
+
+  await assert.rejects(
+    withWorkspaceMutationLock(root, async () => {
+      entered = true;
+    }, {
+      afterStaleLockObserved: async () => {
+        await rm(lockPath);
+        await writeFile(lockPath, replacement);
+      },
+    }),
+    (error) => error.code === "OPERATION_IN_PROGRESS",
+  );
+
+  assert.equal(entered, false);
+  assert.equal(await readFile(lockPath, "utf8"), replacement);
+});
+
 test("managed installation rolls back workflow and skills when lock persistence fails", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "sdd-install-rollback-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -575,73 +675,4 @@ test("directory replacement preserves a target recreated at publish time", async
 
   assert.equal(await readFile(join(target, "SKILL.md"), "utf8"), "recreated version\n");
   assert.ok((await readdir(root)).some((name) => name.startsWith(".target.sdd-old-")));
-});
-
-test("failed installation after v1 migration restores the original config", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-migration-rollback-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await mkdir(join(root, "ideas"));
-  await mkdir(join(root, "code"));
-  await writeConfig(root, {
-    version: 1,
-    schema: "sdd-v1",
-    skills: { directory: ".agents/skills" },
-    planning: { root: "ideas", plannedChangesDirectory: "planned-changes" },
-    repositories: { roots: ["code"] },
-    repositoryArtifacts: {
-      activeChanges: "docs/changes",
-      closedChanges: "docs/changes/closed",
-      epics: "docs/epics",
-      adrs: "docs/adrs",
-      audits: "docs/audits",
-    },
-    ideas: {},
-  });
-  const configPath = join(root, ".sdd", "config.yaml");
-  const originalConfig = await readFile(configPath, "utf8");
-
-  await assert.rejects(
-    () => initWorkspace(root, {
-      writeLock: async () => { throw new Error("injected migration lock failure"); },
-    }),
-    /injected migration lock failure/,
-  );
-
-  assert.equal(await readFile(configPath, "utf8"), originalConfig);
-  assert.equal(await pathExists(join(root, ".sdd", "install-lock.json")), false);
-});
-
-test("failed v1 config restoration reports incomplete recovery", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-migration-recovery-failure-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await mkdir(join(root, "ideas"));
-  await mkdir(join(root, "code"));
-  await writeConfig(root, {
-    version: 1,
-    schema: "sdd-v1",
-    skills: { directory: ".agents/skills" },
-    planning: { root: "ideas", plannedChangesDirectory: "planned-changes" },
-    repositories: { roots: ["code"] },
-    repositoryArtifacts: {
-      activeChanges: "docs/changes",
-      closedChanges: "docs/changes/closed",
-      epics: "docs/epics",
-      adrs: "docs/adrs",
-      audits: "docs/audits",
-    },
-    ideas: {},
-  });
-  const configPath = join(root, ".sdd", "config.yaml");
-
-  await assert.rejects(
-    () => initWorkspace(root, {
-      writeLock: async () => { throw new Error("injected installation failure"); },
-      restoreConfig: async () => { throw new Error("injected restoration failure"); },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail === `Retained migrated configuration: ${configPath}`)
-      && error.details.some((detail) => detail.includes("injected restoration failure")),
-  );
-
-  assert.match(await readFile(configPath, "utf8"), /^version: 2$/m);
 });
