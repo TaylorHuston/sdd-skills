@@ -11,9 +11,9 @@ Planning invariant: describe the accepted end state, observable behavior, durabl
 
 ## Authority And Project Profile
 
-Resolve the user installation, Space, idea planning path, and target repositories with `sdd context <relevant-path> --json`. Read the `workflowPath` returned by `sdd context` completely before defining Change status, Stories, Requirements, Scenarios, evidence, or repository ownership. If user setup is missing, direct the user to `sdd setup`; if a repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
+Resolve the workspace installation, Space, idea planning path, and target repositories with `sdd context <relevant-path> --json`. Retain the resolved workspace root and pass `--workspace <workspace-root>` to subsequent SDD commands whenever the target repository is external to the workspace or the command's current directory is not inside that workspace. Read the `workflowPath` returned by `sdd context` completely before defining Change status, Stories, Requirements, Scenarios, evidence, or repository ownership. If workspace setup is missing, direct the user to `sdd setup [workspace-path]`; if a repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
 
-The one canonical dated Change record lives under `~/.sdd/changes/`; target repositories are stable IDs in `tasks.md`, not copies of the Change. Project guidance owns branch and write policy, release conventions, supporting docs, technology constraints, and specialist guidance. Epics, ADRs, implementation, tests, and supporting docs remain repository-local under their canonical paths.
+The one canonical dated Change record lives under `<workspace>/.sdd/changes/`; target repositories are stable IDs in `tasks.md`, not copies of the Change. Project guidance owns branch and write policy, release conventions, supporting docs, technology constraints, and specialist guidance. Epics, ADRs, implementation, tests, and supporting docs remain repository-local under their canonical paths.
 
 Use `/sdd-interactive` when the user wants to create and immediately implement a small tracked change in one session.
 
@@ -44,9 +44,9 @@ Use `assets/brief-template.md`. A Change Brief has no Change `status`, does not 
 `--plan` writes the canonical planned artifact set:
 
 ```text
-~/.sdd/changes/<yyyy-mm-dd-change-name>/proposal.md
-~/.sdd/changes/<yyyy-mm-dd-change-name>/design.md
-~/.sdd/changes/<yyyy-mm-dd-change-name>/tasks.md
+<workspace>/.sdd/changes/<yyyy-mm-dd-change-name>/proposal.md
+<workspace>/.sdd/changes/<yyyy-mm-dd-change-name>/design.md
+<workspace>/.sdd/changes/<yyyy-mm-dd-change-name>/tasks.md
 ```
 
 Use:
@@ -57,13 +57,13 @@ Use:
 - `assets/epic-template.md` for proposed new Epic shape
 - `/sdd-adr` and its ADR template for durable architecture decisions
 
-Assign the dated Change ID when planning begins, not when the brief is captured. Change IDs are globally unique across the user installation. Use `sdd change create <space-id> <slug>` with explicit `--repo` selections when needed; the command creates the one canonical central record and writes the Space and target repository IDs into `tasks.md`.
+Assign the dated Change ID when planning begins, not when the brief is captured. Change IDs are unique across active and closed storage within the selected workspace. Use `sdd change create <space-id> <slug>` with explicit `--repo` selections when needed; the command creates the one canonical central record and writes the Space and target repository IDs into `tasks.md`.
 
 `--plan` refines that central record in place. It owns semantic scope, target-repository responsibilities, Epic actions, design, tasks, dependencies, and cross-repository coordination without creating repository copies.
 
 ### Replanned Change
 
-`--replan` updates the existing central active Change under `~/.sdd/changes/<change-id>/`. It never creates a private brief, repository copy, or second Change for the same scope.
+`--replan` updates the existing central active Change under `<workspace>/.sdd/changes/<change-id>/`. It never creates a private brief, repository copy, or second Change for the same scope.
 
 ## Common Setup
 
@@ -112,7 +112,7 @@ The outcome is one coherent central planned Change that is ready to hand to `/sd
    - Read code when needed to avoid fictional `Implemented By` or `Verified By` plans and to compare viable approaches.
    - When planning depends on version-sensitive library, framework, SDK, API, CLI, or cloud-platform behavior, prefer an available current-documentation capability such as Context7. Query the exact concept and installed version when known; otherwise use primary vendor documentation rather than relying on model memory.
 3. Create or continue the planned Change.
-   - For a new plan, run `sdd change create <space-id> <slug>` with explicit `--repo` selections when needed. Confirm the globally unique ID, `space`, and stable `repositories` frontmatter before refinement.
+   - For a new plan, run `sdd change create <space-id> <slug>` with explicit `--repo` selections when needed. Confirm the workspace-unique ID, `space`, and stable `repositories` frontmatter before refinement.
    - For each new Epic named by the plan, run `sdd epic create <space-id> <epic-id> <slug>` against exactly one selected repository before refining the canonical scaffold. Do not hand-author a substitute Epic shape.
    - Update the one central Change in place. Divide repository-specific ownership and coordination obligations clearly while keeping shared scope, decisions, and lifecycle state in that record.
    - Never create or maintain repository-local Change copies.
@@ -143,7 +143,7 @@ The outcome is one coherent central planned Change that is ready to hand to `/sd
    - Create an ADR candidate or Proposed ADR for durable architecture, API, client, data, integration, deployment, dependency, auth/security, state, or storage decisions future work should respect.
    - Do not create ADRs for ordinary, reversible implementation details.
 8. Write `tasks.md`.
-   - Start with frontmatter containing `status: proposed`, the owning `space`, and the stable target `repositories` list. Use only `proposed`, `planned`, `in_progress`, or `in_review`; central folder location under `~/.sdd/changes/closed/` is the terminal state.
+   - Start with frontmatter containing `status: proposed`, the owning `space`, and the stable target `repositories` list. Use only `proposed`, `planned`, `in_progress`, or `in_review`; central folder location under `<workspace>/.sdd/changes/closed/` is the terminal state.
    - Keep tasks at end-state, artifact, Story/capability, verification, review, and closeout level rather than writing a file-by-file sequence or freezing an implementation order.
    - Seed the living Implementation Risk And Confirmation Matrix, Decision Fan-Out Ledger, Verification Environment table, and Verification Scope Decision with only the obligations currently knowable. Treat Pattern Parity, Boundary Contract, and Stateful Transition matrices as triggered Apply artifacts: mark known applicability when useful, but do not predict exhaustive sibling concerns, cross-layer mappings, or state interleavings before implementation. Maintain `Resume Here`, implementation and verification ledgers, blockers, manual confirmation, review record, release communication, PR/merge state, ADR state, deferred gaps, truth reconciliation, and closeout tasks.
 9. Validate and hand off.

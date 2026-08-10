@@ -5,11 +5,11 @@ description: Apply or continue one central SDD Change across all targeted reposi
 
 # SDD Apply
 
-Apply a planned or in-progress central SDD Change from `~/.sdd/changes/<change-id>/`. This is the implementation-side companion to `/sdd-change --plan`: `proposal.md` defines shared scope, `design.md` defines the end state, constraints, repository responsibilities, and Epic changes, and `tasks.md` is the one adaptive implementation ledger and cold-resume surface. Treat the plan as a contract for what must be true and confirmed, not a fixed implementation script; revise the path, risks, coordination, and evidence as implementation teaches you more.
+Apply a planned or in-progress central SDD Change from `<workspace>/.sdd/changes/<change-id>/`. This is the implementation-side companion to `/sdd-change --plan`: `proposal.md` defines shared scope, `design.md` defines the end state, constraints, repository responsibilities, and Epic changes, and `tasks.md` is the one adaptive implementation ledger and cold-resume surface. Treat the plan as a contract for what must be true and confirmed, not a fixed implementation script; revise the path, risks, coordination, and evidence as implementation teaches you more.
 
 ## Authority And Project Profile
 
-Resolve the user installation, Space, workspace, and every target implementation repository with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before interpreting SDD artifact authority, evidence, reconciliation, or closeout. Treat the stable repository IDs in the central `tasks.md` frontmatter as the target set and resolve each ID to its current local root. The Change record lives once under `~/.sdd/changes/`; Epics, ADRs, implementation, tests, release communication, and supporting docs remain in their owning repositories. Project guidance owns branch and commit policy, verification commands, truth-bearing supporting-doc requirements, release conventions, technology constraints, and permissions. If user setup is missing, direct the user to `sdd setup`; if a target repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
+Resolve the workspace installation, Space, and every target implementation repository with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before interpreting SDD artifact authority, evidence, reconciliation, or closeout. Treat the stable repository IDs in the central `tasks.md` frontmatter as the target set and resolve each ID to its current local root. The Change record lives once under `<workspace>/.sdd/changes/`; Epics, ADRs, implementation, tests, and supporting docs remain repository-local. If workspace setup is missing, direct the user to `sdd setup [workspace-path]`; if a repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an unhealthy installation.
 
 Non-negotiable invariant: Epic/Story truth must stay aligned with implementation reality as the work proceeds. If implementation changes behavior, reveals stale Story wording, changes Requirement or Scenario meaning, moves Epic ownership, or changes verification confidence, update the affected Epic/Story truth in the same run or stop before claiming implementation progress.
 
@@ -23,7 +23,7 @@ Do not create a separate implementation record, Story approach report, Epic appr
 
 Use `/sdd-interactive` instead when no suitable central Change exists yet and the user wants a lightweight tracked working session that creates the Change and immediately applies small edits.
 
-Default to an orchestrator-and-subagents model. The main agent owns central Change selection, the one `tasks.md` ledger, repository resolution, branch/git safety in every target, cross-repository dependency ordering, phase selection, subagent scoping, validation of child claims, Epic reconciliation, commits, global lifecycle transitions, stop conditions, and user-facing decisions. Delegate non-trivial implementation, discovery, verification, and implementation self-check slices to subagents when the tooling is available and safe.
+Default to an orchestrator-and-subagents model. The main agent owns central Change selection, the one `tasks.md` ledger, repository resolution, branch/git safety in every target, cross-repository dependency ordering, phase selection, subagent scoping, validation of child claims, Epic reconciliation, commits, Change-wide lifecycle transitions, stop conditions, and user-facing decisions. Delegate non-trivial implementation, discovery, verification, and implementation self-check slices to subagents when the tooling is available and safe.
 
 Delegation authorization: invoking `/sdd-apply`, naming `sdd-apply`, or asking to apply/continue an active SDD change is explicit permission to use bounded SDD subagents under this skill's delegation model. If the local tool policy requires an explicit user request before spawning subagents, this skill invocation satisfies that requirement for non-trivial Discovery, implementation, verification, and self-check slices that remain inside the selected change. Do not ask for separate subagent permission unless the user passed `--no-delegate`, the requested delegation would exceed the selected change, the tool requires a more specific approval than normal spawning, or a stop condition applies.
 
@@ -37,12 +37,12 @@ Use `assets/epic-template.md` when creating a new Epic or normalizing an Epic fi
 
 ## Canonical Change And Repository Layout
 
-The one canonical active Change lives in the user-level store:
+The one canonical active Change lives in the workspace-level store:
 
-- proposal: `~/.sdd/changes/<yyyy-mm-dd-change-name>/proposal.md`
-- design: `~/.sdd/changes/<yyyy-mm-dd-change-name>/design.md`
-- tasks ledger: `~/.sdd/changes/<yyyy-mm-dd-change-name>/tasks.md`
-- closed history: `~/.sdd/changes/closed/<yyyy-mm-dd-change-name>/`
+- proposal: `<workspace>/.sdd/changes/<yyyy-mm-dd-change-name>/proposal.md`
+- design: `<workspace>/.sdd/changes/<yyyy-mm-dd-change-name>/design.md`
+- tasks ledger: `<workspace>/.sdd/changes/<yyyy-mm-dd-change-name>/tasks.md`
+- closed history: `<workspace>/.sdd/changes/closed/<yyyy-mm-dd-change-name>/`
 
 `tasks.md` frontmatter contains the active `status`, owning `space`, and `repositories` as stable portable repository IDs. One Change may coordinate any number of target repositories; never copy its artifacts into those repositories.
 
@@ -58,7 +58,7 @@ Project-local guidance may adapt branch policy, release-communication location, 
 
 ## Inputs And Modes
 
-Start from an explicit globally unique Change ID, central active Change path, or central active Change inferred from the conversation.
+Start from an explicit workspace-unique Change ID, central active Change path, or central active Change inferred from the conversation.
 
 Supported modes:
 
@@ -71,11 +71,11 @@ Supported modes:
 
 Invoking `/sdd-apply` in default or explicit full mode authorizes local commits for completed, verified slices when each affected target repository's branch policy allows them. A user instruction not to commit or the `--no-commit` flag overrides that authorization. This permission does not authorize push, merge, deploy, rebase, destructive data changes, deleting branches, touching credentials, or marking user acceptance complete.
 
-Closeout is not a special correctness mode. Always maintain closeout readiness as normal workflow truth. Move the one Change to `~/.sdd/changes/closed/` only when the user asks to close, finish, merge-and-close, or otherwise complete it, and only after every targeted repository has met its implementation, review, PR/merge, release, and accepted-gap gates. Closing still requires a completed `/sdd-review` or an explicit user override that review is not needed.
+Closeout is not a special correctness mode. Always maintain closeout readiness as normal workflow truth. Move the one Change to `<workspace>/.sdd/changes/closed/` only when the user asks to close, finish, merge-and-close, or otherwise complete it, and only after every targeted repository has met its implementation, review, PR/merge, release, and accepted-gap gates. Closing still requires a completed `/sdd-review` or an explicit user override that review is not needed.
 
 ## Select The Change
 
-Use an explicit globally unique Change ID or canonical active path when provided. Otherwise:
+Use an explicit workspace-unique Change ID or canonical active path when provided. Otherwise:
 
 1. Resolve the Space from the conversation and `sdd context <relevant-path> --json`.
 2. Run `sdd status <space-id> --json` and select only from the top-level unique `activeChanges`. Per-repository `activeChanges` and `recentChanges` are filtered projections for impact and history, not separately selectable Change records.
@@ -92,9 +92,9 @@ Always announce the selected central Change path, Change ID, target repository I
 
 Before editing, read:
 
-- `~/.sdd/changes/<change-id>/proposal.md`
-- `~/.sdd/changes/<change-id>/design.md`
-- `~/.sdd/changes/<change-id>/tasks.md`, including `status`, `space`, and the stable target `repositories`
+- `<workspace>/.sdd/changes/<change-id>/proposal.md`
+- `<workspace>/.sdd/changes/<change-id>/design.md`
+- `<workspace>/.sdd/changes/<change-id>/tasks.md`, including `status`, `space`, and the stable target `repositories`
 - the workspace workflow returned by `sdd context` and enough `sdd status <space-id> --json` output to resolve every target repository ID without treating its per-repository Change projections as copies
 - relevant PRD/Product Brief context under the resolved idea planning path
 - relevant workspace guidance and, in every target repository, `AGENTS.md`, README, branch/merge policy, and local project guidance; if no project-local policy exists, use documented project or workspace guidance as fallback
@@ -138,7 +138,7 @@ Check that:
 - Requirements and Scenarios describe observable behavior unless a technical detail is itself user-visible.
 - Scenarios are concrete enough to drive tests or manual checks. Do not proceed with generic Scenarios such as "WHEN this Story's workflow is exercised"; patch the artifact or stop for scope clarification.
 - the technical approach is sufficient for the next implementation slice without pretending the full implementation sequence is knowable.
-- the one central `tasks.md` has a usable `Resume Here`, repository-qualified Requirement/Scenario checklist, implementation and verification ledgers, living risk/confirmation matrix, decision fan-out ledger, verification-environment record, review-handoff candidates, blockers/open questions, and closeout area. It distinguishes repository-specific work, review, PR, and release state while keeping one global lifecycle status. Seed missing rows from current artifacts, code, and relevant recent reviews; do not require planning to have predicted every implementation discovery.
+- the one central `tasks.md` has a usable `Resume Here`, repository-qualified Requirement/Scenario checklist, implementation and verification ledgers, living risk/confirmation matrix, decision fan-out ledger, verification-environment record, review-handoff candidates, blockers/open questions, and closeout area. It distinguishes repository-specific work, review, PR, and release state while keeping one Change-wide lifecycle status. Seed missing rows from current artifacts, code, and relevant recent reviews; do not postpone required ledger repair until final cleanup.
 - every target repository's current branch satisfies project-local policy or documented fallback policy, and dirty state allows safe edits.
 - stale or already-implemented behavior cannot satisfy the new Requirements by accident.
 - tests and verification plans can prove the production path, not only helper or mock behavior.
@@ -258,7 +258,7 @@ Every delegated implementation prompt must include:
 - why each selected skill or guidance item applies to this slice
 - expected files or surfaces to inspect
 - allowed toolsets and edit permissions
-- explicit instruction not to commit, push, merge, close or move the central Change, create a repository-local Change copy, or update global Change status
+- explicit instruction not to commit, push, merge, close or move the central Change, create a repository-local Change copy, or update the Change-wide status
 - BDD/TDD expectation, including failing-first proof when practical
 - verification commands or browser/manual checks to run
 - required report shape
@@ -301,7 +301,7 @@ For every UI-bearing slice, rendered UI verification is required before review h
    - Use `assets/subagent-requirement-prompt.md`.
    - Pass every selected available skill or required guidance item and require the subagent to load and apply it.
    - Allow edits only for the assigned repository-local slice.
-   - Require the subagent to report central ledger updates instead of making global Change-status or closeout decisions.
+   - Require the subagent to report central ledger updates instead of making Change-wide status or closeout decisions.
 4. Follow BDD/TDD for the selected Requirement or Scenario when practical.
    - Translate Scenarios into concrete tests, browser checks, command checks, or manual scenarios.
    - Preserve Requirement and Scenario IDs in test names, verification notes, or `tasks.md` entries when that improves traceability.
@@ -369,17 +369,17 @@ For every UI-bearing slice, rendered UI verification is required before review h
    - Update the Implementation Risk And Confirmation Matrix, triggered Pattern Parity Matrix, triggered Boundary Contract Matrix, triggered Stateful Transition Matrix, Decision Fan-Out Ledger, Verification Environment, Verification Scope Decision, and per-repository Review Handoff Candidates from the slice's discoveries and evidence.
    - Add or refresh the repository-qualified Visual Verification Matrix and rendered-verification status.
    - Add or refresh manual UI confirmation steps and status.
-   - Keep each target repository's review record, manual confirmation status, release-communication status, PR/merge state, deferred gaps, and readiness consistent while preserving one global lifecycle status and central folder location.
+   - Keep each target repository's review record, manual confirmation status, release-communication status, PR/merge state, deferred gaps, and readiness consistent while preserving one Change-wide lifecycle status and central folder location.
    - Record any superseded Story/Requirement/Scenario wording and the repository-local artifact reconciliation performed.
    - Keep old proposal/design status text from contradicting completed work. If design sections still say `Not implemented yet`, `Not verified yet`, or implementation is pending after implementation has landed, update or clearly mark that text as historical before closeout.
    - Record consequential skill guidance or delegation outcomes only when they changed implementation, verification, artifacts, or stop conditions; also record blockers, departures, and repository-qualified commit hashes or commit candidates.
-   - Keep global `status: in_progress` while any target repository still has implementation, verification, remediation, review-handoff preparation, or unresolved blockers. Run `sdd change transition <space-id> <change-id> --from in_progress --to in_review` once, with no `--repo`, only after implementation is complete and every target repository is ready for independent `/sdd-review`.
+   - Keep `status: in_progress` while any target repository still has implementation, verification, remediation, review-handoff preparation, or unresolved blockers. Run `sdd change transition <space-id> <change-id> --from in_progress --to in_review` once, with no `--repo`, only after implementation is complete and every target repository is ready for independent `/sdd-review`.
    - Before a repository's implementation commit exists, record its relevant ledger rows as `commit pending`, `uncommitted`, or a clear commit candidate rather than inventing a hash.
 13. Commit locally in each affected target repository when authorized, the slice is verified, and its changes are commit-shaped.
    - In default/full mode, this is a required phase-boundary action before selecting, delegating, or implementing the next Requirement/Scenario. Do not postpone all commits until implementation completion or review handoff.
    - Prefer one focused commit for each coherent Requirement/Scenario phase in each participating repository. Combine slices only when they are inseparable to build or verify; split an unusually long phase into additional coherent, green checkpoint commits.
    - Recheck the diff and `git status` in each participating repository, stage only the exact intended files, and confirm each commit includes its implementation, tests, repository-local Epic truth, and supporting-doc reconciliation.
-   - Do not stage unrelated dirty files or try to stage `~/.sdd/changes/<change-id>/` into a target repository.
+   - Do not stage unrelated dirty files or try to stage `<workspace>/.sdd/changes/<change-id>/` into a target repository.
    - After each commit succeeds, immediately update the central `tasks.md` so `Resume Here`, the implementation ledger, verification ledger, repository closeout state, and PR/merge state reference the real repository ID and commit hash.
    - Run any commit-sensitive, generated-contract, clean-tree, migration, or exact-candidate checks against the corresponding repository commit when their result could differ from the uncommitted working tree.
    - In `--no-commit` mode, do not commit; keep the central `tasks.md` on repository-qualified commit candidates and say that hashes remain pending.
@@ -447,7 +447,7 @@ A change is implementation-complete only when:
 - the implementation self-check has no unresolved safe fixes.
 - the changed-surface reverse-traceability inventory ran and every relevant candidate was reconciled or recorded as a gap.
 - central `sdd validate` passes after the final Epic and Change reconciliation; any `--repo` projections cover the intended target set, and warnings are either resolved or explicitly classified.
-- the one central `tasks.md` has an accurate final `Resume Here`, repository-qualified implementation ledger, verification ledger, blockers/open questions, per-repository readiness, and global closeout state.
+- the one central `tasks.md` has an accurate final `Resume Here`, repository-qualified implementation ledger, verification ledger, blockers/open questions, per-repository readiness, and Change-wide closeout state.
 - `tasks.md` records the review outcome for every targeted repository as review paths, clean review records, or explicit user-approved review waivers before closeout.
 - `tasks.md` records manual UI confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
 - related proposal/design/tasks/review artifacts do not contain stale implementation-pending language or contradictory manual confirmation status unless clearly marked historical.
@@ -464,14 +464,14 @@ Implementation-complete means every targeted repository is ready for `/sdd-revie
 
 In default/full mode, do not report a partial-success handoff while any implementation-completion criterion remains safely achievable in any target repository. Once every criterion is satisfied, run `sdd change transition <space-id> <change-id> --from in_progress --to in_review` once, with no `--repo`, rerun central scoped validation, and only then report the Change as ready for `/sdd-review`. If readiness cannot be reached, name the exact repository-qualified Stop Condition and the evidence showing why continued safe in-scope work cannot resolve it.
 
-Do not move the Change to `~/.sdd/changes/closed/` unless the user explicitly asks to close, finish, merge-and-close, or otherwise complete it. Closing from `/sdd-apply` requires implementation completion and completed review/PR/release gates for every target repository plus a completed `/sdd-review`, or explicit user overrides recorded for the affected gates.
+Do not move the Change to `<workspace>/.sdd/changes/closed/` unless the user explicitly asks to close, finish, merge-and-close, or otherwise complete it. Closing from `/sdd-apply` requires implementation completion and completed review/PR/release gates for every target repository plus a completed `/sdd-review`, or explicit user overrides recorded for the affected gates.
 
 When closing:
 
 1. Finalize the active central `tasks.md` while it still has `status: in_review`. Ensure every target repository's closeout reflects its passing review outcome or waiver, review record, manual confirmation status, release-communication status, PR/merge state, remaining accepted risks, immutable candidate, and no contradictory checklist or Resume Here state.
    - Confirm manual confirmation status uses only `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
    - Confirm related central Change artifacts and repository-local Epics/supporting docs no longer contradict the accepted state, including stale `Not implemented yet`, `Not verified yet`, old boundary wording, or obsolete manual status vocabulary.
-2. Run `sdd change close <space-id> <change-id> --workspace <workspace-root>` exactly once, with no `--repo`. The command moves the one record to `~/.sdd/changes/closed/<change-id>/`; do not set `status: closed`.
+2. Run `sdd change close <space-id> <change-id> --workspace <workspace-root>` exactly once, with no `--repo`. The command moves the one record to `<workspace>/.sdd/changes/closed/<change-id>/`; do not set `status: closed`.
 3. Verify the central active path is gone, the closed path exists once, and no live reference points to the old active path unless it intentionally describes history.
 
 ## Stop Conditions
@@ -501,7 +501,7 @@ In `--step`, report the completed repository-qualified slice, files changed by r
 
 When stopping or completing, report:
 
-- central Change path, globally unique Change ID, target repository IDs, and final state
+- central Change path, workspace-unique Change ID, target repository IDs, and final state
 - manual feedback handled, if any, including its classification, affected repositories, and artifact updates
 - completed and remaining repository-qualified tasks
 - repository-local Epic files updated
@@ -511,7 +511,7 @@ When stopping or completing, report:
 - manual UI confirmation walkthrough for the user, or why none applies
 - commits by repository or repository-qualified commit candidates
 - remaining repository-qualified or cross-repository gaps and blockers
-- global Change status, each target repository's closeout readiness, and any contradictory state
+- Change-wide status, each target repository's closeout readiness, and any contradictory state
 - whether `/sdd-review`, any repository gate, central closeout, or acceptance remains pending
 
-Before reporting success, confirm that Discovery ran against the central Change, branch/git state was checked in every target repository, focused verification ran, required rendered UI evidence was directly inspected, applicable manual UI confirmation steps were produced, repository-local Epic truth and the one central Change were reconciled, `tasks.md` can cold-resume all target work, every targeted repository met the gate for the global transition or close being claimed, and no disallowed git/deploy/destructive action occurred.
+Before reporting success, confirm that Discovery ran against the central Change, branch/git state was checked in every target repository, focused verification ran, required rendered UI evidence was directly inspected, applicable manual UI confirmation steps were produced, repository-local Epic truth and the one central Change were reconciled, `tasks.md` can cold-resume all target work, every targeted repository met the gate for the Change-wide transition or close being claimed, and no disallowed git/deploy/destructive action occurred.

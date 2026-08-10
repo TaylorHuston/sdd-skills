@@ -4,25 +4,35 @@ import { basename, dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { parseDocument } from "yaml";
 
-import { listStoredChanges, relativeChangeStorePath } from "../change-store.js";
-import { resolveRepositoryTargets } from "../change-repositories.js";
+import {
+  readStoredChangesSnapshot,
+  readRequiredChangeFileSnapshot,
+  relativeChangeStorePath,
+} from "../change-store.js";
+import { recoverPendingChangeTransitions } from "./change-transition.js";
+import { resolveRepositoryTargetsForStatus } from "../change-repositories.js";
 import {
   CHANGE_STATUSES,
   LEGACY_CHANGE_STATUSES,
+  isRepositoryOnlyChangeMetadata,
   parseChangeMetadata,
 } from "../change-status.js";
 import {
   assertValidConfig,
-  getUserRoot,
   relativeWorkspacePath,
   resolveIdeaPlanningPath,
   resolveRepositoryArtifacts,
   resolveWorkspaceStatus,
   resolveWorkspacePath,
 } from "../config.js";
-import { resolveOperationConfiguration } from "../workspace.js";
+import {
+  isMetadataOnlyRepositorySpace,
+  resolveOperationConfiguration,
+  synthesizeRepositoryOnlySpaceFromChangeMetadata,
+} from "../workspace.js";
 import { SddError } from "../errors.js";
 import { isDirectory, pathExists } from "../fs.js";
+import { withWorkspaceMutationLock } from "../mutation.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -119,46 +129,78 @@ export async function readGitStatus(
   }
 }
 
-async function readCentralChanges(userRoot) {
-  const records = await listStoredChanges(userRoot);
-  const seen = new Set();
-  const changes = [];
-  for (const record of records) {
-    if (seen.has(record.changeId)) {
-      throw new SddError(`Change exists in both active and closed central locations: ${record.changeId}`, {
-        code: "CHANGE_LOCATION_COLLISION",
-      });
-    }
-    seen.add(record.changeId);
-    const tasksPath = join(record.path, "tasks.md");
-    if (!(await pathExists(tasksPath))) {
-      throw new SddError(`Change is missing tasks.md: ${relativeChangeStorePath(record.path, userRoot)}`, {
-        code: "INCOMPLETE_CHANGE",
-      });
-    }
-    const metadata = parseChangeMetadata(await readFile(tasksPath, "utf8"));
-    if (metadata.error) {
-      throw new SddError(
-        `Cannot parse Change metadata in ${relativeChangeStorePath(tasksPath, userRoot)}: ${metadata.error}`,
-        { code: "INVALID_CHANGE_METADATA" },
-      );
-    }
-    const statusValid = CHANGE_STATUSES.includes(metadata.status)
-      || (record.closed && LEGACY_CHANGE_STATUSES.includes(metadata.status));
-    changes.push({
-      changeId: record.changeId,
-      date: changeDate(record.changeId),
-      status: record.closed ? "closed" : statusValid ? metadata.status : "unknown",
-      storedStatus: metadata.status,
-      statusValid,
-      statusError: null,
-      closed: record.closed,
-      path: relativeChangeStorePath(record.path, userRoot),
-      spaceId: metadata.space,
-      repositories: [...metadata.repositories],
-    });
-  }
-  return changes.sort(compareRecent);
+async function readCentralChanges(
+  workspaceRoot,
+  {
+    afterChangeFileRead = null,
+    afterClosedChangeInventory = null,
+    afterStoredChangesInventory = null,
+  } = {},
+) {
+  return readStoredChangesSnapshot(
+    workspaceRoot,
+    async (records) => {
+      const seen = new Set();
+      const changes = [];
+      for (const record of records) {
+        if (seen.has(record.changeId)) {
+          throw new SddError(`Change exists in both active and closed central locations: ${record.changeId}`, {
+            code: "CHANGE_LOCATION_COLLISION",
+          });
+        }
+        seen.add(record.changeId);
+        const tasksPath = join(record.path, "tasks.md");
+        const tasksSnapshot = await readRequiredChangeFileSnapshot(
+          record.path,
+          "tasks.md",
+          workspaceRoot,
+          {
+            afterRead: afterChangeFileRead
+              ? (observation) => afterChangeFileRead({
+                  changeId: record.changeId,
+                  closed: record.closed,
+                  fileName: "tasks.md",
+                  ...observation,
+                })
+              : null,
+          },
+        );
+        if (tasksSnapshot === null) {
+          throw new SddError(`Change is missing tasks.md: ${relativeChangeStorePath(record.path, workspaceRoot)}`, {
+            code: "INCOMPLETE_CHANGE",
+          });
+        }
+        const metadata = parseChangeMetadata(tasksSnapshot.source);
+        if (metadata.error) {
+          throw new SddError(
+            `Cannot parse Change metadata in ${relativeChangeStorePath(tasksPath, workspaceRoot)}: ${metadata.error}`,
+            { code: "INVALID_CHANGE_METADATA" },
+          );
+        }
+        const statusValid = CHANGE_STATUSES.includes(metadata.status)
+          || (record.closed && LEGACY_CHANGE_STATUSES.includes(metadata.status));
+        changes.push({
+          changeId: record.changeId,
+          date: changeDate(record.changeId),
+          status: record.closed ? "closed" : statusValid ? metadata.status : "unknown",
+          storedStatus: metadata.status,
+          statusValid,
+          statusError: null,
+          closed: record.closed,
+          path: relativeChangeStorePath(record.path, workspaceRoot),
+          spaceId: metadata.space,
+          repositories: [...metadata.repositories],
+        });
+      }
+      return changes.sort(compareRecent);
+    },
+    {
+      afterInventory: afterStoredChangesInventory,
+      listOptions: {
+        afterClosedInventory: afterClosedChangeInventory,
+      },
+    },
+  );
 }
 
 async function readEpic(workspaceRoot, repository, epicPath) {
@@ -220,7 +262,10 @@ async function buildSpace(
     gitConcurrency = 4,
   } = {},
 ) {
-  const resolved = await resolveRepositoryTargets(workspaceRoot, config, space);
+  const resolution = isMetadataOnlyRepositorySpace(space)
+    ? { repositories: [], diagnostics: [] }
+    : await resolveRepositoryTargetsForStatus(workspaceRoot, config, space);
+  const resolved = resolution.repositories;
   const selectedRepositories = resolved
     .filter((repository) => includeInactiveRepositories || repository.status === "active");
   const repositories = await mapWithConcurrency(
@@ -272,6 +317,7 @@ async function buildSpace(
     activeChanges,
     recentChanges: closedChanges.slice(0, 5),
     unresolvedRepositoryIds,
+    repositoryDiagnostics: resolution.diagnostics,
     repositoryActivity,
     change: (activeChanges.length > 0 ? activeChanges : changes)[0] ?? null,
   };
@@ -299,13 +345,54 @@ export async function getStatus(
     gitCommand = "git",
     gitTimeoutMs = 10_000,
     gitConcurrency = 4,
-    userRoot = null,
+    workspaceRoot: requestedWorkspaceRoot = null,
+    afterChangeFileRead = null,
+    afterClosedChangeInventory = null,
+    afterStoredChangesInventory = null,
   } = {},
 ) {
-  userRoot ??= getUserRoot();
-  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath, { userRoot });
+  const { workspaceRoot, config } = await resolveOperationConfiguration(
+    startPath,
+    {
+      ...(requestedWorkspaceRoot ? { workspaceRoot: requestedWorkspaceRoot } : {}),
+      repositoryTopology: "observational",
+    },
+  );
   assertValidConfig(config, "read SDD status");
-  const centralChanges = await readCentralChanges(userRoot);
+  const configuredSpaceIds = new Set(Object.keys(config.ideas ?? {}));
+  const centralChanges = await withWorkspaceMutationLock(workspaceRoot, async () => {
+    await recoverPendingChangeTransitions(workspaceRoot);
+    return readCentralChanges(workspaceRoot, {
+      afterChangeFileRead,
+      afterClosedChangeInventory,
+      afterStoredChangesInventory,
+    });
+  });
+  for (const change of centralChanges) {
+    const metadata = {
+      error: null,
+      space: change.spaceId,
+      repositories: change.repositories,
+    };
+    synthesizeRepositoryOnlySpaceFromChangeMetadata(config, metadata);
+    const repositoryOnlyContext = config.ideas?.[change.spaceId]?._repositoryOnly === true;
+    if (
+      (!configuredSpaceIds.has(change.spaceId) || repositoryOnlyContext)
+      && !isRepositoryOnlyChangeMetadata(metadata)
+    ) {
+      throw new SddError(
+        `Change ${change.changeId} references unknown Space ID ${change.spaceId}.`,
+        {
+          code: "SPACE_NOT_FOUND",
+          details: Object.keys(config.ideas)
+            .filter((id) =>
+              configuredSpaceIds.has(id) && config.ideas[id]?._repositoryOnly !== true)
+            .sort()
+            .map((id) => `Available Space ID: ${id}`),
+        },
+      );
+    }
+  }
 
   if (spaceId !== null) {
     if (!Object.hasOwn(config.ideas, spaceId)) {
@@ -318,7 +405,6 @@ export async function getStatus(
       command: "status",
       mode: "space",
       workspaceRoot,
-      userRoot,
       ...(await buildSpace(workspaceRoot, config, spaceId, config.ideas[spaceId], centralChanges, {
         detail: true,
         gitCommand,
@@ -330,7 +416,13 @@ export async function getStatus(
 
   const spaces = [];
   for (const [id, space] of Object.entries(config.ideas).sort(([left], [right]) => left.localeCompare(right))) {
-    if (space._repositoryOnly === true) continue;
+    if (
+      space._repositoryOnly === true
+      && !isMetadataOnlyRepositorySpace(space)
+      && !centralChanges.some((change) => change.spaceId === id)
+    ) {
+      continue;
+    }
     if (!includeAll && resolveWorkspaceStatus(space.status) !== "active") continue;
     spaces.push(await buildSpace(workspaceRoot, config, id, space, centralChanges, {
       includeInactiveRepositories: includeAll,
@@ -343,7 +435,6 @@ export async function getStatus(
     command: "status",
     mode: "summary",
     workspaceRoot,
-    userRoot,
     filter: includeAll ? "all" : "active",
     spaces,
   };

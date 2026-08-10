@@ -1,4 +1,4 @@
 interface:
   display_name: "SDD Apply"
   short_description: "Apply one central Change across repository targets"
-  default_prompt: "Use $sdd-apply to select a planned or in-progress central Change, coordinate its one ledger across every targeted repository, and keep repository-local Epics, code, tests, ADRs, and supporting docs in their owners. A planned Change goes directly to Apply with no promotion stage; transition or close it once only after every target meets the global gate."
+  default_prompt: "Use $sdd-apply to select a planned or in-progress workspace-central Change, coordinate its one ledger across every targeted repository, and keep repository-local Epics, code, tests, ADRs, and supporting docs in their owners. A planned Change goes directly to Apply with no promotion stage; transition or close it once only after every target meets the Change-wide gate."

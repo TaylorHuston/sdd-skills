@@ -5,12 +5,12 @@ Use one aggregate record for the central Change and repeat the repository bundle
 ## Aggregate Release Scope
 
 - Target repository IDs:
-- Included central SDD Change IDs (do not include user-local paths):
+- Included central SDD Change IDs (do not include workspace-local paths):
 - Version decision by repository or shared release train: version update / no version update
 - User-confirmed release version/date, when applicable:
 - Cross-repository ordering, compatibility, or atomicity constraints: none
 - Aggregate release readiness: pending / ready / blocked
-- Global Change closeout eligibility: pending / ready / blocked
+- Change-wide closeout eligibility: pending / ready / blocked
 
 ## Repository Handoff: <repository-id>
 
@@ -113,4 +113,4 @@ Repeat this complete section for every target repository.
 - [ ] Cross-repository compatibility and ordering gates passed or are not applicable with reason
 - [ ] Repository-specific PR/merge/release/acceptance state is current in the one central ledger
 - [ ] No required target remains pending or blocked
-- [ ] Global Change closeout performed once, only after authorization and all target gates pass
+- [ ] Change-wide closeout performed once, only after authorization and all target gates pass

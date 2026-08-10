@@ -9,11 +9,11 @@ Review a SDD change like a local pull request. This is the final independent gat
 
 ## Authority And Project Profile
 
-Resolve the user installation, Space, one central Change, and every target repository with `sdd context <relevant-path> --json`; use `sdd status <space-id> --json` when Change selection is needed. Read the `workflowPath` returned by `sdd context` completely before judging artifact authority, traceability, evidence, reconciliation, or closeout. The one canonical active Change lives at `~/.sdd/changes/<change-id>/`, closed history lives at `~/.sdd/changes/closed/<change-id>/`, and `tasks.md` names the Space and target repositories by stable portable IDs. Epics, ADRs, implementation, tests, and supporting docs remain repository-local. Project guidance in each target repository owns source and target policy, required checks, merge/PR rules, truth-bearing supporting-doc requirements, release conventions, technology constraints, available review skills, and permissions. Treat idea-owned planned folders and repository-local active or closed Change folders as migration input only; direct the user to `sdd update` instead of reviewing them in place. If user setup is missing, direct the user to `sdd setup`; if a target repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
+Resolve the workspace installation, Space, one central Change, and every target repository with `sdd context <relevant-path> --json`; use `sdd status <space-id> --json` when Change selection is needed. Retain the resolved workspace root and pass `--workspace <workspace-root>` to subsequent SDD commands whenever the target repository is external to the workspace or the command's current directory is not inside that workspace. Read the `workflowPath` returned by `sdd context` completely before judging artifact authority, traceability, evidence, reconciliation, or closeout. The one canonical active Change lives at `<workspace>/.sdd/changes/<change-id>/`, closed history lives at `<workspace>/.sdd/changes/closed/<change-id>/`, and `tasks.md` names the Space plus stable target repository IDs. If workspace setup is missing, direct the user to `sdd setup [workspace-path]`.
 
 Default behavior is deep review. A clean `/sdd-review` means every targeted repository and the central evidence are technically ready for their selected targets, not merely that one repository or the Change folder looks plausible. Required manual acceptance and explicit integration authorization remain separate readiness gates. The primary review surface is every repository's source-vs-target diff plus the one central artifact set that claims to explain them. When default review returns `ready` for non-production targets and closeout readiness passes everywhere, treat merge-and-close as the obvious recommended next action and ask the user to confirm it. Use cheaper or narrower modes only when the user asks for them explicitly.
 
-Multi-repository invariant: derive the complete target set from `tasks.md` frontmatter, inspect every listed repository, and record repository-specific refs, gates, findings, verification, review freshness, PR/merge state, and closeout state in the one central review and ledger. A passing repository never makes the Change globally ready by itself. Transition or close the central Change only once, and only after every target repository has met the applicable global gate.
+Multi-repository invariant: derive the complete target set from `tasks.md` frontmatter, inspect every listed repository, and record repository-specific refs, gates, findings, verification, review freshness, PR/merge state, and closeout state in the one central review and ledger. A passing repository never makes the Change ready by itself. Transition or close the central Change only once, and only after every target repository has met the applicable Change-wide gate.
 
 Full-review invariant: complete the entire applicable discovery surface before issuing a verdict or beginning ordinary remediation. A `BLOCKING` or `REQUIRED` finding in one gate is evidence for the final verdict, not permission to skip later gates. Continue all independent read-only inspection, verification, and delegated passes even when integration is already known to be blocked. Halt the whole discovery wave early only when further inspection itself is unsafe or impossible, such as unresolved change/branch selection, inaccessible required inputs, an active destructive or production hazard, or required authorization for the next inspection step. When mutation, credentials, or user judgment block one gate, mark that gate `blocked` and finish every other independent gate that remains safe.
 
@@ -33,11 +33,11 @@ Always validate closeout readiness as part of review. If the user asks to finish
 
 ## Inputs And Modes
 
-Start from an explicit central Change path, globally unique Change ID, source branch, target branch, or active Change inferred from the conversation.
+Start from an explicit central Change path, workspace-unique Change ID, source branch, target branch, or active Change inferred from the conversation.
 
 Supported modes:
 
-- Default: run one complete deep PR-style discovery wave across every targeted repository and its selected target branch, finish every applicable gate even after findings are known, consolidate and validate the full finding set in the central Change, fix the complete safe in-scope subset as one batch, rerun affected checks, perform one regression-focused rereview, commit only verified repository-local safe-fix batches, and report one resulting global verdict with repository-specific results. Long-running or completed commands do not change this terminal condition. Do not pause after individual findings or require another `/sdd-review` invocation to discover omitted review categories. Do not create a PR, merge, push, or close the Change without confirmation. If the verdict is `ready` but manual confirmation is `pending user`, present the prepared walkthrough and report closeout readiness separately. If the verdict is `ready`, every selected target is non-production, and closeout readiness passes, ask whether to perform the policy-defined merge-and-close next.
+- Default: run one complete deep PR-style discovery wave across every targeted repository and its selected target branch, finish every applicable gate even after findings are known, consolidate and validate the full finding set in the central Change, fix the complete safe in-scope subset as one batch, rerun affected checks, perform one regression-focused rereview, commit only verified repository-local safe-fix batches, and report one consolidated verdict with repository-specific results. Long-running commands are continuation points, not stopping points.
 - `--deep`: explicit alias for default behavior.
 - `--fast`: run a lightweight review on the main thread only. Still check source-vs-target diff, required SDD artifacts, branch policy, dirty state, security, and verification evidence, but skip delegated review passes and broad optional checks unless a risk is obvious.
 - `--artifact-only`: review SDD artifacts, Epic truth, Change status, manual confirmation status, release-communication status, and PRD alignment when applicable. Do not review application code beyond what is necessary to confirm artifact claims. Do not return `ready` for integration from this mode; use `artifact-ready`, `changes-requested`, or `blocked`.
@@ -50,7 +50,7 @@ Supported modes:
 - `--pr`: when all gates pass, create a non-production pull request following the app's branch policy. If the target is the production branch, use `/sdd-release` instead.
 - `--merge`: when all gates pass, merge to the non-production integration branch following the app's branch policy. If the target is the production branch, use `/sdd-release` instead.
 - `--merge-and-close`: when all gates pass, complete the policy-defined non-production merge path and close the change. Treat this as explicit authorization for both the non-production merge/integration action and the closeout mutation, but not for push, rebase, branch deletion, deployment, production action, or remote PR merge unless the request or app policy explicitly covers that action.
-PR creation, merge, merge-and-close, push, rebase, branch deletion, deployment, destructive data changes, credentials, production actions, and `sdd change close` require explicit user authorization through the request or active workflow context. A request to create a PR or merge into a production branch is a release request and should route to `/sdd-release` unless the user explicitly states otherwise. A local commit containing only safe review fixes in a target repository is part of default review remediation and does not require separate authorization. The user-local central Change record is never staged, committed, or pushed with a target repository. If branch or merge policy is unclear in any target repository, stop before PR, merge, or closeout.
+PR creation, merge, merge-and-close, push, rebase, branch deletion, deployment, destructive data changes, credentials, production actions, and `sdd change close` require explicit user authorization through the request or active workflow context. A request to create a PR or merge into a production branch is a release request and should route to `/sdd-release` unless the user explicitly states otherwise. A local commit containing only safe review fixes in a target repository is part of default review remediation and does not require separate authorization. The workspace-local central Change record is never staged, committed, or pushed with a target repository. If branch or merge policy is unclear in any target repository, stop before PR, merge, or closeout.
 
 ## Select The Change And Repository Branches
 
@@ -67,7 +67,7 @@ Resolve source and target branches separately for every targeted repository from
 
 If a requested PR or merge target is a production branch, stop that repository's integration action and route it to `/sdd-release` unless project-local policy defines a different non-release production-branch workflow and the user explicitly confirms it.
 
-Always announce the selected central Change path and ID, the full target repository set, each repository's source and target branches, and whether PR, merge, and global closeout actions are authorized.
+Always announce the selected central Change path and ID, the full target repository set, each repository's source and target branches, and whether PR, merge, and Change-wide closeout actions are authorized.
 
 ## Build The Review Bundle
 
@@ -117,7 +117,7 @@ Prefer `git merge-tree --write-tree TARGET SOURCE` for each conflict check. Trea
 
 Treat each repository's `TARGET...SOURCE` as its primary PR-style review diff. Use working-tree diffs only to understand uncommitted repository fixes, generated files, or blockers. Do not allow unrelated dirty files outside a target repository to obscure its source-vs-target review.
 
-Record the central bundle summary and a repository-keyed bundle for every target in the central `review.md` when findings exist, or in central `tasks.md` when the review is clean and no `review.md` is required. Record immutable reviewed source commits per repository; branch names alone are not sufficient watermarks. Never place the user-local central Change files in a repository diff.
+Record the central bundle summary and a repository-keyed bundle for every target in the central `review.md` when findings exist, or in central `tasks.md` when the review is clean and no `review.md` is required. Record immutable reviewed source commits per repository; branch names alone are not sufficient watermarks. Never place the workspace-local central Change files in a repository diff.
 
 ## Resolve Verification Scope
 
@@ -133,12 +133,12 @@ Require integration-candidate proof separately in each repository whose target h
 
 Before reviewing, read:
 
-- `~/.sdd/changes/<change-id>/proposal.md`
-- `~/.sdd/changes/<change-id>/design.md`
-- `~/.sdd/changes/<change-id>/tasks.md`
-- existing `~/.sdd/changes/<change-id>/review.md`, if present
+- `<workspace>/.sdd/changes/<change-id>/proposal.md`
+- `<workspace>/.sdd/changes/<change-id>/design.md`
+- `<workspace>/.sdd/changes/<change-id>/tasks.md`
+- existing `<workspace>/.sdd/changes/<change-id>/review.md`, if present
 
-Validate that active `tasks.md` frontmatter uses `proposed`, `planned`, `in_progress`, or `in_review`, names the selected Space, and lists every target repository by stable portable ID. In mutating modes, run `sdd change transition <space-id> <change-id> --from in_progress --to in_review` once when implementation is complete in every targeted repository and independent review begins; retain `in_review` when review is already underway. Do not transition targets independently or pass repository flags. If any repository is not ready for independent review, record its state centrally and leave the global status unchanged. In `--check`, report stale or invalid metadata without editing it.
+Validate that active `tasks.md` frontmatter uses `proposed`, `planned`, `in_progress`, or `in_review`, names the selected Space, and lists every target repository by stable portable ID. In mutating modes, run `sdd change transition <space-id> <change-id> --from in_progress --to in_review` once when implementation is complete in every targeted repository and independent review begins; retain `in_review` when review is already underway. Do not transition targets independently or pass repository flags. If a Change ID collides in the selected workspace's active and closed stores, stop rather than selecting either record.
 - Run `sdd validate <space-id> --change <change-id> --workspace <workspace-root> --json` before the broad review wave and again after central artifact remediation. Use `--repo <repository-id>` to project the same central record into each target repository when contextual validation is needed; this validation filter does not create a repository-owned Change. Treat deterministic errors as review findings and inspect warnings, but continue the independent diff, implementation-truth, evidence-strength, security, docs, and acceptance review even when validation passes.
 - project-defined release communication in each affected repository when the proposal or task ledger says it is affected, or implementation changes public release meaning
 - relevant target Epic files under each repository's canonical Epic path
@@ -153,7 +153,7 @@ Validate that active `tasks.md` frontmatter uses `proposed`, `planned`, `in_prog
 - every source-vs-target diff and changed file list
 - code, tests, generated files, docs, and configuration touched by the Change in every target repository
 
-Check git status in every target repository that may change. Preserve unrelated dirty files. The central Change record is user-local state outside those repositories: update it as the single ledger, but never stage, commit, or push it with repository work.
+Check git status in every target repository that may change. Preserve unrelated dirty files. The central Change record is workspace-local state outside those repositories: update it as the single ledger, but never stage, commit, or push it with repository work.
 
 For review readiness, uncommitted files outside a targeted source repository do not block that repository's review, PR, or merge readiness unless they are explicitly part of the requested branch operation. Report adjacent-repository dirty state clearly without treating it as a second Change owner. Target-repository dirty state still blocks readiness when it is part of the Change and is not committed or explicitly deferred.
 
@@ -200,7 +200,7 @@ Use the main thread only when:
 - subagent tooling is unavailable
 - the user needs to answer a question before a reviewer can be scoped
 
-Parallelize read-only delegated review passes when their scopes do not overlap. Do not delegate global Change-status decisions, commits, PR creation, merges, central closeout, branch operations, or final verdicts.
+Parallelize read-only delegated review passes when their scopes do not overlap. Do not delegate Change-wide status decisions, commits, PR creation, merges, central closeout, branch operations, or final verdicts.
 
 Treat all materially relevant delegated passes plus the orchestrator's own inspection as one review discovery wave. Do not begin ordinary remediation while required passes are still outstanding. Once the wave completes or reaches the bounded fallback threshold:
 
@@ -236,7 +236,7 @@ Treat subagent output as evidence, not final truth. Validate important claims by
 
 Run every gate that applies and record `pass`, `findings`, `blocked`, or `not applicable`. Do not short-circuit this list because an earlier gate already guarantees `changes-requested` or `blocked`; complete later independent gates so the user receives one comprehensive finding set. Before finalizing, confirm that every gate has an explicit result and that no delegated or main-thread review pass remains uncollected. Apply the detailed semantics from the managed workflow document, the canonical templates, selected available review skills, and project guidance instead of restating them here.
 
-1. **Artifact truth**: the one central proposal, design, task ledger, and review; repository-local Epic/Story truth; Requirements; Scenarios; independent implementation/verification state; behavior and evidence maps; implementation/verification gaps; target repository metadata; repository-specific ledger results; and global Change status agree with implementation reality in every target.
+1. **Artifact truth**: the one central proposal, design, task ledger, and review; repository-local Epic/Story truth; Requirements; Scenarios; independent implementation/verification state; behavior and evidence maps; implementation/verification gaps; target repository metadata; repository-specific ledger results; and Change-wide status agree with implementation reality in every target.
 2. **Canonical map authority and cold navigation**: confirm every Story has one current `Implemented By` map and one current `Verified By` map, with no competing `Prior`, `Detailed`, `Legacy`, or migration-era maps. For every changed Requirement, and for Scenarios with distinct owners, start from the Epic and identify the primary governing definition, registration, or configuration plus stable anchor without a repository-wide rediscovery search. Treat imports, call sites, incidental handlers, broad file tokens, files cited for a different symbol, undifferentiated dumps, mappings that stop at UI/tests, missing paths/anchors, and unclassified support files as findings.
 3. **Source-vs-target code review**: review the actual diff and source-only commits for correctness, regressions, maintainability, accidental scope, project-pattern fit, and user-visible state handling.
 4. **Pattern conformance**: when the diff adds or changes a surface parallel to an established adapter, client, route, workspace, worker, migration, command, or similar implementation, identify the closest current reference and compare applicable auth/session/CSRF, retry, timeout/cancel, error/conflict, recovery, pending-write, identity, route-context, configuration, generated-contract, accessibility, and visual-token behavior plus focused tests. Unexplained divergence or copied defects are findings.
@@ -249,7 +249,7 @@ Run every gate that applies and record `pass`, `findings`, `blocked`, or `not ap
 11. **Rendered UI verification**: for every UI-bearing change, independently render current source, open the affected surfaces, exercise changed interactions, directly inspect screenshots or rendered results, and inspect relevant console and network failures. Cover the proportional Visual Verification Matrix, including representative desktop/mobile viewports and applicable default, loading, empty, error, populated, long-content, focus, selected, disabled, permission, and recovery states. Prefer project-owned browser, screenshot, or preview tooling, then an available runtime browser capability, rendered preview or fixture, or manual browser capture. A green build, passing non-visual tests, apply-side screenshots alone, or generated-but-uninspected images cannot pass this gate. If no available path can render a required surface, mark the gate `blocked` unless the user explicitly accepts the gap.
 12. **Manual acceptance**: user-facing changes have the workflow-defined walkthrough and status when applicable. A complete current walkthrough with status `pending user` does not make the review `changes-requested`, though project policy may keep integration or closeout pending until confirmation. Owner manual acceptance is distinct from the reviewer's rendered UI verification and does not substitute for it.
 13. **Supporting truth**: required project docs, release communication, generated indexes, ADRs, and product direction do not contradict the implementation or Epic map. The resolved Idea's current entry-point docs must identify the selected repository and repository lifecycle correctly, agree with `.sdd/config.yaml`, and avoid describing implemented replacement work as future or an archived repository as active. Clearly dated exploration, decisions, and historical sections may preserve their original point-in-time language when they are recognizable as history rather than current routing guidance.
-14. **Integration readiness**: each repository's source, target, reviewed commit, prospective integration tree, dirty state, conflict state, required checks, authorization, and policy-defined PR/merge path are unambiguous; required integration-candidate proof passes for every exact tree that will be integrated; the central ledger contains no missing target; and global closeout remains gated on the complete target set.
+14. **Integration readiness**: each repository's source, target, reviewed commit, prospective integration tree, dirty state, conflict state, required checks, authorization, and policy-defined PR/merge path are unambiguous; required integration-candidate proof passes for every exact tree that will be integrated; the central ledger contains no missing target; and Change-wide closeout remains gated on the complete target set.
 
 For UI-bearing changes with a recorded component strategy, verify that required component-state evidence exists through configured previews or equivalent rendered-route, fixture, browser, or manual evidence; adopted source follows the project's ownership model; application-specific behavior did not leak into a generic reference; deliberate divergences preserve accepted product behavior; and anything described as shared or standardized has implemented consumer use outside the catalog itself at the level required by project guidance. A candidate that remains explicitly experimental is not a finding merely because it has not yet been promoted. Use apply-side visual evidence to target the independent review, but reproduce and directly inspect representative current rendering rather than accepting that evidence on trust.
 
@@ -271,9 +271,9 @@ Classify findings as:
 - `REQUIRED`: should be resolved unless the user explicitly accepts the risk.
 - `SUGGESTION`: non-blocking improvement.
 
-When unresolved `BLOCKING` or `REQUIRED` findings remain after consolidated safe remediation and regression rereview, create or update the one central review artifact at `~/.sdd/changes/<change-id>/review.md` using `assets/review-template.md`. Record findings and outcomes by repository when they are not global. Do not create repository-local review copies or duplicate the template in this skill.
+When unresolved `BLOCKING` or `REQUIRED` findings remain after consolidated safe remediation and regression rereview, create or update the one central review artifact at `<workspace>/.sdd/changes/<change-id>/review.md` using `assets/review-template.md`. Record findings and outcomes by repository when they are not Change-wide. Do not create repository-local review copies or duplicate the template in this skill.
 
-If the review is clean, a separate central review artifact is optional unless project policy requires one. Record the global verdict, date, review scope, and manual confirmation status plus each repository's source, target, exact reviewed source commit, and gate result in the central task ledger so later PR stewardship can detect review staleness.
+If the review is clean, a separate central review artifact is optional unless project policy requires one. Record the consolidated verdict, date, review scope, and manual confirmation status plus each repository's source, target, exact reviewed source commit, and gate result in the central task ledger so later PR stewardship can detect review staleness.
 
 ## Remediation
 
@@ -312,10 +312,10 @@ When the global verdict is `ready` but required manual confirmation is `pending 
 
 When all gates pass in every targeted repository:
 
-- If any selected target is a production branch, do not create that PR or merge from `/sdd-review`; record that repository as locally ready, hand it to `/sdd-release`, and keep global closeout pending.
-- If `--pr` is authorized, create each policy-required non-production PR in the authorized target repositories. Include a public-safe Change ID, summary, Requirements/Scenarios covered, verification evidence, security review result, and remaining non-blocking risks; never expose the user-local central path.
+- If any selected target is a production branch, do not create that PR or merge from `/sdd-review`; record that repository as locally ready, hand it to `/sdd-release`, and keep Change-wide closeout pending.
+- If `--pr` is authorized, create each policy-required non-production PR in the authorized target repositories. Include a public-safe Change ID, summary, Requirements/Scenarios covered, verification evidence, security review result, and remaining non-blocking risks; never expose the workspace-local central path.
 - If `--merge` is authorized, merge the authorized target repositories following each repository's policy. Recheck target branch, conflict state, dirty state, and required checks immediately before every merge.
-- If `--merge-and-close` is authorized, complete every policy-defined non-production integration first, then close the central Change once. Recheck each repository's target branch, conflict state, dirty state, required checks, and closeout row immediately before its merge and recheck the complete ledger before close. If any repository policy requires a PR, push, rebase, remote PR merge, or another action not explicitly authorized, stop before that action and keep global closeout pending.
+- If `--merge-and-close` is authorized, complete every policy-defined non-production integration first, then close the central Change once. Recheck each repository's target branch, conflict state, dirty state, required checks, and closeout row immediately before its merge and recheck the complete ledger before close. If any repository policy requires a PR, push, rebase, remote PR merge, or another action not explicitly authorized, stop before that action and keep Change-wide closeout pending.
 - If neither `--pr`, `--merge`, nor `--merge-and-close` is authorized and every ready target is non-production, ask the user whether to perform the policy-defined merge-and-close now. Spell out each repository's source branch, target branch, merge strategy or policy requirement, the single `sdd change close <space-id> <change-id>` transition, and any action that still requires separate authorization such as push, rebase, branch deletion, remote PR merge, or deployment.
 - If neither `--pr`, `--merge`, nor `--merge-and-close` is authorized and any ready target is production, report the repository-specific readiness and hand off to `/sdd-release`.
 
@@ -324,10 +324,10 @@ Do not push unless explicitly authorized or required by an explicitly requested 
 When merge-and-closing:
 
 1. Follow each target repository's local `AGENTS.md` merge policy for target branch, merge strategy, PR requirements, and whether direct integration-branch commits are allowed.
-2. Perform every required non-production merge/integration step before global closeout unless project policy explicitly says otherwise. One completed repository does not authorize early close.
+2. Perform every required non-production merge/integration step before Change-wide closeout unless project policy explicitly says otherwise. One completed repository does not authorize early close.
 3. After each integration succeeds, confirm its actual integrated tree matches the reviewed integration candidate. If it differs, rerun that repository's required integration-candidate gates. Update the one central closeout record with repository-keyed tested and actual trees/commits, aggregate results, PR/merge status, target branches, dates, review outcomes, manual confirmation, release communication, and accepted risks.
-4. Only after every targeted repository row passes, run `sdd change close <space-id> <change-id>` once. Do not pass `--repo`, do not repeat the command per target, and do not stage, commit, or push the user-local central closeout mutation.
-5. Verify the central record now exists only at `~/.sdd/changes/closed/<change-id>/`, no active central duplicate remains, and repository-local references are current or clearly historical.
+4. Only after every targeted repository row passes, run `sdd change close <space-id> <change-id>` once. Do not pass `--repo`, do not repeat the command per target, and do not stage, commit, or push the workspace-local central closeout mutation.
+5. Verify the central record now exists only at `<workspace>/.sdd/changes/closed/<change-id>/`, no active central duplicate remains, and repository-local references are current or clearly historical.
 
 When closing without an integration action:
 
@@ -393,7 +393,7 @@ Include:
 - test and verification commands/results, with every pending live-provider or production-path check classified as required verification, optional confidence evidence, or manual acceptance and reflected in the verdict
 - rendered UI verification result, including surfaces, viewports, states/interactions, directly inspected evidence, console/network outcome, and any blocked or accepted rows; say `not applicable` with a reason when the change is not UI-bearing
 - manual UI confirmation walkthrough status, plus a concise `Suggested manual UI testing` list with route/setup/actions/expected result for anything the user should confirm; say `none` when no manual UI confirmation is useful
-- global Change status, repository-specific closeout readiness, and any contradictory state
+- Change-wide status, repository-specific closeout readiness, and any contradictory state
 - formal security review result
 - docs result
 - Idea-side repository and current-state truth result

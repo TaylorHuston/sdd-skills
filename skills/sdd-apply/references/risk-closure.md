@@ -148,4 +148,4 @@ Before transitioning the central Change once to `in_review`:
 - leave no required risk, dependency, fan-out, environment, verification, review, PR, or release row silently pending or blocked for any target
 - run repository-scoped fresh-context failure-seeking passes against each committed diff and a cross-repository pass when shared contracts or sequencing require it
 
-Only after every target satisfies these rows may the orchestrator run the global transition, without `--repo`. This Apply-side gate reduces predictable review churn. It does not replace independent `/sdd-review`.
+Only after every target satisfies these rows may the orchestrator run the Change-wide transition, without `--repo`. This Apply-side gate reduces predictable review churn. It does not replace independent `/sdd-review`.

@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
 import { configureWorkspace } from "./commands/configure.js";
@@ -10,70 +10,86 @@ import { transitionChange } from "./commands/change-transition.js";
 import { diagnoseWorkspace } from "./commands/doctor.js";
 import { createEpic } from "./commands/epic-create.js";
 import { initRepository, setupInstallation } from "./commands/init-installation.js";
-import { initWorkspace } from "./commands/init.js";
 import { getStatus } from "./commands/status.js";
 import { updateWorkspace } from "./commands/update.js";
 import { validateArtifacts } from "./commands/validate.js";
+import { repositoryMatchesSelector } from "./change-repositories.js";
+import {
+  assertValidConfig,
+  assertValidRepositoryConfig,
+  findRepositoryRoot,
+  readRepositoryConfig,
+  readWorkspaceConfig,
+  resolveRepositoryPath,
+  resolveWorkspacePath,
+} from "./config.js";
+import { isPathPhysicallyInside, resolvePhysicalPath } from "./fs.js";
 import { PACKAGE_JSON_PATH } from "./constants.js";
 import { SddError } from "./errors.js";
 import {
   collectConfigureOptions,
-  collectInitOptions,
   collectSetupOptions,
 } from "./prompts.js";
+import { findOperationConfiguration } from "./workspace.js";
 
 const HELP = `Story-Driven Development CLI
 
 Usage:
-  sdd setup [options]             Set up user-level configuration and global skills
-  sdd init [path] [options]       Initialize one repository
-  sdd configure [path] [options]  Repair configured user topology paths
-  sdd update [path] [options]     Update user skills or a legacy installation
-  sdd doctor [path] [--json]      Validate SDD installation, topology, guidance, repository, and Changes
-  sdd context [path] [--json]     Resolve the current planning/repository context
-  sdd status [space-id] [options] List Space status or show one Space in detail
-  sdd validate [space-id] [options] Validate SDD artifact structure and references
-  sdd epic create [options]       Scaffold a canonical Epic in one repository
-  sdd change create [options]     Scaffold a central Change for a Space
-  sdd change transition [options] Guard one active Change status transition
-  sdd change close [options]      Move an in-review Change into central closed history
-  sdd --version                   Print the package version
+  sdd setup [workspace-path] [options]  Set up one workspace installation and managed skills
+  sdd init [path] [options]             Initialize one repository
+  sdd configure [path] [options]        Repair configured workspace topology paths
+  sdd update [path] [options]           Update workspace workflow, skills, or legacy artifacts
+  sdd doctor [path] [options]           Validate the workspace installation and mapped artifacts
+  sdd context [path] [options]          Resolve planning/repository context in one workspace
+  sdd status [space-id] [options]       List Space status or show one Space in detail
+  sdd validate [space-id] [options]     Validate SDD artifact structure and references
+  sdd epic create [options]             Scaffold a canonical Epic in one repository
+  sdd change create [options]           Scaffold a workspace-central Change for a Space
+  sdd change transition [options]       Guard one active Change status transition
+  sdd change close [options]            Move an in-review Change into workspace closed history
+  sdd --version                         Print the package version
 
 Setup options:
-  --from-workspace <path>         Migrate an existing pre-1.0 workspace configuration
+  --from-user <path>              Migrate an explicit legacy home-root installation
   --planning-root <path>          Override detected planning root
   --repository-root <path>        Add a repository root; may be repeated
-  --skills-dir <path>             User skill directory (default: ~/.agents/skills)
+  --skills-dir <path>             Managed skill directory inside the workspace (default: .agents/skills)
   --yes                           Accept detected paths without interactive questions
   --dry-run                       Report without writing files
-  --force                         Replace conflicting managed skills
+  --force                         Replace conflicting destination managed workflow or skills
   --json                          Emit machine-readable JSON
 
 Init options:
   --repo-id <id>                  Override the repository ID derived from the directory name
-  --legacy-workspace              Initialize the deprecated pre-1.0 workspace contract
+  --workspace <path>              Select the owning workspace explicitly
   --dry-run                       Report without writing files
   --json                          Emit machine-readable JSON
 
 Configure options:
+  --workspace <path>              Select the owning workspace explicitly
   --planning-root <path>          Set the planning root
   --repository-root <name=path>   Set a named repository root; may be repeated
   --yes                           Accept detected replacements without prompting
   --dry-run                       Report changes without writing configuration
   --json                          Emit machine-readable JSON
 
+Doctor and context options:
+  --workspace <path>              Select the owning workspace explicitly
+  --json                          Emit machine-readable JSON
+
 Update options:
+  --workspace <path>              Select the owning workspace explicitly
   --dry-run                       Report without writing files
   --force                         Replace conflicting managed workflow or skills
   --json                          Emit machine-readable JSON
 
 Status options:
-  --workspace <path>              Resolve status from this path (default: current directory)
+  --workspace <path>              Select the owning workspace explicitly
   --all                           Include inactive and archived ideas and repositories
   --json                          Emit machine-readable JSON
 
 Validate options:
-  --workspace <path>              Resolve SDD context from this path (default: current directory)
+  --workspace <path>              Select the owning workspace explicitly
   --repo <path>                   Select a mapped repository; may be repeated
   --change <change-id>            Validate one active or closed Change
   --epic <epic-id>                Validate one Epic
@@ -84,7 +100,7 @@ Epic create usage:
   sdd epic create <space-id> <epic-id> <slug> [options]
 
 Epic create options:
-  --workspace <path>              Resolve SDD context from this path (default: current directory)
+  --workspace <path>              Select the owning workspace explicitly
   --repo <path>                   Select the target mapped repository
   --date <yyyy-mm-dd>             Override the local creation date
   --dry-run                       Report the scaffold without writing files
@@ -94,7 +110,7 @@ Change create usage:
   sdd change create <space-id> <slug> [options]
 
 Change create options:
-  --workspace <path>              Resolve SDD context from this path (default: current directory)
+  --workspace <path>              Select the owning workspace explicitly
   --repo <path>                   Select a mapped repository; may be repeated
   --date <yyyy-mm-dd>             Override the local creation date
   --dry-run                       Report the scaffold without writing files
@@ -105,7 +121,7 @@ Change transition usage:
   sdd change transition <space-id> <change-id> --from <status> --to <status> [options]
 
 Change transition options:
-  --workspace <path>              Resolve SDD context from this path (default: current directory)
+  --workspace <path>              Select the owning workspace explicitly
   --from <status>                 Require the current active Change status
   --to <status>                   Set the next allowed active Change status
   --dry-run                       Report the transition without writing tasks.md
@@ -115,7 +131,7 @@ Change close usage:
   sdd change close <space-id> <change-id> [options]
 
 Change close options:
-  --workspace <path>              Resolve SDD context from this path (default: current directory)
+  --workspace <path>              Select the owning workspace explicitly
   --dry-run                       Report the closeout without moving files
   --json                          Emit machine-readable JSON
 `;
@@ -128,12 +144,12 @@ Usage:
   sdd change close <space-id> <change-id> [options]
 
 Commands:
-  create      Scaffold one canonical central Change
+  create      Scaffold one canonical workspace-central Change
   transition  Guard and apply an allowed active Change status transition
-  close       Move an in-review Change into central closed history
+  close       Move an in-review Change into workspace closed history
 
 Shared options:
-  --workspace <path>  Resolve the initialized user installation (default: current directory)
+  --workspace <path>  Select the owning workspace explicitly
   --dry-run           Report without writing files
   --json              Emit machine-readable JSON
 `;
@@ -165,19 +181,243 @@ function commandOptions(extra = {}) {
 function parseCommandArgs(args, options) {
   return parseArgs({ args, options, allowPositionals: true, strict: true });
 }
+function requireNonEmptyPath(value, label) {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new SddError(`${label} requires a non-empty path.`, { code: "USAGE" });
+  }
+  return value;
+}
+
+function pathOption(values, name) {
+  if (values[name] === undefined) return undefined;
+  return requireNonEmptyPath(values[name], `--${name}`);
+}
+
+function pathOptionValues(values, name) {
+  if (values[name] === undefined) return undefined;
+  if (!Array.isArray(values[name])) {
+    throw new SddError(`--${name} requires a non-empty path.`, { code: "USAGE" });
+  }
+  return values[name].map((value) => requireNonEmptyPath(value, `--${name}`));
+}
+
+function resolvePathOption(values, name) {
+  const value = pathOption(values, name);
+  return value === undefined ? null : resolve(value);
+}
+function environmentWorkspaceAuthority() {
+  const value = process.env.SDD_WORKSPACE_ROOT;
+  return typeof value === "string" && value.trim().length > 0 ? resolve(value) : null;
+}
+
+function effectiveWorkspaceAuthority(requestedWorkspaceRoot = null) {
+  return requestedWorkspaceRoot ?? environmentWorkspaceAuthority();
+}
+
+
 
 function requireAtMostOnePath(positionals, command) {
   if (positionals.length > 1) {
     throw new SddError(`${command} accepts at most one path.`, { code: "USAGE" });
   }
-  return resolve(positionals[0] ?? process.cwd());
+  return positionals[0] === undefined
+    ? resolve(process.cwd())
+    : resolve(requireNonEmptyPath(positionals[0], `${command} path`));
+}
+async function resolveConfiguredRepositoryStartPath(
+  workspaceRoot,
+  repositories,
+  spaceId,
+  { tolerateUnresolvedMappings = false } = {},
+) {
+  const config = assertValidConfig(
+    await readWorkspaceConfig(workspaceRoot),
+    "resolve a CLI repository target",
+  );
+  const configuredRepositoryRoots = Object.values(config.repositories.roots ?? {}).map(
+    (configuredRoot) => resolveWorkspacePath(workspaceRoot, configuredRoot),
+  );
+  const hasConfiguredSpace = spaceId !== null
+    && spaceId !== undefined
+    && Object.hasOwn(config.ideas ?? {}, spaceId);
+  const selector = repositories.length === 1
+    ? repositories[0]
+    : repositories.length === 0 && !hasConfiguredSpace
+      && spaceId !== null && spaceId !== undefined
+      ? spaceId
+      : null;
+  if (selector === null) {
+    return { configuredRepositoryRoots, hasConfiguredSpace, targetPath: null };
+  }
+
+  const spaces = hasConfiguredSpace
+    ? [[spaceId, config.ideas[spaceId]]]
+    : Object.entries(config.ideas ?? {});
+  const candidates = spaces.flatMap(([, space]) =>
+    (space.repositories ?? []).map((repository) => ({
+      ...repository,
+      resolvedPath: resolveRepositoryPath(config, repository),
+    })));
+
+  const pathMatchResults = await Promise.allSettled(
+    candidates.map((repository) =>
+      repositoryMatchesSelector(workspaceRoot, repository, selector)),
+  );
+  const pathMatches = candidates.filter(
+    (_, index) => pathMatchResults[index].status === "fulfilled"
+      && pathMatchResults[index].value,
+  );
+  const pathMatchError = pathMatchResults.find((result) => result.status === "rejected");
+  if (pathMatches.length === 1) {
+    return {
+      configuredRepositoryRoots,
+      hasConfiguredSpace,
+      targetPath: resolveWorkspacePath(workspaceRoot, pathMatches[0].resolvedPath),
+    };
+  }
+  if (pathMatches.length > 1) {
+    return { configuredRepositoryRoots, hasConfiguredSpace, targetPath: null };
+  }
+
+  const identityTargets = new Set([
+    ...candidates.map((repository) =>
+      resolveWorkspacePath(workspaceRoot, repository.resolvedPath)),
+    ...configuredRepositoryRoots,
+  ]);
+  const identityMatches = [];
+  for (const targetPath of identityTargets) {
+    try {
+      if ((await readRepositoryConfig(targetPath))?.id === selector) {
+        identityMatches.push(targetPath);
+      }
+    } catch {
+      // Selection reports malformed configured identities after target routing is settled.
+    }
+  }
+  if (
+    identityMatches.length === 0
+    && pathMatchError
+    && !tolerateUnresolvedMappings
+  ) {
+    throw pathMatchError.reason;
+  }
+  return {
+    configuredRepositoryRoots,
+    hasConfiguredSpace,
+    targetPath: identityMatches.length === 1 ? identityMatches[0] : null,
+  };
 }
 
-function requireNoPositionals(positionals, command) {
-  if (positionals.length > 0) {
-    throw new SddError(`${command} does not accept a path.`, { code: "USAGE" });
+async function repositoryIsWithinConfiguredRoots(repositoryRoot, configuredRoots) {
+  for (const configuredRoot of configuredRoots) {
+    if (await isPathPhysicallyInside(configuredRoot, repositoryRoot)) return true;
   }
+  return false;
 }
+
+// Configured authority must not erase an explicitly identified repository target,
+// but it also must not turn an unrelated checkout into an implicit target.
+async function resolveCommandStartPath(
+  workspaceRoot = null,
+  repositories = [],
+  spaceId = null,
+  { observational = false } = {},
+) {
+  if (repositories.length === 1 && isAbsolute(repositories[0])) {
+    return resolve(repositories[0]);
+  }
+  const cwd = resolve(process.cwd());
+  const authorityWorkspaceRoot = effectiveWorkspaceAuthority(workspaceRoot);
+  if (authorityWorkspaceRoot === null) return cwd;
+  const configured = await resolveConfiguredRepositoryStartPath(
+    authorityWorkspaceRoot,
+    repositories,
+    spaceId,
+    { tolerateUnresolvedMappings: observational },
+  );
+  if (configured.targetPath) return configured.targetPath;
+  if (configured.hasConfiguredSpace) return authorityWorkspaceRoot;
+
+  let cwdRepositoryRoot = null;
+  let cwdRepositoryConfig = null;
+  try {
+    cwdRepositoryRoot = await findRepositoryRoot(cwd);
+    cwdRepositoryConfig = cwdRepositoryRoot
+      ? assertValidRepositoryConfig(await readRepositoryConfig(cwdRepositoryRoot))
+      : null;
+  } catch {
+    // An unrelated malformed checkout cannot override configured workspace authority.
+  }
+  if (
+    (spaceId === null || spaceId === undefined)
+    && repositories.length === 0
+    && cwdRepositoryConfig
+  ) {
+    const configuredCwd = await resolveConfiguredRepositoryStartPath(
+      authorityWorkspaceRoot,
+      [cwdRepositoryConfig.id],
+      null,
+      { tolerateUnresolvedMappings: observational },
+    );
+    if (configuredCwd.targetPath) {
+      const [physicalCwdRepository, physicalConfiguredTarget] = await Promise.all([
+        resolvePhysicalPath(cwdRepositoryRoot),
+        resolvePhysicalPath(configuredCwd.targetPath),
+      ]);
+      if (physicalCwdRepository === physicalConfiguredTarget) {
+        return configuredCwd.targetPath;
+      }
+    }
+    if (await repositoryIsWithinConfiguredRoots(
+      cwdRepositoryRoot,
+      configured.configuredRepositoryRoots,
+    )) {
+      return cwdRepositoryRoot;
+    }
+    return authorityWorkspaceRoot;
+  }
+  if (
+    (
+      cwdRepositoryConfig?.id === spaceId
+      || repositories.includes(cwdRepositoryConfig?.id)
+    )
+    && await repositoryIsWithinConfiguredRoots(
+      cwdRepositoryRoot,
+      configured.configuredRepositoryRoots,
+    )
+  ) {
+    return cwdRepositoryRoot;
+  }
+  return authorityWorkspaceRoot;
+}
+
+// Contained selectors use portable workspace paths; external selectors retain absolute identity.
+function normalizeRepositorySelectors(workspaceRoot = null, repositories = []) {
+  if (!workspaceRoot) return repositories;
+  const resolvedWorkspaceRoot = resolve(workspaceRoot);
+  return repositories.map((repository) => {
+    if (!isAbsolute(repository)) return repository;
+    const resolvedRepository = resolve(repository);
+    const workspaceRelative = relative(resolvedWorkspaceRoot, resolvedRepository)
+      .split("\\")
+      .join("/");
+    return workspaceRelative === ".." || workspaceRelative.startsWith("../")
+      ? resolvedRepository.split("\\").join("/")
+      : workspaceRelative || ".";
+  });
+}
+
+function requireCommandPath(positionals, command, defaultPath = null) {
+  if (positionals.length > 1) {
+    throw new SddError(`${command} accepts at most one path.`, { code: "USAGE" });
+  }
+  const selected = positionals[0] !== undefined
+    ? positionals[0]
+    : defaultPath ?? process.cwd();
+  return resolve(requireNonEmptyPath(selected, `${command} path`));
+}
+
+
 
 function parseRepositoryRootOverrides(values = []) {
   const roots = {};
@@ -209,10 +449,108 @@ function printWorkflowAction(workflow) {
   console.log(`Workflow: ${workflow.action} (${workflow.path})`);
 }
 
+function migrationActionPrefix(action, dryRun) {
+  const appliedPrefix = {
+    adopt: "Adopted",
+    complete: "Completed",
+    conflict: "Conflict",
+    consolidate: "Consolidated",
+    create: "Created",
+    install: "Installed",
+    migrate: "Migrated",
+    move: "Moved",
+    preserve: "Preserved",
+    reconcile: "Reconciled",
+    remove: "Removed",
+    "remove-forced": "Removed",
+    replace: "Replaced",
+    "replace-forced": "Replaced",
+    retire: "Retired",
+    rollback: "Rolled back",
+    unchanged: "Checked",
+    update: "Updated",
+    "update-forced": "Updated",
+    upgrade: "Upgraded",
+  }[action.action];
+  if (appliedPrefix === undefined) {
+    throw new SddError(
+      `Cannot render unknown migration action: ${String(action.action)}`,
+      { code: "UNEXPECTED_ERROR" },
+    );
+  }
+  return dryRun ? `Would ${action.action}` : appliedPrefix;
+}
+
+function migrationActionSubject(action) {
+  if (!action.kind && action.stageRoot) {
+    return `migration recovery: ${action.stageRoot}`;
+  }
+  switch (action.kind) {
+    case "change": {
+      const label = `${action.closed ? "closed " : ""}Change ${action.changeId}`;
+      return Array.isArray(action.from) && action.to
+        ? `${label}: ${action.from.join(", ")} -> ${action.to}`
+        : label;
+    }
+    case "planned-change":
+      return `planned Change ${action.changeId}`;
+    case "brief":
+      return `Change Brief: ${action.from} -> ${action.to}`;
+    case "legacy-planned-root":
+      return `legacy planned Changes root: ${action.path}`;
+    case "legacy-root":
+      return `legacy root: ${action.path}`;
+    case "workspace-config":
+    case "configuration": {
+      const transition = action.from !== undefined && action.to !== undefined
+        ? ` (${action.from} -> ${action.to})`
+        : "";
+      return `workspace configuration: ${action.path}${transition}`;
+    }
+    case "repository-config": {
+      const transition = action.from !== undefined && action.to !== undefined
+        ? ` (${action.from} -> ${action.to})`
+        : "";
+      return `repository configuration: ${action.path}${transition}`;
+    }
+    case "recovery":
+      return `recovery data: ${action.path}`;
+    case "workflow":
+      return `workflow: ${action.path}`;
+    case "skill":
+      return `managed skill: ${action.skillName}`;
+    case "legacy-skill":
+      return `legacy managed skill: ${action.skillName}`;
+    case "legacy-config":
+      return `legacy configuration: ${action.path}`;
+    default:
+      throw new SddError(
+        `Cannot render unknown migration action kind: ${String(action.kind)}`,
+        { code: "UNEXPECTED_ERROR" },
+      );
+  }
+}
+
+function printMigrationActions(migration, dryRun) {
+  const actions = migration?.actions ?? [];
+  if (actions.length === 0) {
+    console.log("Legacy migration: no actions required.");
+  } else {
+    for (const action of actions) {
+      console.log(`${migrationActionPrefix(action, dryRun)} ${migrationActionSubject(action)}`);
+    }
+  }
+  for (const warning of migration?.warnings ?? []) {
+    console.log(`Migration warning: ${warning}`);
+  }
+}
+
 export function statusSummaryRows(result) {
   return result.spaces.flatMap((space) => {
+    const projectedChangeIds = new Set();
     const repositoryRows = space.repositoryActivity.map((repository) => {
       const change = repository.activeChanges[0] ?? repository.change;
+      if (change) projectedChangeIds.add(change.changeId);
       return [
         space.spaceId,
         space.status,
@@ -224,36 +562,27 @@ export function statusSummaryRows(result) {
         repository.activeChangeCount,
       ];
     });
-    const projectedRepositoryIds = new Set(
-      space.repositoryActivity.map((repository) => repository.id),
-    );
-    const spaceRows = space.activeChanges
-      .filter((change) => change.unresolvedRepositoryIds.length === 0
-        && !change.repositories.some((repositoryId) => projectedRepositoryIds.has(repositoryId)))
-      .map((change) => [
-        space.spaceId,
-        space.status,
-        "-",
-        "space",
-        change.status,
-        change.changeId,
-        change.repositories.join(",") || "-",
-        0,
-      ]);
-    const unresolvedRows = space.activeChanges
-      .filter((change) => change.unresolvedRepositoryIds.length > 0)
-      .map((change) => [
-        space.spaceId,
-        space.status,
-        "-",
-        "unresolved",
-        change.status,
-        change.changeId,
-        change.unresolvedRepositoryIds.join(","),
-        0,
-      ]);
-    if (repositoryRows.length + spaceRows.length + unresolvedRows.length > 0) {
-      return [...repositoryRows, ...spaceRows, ...unresolvedRows];
+    const changes = space.activeChanges.length > 0
+      ? space.activeChanges
+      : space.recentChanges;
+    const spaceRows = changes
+      .filter((change) => change.unresolvedRepositoryIds.length > 0
+        || !projectedChangeIds.has(change.changeId))
+      .map((change) => {
+        const unresolved = change.unresolvedRepositoryIds.length > 0;
+        return [
+          space.spaceId,
+          space.status,
+          "-",
+          unresolved ? "unresolved" : "space",
+          change.status,
+          change.changeId,
+          (unresolved ? change.unresolvedRepositoryIds : change.repositories).join(",") || "-",
+          0,
+        ];
+      });
+    if (repositoryRows.length + spaceRows.length > 0) {
+      return [...repositoryRows, ...spaceRows];
     }
     return [[space.spaceId, space.status, "-", "-", "-", "-", "-", 0]];
   });
@@ -274,6 +603,12 @@ function formatGitStatus(git) {
   return `${location}, dirty${counts.length > 0 ? ` (${counts.join(", ")})` : ""}`;
 }
 
+function printRepositoryDiagnostics(diagnostics, indent = "") {
+  for (const diagnostic of diagnostics ?? []) {
+    console.log(`${indent}Repository diagnostic [${diagnostic.code}]: ${diagnostic.message}`);
+  }
+}
+
 function printStatus(result) {
   if (result.mode === "summary") {
     console.log(`SDD workspace: ${result.workspaceRoot}`);
@@ -287,13 +622,28 @@ function printStatus(result) {
       console.log(`${space.spaceId} [${space.status}]`);
       console.log(`  Planning: ${space.planningPath}`);
       console.log(`  Active Changes: ${space.activeChangeCount}`);
-      for (const change of space.activeChanges.filter(
-        (entry) => entry.unresolvedRepositoryIds.length > 0,
+      const projectedChangeIds = new Set(
+        space.repositoryActivity
+          .map((repository) => repository.activeChanges[0] ?? repository.change)
+          .filter(Boolean)
+          .map((change) => change.changeId),
+      );
+      const changes = space.activeChanges.length > 0
+        ? space.activeChanges
+        : space.recentChanges;
+      for (const change of changes.filter(
+        (entry) => entry.unresolvedRepositoryIds.length > 0
+          || !projectedChangeIds.has(entry.changeId),
       )) {
+        const unresolved = change.unresolvedRepositoryIds.length > 0;
+        const paths = unresolved
+          ? change.unresolvedRepositoryIds
+          : change.repositories;
         console.log(
-          `    Unresolved Change: ${change.changeId} [${change.status}] (${change.unresolvedRepositoryIds.join(", ")})`,
+          `    Space Change: ${change.changeId} [${change.status}] (${paths.join(", ") || "-"})`,
         );
       }
+      printRepositoryDiagnostics(space.repositoryDiagnostics, "  ");
       if (space.repositoryActivity.length === 0) {
         console.log("  Repositories: none");
         continue;
@@ -329,6 +679,7 @@ function printStatus(result) {
       : "";
     console.log(`  ${change.changeId} [${change.status}${unresolved}]`);
   }
+  printRepositoryDiagnostics(result.repositoryDiagnostics);
   if (result.repositoryDetails.length === 0) {
     console.log("Repositories: none");
     return;
@@ -359,67 +710,33 @@ function printStatus(result) {
 
 function printHuman(result) {
   if (result.command === "setup") {
-    console.log(`${result.dryRun ? "Would set up" : result.createdUserConfig ? "Set up" : "Reconciled"} user SDD: ${result.userConfigPath}`);
-    if (result.migratedFromWorkspace) {
-      console.log(`Migration source: ${result.migratedFromWorkspace}`);
+    const verb = result.dryRun
+      ? "Would set up"
+      : result.createdWorkspaceConfig
+        ? "Set up"
+        : "Reconciled";
+    console.log(`${verb} workspace SDD: ${result.workspaceConfigPath}`);
+    console.log(`Workspace: ${result.workspaceRoot}`);
+    if (result.migrationSource) {
+      console.log(`Legacy migration source: ${result.migrationSource}`);
     }
-    console.log(`Doctrine: bundled with @taylorhuston/sdd`);
-    printSkillActions(result.skills.actions);
+    if (result.migration) printMigrationActions(result.migration, result.dryRun);
+    console.log(`Workflow: ${result.workflowPath}`);
+    if (result.skills?.actions) printSkillActions(result.skills.actions);
     return;
   }
   if (result.command === "init") {
-    if (result.mode === "repository") {
-      console.log(`${result.dryRun ? "Would initialize" : result.createdRepositoryConfig ? "Initialized" : "Reconciled"} repository SDD: ${result.repositoryConfigPath}`);
-      console.log(`Repository ID: ${result.repositoryConfig.id}`);
-      console.log(`Doctrine: bundled with @taylorhuston/sdd`);
-      return;
-    }
-    console.log(`${result.dryRun ? "Would initialize" : result.created ? "Initialized" : "Reconciled"} SDD workspace: ${result.workspaceRoot}`);
-    console.log(`Configuration: ${result.configPath}`);
-    if (result.migratedFrom) console.log(`Migrated configuration: v${result.migratedFrom} -> v${result.config.version}`);
-    console.log(`Planning root: ${result.config.planning.root}`);
-    console.log(
-      `Repository roots: ${Object.entries(result.config.repositories.roots)
-        .map(([name, path]) => `${name}=${path}`)
-        .join(", ")}`,
-    );
-    console.log(`Ideas mapped: ${result.ideasImported}`);
-    printWorkflowAction(result.workflow);
-    printSkillActions(result.skills.actions);
+    console.log(`${result.dryRun ? "Would initialize" : result.createdRepositoryConfig ? "Initialized" : "Reconciled"} repository SDD: ${result.repositoryConfigPath}`);
+    console.log(`Repository ID: ${result.repositoryConfig.id}`);
+    console.log(`Workspace: ${result.workspaceRoot}`);
+    console.log(`Workspace configuration: ${result.workspaceConfigPath}`);
+    console.log(`Doctrine: bundled with @taylorhuston/sdd`);
     return;
   }
   if (result.command === "update") {
-    const label = result.mode === "user" ? "user SDD installation" : "legacy SDD workspace";
+    const label = result.mode === "legacy" ? "legacy SDD workspace" : "SDD workspace";
     console.log(`${result.dryRun ? "Would update" : "Updated"} ${label}: ${result.workspaceRoot}`);
-    if (result.migration.actions.length === 0) {
-      console.log("Legacy migration: no actions required.");
-    } else {
-      for (const action of result.migration.actions) {
-        const prefix = result.dryRun
-          ? `Would ${action.action}`
-          : action.action === "remove"
-            ? "Removed"
-            : action.action === "upgrade"
-              ? "Upgraded"
-              : action.action === "move"
-                ? "Moved"
-                : action.action === "consolidate"
-                  ? "Consolidated"
-                  : "Migrated";
-        if (action.kind === "change") {
-          console.log(
-            `${prefix} ${action.closed ? "closed " : ""}Change ${action.changeId}: ${action.from.join(", ")} -> ${action.to}`,
-          );
-        } else if (action.kind === "brief") {
-          console.log(`${prefix} Change Brief: ${action.from} -> ${action.to}`);
-        } else if (action.kind === "legacy-root") {
-          console.log(`${prefix} legacy root: ${action.path}`);
-        } else {
-          console.log(`${prefix} ${action.kind}: ${action.path} (${action.from} -> ${action.to})`);
-        }
-      }
-    }
-    for (const warning of result.migration.warnings) console.log(`Migration warning: ${warning}`);
+    printMigrationActions(result.migration, result.dryRun);
     printWorkflowAction(result.workflow);
     printSkillActions(result.skills.actions);
     return;
@@ -541,7 +858,7 @@ async function executeCommand(command, args) {
     const { values, positionals } = parseCommandArgs(
       args,
       commandOptions({
-        "from-workspace": { type: "string" },
+        "from-user": { type: "string" },
         "planning-root": { type: "string" },
         "repository-root": { type: "string", multiple: true },
         "skills-dir": { type: "string" },
@@ -551,29 +868,34 @@ async function executeCommand(command, args) {
       }),
     );
     if (values.help) return { help: true };
-    requireNoPositionals(positionals, command);
+    const workspaceRoot = requireAtMostOnePath(positionals, command);
+    const fromUser = pathOption(values, "from-user");
+    const planningRoot = pathOption(values, "planning-root");
+    const repositoryRoots = pathOptionValues(values, "repository-root");
+    const skillsDirectory = pathOption(values, "skills-dir");
     if (
-      values["from-workspace"] &&
-      [values["planning-root"], values["repository-root"]].some((value) => value !== undefined)
+      fromUser !== undefined
+      && [planningRoot, repositoryRoots].some((value) => value !== undefined)
     ) {
       throw new SddError(
-        "--from-workspace cannot be combined with --planning-root or --repository-root.",
+        "--from-user cannot be combined with --planning-root or --repository-root.",
         { code: "USAGE" },
       );
     }
     const setupOptions = await collectSetupOptions(
+      workspaceRoot,
       {
-        fromWorkspace: values["from-workspace"],
-        planningRoot: values["planning-root"],
-        repositoryRoots: values["repository-root"],
-        skillsDirectory: values["skills-dir"],
+        fromUser: fromUser === undefined ? null : resolve(fromUser),
+        planningRoot,
+        repositoryRoots,
+        skillsDirectory,
         dryRun: values["dry-run"] ?? false,
         force: values.force ?? false,
       },
       { interactive: !values.yes && Boolean(process.stdin.isTTY && process.stdout.isTTY) },
     );
     return {
-      result: await setupInstallation(setupOptions),
+      result: await setupInstallation(workspaceRoot, setupOptions),
       json: values.json ?? false,
     };
   }
@@ -582,51 +904,19 @@ async function executeCommand(command, args) {
     const { values, positionals } = parseCommandArgs(
       args,
       commandOptions({
-        "planning-root": { type: "string" },
-        "repository-root": { type: "string", multiple: true },
-        "skills-dir": { type: "string" },
+        workspace: { type: "string" },
         "repo-id": { type: "string" },
-        "legacy-workspace": { type: "boolean" },
-        yes: { type: "boolean", short: "y" },
         "dry-run": { type: "boolean" },
-        force: { type: "boolean" },
       }),
     );
     if (values.help) return { help: true };
     const repositoryRoot = requireAtMostOnePath(positionals, command);
-    let result;
-    if (values["legacy-workspace"]) {
-      const initOptions = await collectInitOptions(
-        repositoryRoot,
-        {
-          planningRoot: values["planning-root"],
-          repositoryRoots: values["repository-root"],
-          skillsDirectory: values["skills-dir"],
-          dryRun: values["dry-run"] ?? false,
-          force: values.force ?? false,
-        },
-        { interactive: !values.yes && Boolean(process.stdin.isTTY && process.stdout.isTTY) },
-      );
-      result = await initWorkspace(repositoryRoot, initOptions);
-    } else {
-      const setupOnlyOptions = [
-        values["planning-root"],
-        values["repository-root"],
-        values["skills-dir"],
-        values.yes,
-        values.force,
-      ];
-      if (setupOnlyOptions.some((value) => value !== undefined)) {
-        throw new SddError(
-          "User-level setup options belong to `sdd setup`; repository init accepts only --repo-id, --dry-run, and --json.",
-          { code: "USAGE" },
-        );
-      }
-      result = await initRepository(repositoryRoot, {
-        repositoryId: values["repo-id"],
-        dryRun: values["dry-run"] ?? false,
-      });
-    }
+    const requestedWorkspaceRoot = resolvePathOption(values, "workspace");
+    const result = await initRepository(repositoryRoot, {
+      repositoryId: values["repo-id"],
+      workspaceRoot: requestedWorkspaceRoot,
+      dryRun: values["dry-run"] ?? false,
+    });
     return { result, json: values.json ?? false };
   }
 
@@ -634,6 +924,7 @@ async function executeCommand(command, args) {
     const { values, positionals } = parseCommandArgs(
       args,
       commandOptions({
+        workspace: { type: "string" },
         "planning-root": { type: "string" },
         "repository-root": { type: "string", multiple: true },
         yes: { type: "boolean", short: "y" },
@@ -641,21 +932,31 @@ async function executeCommand(command, args) {
       }),
     );
     if (values.help) return { help: true };
-    const workspaceRoot = requireAtMostOnePath(positionals, command);
+    const positionalStartPath = requireAtMostOnePath(positionals, command);
+    const requestedWorkspaceRoot = resolvePathOption(values, "workspace");
+    const planningRoot = pathOption(values, "planning-root");
+    const repositoryRootOverrides = pathOptionValues(values, "repository-root");
+    const discoveredWorkspaceRoot = positionals.length === 0 && requestedWorkspaceRoot === null
+      ? (await findOperationConfiguration(positionalStartPath)).workspaceRoot
+      : null;
+    const scanStartPath = positionals.length === 1
+      ? positionalStartPath
+      : requestedWorkspaceRoot ?? discoveredWorkspaceRoot;
     const configureOptions = await collectConfigureOptions(
-      workspaceRoot,
+      scanStartPath,
       {
-        planningRoot: values["planning-root"],
-        repositoryRoots: parseRepositoryRootOverrides(values["repository-root"]),
+        planningRoot,
+        repositoryRoots: parseRepositoryRootOverrides(repositoryRootOverrides),
         acceptSuggestions: values.yes ?? false,
         dryRun: values["dry-run"] ?? false,
+        workspaceRoot: requestedWorkspaceRoot,
       },
       {
         interactive: !values.yes && Boolean(process.stdin.isTTY && process.stdout.isTTY),
       },
     );
     return {
-      result: await configureWorkspace(workspaceRoot, configureOptions),
+      result: await configureWorkspace(scanStartPath, configureOptions),
       json: values.json ?? false,
     };
   }
@@ -664,32 +965,57 @@ async function executeCommand(command, args) {
     const { values, positionals } = parseCommandArgs(
       args,
       commandOptions({
+        workspace: { type: "string" },
         "dry-run": { type: "boolean" },
         force: { type: "boolean" },
       }),
     );
     if (values.help) return { help: true };
-    const result = await updateWorkspace(requireAtMostOnePath(positionals, command), {
-      dryRun: values["dry-run"] ?? false,
-      force: values.force ?? false,
-    });
+    const requestedWorkspaceRoot = resolvePathOption(values, "workspace");
+    const result = await updateWorkspace(
+      requireAtMostOnePath(positionals, command),
+      {
+        workspaceRoot: requestedWorkspaceRoot,
+        targetSpecified: positionals.length === 1,
+        dryRun: values["dry-run"] ?? false,
+        force: values.force ?? false,
+      },
+    );
     return { result, json: values.json ?? false };
   }
 
   if (command === "doctor") {
-    const { values, positionals } = parseCommandArgs(args, commandOptions());
+    const { values, positionals } = parseCommandArgs(
+      args,
+      commandOptions({ workspace: { type: "string" } }),
+    );
     if (values.help) return { help: true };
+    const requestedWorkspaceRoot = resolvePathOption(values, "workspace");
     return {
-      result: await diagnoseWorkspace(requireAtMostOnePath(positionals, command)),
+      result: await diagnoseWorkspace(
+        requireCommandPath(
+          positionals,
+          command,
+          effectiveWorkspaceAuthority(requestedWorkspaceRoot),
+        ),
+        { workspaceRoot: requestedWorkspaceRoot },
+      ),
       json: values.json ?? false,
     };
   }
 
   if (command === "context") {
-    const { values, positionals } = parseCommandArgs(args, commandOptions());
+    const { values, positionals } = parseCommandArgs(
+      args,
+      commandOptions({ workspace: { type: "string" } }),
+    );
     if (values.help) return { help: true };
+    const requestedWorkspaceRoot = resolvePathOption(values, "workspace");
     return {
-      result: await getWorkspaceContext(requireAtMostOnePath(positionals, command)),
+      result: await getWorkspaceContext(
+        requireCommandPath(positionals, command),
+        { workspaceRoot: requestedWorkspaceRoot },
+      ),
       json: values.json ?? false,
     };
   }
@@ -703,10 +1029,21 @@ async function executeCommand(command, args) {
     if (positionals.length > 1) {
       throw new SddError("status accepts at most one Space ID.", { code: "USAGE" });
     }
+    const requestedWorkspaceRoot = resolvePathOption(values, "workspace");
     return {
-      result: await getStatus(resolve(values.workspace ?? process.cwd()), positionals[0] ?? null, {
-        includeAll: values.all ?? false,
-      }),
+      result: await getStatus(
+        await resolveCommandStartPath(
+          requestedWorkspaceRoot,
+          [],
+          positionals[0] ?? null,
+          { observational: true },
+        ),
+        positionals[0] ?? null,
+        {
+          includeAll: values.all ?? false,
+          workspaceRoot: requestedWorkspaceRoot,
+        },
+      ),
       json: values.json ?? false,
     };
   }
@@ -726,14 +1063,24 @@ async function executeCommand(command, args) {
     if (positionals.length > 1) {
       throw new SddError("validate accepts at most one Space ID.", { code: "USAGE" });
     }
+    const requestedWorkspaceRoot = resolvePathOption(values, "workspace");
+    const repositories = pathOptionValues(values, "repo") ?? [];
     return {
-      result: await validateArtifacts(resolve(values.workspace ?? process.cwd()), {
-        spaceId: positionals[0] ?? null,
-        repositories: values.repo ?? [],
-        changeId: values.change ?? null,
-        epicId: values.epic ?? null,
-        changedFrom: values["changed-from"] ?? null,
-      }),
+      result: await validateArtifacts(
+        await resolveCommandStartPath(
+          requestedWorkspaceRoot,
+          repositories,
+          positionals[0] ?? null,
+        ),
+        {
+          spaceId: positionals[0] ?? null,
+          repositories: normalizeRepositorySelectors(requestedWorkspaceRoot, repositories),
+          changeId: values.change ?? null,
+          epicId: values.epic ?? null,
+          changedFrom: values["changed-from"] ?? null,
+          workspaceRoot: requestedWorkspaceRoot,
+        },
+      ),
       json: values.json ?? false,
     };
   }
@@ -764,16 +1111,19 @@ async function executeCommand(command, args) {
         code: "USAGE",
       });
     }
+    const requestedWorkspaceRoot = resolvePathOption(values, "workspace");
+    const repositories = pathOptionValues(values, "repo") ?? [];
     return {
       result: await createEpic(
-        resolve(values.workspace ?? process.cwd()),
+        await resolveCommandStartPath(requestedWorkspaceRoot, repositories, positionals[0]),
         positionals[0],
         positionals[1],
         positionals[2],
         {
-          repositories: values.repo ?? [],
+          repositories: normalizeRepositorySelectors(requestedWorkspaceRoot, repositories),
           date: values.date ?? null,
           dryRun: values["dry-run"] ?? false,
+          workspaceRoot: requestedWorkspaceRoot,
         },
       ),
       json: values.json ?? false,
@@ -814,14 +1164,19 @@ async function executeCommand(command, args) {
         { code: "USAGE" },
       );
     }
+    const requestedWorkspaceRoot = resolvePathOption(values, "workspace");
+    const repositories = subcommand === "create"
+      ? pathOptionValues(values, "repo") ?? []
+      : [];
     if (subcommand === "close") {
       return {
         result: await closeChange(
-          resolve(values.workspace ?? process.cwd()),
+          await resolveCommandStartPath(requestedWorkspaceRoot, [], positionals[0]),
           positionals[0],
           positionals[1],
           {
             dryRun: values["dry-run"] ?? false,
+            workspaceRoot: requestedWorkspaceRoot,
           },
         ),
         json: values.json ?? false,
@@ -835,13 +1190,14 @@ async function executeCommand(command, args) {
       }
       return {
         result: await transitionChange(
-          resolve(values.workspace ?? process.cwd()),
+          await resolveCommandStartPath(requestedWorkspaceRoot, [], positionals[0]),
           positionals[0],
           positionals[1],
           {
             from: values.from,
             to: values.to,
             dryRun: values["dry-run"] ?? false,
+            workspaceRoot: requestedWorkspaceRoot,
           },
         ),
         json: values.json ?? false,
@@ -849,13 +1205,14 @@ async function executeCommand(command, args) {
     }
     return {
       result: await createChange(
-        resolve(values.workspace ?? process.cwd()),
+        await resolveCommandStartPath(requestedWorkspaceRoot, repositories, positionals[0]),
         positionals[0],
         positionals[1],
         {
-          repositories: values.repo ?? [],
+          repositories: normalizeRepositorySelectors(requestedWorkspaceRoot, repositories),
           date: values.date ?? null,
           dryRun: values["dry-run"] ?? false,
+          workspaceRoot: requestedWorkspaceRoot,
         },
       ),
       json: values.json ?? false,

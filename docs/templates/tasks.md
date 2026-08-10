@@ -11,7 +11,7 @@ repositories:
 - Last completed action: change artifacts drafted
 - Next action: review proposal, design, and tasks
 - Active branches / refs by repository: unknown
-- Expected dirty files: `~/.sdd/changes/yyyy-mm-dd-change-name/` plus repository-local implementation, Epic, ADR, test, and supporting-doc files grouped by target repository
+- Expected dirty files: `<workspace>/.sdd/changes/yyyy-mm-dd-change-name/` plus repository-local implementation, Epic, ADR, test, and supporting-doc files grouped by target repository
 - Known blockers: none identified yet
 
 ## Task Checklist
@@ -188,6 +188,12 @@ Keep focused behavior proof distinct from aggregate and integration-candidate pr
 - Integration-candidate results or reasons source proof is reusable:
 - Remote CI role: required / corroborating / unavailable / not applicable
 
+Repository-key every integration handoff. Repeat one row per target repository; never combine tree identity or rerun evidence across repositories.
+
+| Repository ID | Tested Integration Tree / Ref | Actual Integrated Tree / Ref | Match | Required Aggregate Rerun / Evidence | Result |
+|---|---|---|---|---|---|
+| repository-id | TBD | pending / TBD | yes / no / pending | not required / exact command and result / pending | pass / findings / blocked / pending |
+
 ## Manual UI Confirmation
 
 - Status: pending user / user confirmed / accepted gap / not applicable
@@ -252,8 +258,8 @@ Required for UI-bearing changes. If not applicable, record why.
 - Verification Scope Decision current and required candidate gates passed:
 - Immutable review handoff candidate:
 - PR / merge state by repository:
+- Tested integration tree vs actual integrated tree and required aggregate rerun evidence by repository:
 - Manual UI confirmation status:
 - Rendered UI verification status:
-- PR / merge state:
 - Deferred scope accepted:
-- Change moved to `~/.sdd/changes/closed/yyyy-mm-dd-change-name/`:
+- Change moved to `<workspace>/.sdd/changes/closed/yyyy-mm-dd-change-name/`:

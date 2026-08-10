@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -100,19 +100,33 @@ test("packaged change replan preserves a coherent planned handoff and exact Appl
 });
 
 test("packaged workflows coordinate one central Change across every target repository", async () => {
-  const [change, apply, review, pr, release, spaceStatus] = await Promise.all(
-    ["sdd-change", "sdd-apply", "sdd-review", "sdd-pr", "sdd-release", "sdd-space-status"].map(
-      (skill) => readPackageFile("skills", skill, "SKILL.md"),
+  const skillNames = (await readdir(join(PACKAGE_ROOT, "skills"), { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith("sdd-"))
+    .map((entry) => entry.name)
+    .sort();
+  const skillSources = new Map(
+    await Promise.all(
+      skillNames.map(async (skill) => [skill, await readPackageFile("skills", skill, "SKILL.md")]),
     ),
   );
+  const change = skillSources.get("sdd-change");
+  const apply = skillSources.get("sdd-apply");
+  const review = skillSources.get("sdd-review");
+  const pr = skillSources.get("sdd-pr");
+  const release = skillSources.get("sdd-release");
+  const spaceStatus = skillSources.get("sdd-space-status");
 
-  for (const source of [change, apply, review, pr, release, spaceStatus]) {
-    assert.doesNotMatch(source, /docs\/changes|planned-changes|sdd change promote/i);
+  for (const [skill, source] of skillSources) {
+    assert.doesNotMatch(
+      source,
+      /docs\/changes|planned-changes|sdd change promote/i,
+      `${skill} must not restore a retired Change location or promotion command`,
+    );
   }
 
   assert.match(
     change,
-    /one canonical dated Change record lives under `~\/\.sdd\/changes\/`[\s\S]*target repositories are stable IDs in `tasks\.md`, not copies/,
+    /one canonical dated Change record lives under `<workspace>\/\.sdd\/changes\/`[\s\S]*target repositories are stable IDs in `tasks\.md`, not copies/,
   );
   assert.match(
     apply,
@@ -124,15 +138,36 @@ test("packaged workflows coordinate one central Change across every target repos
   );
   assert.match(
     pr,
-    /derive the complete target set from the central `tasks\.md`[\s\S]*A clean or merged PR never makes the Change globally complete by itself/,
+    /derive the complete target set from the central `tasks\.md`[\s\S]*A clean or merged PR never makes the Change complete by itself/,
   );
   assert.match(
     release,
-    /top-level `sdd status <space-id> --json` output[\s\S]*canonical `~\/\.sdd\/changes\/\*\*` locations/,
+    /top-level `sdd status <space-id> --json` output[\s\S]*canonical `<workspace>\/\.sdd\/changes\/\*\*` locations/,
   );
   assert.match(
     spaceStatus,
     /top-level `activeChanges` and `recentChanges` as the unique canonical Change inventories[\s\S]*not copies or independent lifecycle owners/,
+  );
+});
+
+test("multi-repository handoff templates key integration proof and repeated blocks by repository ID", async () => {
+  const [tasks, review] = await Promise.all([
+    readPackageFile("docs", "templates", "tasks.md"),
+    readPackageFile("docs", "templates", "review.md"),
+  ]);
+
+  const verificationScope = markdownSection(tasks, "Verification Scope Decision");
+  assert.match(
+    verificationScope,
+    /Repository-key every integration handoff\.[\s\S]*\| Repository ID \| Tested Integration Tree \/ Ref \| Actual Integrated Tree \/ Ref \| Match \| Required Aggregate Rerun \/ Evidence \| Result \|/,
+  );
+  assert.match(
+    markdownSection(review, "Review Bundle: <repository-id>"),
+    /^- Repository ID: <repository-id>$/m,
+  );
+  assert.match(
+    markdownSection(review, "PR / Merge Readiness: <repository-id>"),
+    /^- Repository ID: <repository-id>$/m,
   );
 });
 
@@ -177,8 +212,8 @@ test("packaged Apply continues after a verified slice and commits the phase befo
   const applyLoop = markdownSection(applySkill, "Apply Loop");
   assertContractClauses("Apply loop", applyLoop, [
     [
-      "keep the global Change in progress while any target has unfinished handoff work",
-      /Keep global `status: in_progress` while any target repository still has implementation, verification, remediation, review-handoff preparation, or unresolved blockers\./,
+      "keep the central Change in progress while any target has unfinished handoff work",
+      /Keep `status: in_progress` while any target repository still has implementation, verification, remediation, review-handoff preparation, or unresolved blockers\./,
     ],
     [
       "commit an authorized verified commit-shaped slice in every affected target",

@@ -9,7 +9,7 @@ Create the smallest useful SDD change record, then immediately work through the 
 
 ## Authority And Project Profile
 
-Resolve the workspace, Space, idea-owned planning path, and every target implementation repository with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before creating or reconciling SDD artifacts. The dated Change is one user-level record under `~/.sdd/changes/<change-id>/`; its `tasks.md` names the Space and stable portable repository IDs. Epics, ADRs, implementation, tests, and supporting docs remain in their owning repositories. Project guidance in every target repository owns branch and commit policy, verification commands, supporting-doc requirements, release conventions, technology constraints, and permissions. If user setup is missing, direct the user to `sdd setup`; if a target repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
+Resolve the workspace, Space, idea-owned planning path, and every target implementation repository with `sdd context <relevant-path> --json`. Retain the resolved workspace root and pass `--workspace <workspace-root>` to subsequent SDD commands whenever the target repository is external to the workspace or the command's current directory is not inside that workspace. Then read the `workflowPath` returned by `sdd context` completely before creating or reconciling SDD artifacts. The dated Change is one workspace-level record under `<workspace>/.sdd/changes/<change-id>/`; its `tasks.md` names the Space and stable portable repository IDs. Epics, ADRs, implementation, tests, and supporting docs remain in their owning repositories. Project guidance owns branch and verification policy.
 
 This skill is for tracked working sessions. It is not a replacement for `/sdd-change --plan` when the change needs substantial product scoping, architecture design, data/auth/API changes, migration planning, or cross-Epic coordination.
 
@@ -20,9 +20,9 @@ Delegation authorization: invoking `/sdd-interactive`, naming `sdd-interactive`,
 Create or update the one canonical record:
 
 ```text
-~/.sdd/changes/<yyyy-mm-dd-change-name>/proposal.md
-~/.sdd/changes/<yyyy-mm-dd-change-name>/design.md
-~/.sdd/changes/<yyyy-mm-dd-change-name>/tasks.md
+<workspace>/.sdd/changes/<yyyy-mm-dd-change-name>/proposal.md
+<workspace>/.sdd/changes/<yyyy-mm-dd-change-name>/design.md
+<workspace>/.sdd/changes/<yyyy-mm-dd-change-name>/tasks.md
 ```
 
 Use existing central artifacts when the session continues an active Change. Keep `tasks.md` as the shared live ledger for requests, decisions, repository responsibilities, verification, coordination, and resume state. Never create a repository-local Change copy.
@@ -35,7 +35,7 @@ Use existing central artifacts when the session continues an active Change. Keep
    - Inspect the detailed status result's top-level `activeChanges` to find a possible continuation. A per-repository entry is only a filtered projection of that same central record, not another Change to select or edit.
    - If a matching active Change exists, continue it only when the user's intent clearly matches that Change and its target repository set.
    - For a new session, derive a short kebab-case slug and run `sdd change create <space-id> <slug>`, repeating `--repo <repository-id>` for every intended target. Use stable portable repository IDs from the repository contracts; do not put absolute paths or display names in `tasks.md`.
-   - Let the command assign the globally unique dated Change ID and create `~/.sdd/changes/<change-id>/`. Do not hand-create a dated folder or create one record per repository.
+   - Let the command assign the workspace-unique dated Change ID and create `<workspace>/.sdd/changes/<change-id>/`. Do not hand-create a dated folder or create one record per repository.
 2. Load the minimum required context.
    - Read project-local `AGENTS.md`, branch policy, `README.md`, package/test scripts, and relevant development guidelines in every target repository before editing it.
    - Read root `developer-guide.md` when present and development work is involved.
@@ -99,7 +99,7 @@ Use existing central artifacts when the session continues an active Change. Keep
    - Keep the central status `in_progress` while any target has implementation, verification, remediation, or unresolved coordination work. Only after every targeted repository is ready for independent review, run `sdd change transition <space-id> <change-id> --from in_progress --to in_review` once, without `--repo`.
    - Recommend `/sdd-review` before merge or closeout when code, user-visible behavior, security, data, or release state changed.
    - Do not run `sdd change close` unless the user explicitly asks or the closeout path is already authorized by the active workflow.
-   - When the user asks to close, finish, merge-and-close, or otherwise complete the Change, first confirm the one `tasks.md` remains `status: in_review`, every targeted repository has met its review, manual-confirmation, release-communication, PR/merge, and accepted-gap gates, and no Resume Here, checklist, proposal, design, task, or review text contradicts completion. Then run `sdd change close <space-id> <change-id> --workspace <workspace-root>` exactly once. Do not pass `--repo`, close targets independently, or move the folder manually. The resulting `~/.sdd/changes/closed/<change-id>/` location is the closed state; `tasks.md` retains `status: in_review`.
+   - When the user asks to close, finish, merge-and-close, or otherwise complete the Change, first confirm the one `tasks.md` remains `status: in_review`, every targeted repository has met its review, manual-confirmation, release-communication, PR/merge, and accepted-gap gates, and no Resume Here, checklist, proposal, design, task, or review text contradicts completion. Then run `sdd change close <space-id> <change-id> --workspace <workspace-root>` exactly once. Do not pass `--repo`, close targets independently, or move the folder manually. The resulting `<workspace>/.sdd/changes/closed/<change-id>/` location is the closed state; `tasks.md` retains `status: in_review`.
 
 ## Artifact Shape
 

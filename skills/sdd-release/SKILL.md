@@ -1,6 +1,6 @@
 ---
 name: sdd-release
-description: Prepare coordinated SDD release handoffs to project-defined production targets. Use when the user invokes /sdd-release, asks to release, promote, cut a release, run release checks, review a changelog, prepare required release communication or version metadata, suggest a version increment, or open production PRs. Runs branch-policy and dirty-state preflight across every target repository, verifies SDD review/readiness and global closeout consistency, reviews changelog contents, confirms version-update intent with the user, follows each repository's release gates and release-record conventions, commits authorized release metadata, and opens the handoffs. Default/full invocation grants scoped authorization for one normal push of each resolved source branch and creation of each configured release PR after all gates pass. Does not force-push, push any production target directly, merge, deploy, tag, publish, or mutate production state without separate explicit authorization.
+description: Prepare coordinated SDD release handoffs to project-defined production targets. Use when the user invokes /sdd-release, asks to release, promote, cut a release, run release checks, review a changelog, prepare required release communication or version metadata, suggest a version increment, or open production PRs. Runs branch-policy and dirty-state preflight across every target repository, verifies SDD review/readiness and Change-wide closeout consistency, reviews changelog contents, confirms version intent, and creates the configured handoffs without merging or deploying.
 ---
 
 # SDD Release
@@ -9,7 +9,7 @@ Prepare a release handoff to the project-defined production target.
 
 ## Authority And Project Profile
 
-Resolve the user installation, Space, one central Change, idea-owned planning path, and every target repository named by the Change with `sdd context <relevant-path> --json` and `sdd status <space-id> --json`, then read the `workflowPath` returned by `sdd context` completely before judging SDD readiness, evidence, reconciliation, or reviewed-commit freshness. Resolve each repository's production target, source policy, release mechanism, required checks, versioning, release-note format, hosting provider, and permissions from its project guidance unless the resolved topology declares an explicit exception. Read central Change artifacts only from `~/.sdd/changes/**`; read Epics, ADRs, implementation, tests, release communication, and other repository-owned truth from each owning repository's configured paths. If user setup is missing, direct the user to `sdd setup`; if a repository contract is missing, direct the user to `sdd init <repo>`.
+Resolve the workspace installation, Space, one central Change, idea-owned planning path, and every target repository named by the Change with `sdd context <relevant-path> --json` and `sdd status <space-id> --json`, then read the `workflowPath` returned by `sdd context` completely before judging SDD readiness, evidence, reconciliation, or reviewed-commit freshness. Resolve each repository's production target, source policy, release mechanism, required checks, versioning, release-note format, hosting provider, and handoff independently while keeping one central ledger at `<workspace>/.sdd/changes/`.
 
 This is the release gate after implementation and local review. It is stricter than `/sdd-review`: `/sdd-review` proves technical readiness while recording manual acceptance separately; `/sdd-release` proves that the complete coordinated candidate set satisfies every repository-specific and aggregate technical, acceptance, and handoff gate for the production targets.
 
@@ -19,7 +19,7 @@ After `/sdd-release` opens the release PR set, use `/sdd-pr` for ongoing steward
 
 ## Modes
 
-- Default: run aggregate and repository-specific release preflight, run every target repository's project-defined release gate, update and commit required release artifacts, make one normal push of each resolved source branch, and create every configured release PR or equivalent non-production handoff after all global and repository-specific gates pass.
+- Default: run aggregate and repository-specific release preflight, run every target repository's project-defined release gate, update and commit required release artifacts, make one normal push of each resolved source branch, and create every configured release PR or equivalent non-production handoff after all Change-wide and repository-specific gates pass.
 - `--check`: run preflight and release checks only. Do not edit, commit, push, or open a PR.
 - `--no-pr`: run release checks and update release artifacts, but stop before pushing or opening a PR.
 - `--no-commit`: keep `CHANGELOG.md` and related release artifacts unstaged; report a commit candidate.
@@ -39,7 +39,7 @@ Before release work, read:
 - root `README.md`, package scripts, test docs, deployment docs, and CI docs when present
 - remote review, branch-protection, or release-provider configuration when present
 - each target repository's `CHANGELOG.md` when present, plus its project-defined changelog, release notes, version metadata, or release manifest when different or otherwise required
-- the release-relevant central Change records selected from top-level `sdd status <space-id> --json` output, reading `proposal.md`, `design.md`, `tasks.md`, and `review.md` from their canonical `~/.sdd/changes/**` locations without copying user-local paths into public release artifacts
+- the release-relevant central Change records selected from top-level `sdd status <space-id> --json` output, reading `proposal.md`, `design.md`, `tasks.md`, and `review.md` from their canonical `<workspace>/.sdd/changes/**` locations without copying workspace-local paths into public release artifacts
 - relevant Epic files from each owning repository's configured Epic path when release notes, changelog entries, or readiness depend on Epic truth
 - project PRD/Product Brief when product scope changed or release contents are ambiguous
 - project visual/style guidance or app visual identity docs when a release includes prominent UI, layout, branding, or app-identity changes and those docs affect release risk or communication
@@ -59,7 +59,7 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
    - Confirm each source branch is up to date with its own target or record why not.
    - Check every source/target pair for merge conflicts without performing a merge.
    - Confirm no active SDD change required for this release is missing `/sdd-review` readiness or accepted override.
-   - Confirm each release-relevant active Change has a valid central `tasks.md` status and is `in_review` with a passing review record when release handling is the last remaining transition. A central record under `~/.sdd/changes/closed/` is closed regardless of its retained active status value.
+   - Confirm each release-relevant active Change has a valid central `tasks.md` status and is `in_review` with a passing review record when release handling is the last remaining transition. A central record under `<workspace>/.sdd/changes/closed/` is closed regardless of its retained active status value.
    - Confirm release-relevant active or closed SDD changes have consistent review records, manual confirmation status, release-communication state, PR/merge state, accepted deferred gaps, and folder location.
    - Distinguish technical review readiness from manual acceptance. Resolve whether project policy permits the configured release handoff while confirmation is `pending user`; if not, stop with the prepared walkthrough. Never report full release readiness, merge, deploy, close, or perform another acceptance-dependent action until required confirmation is `user confirmed` or recorded as an accepted gap.
    - Perform a cumulative source-vs-target release risk scan. Require a fresh-context cumulative release-candidate code/security/state review of the exact combined diff for an initial production release, multiple integrated Changes, material post-review work, or a cumulative diff that crosses auth/credentials, filesystem confinement, plugins/capabilities, AI tools or provider-visible content, concurrency/recovery, persistence/migrations, or another high-risk shared boundary. Apply the relevant `/sdd-review` code, boundary-contract, state-transition, security/data-safety, evidence, and integration gates without reopening individual Change lifecycle or repeating unaffected artifact review. Existing per-Change reviews are inputs, not a substitute for this triggered cumulative review. For an ordinary single-Change low-risk release, the proportional cumulative scan is sufficient. Record the exact reviewed release-candidate commit, reviewer/context, gates, result, and accepted gaps. If a release-critical claim lacks proof or the cumulative review finds unresolved risk, stop or route back to `/sdd-review` or `/sdd-apply`.
@@ -185,7 +185,7 @@ Include:
 - release commit hashes or commit candidates by repository
 - aggregate and repository-specific SDD review/readiness status
 - cumulative release-candidate review triggers, exact commits/trees, gates, and results
-- manual confirmation status and whether acceptance permits each configured handoff and any later merge, deployment, or global closeout
+- manual confirmation status and whether acceptance permits each configured handoff and any later merge, deployment, or Change-wide closeout
 - repository-keyed remote reviewer/check watermarks and required-versus-optional status when known
 - whether `/sdd-pr` should be rerun later to steward the complete opened PR set
 - remaining risks or approvals needed

@@ -1,5 +1,5 @@
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { lstat, readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
 import {
   getActiveChangePath,
@@ -8,13 +8,24 @@ import {
   relativeChangeStorePath,
   assertChangeStoreConfinement,
 } from "../change-store.js";
+import {
+  assertPublishedFlatDirectory,
+  publishFlatDirectoryWithoutReplace,
+  recoverFlatDirectoryPublication,
+  stageFlatDirectory,
+} from "../directory-publication.js";
 import { setChangeMetadata } from "../change-status.js";
-import { resolveRepositoryTargets, selectRepositories } from "../change-repositories.js";
-import { assertValidConfig, getUserRoot, resolveWorkspaceStatus } from "../config.js";
-import { resolveOperationConfiguration } from "../workspace.js";
+import {
+  assertSelectedRepositorySnapshotsCurrent,
+  selectRepositoryTargetsForCreate,
+} from "../change-repositories.js";
+import { assertValidConfig, resolveWorkspaceStatus } from "../config.js";
+import {
+  assertOperationConfigurationCurrent,
+  resolveOperationConfiguration,
+} from "../workspace.js";
 import { PACKAGE_ROOT } from "../constants.js";
 import { SddError } from "../errors.js";
-import { pathExists } from "../fs.js";
 import { withWorkspaceMutationLock } from "../mutation.js";
 
 const TEMPLATE_FILES = Object.freeze([
@@ -49,6 +60,9 @@ function renderTemplate(source, { title, changeId, changePath, spaceId, reposito
     ? repositories.map((repository) =>
       `- \`${repository.id}\` — \`${repository.resolvedPath}\`${repository.role ? ` (${repository.role})` : ""}`)
     : ["- None selected; this Space has no mapped implementation repository yet."];
+  const expectedDirtyFiles = repositories.length > 0
+    ? `central Change \`<workspace>/${changePath}/\` plus repository-local implementation, Epic, ADR, test, and supporting-doc files grouped by target repository: ${repositories.map((repository) => `\`${repository.id}\` (\`${repository.resolvedPath}\`)`).join(", ")}`
+    : `central Change \`<workspace>/${changePath}/\`; no repository-local dirty files are expected because no implementation repository is targeted`;
   let rendered = source
     .replaceAll("CHANGE TITLE", title)
     .replaceAll("yyyy-mm-dd-change-name", changeId)
@@ -62,8 +76,8 @@ function renderTemplate(source, { title, changeId, changePath, spaceId, reposito
   }
   if (/^---\r?\n/.test(rendered)) {
     rendered = rendered.replace(
-      /- Expected dirty files: `[^`]+`/,
-      `- Expected dirty files: repositories targeted by \`${changePath}\``,
+      /^- Expected dirty files:.*$/m,
+      `- Expected dirty files: ${expectedDirtyFiles}`,
     );
     const withMetadata = setChangeMetadata(rendered, {
       space: spaceId,
@@ -74,6 +88,20 @@ function renderTemplate(source, { title, changeId, changePath, spaceId, reposito
   return rendered;
 }
 
+async function changeEntryPresent(path, workspaceRoot) {
+  const parent = dirname(path);
+  await assertChangeStoreConfinement(parent, workspaceRoot);
+  try {
+    await lstat(path);
+    await assertChangeStoreConfinement(parent, workspaceRoot);
+    return true;
+  } catch (error) {
+    if (!["ENOENT", "ENOTDIR"].includes(error?.code)) throw error;
+    await assertChangeStoreConfinement(parent, workspaceRoot);
+    return false;
+  }
+}
+
 export async function createChange(
   startPath,
   spaceId,
@@ -82,21 +110,66 @@ export async function createChange(
     date = null,
     repositories = [],
     dryRun = false,
-    userRoot = null,
+    workspaceRoot: requestedWorkspaceRoot = null,
     lockToken = null,
+    beforePublish = null,
+    beforeHandoff = null,
+    afterPublicationJournalMkdir = null,
+    afterPublicationLiveOwner = null,
+    afterStageRootMkdir = null,
+    afterStageRootReservation = null,
+    afterStagedPayload = null,
+    afterStagedProgress = null,
+    afterStagedEntry = null,
+    afterStagingComplete = null,
+    afterPublicationPrepared = null,
+    afterReservationMkdir = null,
+    afterReservationReceiptWrite = null,
+    afterReservationReceipt = null,
+    afterReservation = null,
+    afterEntryPublication = null,
+    afterTemporaryVerification = null,
+    afterSourceCleanup = null,
+    afterHandoffCleanup = null,
+    afterJournalCleanup = null,
+    afterOwnerMarkerCleanup = null,
   } = {},
 ) {
-  userRoot ??= getUserRoot();
+  const operation = await resolveOperationConfiguration(
+    startPath,
+    requestedWorkspaceRoot ? { workspaceRoot: requestedWorkspaceRoot } : {},
+  );
+  const { workspaceRoot, config } = operation;
   if (!dryRun && lockToken !== CENTRAL_CHANGE_LOCK) {
-    return withWorkspaceMutationLock(userRoot, () => createChange(startPath, spaceId, slug, {
+    return withWorkspaceMutationLock(workspaceRoot, () => createChange(startPath, spaceId, slug, {
       date,
       repositories,
       dryRun,
-      userRoot,
+      workspaceRoot,
       lockToken: CENTRAL_CHANGE_LOCK,
+      beforePublish,
+      beforeHandoff,
+      afterStageRootMkdir,
+      afterPublicationJournalMkdir,
+      afterPublicationLiveOwner,
+      afterStageRootReservation,
+      afterStagedPayload,
+      afterStagedProgress,
+      afterStagedEntry,
+      afterStagingComplete,
+      afterPublicationPrepared,
+      afterReservationMkdir,
+      afterReservationReceiptWrite,
+      afterReservationReceipt,
+      afterReservation,
+      afterEntryPublication,
+      afterTemporaryVerification,
+      afterSourceCleanup,
+      afterHandoffCleanup,
+      afterJournalCleanup,
+      afterOwnerMarkerCleanup,
     }));
   }
-  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath, { userRoot });
   assertValidConfig(config, "create a Change");
   const space = config.ideas[spaceId];
   if (!space) {
@@ -126,57 +199,221 @@ export async function createChange(
   }
 
   const changeId = `${selectedDate}-${slug}`;
-  const availableRepositories = await resolveRepositoryTargets(workspaceRoot, config, space, {
-    activeOnly: true,
-  });
-  const selectedRepositories = selectRepositories(availableRepositories, repositories);
-  const absolutePath = getActiveChangePath(changeId, userRoot);
-  const closedPath = getClosedChangePath(changeId, userRoot);
-  await assertChangeStoreConfinement(absolutePath, userRoot);
-  await assertChangeStoreConfinement(closedPath, userRoot);
-  if (await pathExists(absolutePath) || await pathExists(closedPath)) {
+  const selectedRepositories = await selectRepositoryTargetsForCreate(
+    workspaceRoot,
+    config,
+    space,
+    repositories,
+    { requireIdentity: true },
+  );
+  const absolutePath = getActiveChangePath(changeId, workspaceRoot);
+  const closedPath = getClosedChangePath(changeId, workspaceRoot);
+  const title = changeTitle(slug);
+  const files = TEMPLATE_FILES.map(([name]) => name);
+  const displayPath = relativeChangeStorePath(absolutePath, workspaceRoot);
+  const changesRoot = getChangesRoot(workspaceRoot);
+  const assertPublicationPath = (path) =>
+    assertChangeStoreConfinement(path, workspaceRoot);
+  let renderedFiles = null;
+  if (!dryRun) {
+    renderedFiles = await Promise.all(TEMPLATE_FILES.map(async ([name, templatePath]) => {
+      const source = await readFile(templatePath, "utf8");
+      return [name, renderTemplate(source, {
+        title,
+        changeId,
+        changePath: displayPath,
+        spaceId,
+        repositories: selectedRepositories,
+      })];
+    }));
+    await assertOperationConfigurationCurrent(operation);
+    await assertSelectedRepositorySnapshotsCurrent(
+      workspaceRoot,
+      config,
+      space,
+      selectedRepositories,
+    );
+    const recovery = await recoverFlatDirectoryPublication(absolutePath, renderedFiles, {
+      label: `Change ${changeId}`,
+      assertPath: assertPublicationPath,
+      ownerRoot: workspaceRoot,
+    });
+    if (recovery.committed) {
+      let finalError = null;
+      let finalized = null;
+      const assertRecoveryAuthority = async (publication = null) => {
+        if (publication) await assertPublishedFlatDirectory(publication);
+        else await recovery.assertCurrent();
+        await assertOperationConfigurationCurrent(operation);
+        await assertSelectedRepositorySnapshotsCurrent(
+          workspaceRoot,
+          config,
+          space,
+          selectedRepositories,
+        );
+        if (await changeEntryPresent(closedPath, workspaceRoot)) {
+          throw new SddError(`Change ID appeared in closed history during recovery: ${changeId}`, {
+            code: "CONCURRENT_CHANGE",
+          });
+        }
+        if (publication) await assertPublishedFlatDirectory(publication);
+        else await recovery.assertCurrent();
+      };
+      try {
+        await assertRecoveryAuthority();
+        finalized = await recovery.finalize({
+          beforeCommit: ({ publication }) => assertRecoveryAuthority(publication),
+        });
+      } catch (error) {
+        finalError = error;
+      }
+      if (finalError) {
+        try {
+          await recovery.rollback();
+        } catch (cleanupError) {
+          throw new SddError("Recovered Change failed final authority and exact rollback.", {
+            code: "MUTATION_RECOVERY_FAILED",
+            details: [
+              `Original error: ${finalError.message}`,
+              `Active Change requiring inspection: ${absolutePath}`,
+              `Cleanup error: ${cleanupError.message}`,
+            ],
+          });
+        }
+        throw finalError;
+      }
+      await assertPublishedFlatDirectory(finalized.publication);
+      return {
+        command: "change-create",
+        workspaceRoot,
+        dryRun,
+        spaceId,
+        changeId,
+        title,
+        path: displayPath,
+        repositories: selectedRepositories,
+        files,
+      };
+    }
+  }
+  if (await changeEntryPresent(absolutePath, workspaceRoot)
+    || await changeEntryPresent(closedPath, workspaceRoot)) {
     throw new SddError(`Change ID already exists in central active or closed history: ${changeId}`, {
       code: "CHANGE_EXISTS",
     });
   }
 
-  const title = changeTitle(slug);
-  const files = TEMPLATE_FILES.map(([name]) => name);
-  const displayPath = relativeChangeStorePath(absolutePath, userRoot);
   if (!dryRun) {
-    const changesRoot = getChangesRoot(userRoot);
-    const temporaryPath = join(changesRoot, `.${changeId}.sdd-new-${process.pid}-${Date.now()}`);
-    await mkdir(changesRoot, { recursive: true });
-    await assertChangeStoreConfinement(temporaryPath, userRoot);
-    await mkdir(temporaryPath);
-    try {
-      for (const [name, templatePath] of TEMPLATE_FILES) {
-        const source = await readFile(templatePath, "utf8");
-        await writeFile(join(temporaryPath, name), renderTemplate(source, {
-          title,
-          changeId,
-          changePath: displayPath,
-          spaceId,
-          repositories: selectedRepositories,
-        }), "utf8");
-      }
-      await assertChangeStoreConfinement(absolutePath, userRoot);
-      if (await pathExists(absolutePath) || await pathExists(closedPath)) {
-        throw new SddError(`Change ID appeared during creation: ${changeId}`, {
+    const staged = await stageFlatDirectory(changesRoot, changeId, renderedFiles, {
+      label: `Change ${changeId} staging directory`,
+      assertPath: assertPublicationPath,
+      ownerRoot: workspaceRoot,
+      afterStageRootMkdir,
+      afterStageRootReservation,
+      afterStagedPayload,
+      afterStagedProgress,
+      afterStagedEntry,
+      afterStagingComplete,
+    });
+    const prepared = await publishFlatDirectoryWithoutReplace(staged, absolutePath, {
+      label: `Change ${changeId}`,
+      assertPath: assertPublicationPath,
+      beforeHandoff,
+      afterReservationMkdir,
+      afterPublicationJournalMkdir,
+      afterPublicationLiveOwner,
+      afterReservationReceiptWrite,
+      afterReservationReceipt,
+      afterReservation,
+      afterEntryPublication,
+      afterTemporaryVerification,
+      afterSourceCleanup,
+      afterHandoffCleanup,
+      afterJournalCleanup,
+      afterOwnerMarkerCleanup,
+      beforePublish: async (context) => {
+        if (beforePublish) await beforePublish(context);
+        await assertOperationConfigurationCurrent(operation);
+        await assertSelectedRepositorySnapshotsCurrent(
+          workspaceRoot,
+          config,
+          space,
+          selectedRepositories,
+        );
+        if (await changeEntryPresent(closedPath, workspaceRoot)) {
+          throw new SddError(`Change ID appeared in closed history during creation: ${changeId}`, {
+            code: "CONCURRENT_CHANGE",
+          });
+        }
+      },
+    });
+
+    let finalError = null;
+    let finalized = null;
+    const assertFinalAuthority = async (publication = null) => {
+      if (publication) await assertPublishedFlatDirectory(publication);
+      else await prepared.assertCurrent();
+      await assertOperationConfigurationCurrent(operation);
+      await assertSelectedRepositorySnapshotsCurrent(
+        workspaceRoot,
+        config,
+        space,
+        selectedRepositories,
+      );
+      if (await changeEntryPresent(closedPath, workspaceRoot)) {
+        throw new SddError(`Change ID appeared in closed history during creation: ${changeId}`, {
           code: "CONCURRENT_CHANGE",
         });
       }
-      await rename(temporaryPath, absolutePath);
+      if (publication) await assertPublishedFlatDirectory(publication);
+      else await prepared.assertCurrent();
+    };
+    try {
+      if (afterPublicationPrepared) {
+        await afterPublicationPrepared({ path: absolutePath, journalPath: prepared.journalPath });
+      }
+      await assertFinalAuthority();
+      finalized = await prepared.finalize({
+        beforeCommit: ({ publication }) => assertFinalAuthority(publication),
+      });
     } catch (error) {
-      await rm(temporaryPath, { recursive: true, force: true });
-      throw error;
+      finalError = error;
     }
+    if (finalError) {
+      let cleanup;
+      try {
+        cleanup = await prepared.rollback();
+      } catch (cleanupError) {
+        throw new SddError("Change creation final authority check failed and prepared-publication rollback failed.", {
+          code: "MUTATION_RECOVERY_FAILED",
+          details: [
+            `Original error: ${finalError.message}`,
+            `Active Change requiring inspection: ${absolutePath}`,
+            `Cleanup error: ${cleanupError.message}`,
+          ],
+        });
+      }
+      if (!cleanup.removed || cleanup.concurrent) {
+        throw new SddError("Change creation final authority check failed and prepared-publication rollback retained data.", {
+          code: "MUTATION_RECOVERY_FAILED",
+          details: [
+            `Original error: ${finalError.message}`,
+            `Active Change requiring inspection: ${absolutePath}`,
+            ...cleanup.details,
+          ],
+        });
+      }
+      if (finalError instanceof SddError) {
+        finalError.details = [...(finalError.details ?? []), ...cleanup.details];
+      }
+      throw finalError;
+    }
+    await assertPublishedFlatDirectory(finalized.publication);
   }
 
   return {
     command: "change-create",
     workspaceRoot,
-    userRoot,
     dryRun,
     spaceId,
     changeId,

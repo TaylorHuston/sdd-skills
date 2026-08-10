@@ -55,8 +55,8 @@ Evaluate:
 - PRD/product direction and public docs do not contradict the Epic.
 - The Epic is usable for future `/sdd-change --plan`, `/sdd-apply`, and `/sdd-review` work.
 - The orchestrator's full Epic-scoped reverse inventory accounts for relevant behavior-bearing source/tests and reviews support/framework/generated exclusions; unowned candidates are classified rather than silently ignored or treated as deletion approval.
-- Related central active Change records use only `proposed`, `planned`, `in_progress`, or `in_review` in `tasks.md`; location under `~/.sdd/changes/closed/<change-id>/` means closed. Historical closed Changes may retain formerly valid status values.
-- Related central active or closed Change records do not contradict their lifecycle state or still claim accepted work is not implemented, not verified, implementation pending, verification pending, or manually accepted under obsolete status vocabulary. For a multi-repository Change, repository-specific ledger state and global transition/close state must agree.
+- Related central active Change records use only `proposed`, `planned`, `in_progress`, or `in_review` in `tasks.md`; location under `<workspace>/.sdd/changes/closed/<change-id>/` means closed. Historical closed Changes may retain formerly valid status values.
+- Related central active or closed Change records do not contradict their lifecycle state or still claim accepted work is not implemented, not verified, implementation pending, verification pending, or manually accepted under obsolete status vocabulary. For a multi-repository Change, repository-specific ledger state and Change-wide transition/close state must agree.
 - Manual confirmation status uses canonical vocabulary: `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
 
 ## Report Back

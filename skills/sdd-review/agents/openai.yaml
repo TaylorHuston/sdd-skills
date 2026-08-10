@@ -1,4 +1,4 @@
 interface:
   display_name: "SDD Review"
   short_description: "Review one central Change across repositories"
-  default_prompt: "Use $sdd-review to run one deep local PR-style review of the central active Change across every targeted repository, consolidate repository-specific SDD truth, security, manual UI confirmation, and integration readiness in the central ledger, and gate the one global closeout on all targets."
+  default_prompt: "Use $sdd-review to run one deep local PR-style review of the workspace-central active Change across every targeted repository, consolidate repository-specific SDD truth, security, manual UI confirmation, and integration readiness in the central ledger, and gate the one Change-wide closeout on all targets."

@@ -9,7 +9,7 @@ Open and steward the coordinated pull request set for every repository targeted 
 
 ## Authority And Project Profile
 
-Resolve the user installation, Space, one central Change, and every target repository with `sdd context <relevant-path> --json`; use `sdd status <space-id> --json` when Change selection is needed, and read the `workflowPath` returned by `sdd context` completely before judging reconciliation, evidence, review freshness, or merge readiness. Select from the top-level `activeChanges`; repository entries are filtered projections, not separately owned Change records. The canonical active Change lives at `~/.sdd/changes/<change-id>/`, closed history lives at `~/.sdd/changes/closed/<change-id>/`, and `tasks.md.repositories` names the full stable target set. Epics, ADRs, implementation, tests, and supporting docs stay repository-local. Resolve source and target policy, hosting provider, required checks, comment workflow, merge strategy, release communication, and permissions separately for every target repository. GitHub commands below apply only when GitHub is the configured provider. If user setup is missing, direct the user to `sdd setup`; if a repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
+Resolve the workspace installation, Space, one central Change, and every target repository with `sdd context <relevant-path> --json`; use `sdd status <space-id> --json` when Change selection is needed, and read the `workflowPath` returned by `sdd context` completely before judging reconciliation, evidence, review freshness, or merge readiness. Select from the top-level `activeChanges`; repository entries are filtered projections, not separately owned Change records. The canonical active Change lives at `<workspace>/.sdd/changes/<change-id>/`.
 
 Use `/sdd-release` for production-branch release PR preparation. Use `/sdd-pr` for ongoing PR stewardship after a PR exists, or for non-production PRs that are part of the project's normal branch policy.
 
@@ -21,7 +21,7 @@ Treat PR creation and PR stewardship as separate phases. On the activation that 
 
 Non-negotiable invariant: PR feedback must not move implementation beyond the durable Epic/Story map or beyond the commit covered by SDD review without an explicit reconciliation. Track the immutable reviewed source commit, latest reconciled PR head, and a Remote Review Watermark for each configured reviewer and status check. A resolved comment or completed review on an older head is historical evidence, not current-head coverage. Do not return a merge-ready result while the current PR head contains unclassified or unreconciled post-review commits or any required reviewer/check watermark remains pending, failed, unavailable without an accepted policy path, or stale for a material change.
 
-Multi-repository invariant: derive the complete target set from the central `tasks.md`, steward every required repository PR, and record repository-specific branches, commits, URLs, checks, review watermarks, acceptance, and merge state in that one ledger. A clean or merged PR never makes the Change globally complete by itself. Never create, commit, push, or infer a repository-local Change copy, and never transition or close targets independently.
+Multi-repository invariant: derive the complete target set from the central `tasks.md`, steward every required repository PR, and record repository-specific branches, commits, URLs, checks, review watermarks, acceptance, and merge state in that one ledger. A clean or merged PR never makes the Change complete by itself. Never create, commit, push, or infer a repository-local Change copy, and never transition or close targets independently.
 
 A `/sdd-review` verdict of `ready` establishes technical review readiness. It does not by itself prove that required manual acceptance is complete. Resolve the current manual confirmation status from `tasks.md` or the review record and apply project policy separately. PR creation may proceed with `pending user` only when project policy allows review to continue before acceptance; never describe the PR as merge-ready or perform the merge while required confirmation remains pending.
 
@@ -50,7 +50,7 @@ If the source branch, target branch, provider, or project policy cannot be infer
 3. Preserve unrelated dirty files. Do not stash, reset, or overwrite user changes unless explicitly approved.
 4. For each target repository, ensure the source branch contains its intended implementation, tests, Epic/ADR/supporting truth, and review remediation:
    - Commit required repository-local work only when the user has authorized PR work in this request or earlier in this PR workflow.
-   - Never stage or commit `~/.sdd/changes/<change-id>/`; update it separately as the one user-local coordination ledger.
+   - Never stage or commit `<workspace>/.sdd/changes/<change-id>/`; update it separately as the one workspace-local coordination ledger.
    - Resolve the current source commit SHA and the last source commit covered by `/sdd-review` from central `review.md` or `tasks.md`. Treat a branch name alone as mutable context, not as the review watermark.
    - Resolve repository-specific manual confirmation and whether project policy requires `user confirmed` or an `accepted gap` before PR creation, merge readiness, or merge.
    - Build the exact source-to-target changed-file inventory and classify every path against the intended Change, required repository-local truth, review remediation, or generated output required by project policy. Stop on unexplained or unrelated paths.
@@ -76,7 +76,7 @@ Each PR body should include:
 - summary of behavior changes
 - verification run
 - known risks or follow-up decisions
-- public-safe central SDD Change ID plus repository-local Epic, review, release, or plan links when present; never include the user-local Change path
+- public-safe central SDD Change ID plus repository-local Epic, review, release, or plan links when present; never include the workspace-local Change path
 - reviewed source commit
 - latest reconciled PR head
 - post-review change classifications, or `none`
@@ -169,7 +169,7 @@ Do not reopen or edit a centrally closed Change merely to log ordinary PR feedba
 
 ## Review Loop
 
-Repeat across the complete target PR set until one global stop condition applies:
+Repeat across the complete target PR set until one coordinated stop condition applies:
 
 - no actionable comments or unresolved required review threads remain in any target PR
 - required checks fail and cannot be fixed safely in this workflow
@@ -215,10 +215,10 @@ When no target PR has actionable comments left:
    - immutable source commit covered by the last `/sdd-review`
    - latest reconciled PR head
    - every commit after the reviewed source commit has an impact classification
-   - behavior, contract, security, data, API, architecture, or other material risk changes received a fresh global `/sdd-review`
+   - behavior, contract, security, data, API, architecture, or other material risk changes received a fresh complete `/sdd-review`
    - Epic truth, evidence, supporting docs, and release communication match the current PR head
    - the final source-to-target file inventory is identical to the classified PR scope, with no unexplained path
-3. Confirm global acceptance readiness:
+3. Confirm coordinated acceptance readiness:
    - central `tasks.md` records canonical manual-confirmation status per target where needed
    - any project-required walkthrough remains complete and current for the reviewed PR head
    - required confirmation is `user confirmed` or an explicitly accepted gap before merge readiness
@@ -226,7 +226,7 @@ When no target PR has actionable comments left:
 4. Confirm the central coordination gate:
    - every target repository has a current PR URL, source/target pair, reviewed commit, current head, remote-review watermark, acceptance state, and merge state
    - no repository-local Change copy or independently transitioned lifecycle state exists
-   - one target's clean or merged PR is not reported as global completion while another target is pending
+   - one target's clean or merged PR is not reported as Change completion while another target is pending
 5. Post concise repository-specific PR comments when useful, covering comments addressed, declined comments, verification, reviewed/current heads, remote-review watermarks, and remaining non-blocking risks.
 6. Stop and prompt the user only after every target's technical, remote-review, coordination, and required acceptance gates pass:
    - Say the coordinated PR set is ready for their review/approval.
@@ -248,9 +248,9 @@ Include:
 - reviewed source commit, current PR head, and latest reconciled PR head per repository
 - remote reviewer/check watermarks, including required/optional classification and triggered/completed heads
 - post-review change classifications and repository-local Epic/supporting truth reconciled
-- central `tasks.md` coordination state; never publish its user-local path
+- central `tasks.md` coordination state; never publish its workspace-local path
 - verification commands and results
-- manual confirmation status and whether acceptance blocks global merge readiness
+- manual confirmation status and whether acceptance blocks coordinated merge readiness
 - remaining risks, sequencing constraints, or required user decisions
 - if any PR was newly created: tell the user to rerun `/sdd-pr` after review comments/checks have had time to appear
 - if every existing PR is clean: clearly request approval for the actual merges in order

@@ -89,7 +89,7 @@ Return:
 - verification commands or scenarios run, if any
 - central Change, repository-local documentation, Epic, ADR, design, or tasks updates needed
 - whether the central `tasks.md` Resume Here and this repository's state are accurate enough for cold-start recovery
-- whether this repository's readiness and closeout fields are internally consistent, without inferring global readiness
+- whether this repository's readiness and closeout fields are internally consistent, without inferring Change-wide readiness
 - whether the central risk matrix, Pattern Parity Matrix, Stateful Transition Matrix, decision fan-out ledger, verification-environment record, evidence claims, and this repository's immutable review-handoff candidate match the actual implementation and evidence
 - whether related central proposal/design/tasks/review artifacts and repository-local truth use the same manual confirmation status vocabulary and no longer contain stale implementation-pending text
 - recommended remediation slices, if fixes are safe and in scope

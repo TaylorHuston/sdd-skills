@@ -80,7 +80,7 @@ If the project has no `docs/adrs/`, create it only when the user has asked to dr
 - Name validation evidence needed to prove the decision works.
 - Include "Reconsider When" so future agents know when the decision may be stale.
 - Keep ADRs concise. Put implementation progress in the central Change's `tasks.md`, not in the ADR.
-- Refer to related Changes by stable Change ID, not by a private absolute `~/.sdd/changes/...` path.
+- Refer to related Changes by stable Change ID, not by an installation-specific absolute `<workspace>/.sdd/changes/...` path.
 - Keep Epic/Story truth authoritative for behavior. ADRs explain technical decisions and constraints, not user behavior truth.
 
 ## Final Response

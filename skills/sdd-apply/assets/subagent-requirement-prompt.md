@@ -56,7 +56,7 @@ Read every selected skill completely, including its required references, and app
 - If selected guidance is unavailable, report it only when the absence changes implementation confidence, verification, or a stop condition; otherwise use the best project-local fallback.
 - Do not copy or summarize skill guidance into SDD artifacts unless it directly changes implemented behavior, verification evidence, or a recorded gap.
 - If implementation reveals missing product, security, migration, architecture, or scope decisions, stop and report rather than broadening work.
-- Do not update global Change status or decide global closeout. Report only the assigned repository's readiness and the central ledger changes the orchestrator should make.
+- Do not update Change-wide status or decide Change-wide closeout. Report only the assigned repository's readiness and the central ledger changes the orchestrator should make.
 
 ## BDD/TDD
 
@@ -115,7 +115,7 @@ Return:
 - superseded Story/Requirement/Scenario wording or evidence that needs reconciliation
 - central `tasks.md` repository-qualified checklist, implementation ledger, verification ledger, dependency, and `Resume Here` updates needed
 - Implementation Risk And Confirmation Matrix, Pattern Parity Matrix, Stateful Transition Matrix, Decision Fan-Out Ledger, Verification Environment, and repository-specific Review Handoff Candidate updates needed from this slice
-- assigned repository review record, manual confirmation status, release-communication status, PR/merge state, or readiness updates needed; do not infer global closeout
+- assigned repository review record, manual confirmation status, release-communication status, PR/merge state, or readiness updates needed; do not infer Change-wide closeout
 - durable documentation updates needed
 - blockers or risks
 - slice outcome: `done`, `reviewed-no-change`, `superseded`, `deferred`, or `blocked`

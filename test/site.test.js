@@ -28,17 +28,32 @@ test("public guide separates portable methodology from package implementation an
   assert.doesNotMatch(html, /Scenario R\d+\.\d+/);
 });
 
-test("public guide documents central Change ownership and fail-closed automatic migration", async () => {
+test("public guide documents workspace-owned Changes and explicit fail-closed user migration", async () => {
   const { html } = await readSite();
 
-  assert.match(html, /User-owned work/);
-  assert.match(html, /~\/\.sdd\/changes\//);
+  assert.match(html, /workspace-owned work/i);
+  assert.match(html, /&lt;workspace&gt;\/\.sdd\/changes\//);
+  assert.match(html, /&lt;workspace&gt;\/\.sdd\/config\.yaml/);
+  assert.match(html, /&lt;workspace&gt;\/\.agents\/skills\//);
   assert.match(html, /change-briefs\//);
-  assert.match(html, /tasks\.md[\s\S]{0,200}Space and target repositories/);
-  assert.match(html, /During upgrades,[\s\S]{0,120}<code>sdd update<\/code>[\s\S]{0,120}complete fail-closed preflight/);
-  assert.match(html, /consolidates identical legacy copies/);
-  assert.match(html, /aborts without writes/);
-  assert.match(html, /<code>sdd validate --change<\/code>/);
+  assert.match(html, /sdd setup \/path\/to\/workspace/);
+  assert.match(
+    html,
+    /sdd setup \/path\/to\/workspace --from-user \/path\/to\/old-user-root --dry-run/,
+  );
+  assert.match(html, /old home-root workspace v1-v3, user-v1, or user-v2 installation/);
+  assert.match(
+    html,
+    /Post-crash cleanup resumes only from complete source-derived transaction\s+provenance; without it, setup fails closed and retains the remaining state for manual inspection\./,
+  );
+  assert.match(
+    html,
+    /<code>sdd validate &lt;space-id&gt; --change &lt;change-id&gt; --workspace &lt;path&gt;<\/code>/,
+  );
+  assert.doesNotMatch(html, /<code>sdd validate --change<\/code>/);
+  assert.doesNotMatch(html, /~\/\.sdd/);
+  assert.doesNotMatch(html, /user-level Change store/i);
+  assert.doesNotMatch(html, /globally unique Change IDs/i);
   assert.doesNotMatch(html, /sdd change promote/);
   assert.doesNotMatch(html, /planned-changes\//);
   assert.doesNotMatch(html, /docs\/changes/);

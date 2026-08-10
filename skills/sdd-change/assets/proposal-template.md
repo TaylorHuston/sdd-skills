@@ -36,8 +36,8 @@ Summarize the behavior that will change.
 
 ## Change Folder
 
-- Active lifecycle location: `~/.sdd/changes/yyyy-mm-dd-change-name/`
-- Closed location: `~/.sdd/changes/closed/yyyy-mm-dd-change-name/`
+- Active lifecycle location: `<workspace>/.sdd/changes/yyyy-mm-dd-change-name/`
+- Closed location: `<workspace>/.sdd/changes/closed/yyyy-mm-dd-change-name/`
 - Repository-local Epics, ADRs, implementation, tests, and supporting docs remain in each target repository.
 
 ## Impact

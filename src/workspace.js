@@ -1,88 +1,192 @@
-import { join, relative, resolve, sep } from "node:path";
+import { relative, resolve, sep } from "node:path";
+
+import { assertRepositoryArtifactRoots } from "./change-repositories.js";
+import { isRepositoryOnlyChangeMetadata } from "./change-status.js";
 
 import {
+  assertWorkspaceConfigSnapshotCurrent,
   assertValidConfig,
   assertValidRepositoryConfig,
   findRepositoryRoot,
   findWorkspaceRoot,
-  getUserRoot,
-  readConfig,
+  getWorkspaceConfigPath,
   readRepositoryConfig,
+  readWorkspaceConfigSnapshot,
   resolveIdeaPlanningPath,
   resolveRepositoryArtifacts,
   resolveRepositoryPath,
   resolveWorkspaceStatus,
   resolveWorkspacePath,
 } from "./config.js";
-import { WORKFLOW_SOURCE_PATH } from "./constants.js";
+import { WORKFLOW_RELATIVE_PATH } from "./constants.js";
 import { SddError } from "./errors.js";
 import { isPathInside, isPathPhysicallyInside, resolvePhysicalPath } from "./fs.js";
 
 function normalizeRelativePath(value) {
   return value.split(sep).join("/") || ".";
 }
-export async function findOperationConfiguration(
-  startPath,
-  { userRoot = getUserRoot() } = {},
-) {
-  const sourceWorkspaceRoot = await findWorkspaceRoot(startPath);
-  const sourceConfig = structuredClone(await readConfig(sourceWorkspaceRoot));
-  let workspaceRoot = sourceWorkspaceRoot;
-  let config = sourceConfig;
-  if (resolve(workspaceRoot) !== resolve(userRoot) && sourceConfig.kind !== "user") {
-    try {
-      const userConfig = structuredClone(await readConfig(userRoot));
-      if (userConfig?.kind === "user") {
-        workspaceRoot = userRoot;
-        config = userConfig;
-      }
-    } catch (error) {
-      if (error?.code !== "WORKSPACE_NOT_INITIALIZED") throw error;
-    }
-  }
-  return { workspaceRoot, config, sourceWorkspaceRoot, sourceConfig };
+
+export function isMetadataOnlyRepositorySpace(space) {
+  return space?._repositoryOnly === true && space?._metadataOnly === true;
 }
 
-export async function resolveWorkspaceContext(
-  startPath,
-  { userRoot = getUserRoot(), authoritativeConfig = null } = {},
-) {
-  const targetPath = resolve(startPath);
-  const { workspaceRoot, config } = authoritativeConfig
-    ? { workspaceRoot: userRoot, config: structuredClone(authoritativeConfig) }
-    : await findOperationConfiguration(targetPath, { userRoot });
-  assertValidConfig(config, "resolve workspace context");
-  if (config.kind === "user" && config.migration?.sourceWorkspace) {
-    throw new SddError(
-      "Legacy workspace migration is pending. Run `sdd update` before using this installation.",
-      {
-        code: "CONFIG_MIGRATION_REQUIRED",
-        details: [`Migration source: ${config.migration.sourceWorkspace}`],
-      },
-    );
+export function synthesizeRepositoryOnlySpaceFromChangeMetadata(config, metadata) {
+  if (!isRepositoryOnlyChangeMetadata(metadata)) return null;
+  const existing = Object.hasOwn(config.ideas ?? {}, metadata.space)
+    ? config.ideas[metadata.space]
+    : null;
+  if (existing !== null) {
+    return isMetadataOnlyRepositorySpace(existing) ? existing : null;
   }
-  const physicalRepositoryOwners = new Map();
+
+  const space = {
+    status: "active",
+    repositories: [],
+  };
+  Object.defineProperties(space, {
+    _repositoryOnly: { value: true, enumerable: false },
+    _metadataOnly: { value: true, enumerable: false },
+    _unresolvedRepositoryIds: {
+      value: Object.freeze([metadata.space]),
+      enumerable: false,
+    },
+  });
+  config.ideas[metadata.space] = space;
+  return space;
+}
+
+async function pathContainment(ownerPath, physicalTargetPath) {
+  const physicalOwnerPath = await resolvePhysicalPath(ownerPath);
+  if (!isPathInside(physicalOwnerPath, physicalTargetPath)) return null;
+  return {
+    physicalOwnerPath,
+    physicalDepth: physicalOwnerPath.split(sep).filter(Boolean).length,
+  };
+}
+
+async function contextPathContainment(
+  ownerPath,
+  physicalTargetPath,
+  observational,
+) {
+  try {
+    return await pathContainment(ownerPath, physicalTargetPath);
+  } catch (error) {
+    if (!observational) throw error;
+    // Status resolves mapped repositories independently and retains their diagnostics.
+    return null;
+  }
+}
+
+export async function assertDistinctRepositoryOwnership(workspaceRoot, config) {
+  const owners = [];
   for (const [ideaId, idea] of Object.entries(config.ideas ?? {})) {
-    for (const repository of idea.repositories ?? []) {
+    for (const [repositoryIndex, repository] of (idea.repositories ?? []).entries()) {
       const configuredPath = resolveRepositoryPath(config, repository);
       const absolutePath = resolveWorkspacePath(workspaceRoot, configuredPath);
-      const physicalPath = await resolvePhysicalPath(absolutePath);
-      const previous = physicalRepositoryOwners.get(physicalPath);
-      if (previous) {
-        throw new SddError("Cannot resolve context with duplicate physical repository ownership.", {
-          code: "INVALID_CONFIG",
-          details: [
-            `${configuredPath} resolves to ${physicalPath}, already claimed by ${previous.ideaId} (${previous.configuredPath}).`,
-          ],
-        });
-      }
-      physicalRepositoryOwners.set(physicalPath, { ideaId, configuredPath });
+      owners.push({
+        ideaId,
+        repositoryIndex,
+        configuredPath,
+        physicalPath: await resolvePhysicalPath(absolutePath),
+      });
     }
   }
+  owners.sort((left, right) =>
+    left.physicalPath.localeCompare(right.physicalPath)
+    || left.ideaId.localeCompare(right.ideaId)
+    || left.configuredPath.localeCompare(right.configuredPath)
+    || left.repositoryIndex - right.repositoryIndex);
+
+  const firstOwnerByPhysicalPath = new Map();
+  const details = [];
+  for (const owner of owners) {
+    const previous = firstOwnerByPhysicalPath.get(owner.physicalPath);
+    if (!previous) {
+      firstOwnerByPhysicalPath.set(owner.physicalPath, owner);
+      continue;
+    }
+    details.push(
+      `${owner.configuredPath} resolves to ${owner.physicalPath}, already claimed by ${previous.ideaId} (${previous.configuredPath}).`,
+    );
+  }
+  if (details.length > 0) {
+    throw new SddError("Cannot resolve context with duplicate physical repository ownership.", {
+      code: "INVALID_CONFIG",
+      details,
+    });
+  }
+  return config;
+}
+
+export async function assertValidRepositoryArtifactTopology(workspaceRoot, config) {
+  for (const idea of Object.values(config.ideas ?? {})) {
+    for (const repository of idea.repositories ?? []) {
+      const resolvedPath = resolveRepositoryPath(config, repository);
+      await assertRepositoryArtifactRoots(
+        resolveWorkspacePath(workspaceRoot, resolvedPath),
+        resolveRepositoryArtifacts(config, repository),
+        { repositoryPath: normalizeRelativePath(resolvedPath) },
+      );
+    }
+  }
+  return config;
+}
+
+export async function findOperationConfiguration(startPath, options = {}) {
+  const workspaceRoot = await findWorkspaceRoot(startPath, options);
+  const snapshot = await readWorkspaceConfigSnapshot(workspaceRoot);
+  const workspaceConfigSnapshot = structuredClone(snapshot);
+  const config = structuredClone(workspaceConfigSnapshot.config);
+  return {
+    workspaceRoot,
+    workspaceConfigPath: getWorkspaceConfigPath(workspaceRoot),
+    workspaceConfigSnapshot,
+    config,
+  };
+}
+
+export async function assertOperationConfigurationCurrent(operation) {
+  const {
+    workspaceRoot,
+    workspaceConfigSnapshot,
+  } = operation;
+  if (!workspaceConfigSnapshot) {
+    throw new SddError("Workspace configuration authority changed after operation selection.", {
+      code: "CONCURRENT_CHANGE",
+    });
+  }
+  await assertWorkspaceConfigSnapshotCurrent(workspaceRoot, workspaceConfigSnapshot);
+  return true;
+}
+
+export async function resolveWorkspaceContext(startPath, options = {}) {
+  const observationalRepositoryTopology = options.repositoryTopology === "observational";
+  const targetPath = resolve(options.cwd ?? process.cwd(), startPath);
+  const {
+    workspaceRoot,
+    workspaceConfigPath,
+    workspaceConfigSnapshot,
+    config,
+  } = await findOperationConfiguration(targetPath, options);
+  assertValidConfig(config, "resolve workspace context");
+  if (!observationalRepositoryTopology) {
+    await assertDistinctRepositoryOwnership(workspaceRoot, config);
+  }
+  const physicalTargetPath = await resolvePhysicalPath(targetPath);
   const repositoryRoot = await findRepositoryRoot(targetPath);
-  const repositoryConfig = repositoryRoot ? await readRepositoryConfig(repositoryRoot) : null;
+  const physicalRepositoryRoot = repositoryRoot
+    ? await resolvePhysicalPath(repositoryRoot)
+    : null;
+  let repositoryConfig = null;
+  try {
+    repositoryConfig = repositoryRoot ? await readRepositoryConfig(repositoryRoot) : null;
+    if (repositoryConfig) assertValidRepositoryConfig(repositoryConfig);
+  } catch (error) {
+    if (!observationalRepositoryTopology) throw error;
+    repositoryConfig = null;
+  }
   if (repositoryConfig) {
-    assertValidRepositoryConfig(repositoryConfig);
     let mapped = false;
     for (const idea of Object.values(config.ideas ?? {})) {
       for (const repository of idea.repositories ?? []) {
@@ -90,7 +194,7 @@ export async function resolveWorkspaceContext(
           workspaceRoot,
           resolveRepositoryPath(config, repository),
         );
-        if (await resolvePhysicalPath(absolutePath) === await resolvePhysicalPath(repositoryRoot)) {
+        if (await resolvePhysicalPath(absolutePath) === physicalRepositoryRoot) {
           Object.defineProperties(repository, {
             id: { value: repositoryConfig.id, enumerable: false },
             artifacts: { value: repositoryConfig.artifacts, enumerable: false },
@@ -132,38 +236,8 @@ export async function resolveWorkspaceContext(
       config.ideas[repositoryConfig.id] = repositoryOnlySpace;
     }
   }
-  for (const [ideaId, idea] of Object.entries(config.ideas ?? {})) {
-    for (const repository of idea.repositories ?? []) {
-      const repositoryPath = resolveWorkspacePath(
-        workspaceRoot,
-        resolveRepositoryPath(config, repository),
-      );
-      const artifacts = resolveRepositoryArtifacts(config, repository);
-      const physicalArtifacts = new Map();
-      for (const [key, configuredPath] of Object.entries(artifacts)) {
-        const artifactPath = join(repositoryPath, configuredPath);
-        if (!(await isPathPhysicallyInside(repositoryPath, artifactPath))) {
-          throw new SddError("Cannot resolve context with an artifact root outside its repository.", {
-            code: "UNSAFE_ARTIFACT_PATH",
-            details: [`${ideaId}.${key} resolves outside ${repositoryPath}: ${artifactPath}.`],
-          });
-        }
-        physicalArtifacts.set(key, await resolvePhysicalPath(artifactPath));
-      }
-      const artifactEntries = [...physicalArtifacts.entries()];
-      for (let leftIndex = 0; leftIndex < artifactEntries.length; leftIndex += 1) {
-        for (let rightIndex = leftIndex + 1; rightIndex < artifactEntries.length; rightIndex += 1) {
-          const [leftKey, leftPath] = artifactEntries[leftIndex];
-          const [rightKey, rightPath] = artifactEntries[rightIndex];
-          if (isPathInside(leftPath, rightPath) || isPathInside(rightPath, leftPath)) {
-            throw new SddError("Cannot resolve context with overlapping physical artifact roots.", {
-              code: "INVALID_CONFIG",
-              details: [`${ideaId}.${leftKey} overlaps ${ideaId}.${rightKey}.`],
-            });
-          }
-        }
-      }
-    }
+  if (!observationalRepositoryTopology) {
+    await assertValidRepositoryArtifactTopology(workspaceRoot, config);
   }
   const matches = [];
 
@@ -181,16 +255,25 @@ export async function resolveWorkspaceContext(
       status: resolveWorkspaceStatus(repository.status),
       resolvedPath: normalizeRelativePath(resolveRepositoryPath(config, repository)),
     }));
-    if (planningPath && isPathInside(planningPath, targetPath)) {
-      matches.push({
-        kind: "planning",
-        idea: ideaId,
-        ideaStatus,
-        spaceId: ideaId,
-        matchedPath: planningPath,
-        planningPath: normalizeRelativePath(resolvedPlanningPath),
-        repositories: resolvedRepositories,
-      });
+    if (planningPath) {
+      const containment = await contextPathContainment(
+        planningPath,
+        physicalTargetPath,
+        observationalRepositoryTopology,
+      );
+      if (containment) {
+        matches.push({
+          kind: "planning",
+          idea: ideaId,
+          ideaStatus,
+          spaceId: ideaId,
+          matchedPath: planningPath,
+          planningPath: normalizeRelativePath(resolvedPlanningPath),
+          repositories: resolvedRepositories,
+          ...containment,
+          exactRepositoryRoot: false,
+        });
+      }
     }
 
     for (const repository of resolvedRepositories) {
@@ -198,7 +281,12 @@ export async function resolveWorkspaceContext(
         workspaceRoot,
         repository.resolvedPath,
       );
-      if (isPathInside(repositoryPath, targetPath)) {
+      const containment = await contextPathContainment(
+        repositoryPath,
+        physicalTargetPath,
+        observationalRepositoryTopology,
+      );
+      if (containment) {
         matches.push({
           kind: "repository",
           idea: repositoryOnly ? null : ideaId,
@@ -208,17 +296,32 @@ export async function resolveWorkspaceContext(
           matchedPath: repositoryPath,
           planningPath: resolvedPlanningPath === null ? null : normalizeRelativePath(resolvedPlanningPath),
           repositories: resolvedRepositories,
+          ...containment,
+          exactRepositoryRoot: physicalRepositoryRoot !== null
+            && containment.physicalOwnerPath === physicalRepositoryRoot,
         });
       }
     }
   }
 
-  matches.sort((left, right) => right.matchedPath.length - left.matchedPath.length);
+  matches.sort((left, right) =>
+    Number(right.exactRepositoryRoot) - Number(left.exactRepositoryRoot)
+    || right.physicalDepth - left.physicalDepth
+    || left.physicalOwnerPath.localeCompare(right.physicalOwnerPath)
+    || Number(right.kind === "repository") - Number(left.kind === "repository")
+    || String(left.spaceId).localeCompare(String(right.spaceId)));
   const match = matches[0] ?? null;
-  const withinWorkspace = isPathInside(workspaceRoot, targetPath);
+  const withinWorkspace = await isPathPhysicallyInside(workspaceRoot, targetPath);
+  if (!match && !withinWorkspace) {
+    throw new SddError(
+      `Workspace ${workspaceRoot} does not map external target ${targetPath}.`,
+      { code: "WORKSPACE_TARGET_UNMAPPED" },
+    );
+  }
 
-  return {
+  const context = {
     workspaceRoot,
+    workspaceConfigPath,
     relativePath: normalizeRelativePath(relative(workspaceRoot, targetPath)),
     kind: match?.kind ?? (targetPath === workspaceRoot ? "workspace" : withinWorkspace ? "unmapped" : "external"),
     idea: match?.idea ?? null,
@@ -229,25 +332,22 @@ export async function resolveWorkspaceContext(
     relatedRepositories: match?.repositories ?? [],
     config,
     repositoryConfig,
-    workflowPath: WORKFLOW_SOURCE_PATH,
+    workflowPath: resolve(workspaceRoot, WORKFLOW_RELATIVE_PATH),
   };
+  Object.defineProperty(context, "workspaceConfigSnapshot", {
+    value: workspaceConfigSnapshot,
+    enumerable: false,
+  });
+  return context;
 }
 
-export async function resolveOperationConfiguration(
-  startPath,
-  { userRoot = getUserRoot() } = {},
-) {
-  const canonicalConfig = structuredClone(await readConfig(userRoot));
-  assertValidConfig(canonicalConfig, "resolve the user SDD installation");
-  const context = await resolveWorkspaceContext(startPath, {
-    userRoot,
-    authoritativeConfig: canonicalConfig,
-  });
+export async function resolveOperationConfiguration(startPath, options = {}) {
+  const context = await resolveWorkspaceContext(startPath, options);
   return {
-    workspaceRoot: userRoot,
-    userRoot,
+    workspaceRoot: context.workspaceRoot,
+    workspaceConfigPath: context.workspaceConfigPath,
     config: context.config,
-    canonicalConfig,
+    workspaceConfigSnapshot: context.workspaceConfigSnapshot,
     context,
   };
 }

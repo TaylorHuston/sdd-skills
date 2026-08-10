@@ -2,7 +2,7 @@
 
 ## Review Scope
 
-- Central Change: `~/.sdd/changes/yyyy-mm-dd-change-name/`
+- Central Change: `<workspace>/.sdd/changes/yyyy-mm-dd-change-name/`
 - Space: `<space-id>`
 - Target repository IDs: `<repository-id, ...>`
 - Repositories reviewed: `<repository-id, ...>`
@@ -18,7 +18,7 @@ changes-requested | blocked | ready
 | Gate | Result | Notes |
 |---|---|---|
 | Change artifacts | TBD | TBD |
-| Change status | TBD | `proposed` / `planned` / `in_progress` / `in_review`; central location under `~/.sdd/changes/closed/` means closed. |
+| Change status | TBD | `proposed` / `planned` / `in_progress` / `in_review`; central location under `<workspace>/.sdd/changes/closed/` means closed. |
 | Epic truth | TBD | TBD |
 | Canonical map authority | TBD | One current implementation map and one current verification map per Story. |
 | Requirements and Scenarios | TBD | TBD |
@@ -90,10 +90,11 @@ changes-requested | blocked | ready
 |---|---|---|---|---|---|---|
 | TBD | desktop / mobile | TBD | project browser/screenshot tooling / runtime browser / rendered preview or fixture / manual browser capture | TBD | clean / findings / not applicable | pass / findings / blocked / not applicable |
 
-## Review Bundle
+## Review Bundle: <repository-id>
 
 Repeat this bundle for every target repository and identify the stable repository ID.
 
+- Repository ID: <repository-id>
 - Source branch/ref:
 - Reviewed source commit:
 - Target branch/ref:
@@ -143,10 +144,11 @@ Repeat this bundle for every target repository and identify the stable repositor
 - Regression-focused rereview:
 - New regressions introduced by remediation: none / list
 
-## PR / Merge Readiness
+## PR / Merge Readiness: <repository-id>
 
 Record this readiness block for every target repository. A ready aggregate verdict does not collapse distinct branches, commits, PRs, or integration targets.
 
+- Repository ID: <repository-id>
 - Source branch:
 - Reviewed source commit:
 - Target branch:

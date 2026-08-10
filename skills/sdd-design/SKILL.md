@@ -31,12 +31,12 @@ When no flag is supplied, infer the mode only when the Change state and request 
 
 ## Resolve Authority
 
-1. Resolve the workspace, owning Space, one central Change, and every relevant target repository ID from explicit user input or `sdd context <relevant-path> --json`.
-2. Read the `workflowPath` returned by `sdd context` completely. If user setup is missing, direct the user to `sdd setup`; if a target repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
-3. Require one selected central open Change at `~/.sdd/changes/<change-id>/`, where the flat Change ID is globally unique. Read `tasks.md` frontmatter and require `status` to be one of `proposed`, `planned`, `in_progress`, or `in_review`, `space` to match the resolved Space, and `repositories` to contain the stable portable target repository IDs. An undated Change Brief under an idea's planning path is input to `/sdd-change`, not a Change that this skill may design in place.
+1. Resolve the workspace, owning Space, one central Change, and every relevant target repository ID from explicit user input or `sdd context <relevant-path> --json`. Retain the resolved workspace root and pass `--workspace <workspace-root>` to subsequent SDD commands whenever the target repository is external to the workspace or the command's current directory is not inside that workspace.
+2. Read the `workflowPath` returned by `sdd context` completely. If workspace setup is missing, direct the user to `sdd setup [workspace-path]`; if a target repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
+3. Require one selected central open Change at `<workspace>/.sdd/changes/<change-id>/`, where the flat Change ID is unique within that workspace. Read `tasks.md` frontmatter and require `status` to be one of `proposed`, `planned`, `in_progress`, or `in_review`, `space` to match the resolved Space, and `repositories` to contain the stable portable target repository IDs. An undated Change Brief under an idea's planning path is input to `/sdd-change`, not a Change that this skill may design in place.
 4. Resolve repository paths from those IDs for repository-local implementation, visual identity, prototype, Storybook, Epic, ADR, and design-evidence context. Never create or use a repository-local Change copy.
 5. Ask when one Space maps to multiple plausible Changes, or when the Change's target repository IDs do not resolve unambiguously.
-6. Treat a Change under `~/.sdd/changes/closed/<change-id>/` as history. Create or select a follow-up Change instead of rewriting closed intent.
+6. Treat a Change under `<workspace>/.sdd/changes/closed/<change-id>/` as history. Create or select a follow-up Change instead of rewriting closed intent.
 
 This skill does not start implementation, replan behavior, review, close, merge, or release a Change.
 
@@ -206,7 +206,7 @@ Choose the handoff from the central Change status:
 - A central Change in `proposed` returns to `/sdd-change --plan` or `--replan`; do not hand it to `/sdd-apply` until planning is complete and its status is `planned`.
 - A central Change still in `in_review` has not entered `--revise` correctly; transition the one ledger back to `in_progress` or route planning-level discovery through `/sdd-change --replan`.
 
-For a multi-repository Change, the handoff identifies repository-specific starting slices and evidence obligations in the one ledger. Lifecycle transitions remain global and repo-free, and occur only when every target repository has met the applicable gate.
+For a multi-repository Change, the handoff identifies repository-specific starting slices and evidence obligations in the one ledger. Lifecycle transitions remain Change-wide and repo-free, and occur only when every target repository has met the applicable gate.
 
 The `/sdd-apply` handoff should name:
 

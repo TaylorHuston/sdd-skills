@@ -1,5 +1,5 @@
 ---
-modified: 2026-07-14
+modified: 2026-08-07
 ---
 # SDD Toolchain Agent Guide
 
@@ -37,7 +37,6 @@ src/
   commands/
 schemas/
   workspace.schema.json
-  user.schema.json
   repository.schema.json
 skills/
   sdd-*/
@@ -50,7 +49,7 @@ test/
 
 - Keep skills self-contained and compliant with the OpenAI/Codex skill format.
 - Keep CLI behavior deterministic and expose machine-readable JSON for agent-facing commands.
-- Treat `~/.sdd/config.yaml` as private user topology, `<repo>/.sdd/config.yaml` as the portable repository contract, the package doctrine as the canonical workflow, and `~/.sdd/install-lock.json` as generated installation evidence.
+- Treat `<workspace>/.sdd/config.yaml` as private workspace topology, `<repo>/.sdd/config.yaml` as the portable repository contract, the workspace-managed doctrine as the canonical workflow, and `<workspace>/.sdd/install-lock.json` as generated installation evidence. The current workspace config is `version: 3`, `schema: sdd-v3`, with `ideas` and no `kind`; home-root workspace v1-v3 and released `kind: user` version 1 and version 2 configurations are explicit migration input only.
 - Never overwrite locally modified managed skills or workflow guidance without an explicit `--force` operation.
 - Keep the checked workspace schema, runtime validation, README examples, and generated configuration shape aligned.
 - Keep package docs public-safe. Do not add private vault notes, local paths, credentials, or project-specific secrets.
@@ -90,7 +89,7 @@ Keep these references in mind when working on this package:
 - `README.md` - package overview, installation, artifact model, and adaptation guidance.
 - `CHANGELOG.md` - public release history and release-facing behavior notes.
 - The local `skill-creator` system skill, when available - canonical guidance for OpenAI/Codex skill structure and validation.
-- A consuming project's `.agents/skills/sdd-*` or user-level Codex skills directory - compare when syncing or debugging install drift.
+- A consuming workspace's `.agents/skills/sdd-*` registry - compare when syncing or debugging install drift.
 - `https://github.com/Fission-AI/OpenSpec` - useful comparison point for proposal/change/spec workflow ideas.
 - `https://keepachangelog.com/en/1.1.0/` - changelog format this repo should follow.
 

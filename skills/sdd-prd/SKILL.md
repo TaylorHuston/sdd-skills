@@ -29,13 +29,13 @@ Use this boundary:
 |---|---|
 | `<planning-root>/prd.md` | product purpose, audience, scope, principles, product-level capability areas, market/monetization, open product questions |
 | `<planning-path>/change-briefs/<change-slug>.md` | undated idea-owned desired outcome that is not yet a Change |
-| `~/.sdd/changes/<change-id>/proposal.md` | why this specific Change exists, its target repository IDs, and what Epic actions it proposes |
-| `~/.sdd/changes/<change-id>/design.md` | high-level technical approach plus proposed Epic/Story/Requirement/Scenario changes |
-| `~/.sdd/changes/<change-id>/tasks.md` | status, owning Space, stable target repository IDs, implementation ledger, resume state, verification ledger, and closeout state |
+| `<workspace>/.sdd/changes/<change-id>/proposal.md` | why this specific Change exists, its target repository IDs, and what Epic actions it proposes |
+| `<workspace>/.sdd/changes/<change-id>/design.md` | high-level technical approach plus proposed Epic/Story/Requirement/Scenario changes |
+| `<workspace>/.sdd/changes/<change-id>/tasks.md` | status, owning Space, stable target repository IDs, implementation ledger, resume state, verification ledger, and closeout state |
 | `docs/epics/<key>-<###>-<epic-name>/epic.md` | durable capability/Epic truth, embedded Stories, Requirements, Scenarios, code map, verification map, gaps |
-| `~/.sdd/changes/<change-id>/review.md` | Change-local review findings when `sdd-review` is not clean |
+| `<workspace>/.sdd/changes/<change-id>/review.md` | Change-local review findings when `sdd-review` is not clean |
 
-An active dated Change lives once at `~/.sdd/changes/<change-id>/`; closed history lives at `~/.sdd/changes/closed/<change-id>/`. Change IDs are globally unique, while Epics, ADRs, implementation, tests, and supporting docs remain repository-local. Legacy planned or repository-local active/closed Change paths are migration input only; direct the user to `sdd update` instead of reading them as live owners.
+An active dated Change lives once at `<workspace>/.sdd/changes/<change-id>/`; closed history lives at `<workspace>/.sdd/changes/closed/<change-id>/`. Change IDs are unique within the selected workspace, while Epics, ADRs, implementation, tests, and supporting docs remain repository-local. Legacy planned or repository-local active/closed Change paths are migration input only; direct the user to the selected workspace's supported `sdd update` path instead of reading them as live owners.
 
 `/sdd-change --brief` and `--plan` should read the PRD when available and flag drift. `/sdd-apply` should stop when implementation reveals meaningful product drift. `/sdd-review` should include a lightweight PRD alignment check when product scope changed.
 

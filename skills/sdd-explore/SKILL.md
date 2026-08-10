@@ -127,7 +127,7 @@ The exploration record remains source context. When a stronger artifact becomes 
 |---|---|
 | Durable product purpose, audience, principles, scope, market, or monetization direction | Idea-owned PRD/Product Brief through `/sdd-prd` |
 | A bounded desired outcome that may wait before implementation | An undated private Change Brief at `<planning-path>/change-briefs/<change-slug>.md` through `/sdd-change --brief` |
-| A bounded change ready for current product and technical planning | One central Change at `~/.sdd/changes/<change-id>/` through `/sdd-change --plan`; new records are created with `sdd change create` |
+| A bounded change ready for current product and technical planning | One central Change at `<workspace>/.sdd/changes/<change-id>/` through `/sdd-change --plan`; new records are created with `sdd change create` |
 | A UI-bearing planned or active Change that needs an approved flow, responsive composition, state contract, accessibility behavior, or visual direction | The existing central Change through `/sdd-design` |
 | Technical approach, alternatives, risks, constraints, or verification strategy for an active Change | The central Change's `design.md` |
 | Durable architecture, data, dependency, integration, deployment, security, storage, or cross-cutting repository decision | `docs/adrs/yyyy-mm-dd-<decision-title>.md` through `/sdd-adr` |

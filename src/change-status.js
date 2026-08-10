@@ -1,13 +1,11 @@
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseDocument } from "yaml";
 
 import {
-  listStoredChanges,
+  readStoredChangesSnapshot,
+  readRequiredChangeFileSnapshot,
   relativeChangeStorePath,
 } from "./change-store.js";
-import { getUserRoot } from "./config.js";
-import { pathExists } from "./fs.js";
 
 export const CHANGE_STATUSES = Object.freeze([
   "proposed",
@@ -111,6 +109,14 @@ export function parseChangeMetadata(source) {
   };
 }
 
+export function isRepositoryOnlyChangeMetadata(metadata) {
+  return metadata?.error === null
+    && typeof metadata.space === "string"
+    && Array.isArray(metadata.repositories)
+    && metadata.repositories.length === 1
+    && metadata.repositories[0] === metadata.space;
+}
+
 export function setChangeMetadata(source, { space, repositories }) {
   if (validateOwnership(space, repositories)) return null;
   const parsed = frontmatterDocument(source);
@@ -124,42 +130,108 @@ export function setChangeMetadata(source, { space, repositories }) {
   return `${updatedBlock}${source.slice(parsed.match[0].length)}`;
 }
 
-export async function inspectChangeStatuses(workspaceRoot, config, userRoot = getUserRoot()) {
-  const findings = [];
-  const records = await listStoredChanges(userRoot);
-  const locations = new Map();
-  for (const record of records) {
-    const previous = locations.get(record.changeId);
-    if (previous) {
-      findings.push({
-        level: "error",
-        message: `Change exists in both active and closed central locations: ${record.changeId}.`,
-      });
-    } else {
-      locations.set(record.changeId, record);
-    }
+export async function inspectChangeStatuses(
+  workspaceRoot,
+  config,
+  repositoryIdsBySpace = null,
+  {
+    afterChangeFileRead = null,
+    afterClosedChangeInventory = null,
+    afterStoredChangesInventory = null,
+  } = {},
+) {
+  return readStoredChangesSnapshot(
+    workspaceRoot,
+    async (records) => {
+      const findings = [];
+      const configuredSpaceIds = new Set(Object.keys(config.ideas ?? {}));
+      const locations = new Map();
+      for (const record of records) {
+        const previous = locations.get(record.changeId);
+        if (previous) {
+          findings.push({
+            level: "error",
+            message: `Change exists in both active and closed central locations: ${record.changeId}.`,
+          });
+        } else {
+          locations.set(record.changeId, record);
+        }
 
-    const tasksPath = join(record.path, "tasks.md");
-    const displayPath = relativeChangeStorePath(tasksPath, userRoot);
-    if (!(await pathExists(tasksPath))) {
-      findings.push({ level: "error", message: `Change is missing tasks.md: ${displayPath}.` });
-      continue;
-    }
-    const metadata = parseChangeMetadata(await readFile(tasksPath, "utf8"));
-    if (metadata.error) {
-      findings.push({ level: "error", message: `Cannot parse Change metadata in ${displayPath}: ${metadata.error}` });
-      continue;
-    }
-    if (!CHANGE_STATUSES.includes(metadata.status)
-      && !(record.closed && LEGACY_CHANGE_STATUSES.includes(metadata.status))) {
-      findings.push({
-        level: "error",
-        message: `Invalid Change status ${JSON.stringify(metadata.status)} in ${displayPath}. Expected one of: ${CHANGE_STATUSES.join(", ")}.`,
-      });
-    }
-    if (!Object.hasOwn(config.ideas ?? {}, metadata.space)) {
-      findings.push({ level: "error", message: `Change references unknown Space ${metadata.space}: ${displayPath}.` });
-    }
-  }
-  return findings;
+        const tasksPath = join(record.path, "tasks.md");
+        const displayPath = relativeChangeStorePath(tasksPath, workspaceRoot);
+        const tasksSnapshot = await readRequiredChangeFileSnapshot(
+          record.path,
+          "tasks.md",
+          workspaceRoot,
+          {
+            afterRead: afterChangeFileRead
+              ? (observation) => afterChangeFileRead({
+                  changeId: record.changeId,
+                  closed: record.closed,
+                  fileName: "tasks.md",
+                  ...observation,
+                })
+              : null,
+          },
+        );
+        if (tasksSnapshot === null) {
+          findings.push({ level: "error", message: `Change is missing tasks.md: ${displayPath}.` });
+          continue;
+        }
+        const metadata = parseChangeMetadata(tasksSnapshot.source);
+        if (metadata.error) {
+          findings.push({ level: "error", message: `Cannot parse Change metadata in ${displayPath}: ${metadata.error}` });
+          continue;
+        }
+        if (!CHANGE_STATUSES.includes(metadata.status)
+          && !(record.closed && LEGACY_CHANGE_STATUSES.includes(metadata.status))) {
+          findings.push({
+            level: "error",
+            message: `Invalid Change status ${JSON.stringify(metadata.status)} in ${displayPath}. Expected one of: ${CHANGE_STATUSES.join(", ")}.`,
+          });
+        }
+        const configuredSpace = configuredSpaceIds.has(metadata.space);
+        const repositoryOnlyContext = configuredSpace
+          && config.ideas[metadata.space]?._repositoryOnly === true;
+        const repositoryOnlyMetadata = isRepositoryOnlyChangeMetadata(metadata);
+        if ((!configuredSpace || repositoryOnlyContext) && !repositoryOnlyMetadata) {
+          findings.push({
+            level: "error",
+            code: "SPACE_NOT_FOUND",
+            message: `Change references unknown Space ${metadata.space}: ${displayPath}.`,
+          });
+          continue;
+        }
+        if (!configuredSpace && repositoryOnlyMetadata) {
+          findings.push({
+            level: "warning",
+            code: "REPOSITORY_LOCATOR_UNAVAILABLE",
+            spaceId: metadata.space,
+            repositoryId: metadata.space,
+            message: `Repository-only Space ${metadata.space} has no configured repository locator; central Change metadata is available, but its implementation projection cannot be inspected: ${displayPath}. Run repository-scoped commands from that checkout with --workspace, or configure an explicit mapping before inspecting implementation artifacts.`,
+          });
+          continue;
+        }
+        if (repositoryIdsBySpace === null) continue;
+        const ownedRepositoryIds = repositoryIdsBySpace.get(metadata.space) ?? new Set();
+        for (const repositoryId of [...metadata.repositories].sort(
+          (left, right) => left.localeCompare(right),
+        )) {
+          if (ownedRepositoryIds.has(repositoryId)) continue;
+          findings.push({
+            level: "error",
+            code: "REPOSITORY_NOT_FOUND",
+            message: `Change references repository ID ${repositoryId}, which is not owned by Space ${metadata.space}: ${displayPath}.`,
+          });
+        }
+      }
+      return findings;
+    },
+    {
+      afterInventory: afterStoredChangesInventory,
+      listOptions: {
+        afterClosedInventory: afterClosedChangeInventory,
+      },
+    },
+  );
 }

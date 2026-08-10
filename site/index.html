@@ -1,3 +1,4 @@
+skil
 <!doctype html>
 <html lang="en" data-theme="steel">
 
@@ -59,7 +60,7 @@
       </div>
     </aside>
 
-      <main id="main-content" tabindex="-1">
+    <main id="main-content" tabindex="-1">
       <section class="intro" id="top" aria-labelledby="page-title">
         <div class="introCopy">
           <p class="eyebrow">Guide / Methodology</p>
@@ -651,7 +652,8 @@
         <div>
           <h2 id="implementation-title">How I implemented SDD</h2>
           <p>Everything above this line is the method. What follows is my current local-first implementation: Markdown
-            artifacts, portable repository contracts, private user topology, one central user-level Change store, a deterministic CLI, and agent skills.</p>
+            artifacts, portable repository contracts, private workspace topology, one central workspace Change store,
+            a deterministic CLI, and workspace-managed agent skills.</p>
         </div>
       </section>
 
@@ -671,9 +673,10 @@
             <div>
               <h3 id="default-layout-title">Planning, project truth, and Changes have distinct owners.</h3>
               <p>Planning stays Space-owned and private. Durable project truth lives with the code. Every dated Change
-                lives once under <code>~/.sdd/changes/</code>. <code>~/.sdd/config.yaml</code> maps the private
-                relationships, while each repository commits its portable identity and artifact paths in
-                <code>.sdd/config.yaml</code>.
+                lives once under <code>&lt;workspace&gt;/.sdd/changes/</code>. The workspace's
+                <code>&lt;workspace&gt;/.sdd/config.yaml</code> maps private relationships, while each repository
+                commits its portable identity and artifact paths in <code>.sdd/config.yaml</code>. Managed skills
+                default to <code>&lt;workspace&gt;/.agents/skills/</code>.
               </p>
             </div>
           </div>
@@ -703,8 +706,8 @@
 
             <article class="recordType recordChange implementationRecord">
               <p class="recordIndex">03 / Changes</p>
-              <h4>User-owned work</h4>
-              <pre aria-label="Default Change document layout"><code>~/.sdd/changes/
+              <h4>Workspace-owned work</h4>
+              <pre aria-label="Default Change document layout"><code>&lt;workspace&gt;/.sdd/changes/
   &lt;date&gt;-&lt;change&gt;/
     proposal.md
     design.md
@@ -712,12 +715,16 @@
   closed/
     &lt;date&gt;-&lt;change&gt;/</code></pre>
               <p class="recordNote"><code>sdd change create</code> writes one canonical record whose
-                <code>tasks.md</code> names its Space and target repositories. Closeout moves that folder once under
-                <code>~/.sdd/changes/closed/</code> after project truth has been reconciled.
+                <code>tasks.md</code> names its Space and target repositories. The ID is unique within this workspace,
+                and closeout moves the folder once under <code>&lt;workspace&gt;/.sdd/changes/closed/</code> after
+                project truth has been reconciled.
               </p>
-              <p class="recordNote">During upgrades, <code>sdd update</code> retains the legacy source until commit,
-                performs a complete fail-closed preflight, consolidates identical legacy copies, recovers interrupted
-                transactions, and aborts without writes for divergent, cross-Space, unsafe, missing-identity, or ambiguous-target input.</p>
+              <p class="recordNote">To migrate an old home-root workspace v1-v3, user-v1, or user-v2 installation,
+                preview <code>sdd setup /path/to/workspace --from-user /path/to/old-user-root --dry-run</code>, then
+                run the same command without <code>--dry-run</code>. Setup preflights every collision and ownership
+                boundary, publishes and verifies the workspace before retiring checksum-owned source state, and leaves
+                unrelated skills untouched. Post-crash cleanup resumes only from complete source-derived transaction
+                provenance; without it, setup fails closed and retains the remaining state for manual inspection.</p>
             </article>
           </div>
         </section>
@@ -732,10 +739,11 @@
               <div class="columnLabel">Deterministic layer</div>
               <h3 id="cli-title">SDD CLI</h3>
               <ul>
-                <li>Install user skills and map private topology</li>
+                <li>Install workspace-managed skills and map private topology</li>
                 <li>Initialize portable repository contracts</li>
                 <li>Scaffold canonical Changes and repository-owned Epics</li>
-                <li>Validate artifacts, ownership metadata, audit-report coherence, and optional Git-relative freshness</li>
+                <li>Validate artifacts, ownership metadata, audit-report coherence, and optional Git-relative freshness
+                </li>
                 <li>Report central Change status across mapped repositories</li>
                 <li>Preflight and safely migrate compatible legacy Change locations during update</li>
                 <li>Guard one-record lifecycle transitions</li>
@@ -770,7 +778,9 @@
             <li><span>02</span><strong>Capture intent</strong><code>/sdd-change --brief</code></li>
             <li><span>03</span><strong>Plan just in time</strong><code>/sdd-change --plan</code></li>
             <li><span>04</span><strong>Converge the experience</strong><code>/sdd-design --plan</code></li>
-            <li><span>05</span><strong>Commit to a work scope</strong><code>sdd validate --change</code></li>
+            <li><span>05</span><strong>Commit to a work
+                scope</strong><code>sdd validate &lt;space-id&gt; --change &lt;change-id&gt; --workspace &lt;path&gt;</code>
+            </li>
             <li><span>06</span><strong>Implement in verified slices</strong><code>/sdd-apply</code></li>
             <li class="workflowMapMulti"><span>07</span><strong>Review independently</strong>
               <div><code>/sdd-review</code><code>/sdd-epic-verify</code></div>
@@ -803,9 +813,9 @@
 
         <div class="commandBlock">
           <div class="commandHeader">
-            <span>Install once, initialize each repository</span>
+            <span>Install once per workspace, initialize each repository</span>
             <button class="copyButton" id="copy-command" type="button"
-              data-copy="git clone https://github.com/TaylorHuston/sdd-skills.git&#10;cd sdd-skills&#10;npm install&#10;npm link&#10;sdd setup&#10;cd /path/to/repository&#10;sdd init&#10;sdd doctor"
+              data-copy="git clone https://github.com/TaylorHuston/sdd-skills.git&#10;cd sdd-skills&#10;npm install&#10;npm link&#10;sdd setup /path/to/workspace&#10;cd /path/to/workspace/spaces/repository&#10;sdd init&#10;sdd doctor --workspace /path/to/workspace"
               aria-label="Copy installation and initialization commands">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
@@ -818,10 +828,10 @@
 <span class="prompt">$</span> cd sdd-skills
 <span class="prompt">$</span> npm install
 <span class="prompt">$</span> npm link
-<span class="prompt">$</span> sdd setup
-<span class="prompt">$</span> cd /path/to/repository
+<span class="prompt">$</span> sdd setup /path/to/workspace
+<span class="prompt">$</span> cd /path/to/workspace/spaces/repository
 <span class="prompt">$</span> sdd init
-<span class="prompt">$</span> sdd doctor</code></pre>
+<span class="prompt">$</span> sdd doctor --workspace /path/to/workspace</code></pre>
           <p class="commandNote"><strong>Pre-1.0 distribution:</strong> install from the GitHub checkout for now. A
             standard npm registry install is targeted for the 1.0 release. <a
               href="https://github.com/TaylorHuston/sdd-skills/blob/main/CHANGELOG.md">See what changed <span

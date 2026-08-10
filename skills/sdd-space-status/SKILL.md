@@ -15,7 +15,7 @@ Use `sdd context <relevant-path> --json` to resolve the workspace and Space ID, 
 
 Treat the result's top-level `activeChanges` and `recentChanges` as the unique canonical Change inventories for the Space. Entries under each repository are filtered projections of those same records based on `tasks.md.repositories`; they are not copies or independent lifecycle owners. The CLI output is navigation, not durable product truth. Central active Change artifacts remain working records, repository-local Epics remain the accepted capability map, and implementation/tests reveal runtime reality. Project guidance owns branch policy, required supporting docs, release conventions, and technology-specific constraints.
 
-If the user installation is missing, direct the user to `sdd setup`; if the repository contract is missing, direct them to `sdd init` in that repository. Use `sdd doctor` to diagnose an existing installation.
+If the workspace installation is missing, direct the user to `sdd setup [workspace-path]`; if the repository contract is missing, direct them to `sdd init` in that repository. Use `sdd doctor` to diagnose an existing installation.
 
 ## Inputs
 
@@ -50,7 +50,7 @@ A resolved Space ID or path uses detailed Space mode. A workspace-wide inventory
    - Identify the central active Change, its most useful global resume point, target repositories, repository-specific branches and work states, cross-target blockers, pending review or acceptance, and important Epic/Story context.
    - For an `in_progress` Change, distinguish its declared global resume point and per-repository ledger states from observed recent work. Summarize the last completed slice, the likely current slice, coordination dependencies, and relevant uncommitted work when evidence supports them. Do not assume a recent commit or dirty file belongs to the Change solely because it is recent.
    - Mention only contradictions visible from the targeted reads. Do not turn re-entry into a full drift, template, security, or implementation audit.
-   - Distinguish declared status from inference. Canonical active Change status is `proposed`, `planned`, `in_progress`, or `in_review`. Location under `~/.sdd/changes/closed/<change-id>/`, not a `closed` frontmatter value or repository projection, determines that the Change is closed.
+   - Distinguish declared status from inference. Canonical active Change status is `proposed`, `planned`, `in_progress`, or `in_review`. Location under `<workspace>/.sdd/changes/closed/<change-id>/`, not a `closed` frontmatter value or repository projection, determines that the Change is closed.
 4. Route the next action.
    - Recommend at most three coherent next moves, with the most likely first.
    - Name the skill that owns deeper work rather than performing it here.
