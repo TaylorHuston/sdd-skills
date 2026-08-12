@@ -46,57 +46,27 @@ function assertContractClauses(label, source, clauses) {
   }
 }
 
-test("packaged change replan preserves a coherent planned handoff and exact Apply restart", async () => {
+test("packaged change workflow progresses one central intent record into planning", async () => {
   const changeSkill = await readPackageFile("skills", "sdd-change", "SKILL.md");
-  const replan = markdownSection(changeSkill, "Replan Mode");
-
-  assertContractClauses("Replan mode", replan, [
-    [
-      "route planning-level discoveries from implementation, review, or manual feedback before implementation continues",
-      /Use `--replan` when implementation, review, or manual feedback discovers a new or meaningfully changed Requirement, Scenario, constraint, Epic owner, contract, data\/auth rule, architecture decision, rollout need, or verification obligation that must be planned before implementation continues\./,
-    ],
-    [
-      "leave narrow implementation corrections with Apply",
-      /Do not use it for narrow defects, missing tests, stale evidence indexes, or routine implementation corrections that `\/sdd-apply` can safely reconcile\./,
-    ],
-    [
-      "guard the repo-free return to proposed before replanning the central record",
-      /For a Change not already `proposed`, run `sdd change transition <space-id> <change-id> --from <current-status> --to proposed`\. This compare-and-set mutates the one central `tasks\.md`; do not transition repository targets independently\./,
-    ],
-    [
-      "update every planning and resume artifact affected by the discovery",
-      /Update `proposal\.md`, `design\.md`, ADRs, and `tasks\.md` wherever scope, behavior, approach, evidence, risks, decision fan-out, verification-environment obligations, or resume state changed\./,
-    ],
-    [
-      "record a dated planning update with the exact Apply restart",
-      /Add a dated `Planning Updates` entry with the discovery, classification, decisions, artifacts changed, and exact `\/sdd-apply` restart point\./,
-    ],
-    [
-      "return the central record to planned only after coherence and scoped validation",
-      /Set `status: planned` only when the revised plan is coherent\. Use `sdd change transition <space-id> <change-id> --from proposed --to planned`; then run scoped `sdd validate`\./,
-    ],
-  ]);
-
-  const canonicalTasks = await readPackageFile("docs", "templates", "tasks.md");
-  const packagedTasks = await readPackageFile(
+  const changeTemplate = await readPackageFile("docs", "templates", "change.md");
+  const packagedChangeTemplate = await readPackageFile(
     "skills",
     "sdd-change",
     "assets",
-    "tasks-template.md",
+    "change-template.md",
   );
-  assert.equal(packagedTasks, canonicalTasks, "the packaged Change ledger must mirror the canonical template");
 
-  const planningUpdates = markdownSection(canonicalTasks, "Planning Updates");
-  assertContractClauses("Planning Updates", planningUpdates, [
-    [
-      "identify replanning as the response to planning-level discovery",
-      /Record `\/sdd-change --replan` updates when implementation or feedback discovers planning-level requirements\./,
-    ],
-    [
-      "capture the discovery, classification, changed artifacts, and next Apply starting point",
-      /\| Date \| Discovery \| Classification \| Planning Updates \| Next Apply Starting Point \| .* \| YYYY-MM-DD \| TBD \| in-scope refinement \/ scope expansion \/ product drift \/ Epic ownership change \/ technical constraint \/ follow-up change \| proposal\.md \/ design\.md \/ tasks\.md \| `\/sdd-apply` TBD \|/,
-    ],
-  ]);
+  assert.equal(packagedChangeTemplate, changeTemplate);
+  assert.match(changeSkill, /Select Or Create The Change/);
+  assert.match(changeSkill, /## Capture Intent/);
+  assert.match(changeSkill, /## Technical Planning/);
+  assert.match(changeSkill, /Revising An Existing Plan/);
+  assert.match(changeSkill, /`proposed`: intent exists, but ownership or technical planning may be incomplete/);
+  assert.match(changeSkill, /- `design\.md`: behavior, selected approach[\s\S]*- `tasks\.md`: a short capability-level implementation ledger/);
+  assert.doesNotMatch(changeSkill, /--brief|--plan|--replan|proposal\.md|change-briefs/);
+  assert.match(changeTemplate, /status: proposed/);
+  assert.match(changeTemplate, /space: <space-id>/);
+  assert.match(changeTemplate, /repositories: \[\]/);
 });
 
 test("packaged workflows coordinate one central Change across every target repository", async () => {
@@ -126,19 +96,19 @@ test("packaged workflows coordinate one central Change across every target repos
 
   assert.match(
     change,
-    /one canonical dated Change record lives under `<workspace>\/\.sdd\/changes\/`[\s\S]*target repositories are stable IDs in `tasks\.md`, not copies/,
+    /Every Change starts in the central workspace store:[\s\S]*Target repositories contain Epics, ADRs, code, and tests—not copies of the Change/,
   );
   assert.match(
     apply,
-    /stable repository IDs in the central `tasks\.md` frontmatter as the target set[\s\S]*transition <space-id> <change-id> --from in_progress --to in_review` once, with no `--repo`/,
+    /stable repository IDs in the central `change\.md` frontmatter as the target set[\s\S]*transition <space-id> <change-id> --from in_progress --to in_review` once, with no `--repo`/,
   );
   assert.match(
     review,
-    /derive the complete target set from `tasks\.md` frontmatter[\s\S]*Transition or close the central Change only once/,
+    /derive the complete target set from `change\.md` frontmatter[\s\S]*Transition or close the central Change only once/,
   );
   assert.match(
     pr,
-    /derive the complete target set from the central `tasks\.md`[\s\S]*A clean or merged PR never makes the Change complete by itself/,
+    /derive the complete target set from central `change\.md` frontmatter[\s\S]*A clean or merged PR never makes the Change complete by itself/,
   );
   assert.match(
     release,
@@ -553,63 +523,13 @@ test("packaged evidence closure keeps high-risk Scenarios unverified when only a
   ]);
 });
 
-test("packaged Interactive workflow tracks one lightweight request through an honest review handoff", async () => {
+test("packaged Interactive workflow tracks one lightweight progressive Change", async () => {
   const interactiveSkill = await readPackageFile("skills", "sdd-interactive", "SKILL.md");
 
-  assertContractClauses("Interactive workflow", interactiveSkill, [
-    [
-      "limit the mode to a tracked lightweight session rather than substantial replanning",
-      /This skill is for tracked working sessions\. It is not a replacement for `\/sdd-change --plan` when the change needs substantial product scoping, architecture design, data\/auth\/API changes, migration planning, or cross-Epic coordination\./,
-    ],
-    [
-      "complete the central lightweight artifacts and preserve portable lifecycle metadata",
-      /Complete the lightweight central artifacts\. .* `proposal\.md`: record why the session exists, in-scope work, explicit out-of-scope work, known Epic\/Story impact, release-communication impact, target repositories, and when to stop and route to `\/sdd-change --plan`\. .* `design\.md`: record the current understanding, high-level technical approach, cross-repository boundaries or sequencing when applicable, alternatives or deferred approaches, affected Epic truth, and open questions\. .* `tasks\.md`: preserve the initial `status: proposed`, populate `space` and the complete stable `repositories` list, then record `Resume Here`, target responsibilities, coordination gates, the interactive request log, task checklist, implementation ledger, verification ledger, manual UI confirmation checklist, artifact updates, open questions, and closeout state\./,
-    ],
-    [
-      "leave the central record proposed when scope expands without acceptance",
-      /If the user request would materially expand product scope, user-visible behavior, Epic ownership, data model, auth\/security model, public API, deployment behavior, or external-service state, leave the central Change `proposed` and recommend `\/sdd-change --plan` unless the user explicitly accepts expanding it\./,
-    ],
-    [
-      "process and record one classified repository-owned request at a time",
-      /Take one user request, manual-testing note, or tweak at a time\. .* Record it in the central `tasks\.md` before or immediately after acting, including the responsible repository ID\. .* Classify it as `cosmetic`, `defect`, `verification gap`, `artifact drift`, `requirement refinement`, `small in-scope behavior`, `scope expansion`, or `product drift`\./,
-    ],
-    [
-      "require focused proof for defects and missing evidence",
-      /For `defect` changes, add or update a focused failing-first test\/check when practical, fix the defect, verify, and update scenario-mapped Story evidence\. .* For `verification gap`, produce the missing proof before claiming completion\./,
-    ],
-    [
-      "update accepted behavior before or with implementation",
-      /For `requirement refinement`, update `design\.md` and the target Epic Requirement\/Scenario before or alongside implementation\. .* For `small in-scope behavior`, add or update the relevant Requirement\/Scenario, then implement and verify it\./,
-    ],
-    [
-      "reconcile repository-local implementation ownership, scenario proof, and release communication",
-      /Update affected repository-local Epic `Implementation`, behavior-mapped `Implemented By`, `Implementation Gaps`, `Verification`, scenario-mapped `Verified By`, and `Verification Gaps` when implementation or verification reality changes\. .* Update the project-defined release communication when project policy requires it\./,
-    ],
-    [
-      "keep the central Change in progress until every target is ready for independent review",
-      /Keep the central status `in_progress` while any target has implementation, verification, remediation, or unresolved coordination work\. Only after every targeted repository is ready for independent review, run `sdd change transition <space-id> <change-id> --from in_progress --to in_review` once, without `--repo`\. .* Recommend `\/sdd-review` before merge or closeout when code, user-visible behavior, security, data, or release state changed\./,
-    ],
-  ]);
-
-  const artifactShapeStart = interactiveSkill.indexOf("## Artifact Shape");
-  const artifactShapeEnd = interactiveSkill.indexOf("## Stop Conditions", artifactShapeStart);
-  assert.notEqual(artifactShapeStart, -1, "Interactive must define its lightweight artifact shape");
-  assert.notEqual(artifactShapeEnd, -1, "Interactive artifact shape must end before stop conditions");
-  const taskShape = interactiveSkill.slice(artifactShapeStart, artifactShapeEnd);
-  for (const requiredLedgerSection of [
-    "## Resume Here",
-    "## Interactive Log",
-    "## Implementation Ledger",
-    "## Verification Ledger",
-    "## Manual UI Confirmation",
-    "## Artifact Updates",
-    "## Closeout",
-  ]) {
-    assert.match(taskShape, new RegExp(`^${requiredLedgerSection.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}$`, "m"));
-  }
-  assert.match(
-    taskShape,
-    /^- Status: pending user \/ user confirmed \/ accepted gap \/ not applicable$/m,
-    "the lightweight ledger must preserve explicit manual-confirmation state",
-  );
+  assert.match(interactiveSkill, /sdd change create <space-id> <slug>/);
+  assert.match(interactiveSkill, /`change\.md`: record why the session exists/);
+  assert.match(interactiveSkill, /Status, Space, and repositories remain in `change\.md`/);
+  assert.match(interactiveSkill, /sdd change transition <space-id> <change-id> --from proposed --to planned/);
+  assert.match(interactiveSkill, /Recommend `\/sdd-review` before merge or closeout/);
+  assert.doesNotMatch(interactiveSkill, /proposal\.md|--brief|\/sdd-change --plan|--replan/);
 });

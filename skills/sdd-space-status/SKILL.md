@@ -13,7 +13,7 @@ This skill is a semantic wrapper around `sdd status`, not a second discovery eng
 
 Use `sdd context <relevant-path> --json` to resolve the workspace and Space ID, then use `sdd status <space-id> --json` as the inventory. Read the `workflowPath` returned by `sdd context` before interpreting artifact authority, Epic truth, Change status, or workflow routing.
 
-Treat the result's top-level `activeChanges` and `recentChanges` as the unique canonical Change inventories for the Space. Entries under each repository are filtered projections of those same records based on `tasks.md.repositories`; they are not copies or independent lifecycle owners. The CLI output is navigation, not durable product truth. Central active Change artifacts remain working records, repository-local Epics remain the accepted capability map, and implementation/tests reveal runtime reality. Project guidance owns branch policy, required supporting docs, release conventions, and technology-specific constraints.
+Treat the result's top-level `activeChanges` and `recentChanges` as the unique canonical Change inventories for the Space. Entries under each repository are filtered projections of those same records based on `change.md.repositories`; they are not copies or independent lifecycle owners. The CLI output is navigation, not durable product truth. Central active Change artifacts remain working records, repository-local Epics remain the accepted capability map, and implementation/tests reveal runtime reality. Project guidance owns branch policy, required supporting docs, release conventions, and technology-specific constraints.
 
 If the workspace installation is missing, direct the user to `sdd setup [workspace-path]`; if the repository contract is missing, direct them to `sdd init` in that repository. Use `sdd doctor` to diagnose an existing installation.
 
@@ -41,7 +41,7 @@ A resolved Space ID or path uses detailed Space mode. A workspace-wide inventory
    - Read mapped repository `AGENTS.md`, README, and `docs/README.md` when present.
    - In detailed Space mode, read each active repository's last three local commits from its current checked-out history. Capture the commit hash, date, subject, and changed-file summary. Inspect a commit patch only when its subject and file summary do not explain the work or contradict the active Change record. Do not fetch remote history.
    - Deduplicate by Change ID and read each top-level active Change's central `tasks.md` once, especially Resume Here, target repository responsibilities, pending tasks, blockers, verification, review, manual confirmation, branch/PR/merge/release state, coordination gates, and closeout notes. Do not reread or reinterpret it as one artifact per repository projection.
-   - When a central Change is `in_progress`, also read its `proposal.md` and `design.md` when present. Reconcile its declared global resume point and each target's current slice, implementation and verification ledgers, referenced files, dependencies, and blockers with the last three commits and current working-tree summary in the relevant repositories. Inspect only the relevant diff or files needed to identify the exact implementation slice that was underway.
+   - When a central Change is `in_progress`, also read its `change.md` and `design.md` when present. Reconcile its declared global resume point and each target's current slice, implementation and verification ledgers, referenced files, dependencies, and blockers with the last three commits and current working-tree summary in the relevant repositories. Inspect only the relevant diff or files needed to identify the exact implementation slice that was underway.
    - Read `review.md` or a recent Epic verification report only when the canonical ledger or a repository projection points to it.
    - Read the most relevant repository-local Epic files at summary depth: Outcome, Current Scope, Story Index, Open Decisions, Completion Criteria, and obvious Verification Gaps. Do not exhaustively audit every Requirement or Scenario.
    - Read top-level recent closed Changes from their central records only when needed to avoid recommending completed work or to explain recent direction.
@@ -111,8 +111,8 @@ Use absolute clickable file links in user-facing output. Say when a conclusion i
 
 - `/sdd-prd`: product purpose, audience, scope, or direction needs decisions.
 - `/sdd-explore`: the product or technical path is still unclear.
-- `/sdd-change --brief`: a deferred desired outcome should be retained without technical planning.
-- `/sdd-change --plan` or `--replan`: a new implementation plan or active planning revision is needed.
+- `/sdd-change`: a deferred desired outcome should be retained without technical planning.
+- `/sdd-change` or `--replan`: a new implementation plan or active planning revision is needed.
 - `/sdd-apply`: an active Change has a clear implementation or remediation slice.
 - `/sdd-review`: implementation is ready for the independent local gate.
 - `/sdd-release`: reviewed work is ready for production handoff preparation.

@@ -43,7 +43,7 @@ Project or workspace guidance owns the operating profile:
 - required supporting docs and architecture, API, UI, security, or platform constraints
 - available tools and skills, external-service permissions, and local reporting preferences
 
-Each skill must read the project profile before acting and apply this workflow through that profile. Change storage is fixed within the resolved workspace: undated Change Briefs live at `<planning-path>/change-briefs/<change-slug>.md`, active dated Changes live only at `<workspace>/.sdd/changes/<change-id>/`, and closed Changes live only at `<workspace>/.sdd/changes/closed/<change-id>/`. Epics remain under `docs/epics/`, ADRs remain under `docs/adrs/`, and implementation, tests, and supporting docs remain in each target repository. Package-defined audits and reports also remain under the relevant repository's `docs/` subtree. Project guidance may override idea/repository resolution explicitly and may define allowed repository-local supporting-doc layouts, but it may not relocate, duplicate, or re-scope the workspace-central dated Change store.
+Each skill must read the project profile before acting and apply this workflow through that profile. Change storage is fixed within the resolved workspace: active Changes live only at `<workspace>/.sdd/changes/<change-id>/`, from initial intent onward, and closed Changes live only at `<workspace>/.sdd/changes/closed/<change-id>/`. Epics remain under `docs/epics/`, ADRs remain under `docs/adrs/`, and implementation, tests, and supporting docs remain in each target repository. Package-defined audits and reports also remain under the relevant repository's `docs/` subtree. Project guidance may override idea/repository resolution explicitly and may define allowed repository-local supporting-doc layouts, but it may not relocate, duplicate, or re-scope the workspace-central Change store.
 
 ### Default Space, Change, And Repository Topology
 
@@ -57,9 +57,9 @@ Private product direction is idea-owned, dated Change coordination is workspace-
     story-driven-development.md
     changes/
       <change-id>/
-        proposal.md
-        design.md
-        tasks.md
+        change.md
+        design.md        # added during technical planning
+        tasks.md         # added during technical planning
         review.md        # only when review finds deficiencies
       closed/
         <change-id>/
@@ -69,8 +69,6 @@ Private product direction is idea-owned, dated Change coordination is workspace-
   <planning-root>/
     <idea>/
       prd.md
-      change-briefs/
-        <change-slug>.md
   <repository-root>/
     <repo-a>/
       .sdd/config.yaml
@@ -128,15 +126,15 @@ Resolve workspace ownership in this order:
 
 There is no home-directory fallback. An external repository that is outside the workspace tree must be mapped by the selected workspace and invoked with an explicit `--workspace` or from a current directory inside that workspace. Ambiguous or unmapped ownership fails without selecting another installation.
 
-An old home-root workspace v1-v3 installation or released `kind: user` version 1 or version 2 installation is explicit migration input only. Use `sdd setup <workspace> --from-user <old-user-root> --dry-run` to inspect the complete transaction, then rerun without `--dry-run`. Migration must preflight source and destination identity, configuration and topology, workspace-local Change-ID uniqueness, physical containment, symlink ancestry, managed-skill ownership, and collisions before writing. It stages and verifies destination state before retiring only checksum-owned source artifacts and preserves unrelated skills and files. Automatic post-crash recovery or cleanup requires a complete durable journal plus source-derived transaction provenance independently bound outside the staged transaction; committed partial cleanup without that authenticated proof fails closed and retains state for manual inspection. A provenance-complete rerun is idempotent. No operational command treats the old home-root config or Change namespace as current.
+Pre-1.0 home-scoped installations and older workspace or repository configuration schemas are unsupported. Recreate a current workspace with `sdd setup`, initialize repositories with `sdd init`, and manually preserve only alpha data still worth keeping. No operational command treats an older configuration or Change namespace as current.
 
 Idea and mapped-repository lifecycle status uses exactly `active`, `inactive`, or `archived`. `active` means current development and is included in default workspace status and new Change targeting. `inactive` retains paused or potential work; `archived` is historical/read-only reference. The portable repository contract does not prescribe workspace lifecycle state.
 
-For an existing Change, treat its `tasks.md` `space` and `repositories` frontmatter as the declared scope; resolve those repository IDs through the selected workspace rather than deriving a different target set from the current directory. When creating a Change and more than one mapped repository is relevant, prefer explicit user-selected repositories. Apply project guidance only when it intentionally overrides configured target resolution for the active operation. Ask when multiple target repositories remain plausible or ownership cannot be resolved safely; do not infer or persist an undeclared relationship silently.
+For an existing Change, treat its `change.md` `space` and `repositories` frontmatter as the declared scope; resolve those repository IDs through the selected workspace rather than deriving a different target set from the current directory. Repository ownership may remain empty while `proposed`, but it is required before `planned`. Ask when ownership cannot be resolved safely.
 
 One idea may map to many repositories. Under the current model, one repository should be claimed by at most one idea, and shared tooling repositories may remain unlinked. If real usage requires one repository to support multiple ideas, evolve the config schema and resolver deliberately into a many-to-many model rather than adding ad hoc reverse links.
 
-`<workspace>/.sdd/config.yaml` is authoritative for the workspace's private relationship map; `<repository>/.sdd/config.yaml` is authoritative for portable repository identity and repository-local artifact locations; `<workspace>/.sdd/changes/` is authoritative for every dated Change in that workspace. A repository-only context with no mapped Idea planning path may use its repository ID as the Space ID and may own a central Change, but it cannot invent a private planning destination or create a Change Brief. Do not create a missing idea directory during read-only work. When a workspace root moves, use `sdd configure` to repair it while preserving Space IDs, statuses, roles, and mappings. Change configured relationships only when the active workflow is authorized to modify workspace topology.
+`<workspace>/.sdd/config.yaml` is authoritative for the workspace's private relationship map; `<repository>/.sdd/config.yaml` is authoritative for portable repository identity and repository-local artifact locations; `<workspace>/.sdd/changes/` is authoritative for every Change in that workspace. A repository-only context with no mapped Idea planning path may use its repository ID as the Space ID and may own a central Change. Do not create a missing idea directory during read-only work. When a workspace root moves, use `sdd configure` to repair it while preserving Space IDs, statuses, roles, and mappings.
 
 Default inventory commands include only active ideas and active mapped repositories. Use `sdd status --all` for lifecycle auditing and historical inventory. Explicit `sdd status <space-id>` remains able to show every repository mapped to that Space. Do not create or apply new work against an inactive idea or inactive/archived mapping; update the workspace lifecycle status first when work intentionally resumes.
 
@@ -154,8 +152,7 @@ Neither the planning root nor the central Change store is a second implementatio
 - **Implementation Gaps**: Accepted Story behavior that does not currently exist. An implemented Story has no implementation gaps; a partial Story names the missing Requirement or Scenario references explicitly.
 - **Verified By**: A behavior evidence index. It should name concrete tests, assertions, browser/manual scenarios, review artifacts, or other proof tied to the Requirement or Scenario. Automated evidence uses a repository-relative `path#exact test title or stable anchor` so a future developer can rerun and inspect it. It is not a chronological command log.
 - **Verification Gaps**: Known missing, deferred, or accepted gaps. Empty or stale gaps are misleading and should be cleaned up.
-- **Change Brief**: An undated private outcome capture at the fixed path `<planning-path>/change-briefs/<change-slug>.md`. It records why a change may matter, the desired observable outcome, scope boundaries, success signals, durable constraints, and open product questions without choosing a technical approach. It is not a Change, has no Change status or dated Change ID, and does not authorize planning or implementation by itself.
-- **Change**: One dated tracked artifact set at `<workspace>/.sdd/changes/<change-id>/` while active or `<workspace>/.sdd/changes/closed/<change-id>/` after close, containing `proposal.md`, `design.md`, and `tasks.md`, plus `review.md` when review deficiencies require it. Its flat Change ID is unique within the selected workspace. The one record may create or update Epics in one or many repositories; repository scope is declared by stable portable repository IDs in `tasks.md`.
+- **Change**: One dated tracked record at `<workspace>/.sdd/changes/<change-id>/` while active or `<workspace>/.sdd/changes/closed/<change-id>/` after close. `change.md` captures intent, lifecycle status, Space, and repository ownership from the moment the outcome is preserved. Technical planning adds `design.md` and `tasks.md`; review may add `review.md`. Its flat Change ID is unique within the selected workspace.
 - **Repository projection**: A filtered view of a central Change for one targeted repository. Status, validation, implementation, review, PR, and release workflows may use projections to operate on repository-local artifacts, but a projection is never a stored Change copy or an independent lifecycle owner.
 
 ## Artifact Authority
@@ -167,7 +164,7 @@ Use this authority order:
 1. Running implementation and tests reveal what the application actually does.
 2. Epic files are the durable written map for accepted implemented capabilities, embedded Stories, Requirements, Scenarios, implementation evidence, verification evidence, and known gaps.
 3. The one central active Change record is the working coordination truth for proposed, planned, in-progress, or in-review work across all of its target repositories.
-4. Product Briefs/PRDs and confirmed Change Briefs guide product intent, audience, scope, principles, desired outcomes, and open product questions. They never override current implementation or Epic truth.
+4. Product Briefs/PRDs and proposed Changes guide product intent, audience, scope, principles, desired outcomes, and open product questions. They never override current implementation or Epic truth.
 5. Reviews, release notes, changelogs, and exploration notes are evidence and transition records.
 6. READMEs and general docs are supporting documentation and must not contradict active Epic truth.
 
@@ -175,7 +172,7 @@ There should be no separate durable answer to "what is implemented?" outside Epi
 
 Generated Story indexes, such as `docs/epics/index.md` or `docs/epics/story-index.json`, are optional project-local validation or navigation artifacts. They are not canonical. If a project intentionally maintains them, keep them generated and current; do not hand-maintain them.
 
-Legacy idea-owned planned Change directories and repository-local active or closed dated Change directories—including root-level `changes/`, `docs/changes/`, and `docs/changes/closed/`—are migration inputs only. Canonical workflows must direct them through `sdd update` before planning, applying, reviewing, transitioning, validating as current work, or closing; they must never treat a legacy location as a live owner or edit it in place. Standalone Story files under `docs/stories/`, old Story implementation records, non-Story Task records, and `.llm/plans` or `.llm/reviews` artifacts are also migration inputs rather than canonical current artifacts.
+Legacy idea-owned planned Change directories and repository-local active or closed dated Change directories—including root-level `changes/`, `docs/changes/`, and `docs/changes/closed/`—are unsupported historical data. Canonical workflows must never treat them as live owners or edit them in place. Recreate worthwhile intent through `/sdd-change` or manually convert records into the current central artifact shape. Standalone Story files under `docs/stories/`, old Story implementation records, non-Story Task records, and `.llm/plans` or `.llm/reviews` artifacts are likewise non-canonical historical context.
 
 ## Project Docs
 
@@ -249,25 +246,23 @@ Capture important failure modes as Scenarios when they affect user-visible behav
 
 Use just-in-time elaboration instead of making early technical assumptions durable:
 
-1. `/sdd-change --brief` captures an undated private Change Brief at `<planning-path>/change-briefs/<change-slug>.md` containing durable product intent only. Briefs are not Changes, do not use the Change status vocabulary or receive dated Change IDs, and may wait in the backlog without technical plans becoming stale.
-2. `/sdd-change --plan` confirms the brief's outcome, refreshes current project and implementation context, resolves the complete target repository set, and uses `sdd change create <space-id> <slug>` to scaffold the one central dated Change at `<workspace>/.sdd/changes/<change-id>/` with `status: proposed`, the stable Space ID, and stable portable repository IDs. `sdd change create` must reject any Change ID already present in that workspace's active or closed central store. When the Change introduces an Epic, use `sdd epic create <space-id> <epic-id> <slug>` for the selected repository so the repository-local artifact starts from the canonical validated shape rather than an agent-authored approximation. The skill then refines `proposal.md`, `design.md`, and `tasks.md` around the accepted outcome and selected repositories.
-3. When a UI-bearing Change has material experience uncertainty, `/sdd-design --plan` may converge user flow, responsive composition, component/state behavior, accessibility, and visual direction into the existing central `design.md` and `tasks.md`. After implementation begins, `/sdd-design --revise` may reopen an accepted experience direction when comparison, review, or manual feedback shows that its visual or interaction expression needs another pass without changing accepted behavior. Classify and confirm the revision before moving an `in_review` Change back to `in_progress`; behavioral discovery routes directly through `/sdd-change --plan` or `--replan` instead. Neither mode authorizes application or component-preview edits.
-4. Once the central artifacts validate and `proposal.md` preserves the brief's durable intent, consume the brief so there is no duplicate live planning truth. The dated Change is already the sole active record and appears in central status as soon as it is created; there is no intermediate draft, transfer phase, or repository destination copy.
-5. `/sdd-apply` opens the central `planned` Change, resolves every repository listed in `tasks.md`, and records repository-specific readiness and work in that same ledger before implementation. Planning-level gaps return to `/sdd-change --replan`. The target repositories may advance through their work at different times, but there remains one Change record and Change-wide lifecycle transitions occur only after every targeted repository meets the applicable gate.
-
-When implementation is expected immediately, `--plan` may capture and confirm the brief-level outcome in the same invocation before technical planning. It must not silently skip the intent boundary merely because the brief is short-lived.
+1. `/sdd-change` uses `sdd change create <space-id> <slug>` to create one central `change.md` in `proposed` status as soon as durable intent is captured. Repository ownership may remain empty while proposed.
+2. The skill asks whether the user wants to continue into technical planning. If not, the proposed Change remains the backlog record. A later invocation recognizes and resumes it.
+3. Technical planning refreshes current implementation context, settles repository ownership and observable behavior, compares meaningful approaches with the user, and adds `design.md` plus `tasks.md`.
+4. When a UI-bearing Change has material experience uncertainty, `/sdd-design --plan` may converge flow, responsive composition, state behavior, accessibility, and visual direction in the same Change.
+5. After validation, `/sdd-change` transitions the Change to `planned`. `/sdd-apply` then implements it in place. Planning-level discoveries return the same Change to `proposed` and resume `/sdd-change`; no separate mode flag or duplicate artifact is required.
 
 Use the canonical central dated Change layout:
 
 ```text
 <workspace>/.sdd/changes/<change-id>/
-  proposal.md
-  design.md
-  tasks.md
+  change.md
+  design.md        # added during technical planning
+  tasks.md         # added during technical planning
   review.md        # only when review finds deficiencies
 ```
 
-`proposal.md` defines the problem, goal, scope, non-goals, target repositories, affected repository-local Epics, and expected user/product outcome.
+`change.md` defines the problem, desired outcome, scope, non-goals, success signals, durable constraints, target repositories, affected repository-local Epics, open questions, and lifecycle metadata.
 
 `design.md` is the high-level solution approach. It should explain the chosen technical approach, important alternatives considered, risks, dependencies, migration or data implications, repository boundaries when more than one repository is targeted, and how repository-local Epic/Story/Requirement truth will change. For UI-bearing Changes, its concise `Experience Design` section is the current accepted experience contract linking the user-confirmed flow, responsive composition, component/state behavior, accessibility, visual direction, and stable prototype references. Revision history belongs in the `tasks.md` `Design Updates` ledger so superseded and current directions do not compete. `design.md` should not become a step-by-step implementation plan or duplicate behavioral truth.
 
@@ -275,7 +270,7 @@ Use the canonical central dated Change layout:
 
 ### Change Status
 
-Every active or closed Change `tasks.md` must begin with complete YAML frontmatter:
+Every active or closed Change `change.md` must begin with complete YAML frontmatter:
 
 ```yaml
 ---
@@ -287,7 +282,7 @@ repositories:
 ---
 ```
 
-`space` is the stable Space ID. `repositories` is the complete list of stable portable repository IDs from the target repositories' `.sdd/config.yaml` files; it is not a list of paths, roles, remotes, or display names. It may be empty only for a planning-only Change whose implementation target has not been selected; implementation and repository-local Epic work require explicit targets before the Change becomes implementation-ready. The list is shared by proposal, implementation, review, status, validation, PR, release, and closeout workflows.
+`space` is the stable Space ID. `repositories` lists stable portable repository IDs, not paths, roles, remotes, or display names. It may be empty while the Change is `proposed`; at least one repository is required before `planned`. The metadata is shared by planning, implementation, review, status, validation, PR, release, and closeout workflows.
 
 The stored Change status vocabulary is exactly `proposed`, `planned`, `in_progress`, or `in_review`:
 
@@ -296,11 +291,11 @@ The stored Change status vocabulary is exactly `proposed`, `planned`, `in_progre
 - `in_progress`: implementation, verification, ordinary remediation, or active plan reconciliation is underway across the targeted repositories.
 - `in_review`: every targeted repository has completed its implementation handoff and the whole Change is awaiting or undergoing independent review and closeout gates.
 
-Closure is not a fifth stored status. A Change is closed only when its directory is under `<workspace>/.sdd/changes/closed/<change-id>/`; the moved `tasks.md` retains `status: in_review`, and location-derived closure takes precedence. Active status values may move backward when reality demands it. A review deficiency in any targeted repository returns the one Change to `in_progress`. A discovery that invalidates the plan returns it to `proposed` while `/sdd-change --replan` revises the central record, then to `planned` only when every targeted repository again meets the planning gate. Do not add separate activity states such as `replanning`, repository-specific top-level statuses, or readiness assertions such as `ready_to_close`; those facts belong in the repository-keyed ledger.
+Closure is not a fifth stored status. A Change is closed only when its directory is under `<workspace>/.sdd/changes/closed/<change-id>/`; the moved `change.md` retains `status: in_review`, and location-derived closure takes precedence. Active status values may move backward when reality demands it. A review deficiency may return the Change to `in_progress`; invalidated planning returns it to `proposed` and resumes `/sdd-change`.
 
-Use `sdd change transition <space-id> <change-id> --from <status> --to <status>` when a skill changes an active Change status. The command is a compare-and-set filesystem primitive over the one central `tasks.md`: it refuses stale or invalid lifecycle edges, supports dry-run and JSON output, and changes only the `status` frontmatter field. It takes no `--repo` flags and performs no per-repository copies or mutations. The owning skill still decides why a transition is justified and must confirm that every repository in `tasks.md` has met the destination gate while reconciling `Resume Here`, planning or design updates, repository-specific evidence, review state, and Epic truth. In particular, `/sdd-design --revise` classifies feedback and confirms that it stays within accepted behavior before using `in_review -> in_progress`; planning invalidation routes directly to `proposed`; and implementation handoff uses `in_progress -> in_review` only after every targeted repository's contextual gates pass.
+Use `sdd change transition <space-id> <change-id> --from <status> --to <status>` when a workflow changes an active Change status. The command updates only the `status` field in central `change.md`. The `proposed -> planned` transition additionally requires repository ownership, `design.md`, and `tasks.md`. It takes no `--repo` flags and performs no repository-local mutation.
 
-`sdd status` reports central Changes once at the workspace level: `activeChanges` contains unique active central records and `recentChanges` contains unique recent central history. Per-repository status entries are filtered projections of those same records by `tasks.md` `repositories`; they must retain the same workspace-local Change ID and must not be counted, stored, or mutated as independent Changes. Active versus recent/closed classification comes from the central directory location, not from a repository projection or a stored `closed` status.
+`sdd status` reports central Changes once at the workspace level: `activeChanges` contains unique active central records and `recentChanges` contains unique recent central history. Per-repository status entries are filtered projections of those same records by `change.md` `repositories`; they must retain the same workspace-local Change ID and must not be counted, stored, or mutated as independent Changes. Active versus recent/closed classification comes from the central directory location, not from a stored `closed` status.
 
 After contextual review, acceptance, PR/merge, release, and authorization gates applicable to every targeted repository pass, use `sdd change close <space-id> <change-id>`. The command requires central `status: in_review`, takes no `--repo` flags, preflights the one central record, and moves the whole directory once from `<workspace>/.sdd/changes/<change-id>/` to `<workspace>/.sdd/changes/closed/<change-id>/`. It does not decide readiness, merge branches, commit files, release code, or reconcile product truth. Repository-specific gates remain recorded in the one ledger; the Change-wide close must wait until all targeted repositories meet them.
 
@@ -312,7 +307,7 @@ Central Change records are workspace-local workflow state and do not inherit any
 
 Central storage does not waive validation, target-repository disambiguation, workspace-local ID collision checks, repository guidance, branch policy, or any separate permission required for commits, pushes, merges, deployments, releases, or destructive operations.
 
-When implementation or manual feedback discovers a new or meaningfully changed Requirement, Scenario, constraint, or Epic ownership question that needs planning before more code changes, use `/sdd-change --replan` against the central Change. That mode returns the one `tasks.md` to `status: proposed`, updates `proposal.md`, `design.md`, and `tasks.md`, records the planning update and repository impact, sets `status: planned` only when the revised plan and every targeted repository's readiness gate are coherent, and then hands back to a fresh `/sdd-apply`.
+When implementation or feedback changes a Requirement, Scenario, constraint, technical approach, or Epic ownership question, return the same `change.md` to `proposed` and resume `/sdd-change`. Update `change.md`, `design.md`, and `tasks.md`, then restore `planned` only when the revised plan is coherent.
 
 ## Deterministic Artifact Validation
 
@@ -335,7 +330,7 @@ The universal inventory is intentionally conservative. It expands path globs, re
 
 A behavior-preserving refactor still invalidates navigation claims and may invalidate verification confidence. Update code anchors immediately, rerun the focused proof for every affected Requirement/Scenario, and update `last_verified` only from current evidence. Prior evidence may remain current only when its assertion and relevant behavior boundary are unchanged and the check still passes; otherwise downgrade `Verification` or record the explicit gap.
 
-`/sdd-change --plan` and `--replan` validate the planned or replanned Change before handoff. `/sdd-apply` validates the selected Change and affected Epics during Discovery and again after reconciliation. `/sdd-review` treats scoped validation as one input to its independent diff and truth review. `/sdd-epic-verify` begins with scoped Epic validation before auditing completeness, implementation, and evidence quality.
+`/sdd-change` validates a planned or revised Change before handoff. `/sdd-apply` validates the selected Change and affected Epics during Discovery and again after reconciliation. `/sdd-review` treats scoped validation as one input to its independent diff and truth review. `/sdd-epic-verify` begins with scoped Epic validation before auditing completeness, implementation, and evidence quality.
 
 ## Implementation And Review
 
@@ -367,7 +362,7 @@ Use subagents for isolated implementation slices, specialist guidance, and fresh
 
 Delegation must not make the workflow appear stuck. After spawning a subagent, continue independent local work instead of waiting immediately. When the main thread is genuinely blocked on delegated output, wait at most 60 seconds without a user-visible status update. If the subagent is still running, report what is complete and what remains, then continue any available work. Treat roughly three minutes of cumulative waiting on one delegated task or wave as a recovery threshold: interrupt or close the agent and finish locally, or delegate the remaining question again with a narrower scope. Do not repeatedly poll, silently wait on optional verification, or let a slow reviewer prevent a concise status response. Close completed or abandoned agents promptly.
 
-Manual UI confirmation is part of the workflow for browser-visible or otherwise user-facing changes. The agent should walk the user through what to manually confirm, record the status in `tasks.md`, and classify feedback as implementation bug, experience revision, requirement change, follow-up, or accepted gap. Experience revision within accepted behavior routes through `/sdd-design --revise`; changed behavior routes through `/sdd-change --replan`.
+Manual UI confirmation is part of the workflow for browser-visible or otherwise user-facing changes. The agent should walk the user through what to manually confirm, record the status in `tasks.md`, and classify feedback as implementation bug, experience revision, requirement change, follow-up, or accepted gap. Experience revision within accepted behavior routes through `/sdd-design --revise`; changed behavior returns to `/sdd-change`.
 
 Rendered UI verification is a separate implementation and review gate for UI-bearing changes. Prefer the project's existing browser, screenshot, or component-preview tooling; otherwise use an available runtime browser capability, a rendered fixture or preview, or a manual browser capture. Do not add a named tool merely to satisfy SDD. The implementation pass and independent review must directly inspect current rendering rather than infer visual correctness from source, builds, test exits, or screenshot generation. Record the affected surface, route or fixture, viewport, state or interaction, tool or setup, inspected evidence, console/network result, and outcome in the Change's Visual Verification Matrix. If the current environment cannot render a required surface, record the exact blocked or pending verification instead of silently passing it. Owner manual acceptance remains distinct and may still be `pending user` after rendered verification passes.
 
@@ -383,7 +378,7 @@ Review breadth comes from a repeatable search pipeline, not a single intelligent
 
 Both workflows must also reconcile the exact source-to-target changed-file inventory in every targeted repository. Record each inventory under its stable repository ID in the one ledger, and classify every added, modified, deleted, or renamed path as intended product scope, required SDD/supporting truth, accepted review remediation, authorized release metadata, or project-required generated output. Recompute each inventory after remediation or metadata commits and immediately before that repository's push/PR handoff. An unexpected path is a stop condition, even when it was already committed or does not make tests fail.
 
-Status transitions must accompany the work that justifies them: `/sdd-change --brief` creates no status; `/sdd-change --plan` creates the central `proposed` Change and sets `planned` when the whole plan and all target-readiness gates are complete; `/sdd-apply` changes `planned` to `in_progress` only after every target is ready to begin and changes `in_progress` to `in_review` only after every target reaches implementation handoff; `/sdd-review` keeps `in_review`, returns a deficiency in any target to the one Change-wide `in_progress` state, or routes invalidated planning through the one Change-wide `proposed` state and `/sdd-change --replan`; `/sdd-design --revise` works in `in_progress` and never restores `in_review` itself. Use one guarded, repository-free `sdd change transition` for each justified Change-wide transition.
+Status transitions must accompany the work that justifies them: `/sdd-change` creates a central `proposed` Change and sets `planned` when planning is complete; `/sdd-apply` moves it to `in_progress` and then `in_review`; `/sdd-review` keeps `in_review`, returns implementation deficiencies to `in_progress`, or returns invalidated planning to `proposed` and `/sdd-change`. Use one guarded, repository-free `sdd change transition` for each justified Change-wide transition.
 
 `/sdd-release` prepares promotion to the project-defined production target. It runs the project-defined release checks, reviews the changelog against the actual release scope, recommends the next version under the project's versioning policy, and explicitly confirms with the user whether the handoff should be a version update before mutating versioned release artifacts. It performs a proportional cumulative source-to-target risk scan and requires a fresh-context cumulative release-candidate code/security/state review for initial releases, multiple integrated Changes, material post-review work, or high-risk combined diffs; this reviews the exact combined candidate without reopening individual Change lifecycle or duplicating unaffected artifact review. A default/full invocation is scoped authorization for the resulting release-metadata commits, one normal push of the resolved source branch, and creation of the configured release PR or equivalent handoff after all gates pass; it should not ask again merely because the source branch is not yet remote. That authorization does not include force-push, direct production-target push, merge, deploy, tag, publish, production migration, announcement, or another destructive or production mutation.
 
@@ -438,7 +433,7 @@ Avoid:
 
 - Creating a new Story to avoid fixing a stale existing Story.
 - Allowing implemented behavior to live only in code, chat, a stale report, or a private memory instead of the relevant Epic/Story.
-- Treating `proposal.md`, `design.md`, or `tasks.md` as more authoritative than implementation reality or Epic truth.
+- Treating `change.md`, `design.md`, or `tasks.md` as more authoritative than implementation reality or Epic truth.
 - Turning Stories into tiny UI control requirements.
 - Hiding product scope expansion inside technical design or implementation tasks.
 - Recording only generic command logs in `Verified By`.
@@ -460,7 +455,7 @@ Avoid:
 - Creating or keeping a dated Change anywhere except `<workspace>/.sdd/changes/<change-id>/` or `<workspace>/.sdd/changes/closed/<change-id>/`, including beside its undated Brief or inside a repository.
 - Giving one Change repository-specific IDs or stored copies instead of one workspace-unique ID and one central multi-repository ledger.
 - Treating a per-repository status or validation projection as an independently mutable Change owner.
-- Applying, reviewing, transitioning, or closing an idea-planned or repository-local legacy Change in place instead of directing it through the selected workspace's supported migration workflow.
+- Applying, reviewing, transitioning, or closing an idea-planned or repository-local legacy Change in place instead of recreating or manually converting worthwhile intent into the current central store.
 - Using repository filters with `sdd change transition` or `sdd change close`, or advancing the Change-wide lifecycle before every targeted repository has met the gate.
 - Closing or merging a Change while Epic truth, central tasks, repository-specific review/release/PR/merge state, or manual confirmation status remains contradictory.
 
@@ -473,7 +468,7 @@ Use the skills to apply this doctrine consistently:
 | `/sdd-prd` | Create or revise the private Product Brief/PRD that guides product scope, audience, principles, market context, monetization, and open product questions. |
 | `/sdd-explore` | Think through product ideas, technical options, codebase findings, or requirement questions before deciding whether to create a change. |
 | `/sdd-adr` | Create, update, or assess ADRs for durable technical decisions that future SDD work should respect. |
-| `/sdd-change` | Capture durable intent with `--brief`, create the one central just-in-time dated plan with `--plan`, or revise that central Change with `--replan`. |
+| `/sdd-change` | Create or resume one central Change, capture intent, and continue into technical planning when the user chooses. |
 | `/sdd-design` | Plan initial experience readiness or revise an implemented experience within accepted behavior without editing application or component-preview code. |
 | `/sdd-interactive` | Create and apply a lightweight tracked change in one working session for small concrete changes that do not need a full upfront proposal pass. |
 | `/sdd-apply` | Implement or continue a central active Change across its targeted repositories using Requirement/Scenario-driven slices, subagent delegation when useful, verification, artifact reconciliation, and manual UI confirmation. |
@@ -492,7 +487,7 @@ This document defines the durable doctrine for Story-Driven Development. Skills 
 
 Keep SDD skills focused on workflow procedure: what to read, what decisions to make, what artifacts to update, what verification to run, and what to report. Put portable SDD semantics, the default idea-to-repository relationship, fixed workspace-central Change storage, workspace-local Change identity, projection semantics, and canonical repository-local Epic/ADR ownership in this doctrine. Put private relationships in `<workspace>/.sdd/config.yaml`, the one central dated Change record under `<workspace>/.sdd/changes/`, portable repository facts in `<repository>/.sdd/config.yaml`, and technology, branch, command, release, and reporting preferences in project guidance instead of repeating them in skills or treating them as SDD requirements.
 
-Skills must resolve every dated Change through the selected workspace's central store and mutate its lifecycle once. Repository selection may filter implementation, validation, review, PR, or release work, but it must not create a repository-local Change, split the ledger, or reinterpret a projection as authority. `sdd change transition` and `sdd change close` are repository-free, workspace-scoped single-record operations whose contextual gates aggregate every repository declared in `tasks.md`. If a workflow finds an idea-planned or repository-local legacy dated Change path, it must stop treating that path as live and direct migration through the selected workspace's supported update path. A legacy home-scoped user-v1 or user-v2 installation instead requires explicit `sdd setup <workspace> --from-user <old-user-root>`.
+Skills must resolve every dated Change through the selected workspace's central store and mutate its lifecycle once. Repository selection may filter implementation, validation, review, PR, or release work, but it must not create a repository-local Change, split the ledger, or reinterpret a projection as authority. `sdd change transition` and `sdd change close` are repository-free, workspace-scoped single-record operations whose contextual gates aggregate every repository declared in `change.md`. If a workflow finds an idea-planned or repository-local legacy dated Change path, it must stop treating that path as live and direct the user to recreate or manually convert any worthwhile intent. `sdd update` reconciles only current managed doctrine and skills.
 
 Put project-specific branch, merge, release, deployment, and repository rules in the app repo's local `AGENTS.md` or equivalent project guidance. SDD skills should read and enforce those rules, falling back to documented workspace guidance when local policy is absent, instead of restating a branch model inside each workflow.
 

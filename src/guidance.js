@@ -52,7 +52,7 @@ export async function inspectProjectGuidance(workspaceRoot, config) {
       if (references.has("command")) {
         findings.push({
           level: "error",
-          message: `${displayPath} references the retired /sdd-propose command. Use /sdd-change --plan instead.`,
+          message: `${displayPath} references the retired /sdd-propose command. Use /sdd-change instead.`,
         });
       }
     }

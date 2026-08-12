@@ -38,7 +38,7 @@ Usage:
   sdd setup [workspace-path] [options]  Set up one workspace installation and managed skills
   sdd init [path] [options]             Initialize one repository
   sdd configure [path] [options]        Repair configured workspace topology paths
-  sdd update [path] [options]           Update workspace workflow, skills, or legacy artifacts
+  sdd update [path] [options]           Reconcile managed workflow and skills
   sdd doctor [path] [options]           Validate the workspace installation and mapped artifacts
   sdd context [path] [options]          Resolve planning/repository context in one workspace
   sdd status [space-id] [options]       List Space status or show one Space in detail
@@ -50,7 +50,6 @@ Usage:
   sdd --version                         Print the package version
 
 Setup options:
-  --from-user <path>              Migrate an explicit legacy home-root installation
   --planning-root <path>          Override detected planning root
   --repository-root <path>        Add a repository root; may be repeated
   --skills-dir <path>             Managed skill directory inside the workspace (default: .agents/skills)
@@ -124,7 +123,7 @@ Change transition options:
   --workspace <path>              Select the owning workspace explicitly
   --from <status>                 Require the current active Change status
   --to <status>                   Set the next allowed active Change status
-  --dry-run                       Report the transition without writing tasks.md
+  --dry-run                       Report the transition without writing change.md
   --json                          Emit machine-readable JSON
 
 Change close usage:
@@ -449,102 +448,6 @@ function printWorkflowAction(workflow) {
   console.log(`Workflow: ${workflow.action} (${workflow.path})`);
 }
 
-function migrationActionPrefix(action, dryRun) {
-  const appliedPrefix = {
-    adopt: "Adopted",
-    complete: "Completed",
-    conflict: "Conflict",
-    consolidate: "Consolidated",
-    create: "Created",
-    install: "Installed",
-    migrate: "Migrated",
-    move: "Moved",
-    preserve: "Preserved",
-    reconcile: "Reconciled",
-    remove: "Removed",
-    "remove-forced": "Removed",
-    replace: "Replaced",
-    "replace-forced": "Replaced",
-    retire: "Retired",
-    rollback: "Rolled back",
-    unchanged: "Checked",
-    update: "Updated",
-    "update-forced": "Updated",
-    upgrade: "Upgraded",
-  }[action.action];
-  if (appliedPrefix === undefined) {
-    throw new SddError(
-      `Cannot render unknown migration action: ${String(action.action)}`,
-      { code: "UNEXPECTED_ERROR" },
-    );
-  }
-  return dryRun ? `Would ${action.action}` : appliedPrefix;
-}
-
-function migrationActionSubject(action) {
-  if (!action.kind && action.stageRoot) {
-    return `migration recovery: ${action.stageRoot}`;
-  }
-  switch (action.kind) {
-    case "change": {
-      const label = `${action.closed ? "closed " : ""}Change ${action.changeId}`;
-      return Array.isArray(action.from) && action.to
-        ? `${label}: ${action.from.join(", ")} -> ${action.to}`
-        : label;
-    }
-    case "planned-change":
-      return `planned Change ${action.changeId}`;
-    case "brief":
-      return `Change Brief: ${action.from} -> ${action.to}`;
-    case "legacy-planned-root":
-      return `legacy planned Changes root: ${action.path}`;
-    case "legacy-root":
-      return `legacy root: ${action.path}`;
-    case "workspace-config":
-    case "configuration": {
-      const transition = action.from !== undefined && action.to !== undefined
-        ? ` (${action.from} -> ${action.to})`
-        : "";
-      return `workspace configuration: ${action.path}${transition}`;
-    }
-    case "repository-config": {
-      const transition = action.from !== undefined && action.to !== undefined
-        ? ` (${action.from} -> ${action.to})`
-        : "";
-      return `repository configuration: ${action.path}${transition}`;
-    }
-    case "recovery":
-      return `recovery data: ${action.path}`;
-    case "workflow":
-      return `workflow: ${action.path}`;
-    case "skill":
-      return `managed skill: ${action.skillName}`;
-    case "legacy-skill":
-      return `legacy managed skill: ${action.skillName}`;
-    case "legacy-config":
-      return `legacy configuration: ${action.path}`;
-    default:
-      throw new SddError(
-        `Cannot render unknown migration action kind: ${String(action.kind)}`,
-        { code: "UNEXPECTED_ERROR" },
-      );
-  }
-}
-
-function printMigrationActions(migration, dryRun) {
-  const actions = migration?.actions ?? [];
-  if (actions.length === 0) {
-    console.log("Legacy migration: no actions required.");
-  } else {
-    for (const action of actions) {
-      console.log(`${migrationActionPrefix(action, dryRun)} ${migrationActionSubject(action)}`);
-    }
-  }
-  for (const warning of migration?.warnings ?? []) {
-    console.log(`Migration warning: ${warning}`);
-  }
-}
-
 export function statusSummaryRows(result) {
   return result.spaces.flatMap((space) => {
     const projectedChangeIds = new Set();
@@ -717,10 +620,6 @@ function printHuman(result) {
         : "Reconciled";
     console.log(`${verb} workspace SDD: ${result.workspaceConfigPath}`);
     console.log(`Workspace: ${result.workspaceRoot}`);
-    if (result.migrationSource) {
-      console.log(`Legacy migration source: ${result.migrationSource}`);
-    }
-    if (result.migration) printMigrationActions(result.migration, result.dryRun);
     console.log(`Workflow: ${result.workflowPath}`);
     if (result.skills?.actions) printSkillActions(result.skills.actions);
     return;
@@ -734,9 +633,7 @@ function printHuman(result) {
     return;
   }
   if (result.command === "update") {
-    const label = result.mode === "legacy" ? "legacy SDD workspace" : "SDD workspace";
-    console.log(`${result.dryRun ? "Would update" : "Updated"} ${label}: ${result.workspaceRoot}`);
-    printMigrationActions(result.migration, result.dryRun);
+    console.log(`${result.dryRun ? "Would update" : "Updated"} SDD workspace: ${result.workspaceRoot}`);
     printWorkflowAction(result.workflow);
     printSkillActions(result.skills.actions);
     return;
@@ -832,7 +729,7 @@ function printHuman(result) {
       `${result.dryRun ? "Would transition" : "Transitioned"} Change: ${result.changeId} (${result.from} -> ${result.to})`,
     );
     console.log(`Space: ${result.spaceId}`);
-    console.log(`Tasks: ${result.tasksPath}`);
+    console.log(`Change: ${result.changeFilePath}`);
     console.log(
       `Repositories: ${result.repositories.map((repository) => repository.resolvedPath).join(", ") || "none"}`,
     );
@@ -858,7 +755,6 @@ async function executeCommand(command, args) {
     const { values, positionals } = parseCommandArgs(
       args,
       commandOptions({
-        "from-user": { type: "string" },
         "planning-root": { type: "string" },
         "repository-root": { type: "string", multiple: true },
         "skills-dir": { type: "string" },
@@ -869,23 +765,12 @@ async function executeCommand(command, args) {
     );
     if (values.help) return { help: true };
     const workspaceRoot = requireAtMostOnePath(positionals, command);
-    const fromUser = pathOption(values, "from-user");
     const planningRoot = pathOption(values, "planning-root");
     const repositoryRoots = pathOptionValues(values, "repository-root");
     const skillsDirectory = pathOption(values, "skills-dir");
-    if (
-      fromUser !== undefined
-      && [planningRoot, repositoryRoots].some((value) => value !== undefined)
-    ) {
-      throw new SddError(
-        "--from-user cannot be combined with --planning-root or --repository-root.",
-        { code: "USAGE" },
-      );
-    }
     const setupOptions = await collectSetupOptions(
       workspaceRoot,
       {
-        fromUser: fromUser === undefined ? null : resolve(fromUser),
         planningRoot,
         repositoryRoots,
         skillsDirectory,

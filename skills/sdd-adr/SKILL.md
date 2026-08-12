@@ -9,11 +9,11 @@ Create or update Architecture Decision Records for durable technical decisions i
 
 ## Authority And Project Profile
 
-Resolve the workspace, Space ID, repository, and stable repository ID with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before interpreting SDD artifact roles or Change status. Use the resolved repository and keep ADRs under its `docs/adrs/`. When Change context matters, run `sdd status <space-id> --json` and select relevant central Change records through that repository's filtered projection and their `tasks.md` metadata. Project guidance still owns ADR status vocabulary, required links, and write policy. If user setup is missing, direct the user to `sdd setup`; if the repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
+Resolve the workspace, Space ID, repository, and stable repository ID with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before interpreting SDD artifact roles or Change status. Use the resolved repository and keep ADRs under its `docs/adrs/`. When Change context matters, run `sdd status <space-id> --json` and select relevant central Change records through that repository's filtered projection and their `change.md` metadata. Project guidance still owns ADR status vocabulary, required links, and write policy. If user setup is missing, direct the user to `sdd setup`; if the repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
 
-Use this skill from `/sdd-explore` when a discussion reaches a durable architecture decision, and from `/sdd-change --plan` or `--replan` when the selected technical approach creates a rule future work should follow. Do not create an ADR from `/sdd-change --brief`; briefs intentionally avoid technical decisions.
+Use this skill from `/sdd-explore` when a discussion reaches a durable architecture decision, and from the technical-planning stage of `/sdd-change` when the selected approach creates a rule future work should follow. Do not create an ADR during intent capture before technical decisions are settled.
 
-ADRs complement SDD artifacts. They do not replace Product Briefs/PRDs, Epics, Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, proposal/design/tasks files, review reports, changelogs, or release records.
+ADRs complement SDD artifacts. They do not replace Product Briefs/PRDs, Epics, Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, change/design/tasks files, review reports, changelogs, or release records.
 
 ## ADR Threshold
 
@@ -65,8 +65,8 @@ If the project has no `docs/adrs/`, create it only when the user has asked to dr
    - Use status values that match the project when present; otherwise use `Proposed`, `Accepted`, `Superseded`, or `Rejected`.
 4. Link the ADR.
    - Link related Changes by stable Change ID, and link repository-local Epics, Stories, Requirements, Scenarios, PRs, or implementation evidence when known. Never put a private absolute central Change path in a repository-local ADR.
-   - If invoked during `/sdd-change --plan` or `--replan`, ensure the central `design.md` and `tasks.md` identify the repository-relative ADR path and its repository ID.
-   - If invoked during `/sdd-explore`, offer to link the ADR from an exploration summary or later `/sdd-change --plan`.
+   - If invoked during `/sdd-change` or `--replan`, ensure the central `design.md` and `tasks.md` identify the repository-relative ADR path and its repository ID.
+   - If invoked during `/sdd-explore`, offer to link the ADR from an exploration summary or later `/sdd-change`.
 5. Verify the ADR.
    - Re-read the ADR.
    - Confirm it states context, decision, options considered, consequences, validation, and reconsideration signals.

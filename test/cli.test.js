@@ -28,7 +28,6 @@ import {
   inspectWorkspaceConfiguration,
 } from "../src/commands/configure.js";
 import { closeChange } from "../src/commands/change-close.js";
-import { getCloseTransactionJournalPath } from "../src/change-close-transaction.js";
 import { createChange } from "../src/commands/change-create.js";
 import { transitionChange } from "../src/commands/change-transition.js";
 import { createEpic } from "../src/commands/epic-create.js";
@@ -267,7 +266,7 @@ async function writeChange(root, repository, changeId, status, { closed = false 
   );
   await mkdir(changePath, { recursive: true });
   await writeFile(
-    join(changePath, "tasks.md"),
+    join(changePath, "change.md"),
     [
       "---",
       `status: ${status}`,
@@ -275,7 +274,27 @@ async function writeChange(root, repository, changeId, status, { closed = false 
       "repositories:",
       `  - ${repository}`,
       "---",
-      `# Tasks: ${changeId}`,
+      `# Change: ${changeId}`,
+      "",
+      "## Why",
+      "",
+      "A concrete reason.",
+      "",
+      "## Desired Outcome",
+      "",
+      "A concrete behavior change.",
+      "",
+      "## Scope",
+      "",
+      "A bounded scope.",
+      "",
+      "## Success Signals",
+      "",
+      "The behavior works.",
+      "",
+      "## Open Questions",
+      "",
+      "None.",
       "",
     ].join("\n"),
     "utf8",
@@ -296,30 +315,6 @@ async function writeCanonicalChange(
     "changes",
     ...(closed ? ["closed"] : []),
     changeId,
-  );
-  await writeFile(
-    join(changePath, "proposal.md"),
-    [
-      `# Proposal: ${changeId}`,
-      "",
-      "## Why",
-      "",
-      "A concrete reason.",
-      "",
-      "## What Changes",
-      "",
-      "A concrete behavior change.",
-      "",
-      "## Impact",
-      "",
-      "Focused impact.",
-      "",
-      "## Open Questions",
-      "",
-      "None.",
-      "",
-    ].join("\n"),
-    "utf8",
   );
   await writeFile(
     join(changePath, "design.md"),
@@ -352,12 +347,6 @@ async function writeCanonicalChange(
   await writeFile(
     join(changePath, "tasks.md"),
     [
-      "---",
-      `status: ${status}`,
-      "space: sample",
-      "repositories:",
-      `  - ${repository}`,
-      "---",
       `# Tasks: ${changeId}`,
       "",
       "## Resume Here",
@@ -390,10 +379,10 @@ async function writeCanonicalChange(
 }
 
 async function setPlannedChangeStatus(root, created, status = "planned") {
-  const tasksPath = join(root, created.path, "tasks.md");
-  const source = await readFile(tasksPath, "utf8");
+  const changePath = join(root, created.path, "change.md");
+  const source = await readFile(changePath, "utf8");
   await writeFile(
-    tasksPath,
+    changePath,
     source.replace(/^status: \S+$/m, `status: ${status}`),
     "utf8",
   );
@@ -860,650 +849,14 @@ test("CLI setup adopts a matching skill already inside the workspace registry", 
   assert.equal(lock.managedSkills["sdd-apply"], adopted.hash);
 });
 
-test("CLI setup migrates a released legacy user v1 source through dry-run and apply", async (t) => {
-  const root = await createWorkspace("sdd-from-user-v1-");
-  const legacyUserRoot = join(root, "legacy-home");
-  const workspaceRoot = join(root, "workspace");
-  const sourceConfigPath = join(legacyUserRoot, ".sdd", "config.yaml");
-  const sourceLockPath = join(legacyUserRoot, ".sdd", "install-lock.json");
-  const sourceSkillPath = join(
-    legacyUserRoot,
-    ".agents",
-    "skills",
-    "sdd-change",
-  );
-  const sourceKeepPath = join(legacyUserRoot, "keep.txt");
-  const sourcePlannedRoot = join(
-    legacyUserRoot,
-    "planning",
-    "sample",
-    "planned-changes",
-  );
-  const sourceBriefPath = join(sourcePlannedRoot, "future-capability.md");
-  const plannedChangeIds = [
-    "2026-08-09-first-planned-change",
-    "2026-08-09-second-planned-change",
-  ];
-  const migratedBriefPath = join(
-    legacyUserRoot,
-    "planning",
-    "sample",
-    "change-briefs",
-    "future-capability.md",
-  );
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await mkdir(workspaceRoot, { recursive: true });
-  await mkdir(dirname(sourceConfigPath), { recursive: true });
-  await mkdir(join(legacyUserRoot, "planning", "sample"), { recursive: true });
-  await mkdir(join(legacyUserRoot, "repositories", "sample-app"), { recursive: true });
-  await writeRepositoryConfig(
-    join(legacyUserRoot, "repositories", "sample-app"),
-    createRepositoryConfig("sample-app"),
-  );
-  await cp(
-    join(PACKAGE_ROOT, "skills", "sdd-change"),
-    sourceSkillPath,
-    { recursive: true, verbatimSymlinks: true },
-  );
-  const sourceSkillHash = await hashDirectory(sourceSkillPath);
-  const releasedSourceSkillHash = await releasedLegacyDirectoryHash(sourceSkillPath);
-  const legacyConfig = {
-    kind: "user",
-    version: 1,
-    schema: "sdd-user-v1",
-    skills: { directory: "~/.agents/skills" },
-    planning: {
-      root: "planning",
-      plannedChangesDirectory: "planned-changes",
-    },
-    repositories: { roots: { source: "repositories" } },
-    repositoryArtifacts: {
-      activeChanges: "docs/changes",
-      closedChanges: "docs/changes/closed",
-      epics: "docs/epics",
-      adrs: "docs/adrs",
-      audits: "docs/audits",
-    },
-    ideas: {
-      sample: {
-        status: "active",
-        repositories: [{
-          root: "source",
-          path: "sample-app",
-          role: "primary",
-          status: "active",
-        }],
-      },
-    },
-  };
-  await writeFile(
-    sourceConfigPath,
-    `${JSON.stringify(legacyConfig, null, 2)}\n`,
-    "utf8",
-  );
-  await writeFile(
-    sourceLockPath,
-    `${JSON.stringify({
-      version: 1,
-      packageVersion: "released-v1-fixture",
-      schemaVersion: "sdd-user-v1",
-      skillsDirectory: "~/.agents/skills",
-      managedSkills: { "sdd-change": releasedSourceSkillHash },
-    }, null, 2)}\n`,
-    "utf8",
-  );
-  await writeFile(sourceKeepPath, "unrelated legacy state\n", "utf8");
-  await mkdir(sourcePlannedRoot, { recursive: true });
-  await writeFile(sourceBriefPath, "# Future capability\n", "utf8");
-  for (const changeId of plannedChangeIds) {
-    const plannedChangePath = join(sourcePlannedRoot, changeId);
-    await mkdir(plannedChangePath, { recursive: true });
-    await Promise.all([
-      writeFile(join(plannedChangePath, "proposal.md"), `# Proposal: ${changeId}\n`, "utf8"),
-      writeFile(join(plannedChangePath, "design.md"), `# Design: ${changeId}\n`, "utf8"),
-      writeFile(
-        join(plannedChangePath, "tasks.md"),
-        `---\nstatus: planned\n---\n# Tasks: ${changeId}\n`,
-        "utf8",
-      ),
-    ]);
-  }
-  const sourceBefore = await hashDirectory(legacyUserRoot);
-  const destinationBefore = await hashDirectory(workspaceRoot);
-
-  const { stdout: humanDryRunStdout } = await execFileAsync(process.execPath, [
-    join(PACKAGE_ROOT, "bin", "sdd.js"),
-    "setup",
-    workspaceRoot,
-    "--from-user",
-    legacyUserRoot,
-    "--dry-run",
-    "--yes",
-  ], { cwd: root });
-  for (const changeId of plannedChangeIds) {
-    assert.match(humanDryRunStdout, new RegExp(`Would migrate planned Change ${changeId}`));
-    assert.equal(humanDryRunStdout.split(changeId).length - 1, 1);
-  }
-  assert.ok(
-    humanDryRunStdout.includes(
-      `Would retire legacy planned Changes root: ${sourcePlannedRoot}`,
-    ),
-  );
-
-  const { stdout: dryRunStdout } = await execFileAsync(process.execPath, [
-    join(PACKAGE_ROOT, "bin", "sdd.js"),
-    "setup",
-    workspaceRoot,
-    "--from-user",
-    legacyUserRoot,
-    "--dry-run",
-    "--yes",
-    "--json",
-  ], { cwd: root });
-  const dryRun = JSON.parse(dryRunStdout);
-
-  assert.equal(dryRun.dryRun, true);
-  assert.equal(dryRun.migrationSource, legacyUserRoot);
-  assert.equal(dryRun.config.version, 3);
-  assert.equal(dryRun.config.planning.root, join(legacyUserRoot, "planning"));
-  assert.equal(
-    dryRun.config.repositories.roots.source,
-    join(legacyUserRoot, "repositories"),
-  );
-  assert.ok(dryRun.migration.actions.some((action) =>
-    action.kind === "brief" && action.to === migratedBriefPath));
-  assert.equal(await hashDirectory(legacyUserRoot), sourceBefore);
-  assert.equal(await hashDirectory(workspaceRoot), destinationBefore);
-  assert.equal(await pathExists(getWorkspaceConfigPath(workspaceRoot)), false);
-
-  const { stdout: appliedStdout } = await execFileAsync(process.execPath, [
-    join(PACKAGE_ROOT, "bin", "sdd.js"),
-    "setup",
-    workspaceRoot,
-    "--from-user",
-    legacyUserRoot,
-    "--yes",
-    "--json",
-  ], { cwd: root });
-  const applied = JSON.parse(appliedStdout);
-  const migrated = await readWorkspaceConfig(workspaceRoot);
-
-  assert.equal(applied.dryRun, false);
-  assert.equal(applied.migrationSource, legacyUserRoot);
-  assert.equal(migrated.version, 3);
-  assert.equal(migrated.schema, "sdd-v3");
-  assert.equal(Object.hasOwn(migrated, "kind"), false);
-  assert.equal(Object.hasOwn(migrated.planning, "plannedChangesDirectory"), false);
-  assert.deepEqual(migrated.repositoryArtifacts, {
-    epics: "docs/epics",
-    adrs: "docs/adrs",
-    audits: "docs/audits",
-  });
-  assert.equal(await pathExists(sourceConfigPath), false);
-  assert.equal(await pathExists(sourceLockPath), false);
-  assert.equal(await pathExists(sourceSkillPath), false);
-  assert.equal(await readFile(sourceKeepPath, "utf8"), "unrelated legacy state\n");
-  assert.equal(await pathExists(sourcePlannedRoot), false);
-  for (const changeId of plannedChangeIds) {
-    assert.equal(await pathExists(join(sourcePlannedRoot, changeId)), false);
-    assert.equal(
-      await pathExists(join(workspaceRoot, ".sdd", "changes", changeId, "tasks.md")),
-      true,
-    );
-  }
-  assert.equal(await readFile(migratedBriefPath, "utf8"), "# Future capability\n");
-  assert.equal(
-    await hashDirectory(join(workspaceRoot, ".agents", "skills", "sdd-change")),
-    sourceSkillHash,
-  );
-});
-
-test("CLI setup migrates an explicit legacy user v2 source and supports dry-run", async (t) => {
-  const root = await createWorkspace("sdd-from-user-");
-  const legacyUserRoot = join(root, "legacy-home");
-  const workspaceRoot = join(root, "workspace");
-  const planningRoot = join(root, "legacy-planning");
-  const repositoryRoot = join(root, "legacy-repositories");
-  const legacySkillsRoot = join(root, "legacy-skills");
-  const repositoryPath = join(repositoryRoot, "sample-app");
-  const changeId = "2026-08-07-setup-source-change";
-  const sourceChangePath = join(legacyUserRoot, ".sdd", "changes", changeId);
-  const sourceConfigPath = join(legacyUserRoot, ".sdd", "config.yaml");
-  const sourceWorkflowPath = join(
-    legacyUserRoot,
-    ".sdd",
-    "story-driven-development.md",
-  );
-  const sourceLockPath = join(legacyUserRoot, ".sdd", "install-lock.json");
-  const sourceManagedSkillPath = join(
-    legacySkillsRoot,
-    "sdd-apply",
-  );
-  const sourceUnrelatedSkillPath = join(
-    legacySkillsRoot,
-    "local-legacy-skill",
-    "SKILL.md",
-  );
-  const sourceUnrelatedPath = join(legacyUserRoot, "legacy-unrelated.txt");
-  const sourceRecoveryPath = join(
-    legacyUserRoot,
-    ".sdd",
-    "legacy-recovery.txt",
-  );
-  const destinationRecoveryPath = join(
-    workspaceRoot,
-    ".sdd",
-    "legacy-recovery.txt",
-  );
-  const sourceDefaultSkillsRoot = join(legacyUserRoot, ".agents", "skills");
-  const sourceDefaultSkillsTarget = join(root, "legacy-default-skills");
-  const sourceDefaultSkillsLink = join(
-    legacyUserRoot,
-    ".agents",
-    "default-skills-link",
-  );
-  const sourceDefaultSkillPath = join(
-    sourceDefaultSkillsLink,
-    "local-default-skill",
-    "SKILL.md",
-  );
-  const sourceDefaultFilePath = join(legacyUserRoot, ".agents", "keep.txt");
-  const sourceDefaultTargetSkillPath = join(
-    sourceDefaultSkillsTarget,
-    "local-default-skill",
-    "SKILL.md",
-  );
-  const destinationWorkflowPath = join(
-    workspaceRoot,
-    ".sdd",
-    "story-driven-development.md",
-  );
-  const destinationLockPath = getWorkspaceInstallLockPath(workspaceRoot);
-  const destinationManagedSkillPath = join(
-    workspaceRoot,
-    ".agents",
-    "skills",
-    "sdd-apply",
-  );
-  const destinationUnrelatedSkillPath = join(
-    workspaceRoot,
-    ".agents",
-    "skills",
-    "local-workspace-skill",
-    "SKILL.md",
-  );
-  const destinationUnrelatedPath = join(
-    workspaceRoot,
-    ".sdd",
-    "workspace-unrelated.txt",
-  );
-  t.after(() => rm(root, { recursive: true, force: true }));
-
-  await mkdir(join(planningRoot, "sample"), { recursive: true });
-  await mkdir(repositoryPath, { recursive: true });
-  await writeRepositoryConfig(repositoryPath, createRepositoryConfig("sample-app"));
-  await mkdir(sourceChangePath, { recursive: true });
-  await writeFile(join(sourceChangePath, "proposal.md"), "# Proposal\n", "utf8");
-  await writeFile(join(sourceChangePath, "design.md"), "# Design\n", "utf8");
-  await writeFile(
-    join(sourceChangePath, "tasks.md"),
-    [
-      "---",
-      "status: in_progress",
-      "space: sample",
-      "repositories:",
-      "  - sample-app",
-      "---",
-      "# Tasks",
-      "",
-    ].join("\n"),
-    "utf8",
-  );
-  const legacyConfig = {
-    kind: "user",
-    version: 2,
-    schema: "sdd-user-v2",
-    skills: { directory: "../legacy-skills" },
-    planning: { root: "../legacy-planning" },
-    repositories: { roots: { repos: "../legacy-repositories" } },
-    repositoryArtifacts: {
-      epics: "docs/epics",
-      adrs: "docs/adrs",
-      audits: "docs/audits",
-    },
-    ideas: {
-      sample: {
-        status: "active",
-        planningPath: "../legacy-planning/sample",
-        repositories: [{
-          root: "repos",
-          path: "sample-app",
-          role: "primary",
-          status: "active",
-        }],
-      },
-    },
-  };
-  await mkdir(join(legacyUserRoot, ".sdd"), { recursive: true });
-  await writeFile(
-    sourceConfigPath,
-    `${JSON.stringify(legacyConfig, null, 2)}\n`,
-    "utf8",
-  );
-
-  await cp(
-    join(PACKAGE_ROOT, "skills", "sdd-apply"),
-    sourceManagedSkillPath,
-    { recursive: true, verbatimSymlinks: true },
-  );
-  await cp(WORKFLOW_SOURCE_PATH, sourceWorkflowPath);
-  await writeFile(
-    sourceLockPath,
-    `${JSON.stringify({
-      version: 2,
-      packageVersion: "legacy-fixture",
-      schemaVersion: "sdd-user-v2",
-      skillsDirectory: "../legacy-skills",
-      managedSkills: {
-        "sdd-apply": await releasedLegacyDirectoryHash(sourceManagedSkillPath),
-      },
-      managedWorkflow: {
-        path: ".sdd/story-driven-development.md",
-        hash: await hashFile(sourceWorkflowPath),
-      },
-    }, null, 2)}\n`,
-    "utf8",
-  );
-  await mkdir(dirname(sourceUnrelatedSkillPath), { recursive: true });
-  await writeFile(
-    sourceUnrelatedSkillPath,
-    "unrelated legacy skill\n",
-    "utf8",
-  );
-  await writeFile(sourceUnrelatedPath, "unrelated legacy state\n", "utf8");
-  await writeFile(sourceRecoveryPath, "legacy recovery state\n", "utf8");
-  await mkdir(dirname(sourceDefaultTargetSkillPath), { recursive: true });
-  await writeFile(
-    sourceDefaultTargetSkillPath,
-    "unrelated default-registry skill\n",
-    "utf8",
-  );
-  await mkdir(sourceDefaultSkillsRoot, { recursive: true });
-  await symlink(sourceDefaultSkillsTarget, sourceDefaultSkillsLink, "dir");
-  await writeFile(sourceDefaultFilePath, "unrelated default file\n", "utf8");
-  await mkdir(dirname(destinationUnrelatedSkillPath), { recursive: true });
-  await writeFile(
-    destinationUnrelatedSkillPath,
-    "unrelated workspace skill\n",
-    "utf8",
-  );
-  await mkdir(dirname(destinationUnrelatedPath), { recursive: true });
-  await writeFile(
-    destinationUnrelatedPath,
-    "unrelated workspace state\n",
-    "utf8",
-  );
-
-  assert.equal(await pathExists(getWorkspaceConfigPath(workspaceRoot)), false);
-  assert.equal(await pathExists(destinationLockPath), false);
-  assert.equal(await pathExists(destinationWorkflowPath), false);
-  assert.equal(await pathExists(destinationManagedSkillPath), false);
-  assert.deepEqual(
-    (await readdir(workspaceRoot))
-      .filter((entry) => entry.startsWith(".sdd-from-user-")),
-    [],
-  );
-  const sourceBeforeDryRun = await hashDirectory(legacyUserRoot);
-  const siblingSourcesBeforeDryRun = await Promise.all([
-    planningRoot,
-    repositoryRoot,
-    legacySkillsRoot,
-  ].map((path) => hashDirectory(path)));
-  const destinationBeforeDryRun = await hashDirectory(workspaceRoot);
-  const overrideErrors = [];
-  for (const dryRun of [true, false]) {
-    await assert.rejects(
-      execFileAsync(process.execPath, [
-        join(PACKAGE_ROOT, "bin", "sdd.js"),
-        "setup",
-        workspaceRoot,
-        "--from-user",
-        legacyUserRoot,
-        "--skills-dir",
-        "custom",
-        ...(dryRun ? ["--dry-run"] : []),
-        "--json",
-      ]),
-      (error) => {
-        overrideErrors.push(JSON.parse(error.stderr).error);
-        return true;
-      },
-    );
-  }
-  assert.deepEqual(overrideErrors[0], overrideErrors[1]);
-  assert.equal(overrideErrors[0].code, "INVALID_MIGRATION_OPTIONS");
-  assert.equal(await hashDirectory(legacyUserRoot), sourceBeforeDryRun);
-  assert.deepEqual(
-    await Promise.all([
-      planningRoot,
-      repositoryRoot,
-      legacySkillsRoot,
-    ].map((path) => hashDirectory(path))),
-    siblingSourcesBeforeDryRun,
-  );
-  assert.equal(await hashDirectory(workspaceRoot), destinationBeforeDryRun);
-
-  const dryRunOutput = await execFileAsync(process.execPath, [
-    join(PACKAGE_ROOT, "bin", "sdd.js"),
-    "setup",
-    workspaceRoot,
-    "--from-user",
-    legacyUserRoot,
-    "--dry-run",
-    "--json",
-  ]);
-  assert.equal(
-    await hashDirectory(legacyUserRoot),
-    sourceBeforeDryRun,
-    "dry-run must not mutate any source entry",
-  );
-  assert.deepEqual(
-    await Promise.all([
-      planningRoot,
-      repositoryRoot,
-      legacySkillsRoot,
-    ].map((path) => hashDirectory(path))),
-    siblingSourcesBeforeDryRun,
-    "dry-run must not mutate owner-relative sibling sources",
-  );
-  assert.equal(
-    await hashDirectory(workspaceRoot),
-    destinationBeforeDryRun,
-    "dry-run must not mutate any destination entry",
-  );
-  const dryRun = JSON.parse(dryRunOutput.stdout);
-  assert.equal(dryRun.dryRun, true);
-  assert.equal(dryRun.workspaceRoot, workspaceRoot);
-  assert.equal(dryRun.migrationSource, legacyUserRoot);
-  assert.equal(Object.hasOwn(dryRun, "userRoot"), false);
-  assert.equal(await pathExists(getWorkspaceConfigPath(workspaceRoot)), false);
-  assert.equal(await pathExists(sourceChangePath), true);
-  assert.equal(await pathExists(sourceConfigPath), true);
-  assert.equal(await pathExists(sourceLockPath), true);
-  assert.equal(await pathExists(sourceWorkflowPath), true);
-  assert.equal(await pathExists(sourceManagedSkillPath), true);
-  assert.equal(await pathExists(sourceUnrelatedSkillPath), true);
-  assert.equal(await pathExists(sourceUnrelatedPath), true);
-  assert.equal(await pathExists(sourceRecoveryPath), true);
-  assert.equal(await pathExists(destinationRecoveryPath), false);
-  assert.equal(await pathExists(destinationLockPath), false);
-  assert.equal(await pathExists(destinationWorkflowPath), false);
-  assert.equal(await pathExists(destinationManagedSkillPath), false);
-  assert.equal(await pathExists(destinationUnrelatedSkillPath), true);
-  assert.equal(await pathExists(destinationUnrelatedPath), true);
-  assert.deepEqual(
-    (await readdir(workspaceRoot))
-      .filter((entry) => entry.startsWith(".sdd-from-user-")),
-    [],
-  );
-  const humanDryRunOutput = await execFileAsync(process.execPath, [
-    join(PACKAGE_ROOT, "bin", "sdd.js"),
-    "setup",
-    workspaceRoot,
-    "--from-user",
-    legacyUserRoot,
-    "--dry-run",
-  ]);
-  const migrationKinds = new Set(dryRun.migration.actions.map((action) => action.kind));
-  assert.ok(migrationKinds.has("change"), "dry-run must expose Change migration");
-  assert.ok(migrationKinds.has("recovery"), "dry-run must expose recovery migration");
-  assert.ok(
-    dryRun.migration.actions.some((action) =>
-      ["workspace-config", "workflow", "skill"].includes(action.kind)),
-    "dry-run must expose destination publications",
-  );
-  assert.ok(
-    dryRun.migration.actions.some((action) => action.action === "retire"),
-    "dry-run must expose legacy retirements",
-  );
-  const humanActionLines = humanDryRunOutput.stdout.split("\n");
-  for (const action of dryRun.migration.actions) {
-    const identity = action.changeId ?? action.path ?? action.skillName ?? action.stageRoot;
-    assert.ok(
-      humanActionLines.some((line) =>
-        line.startsWith(`Would ${action.action} `) && line.includes(identity)),
-      `human dry-run must expose ${action.kind ?? "recovery"} action ${identity}`,
-    );
-  }
-  assert.equal(await hashDirectory(legacyUserRoot), sourceBeforeDryRun);
-  assert.deepEqual(
-    await Promise.all([
-      planningRoot,
-      repositoryRoot,
-      legacySkillsRoot,
-    ].map((path) => hashDirectory(path))),
-    siblingSourcesBeforeDryRun,
-  );
-  assert.equal(await hashDirectory(workspaceRoot), destinationBeforeDryRun);
-
-
-  const migratedOutput = await execFileAsync(process.execPath, [
-    join(PACKAGE_ROOT, "bin", "sdd.js"),
-    "setup",
-    workspaceRoot,
-    "--from-user",
-    legacyUserRoot,
-    "--json",
-  ]);
-  const migratedResult = JSON.parse(migratedOutput.stdout);
-  const migrated = await readWorkspaceConfig(workspaceRoot);
-  assert.equal(migratedResult.migrationSource, legacyUserRoot);
-  assert.equal(migrated.version, 3);
-  assert.equal(migrated.schema, "sdd-v3");
-  assert.equal(Object.hasOwn(migrated, "kind"), false);
-  assert.equal(migrated.skills.directory, ".agents/skills");
-  assert.equal(migrated.planning.root, planningRoot);
-  assert.equal(migrated.repositories.roots.repos, repositoryRoot);
-  assert.equal(migrated.ideas.sample.planningPath, join(planningRoot, "sample"));
-  assert.equal(
-    await pathExists(join(workspaceRoot, ".sdd", "changes", changeId, "tasks.md")),
-    true,
-  );
-  assert.equal(await pathExists(sourceConfigPath), false);
-  assert.equal(await pathExists(sourceLockPath), false);
-  assert.equal(await pathExists(sourceWorkflowPath), false);
-  assert.equal(await pathExists(sourceManagedSkillPath), false);
-  assert.equal(await pathExists(join(planningRoot, "sample")), true);
-  assert.equal(await pathExists(getRepositoryConfigPath(repositoryPath)), true);
-  assert.equal(await pathExists(sourceRecoveryPath), false);
-  assert.equal(
-    await readFile(destinationRecoveryPath, "utf8"),
-    "legacy recovery state\n",
-  );
-  assert.equal(
-    await readFile(sourceUnrelatedSkillPath, "utf8"),
-    "unrelated legacy skill\n",
-  );
-  assert.equal((await lstat(sourceDefaultSkillsRoot)).isDirectory(), true);
-  assert.equal((await lstat(sourceDefaultSkillsLink)).isSymbolicLink(), true);
-  assert.equal(
-    await readFile(sourceDefaultSkillPath, "utf8"),
-    "unrelated default-registry skill\n",
-  );
-  assert.equal(
-    await readFile(sourceDefaultFilePath, "utf8"),
-    "unrelated default file\n",
-  );
-  assert.equal(
-    await readFile(sourceUnrelatedPath, "utf8"),
-    "unrelated legacy state\n",
-  );
-});
-
-test("CLI setup migrates an explicit legacy home-root v3 workspace", async (t) => {
-  const root = await createWorkspace("sdd-from-home-workspace-");
-  const legacyHomeRoot = join(root, "legacy-home");
-  const workspaceRoot = join(root, "workspace");
-  const planningRoot = join(workspaceRoot, "ideas");
-  const repositoryRoot = join(workspaceRoot, "repos");
-  t.after(() => rm(root, { recursive: true, force: true }));
-
-  await mkdir(join(planningRoot, "sample"), { recursive: true });
-  await mkdir(join(repositoryRoot, "sample-app"), { recursive: true });
-  const workflowPath = join(workspaceRoot, ".sdd", "story-driven-development.md");
-  await mkdir(legacyHomeRoot, { recursive: true });
-  await writeWorkspaceConfig(legacyHomeRoot, {
-    version: 3,
-    schema: "sdd-v3",
-    skills: { directory: ".agents/skills" },
-    planning: { root: planningRoot },
-    repositories: { roots: { repos: repositoryRoot } },
-    repositoryArtifacts: {
-      epics: "docs/epics",
-      adrs: "docs/adrs",
-      audits: "docs/audits",
-    },
-    ideas: {
-      sample: {
-        status: "active",
-        repositories: [{
-          root: "repos",
-          path: "sample-app",
-          status: "active",
-        }],
-      },
-    },
-  });
-
-  const output = await execFileAsync(process.execPath, [
-    join(PACKAGE_ROOT, "bin", "sdd.js"),
-    "setup",
-    workspaceRoot,
-    "--from-user",
-    legacyHomeRoot,
-    "--json",
-  ]);
-  const result = JSON.parse(output.stdout);
-  const migrated = await readWorkspaceConfig(workspaceRoot);
-  assert.equal(result.migrationSource, legacyHomeRoot);
-  assert.equal(migrated.planning.root, "ideas");
-  assert.equal(migrated.repositories.roots.repos, "repos");
-  assert.equal(await pathExists(getWorkspaceConfigPath(legacyHomeRoot)), false);
-  assert.equal(
-    await readFile(workflowPath, "utf8"),
-    await readFile(WORKFLOW_SOURCE_PATH, "utf8"),
-  );
-});
-
-test("CLI setup parser exposes only workspace setup and explicit legacy migration", async () => {
+test("CLI setup parser exposes only current workspace setup", async () => {
   const output = await execFileAsync(process.execPath, [
     join(PACKAGE_ROOT, "bin", "sdd.js"),
     "--help",
   ]);
   assert.match(output.stdout, /sdd setup \[workspace-path\]/);
-  assert.match(output.stdout, /--from-user <path>/);
   assert.match(output.stdout, /Configure options:\n  --workspace <path>/);
-  assert.doesNotMatch(output.stdout, /--from-workspace|--legacy-workspace|user-level|~\/\.sdd/);
+  assert.doesNotMatch(output.stdout, /--from-user|--from-workspace|--legacy-workspace|user-level|~\/\.sdd/);
 
   for (const args of [
     ["setup", "--from-workspace", "", "--json"],
@@ -1533,7 +886,6 @@ test("CLI rejects empty positional and option paths before authority discovery",
 
   const cases = [
     ["setup positional", ["setup", ""]],
-    ["setup --from-user", ["setup", target, "--from-user", ""]],
     ["setup --planning-root", ["setup", target, "--planning-root", ""]],
     ["setup --repository-root", ["setup", target, "--repository-root", ""]],
     ["setup --skills-dir", ["setup", target, "--skills-dir", ""]],
@@ -1670,6 +1022,7 @@ test("CLI update with an explicit workspace leaves a populated decoy home unchan
 
   assert.equal(result.command, "update");
   assert.equal(result.workspaceRoot, fixture.workspaceRoot);
+  assert.equal(Object.hasOwn(result, "migration"), false);
   assert.ok(result.skills.actions.some(
     (entry) => entry.skillName === workspaceRetiredSkill && entry.action === "remove",
   ));
@@ -1686,14 +1039,14 @@ test("CLI lifecycle mutation with an explicit workspace leaves a populated decoy
   const changeId = "2026-08-08-explicit-workspace-home-authority";
   await writeChange(fixture.workspaceRoot, "sample-web", changeId, "in_review");
   await writeChange(fixture.decoyHome, "sample-web", changeId, "proposed");
-  const workspaceTasksPath = join(
+  const workspaceChangePath = join(
     fixture.workspaceRoot,
     ".sdd",
     "changes",
     changeId,
-    "tasks.md",
+    "change.md",
   );
-  const workspaceTasksBefore = await readFile(workspaceTasksPath, "utf8");
+  const workspaceChangeBefore = await readFile(workspaceChangePath, "utf8");
   const decoyBefore = await hashDirectory(fixture.decoyHome);
 
   const { stdout } = await execFileAsync(process.execPath, [
@@ -1711,12 +1064,12 @@ test("CLI lifecycle mutation with an explicit workspace leaves a populated decoy
     "--json",
   ], { cwd: fixture.workspaceRoot, env: fixture.env });
   const result = JSON.parse(stdout);
-  const workspaceTasksAfter = await readFile(workspaceTasksPath, "utf8");
+  const workspaceChangeAfter = await readFile(workspaceChangePath, "utf8");
 
   assert.equal(result.command, "change-transition");
   assert.equal(result.workspaceRoot, fixture.workspaceRoot);
-  assert.notEqual(workspaceTasksAfter, workspaceTasksBefore);
-  assert.match(workspaceTasksAfter, /^status: in_progress$/m);
+  assert.notEqual(workspaceChangeAfter, workspaceChangeBefore);
+  assert.match(workspaceChangeAfter, /^status: in_progress$/m);
   assert.equal(await hashDirectory(fixture.decoyHome), decoyBefore);
 });
 
@@ -2745,7 +2098,7 @@ test("CLI configure accepts --workspace from unrelated cwd and detects path repl
   assert.deepEqual(result.repositoryRoots, { code: "spaces/code" });
   assert.equal((await diagnoseWorkspace(root)).findings.length, 0);
 });
-test("configure rejects released legacy user configurations as operational authority", async (t) => {
+test("configure rejects unsupported pre-1.0 user configurations", async (t) => {
   const root = await createWorkspace("sdd-configure-legacy-user-");
   t.after(() => rm(root, { recursive: true, force: true }));
   for (const [version, schema] of [
@@ -2790,7 +2143,7 @@ test("configure rejects released legacy user configurations as operational autho
         workspaceRoot: legacyUserRoot,
       }),
       (error) => error instanceof SddError
-        && error.code === "LEGACY_USER_MIGRATION_REQUIRED",
+        && error.code === "INVALID_CONFIG",
     );
   }
 });
@@ -4344,61 +3697,6 @@ test("CLI exposes epic create with JSON output", async (t) => {
   assert.equal(result.validation.valid, true);
 });
 
-test("change create scaffolds a planned Change for a selected repository", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-
-  const result = await createChange(root, "sample", "mobile-notes-access", {
-    date: "2026-07-14",
-    repositories: ["code/sample-mobile"],
-  });
-
-  assert.equal(result.command, "change-create");
-  assert.equal(result.changeId, "2026-07-14-mobile-notes-access");
-  assert.equal(result.path, ".sdd/changes/2026-07-14-mobile-notes-access");
-  assert.equal(result.repositories.length, 1);
-  assert.equal(result.repositories[0].resolvedPath, "code/sample-mobile");
-  assert.deepEqual(result.files, ["proposal.md", "design.md", "tasks.md"]);
-
-  const changeRoot = join(root, result.path);
-  const proposal = await readFile(join(changeRoot, "proposal.md"), "utf8");
-  const design = await readFile(join(changeRoot, "design.md"), "utf8");
-  const tasks = await readFile(join(changeRoot, "tasks.md"), "utf8");
-  assert.match(proposal, /^# Proposal: Mobile Notes Access/m);
-  assert.match(proposal, /Active lifecycle location: `<workspace>\/\.sdd\/changes\/2026-07-14-mobile-notes-access\/`/);
-  assert.match(proposal, /`sample-mobile`/);
-  assert.match(design, /^# Design: Mobile Notes Access/m);
-  assert.match(tasks, /^---\nstatus: proposed\nspace: sample\nrepositories:\n  - sample-mobile\n---/);
-  assert.equal(
-    tasks.split("\n").find((line) => line.startsWith("- Expected dirty files:")),
-    "- Expected dirty files: central Change `<workspace>/.sdd/changes/2026-07-14-mobile-notes-access/` plus repository-local implementation, Epic, ADR, test, and supporting-doc files grouped by target repository: `sample-mobile` (`code/sample-mobile`)",
-  );
-  assert.match(tasks, /run scoped `sdd validate`/i);
-  assert.match(tasks, /run `sdd change close <space-id> <change-id>`/);
-  assert.match(tasks, /^# Tasks: Mobile Notes Access/m);
-  assert.doesNotMatch(`${proposal}\n${design}\n${tasks}`, /CHANGE TITLE|yyyy-mm-dd-change-name/);
-});
-
-test("change create renders one complete repository-keyed Expected dirty files line", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-
-  const result = await createChange(root, "sample", "multi-repository-rendering", {
-    date: "2026-07-14",
-    repositories: ["sample-web", "sample-mobile"],
-  });
-  const tasks = await readFile(join(root, result.path, "tasks.md"), "utf8");
-
-  assert.deepEqual(
-    tasks.split("\n").filter((line) => line.startsWith("- Expected dirty files:")),
-    [
-      "- Expected dirty files: central Change `<workspace>/.sdd/changes/2026-07-14-multi-repository-rendering/` plus repository-local implementation, Epic, ADR, test, and supporting-doc files grouped by target repository: `sample-web` (`code/sample-web`), `sample-mobile` (`code/sample-mobile`)",
-    ],
-  );
-});
-
 test("change create skips archived repositories and rejects inactive Spaces", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -4419,23 +3717,6 @@ test("change create skips archived repositories and rejects inactive Spaces", as
     () => createChange(root, "sample", "inactive-work", { date: "2026-07-15" }),
     (error) => error instanceof SddError && error.code === "SPACE_NOT_ACTIVE",
   );
-});
-
-test("change create dry-run reports the planned Change without writing files", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-
-  const result = await createChange(root, "sample", "dry-run-example", {
-    date: "2026-07-14",
-    repositories: ["sample-web"],
-    dryRun: true,
-  });
-
-  assert.equal(result.dryRun, true);
-  assert.equal(result.path, ".sdd/changes/2026-07-14-dry-run-example");
-  assert.equal(result.repositories[0].resolvedPath, "code/sample-web");
-  assert.equal(await pathExists(join(root, result.path)), false);
 });
 
 test("CLI exposes change create with JSON output", async (t) => {
@@ -4512,65 +3793,6 @@ test("CLI change create resolves a sole absolute repository selector from an exp
     },
   );
   assert.equal(selectionError.code, "REPOSITORY_NOT_FOUND");
-});
-
-test("change create refuses to guess among multiple mapped repositories", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-
-  await assert.rejects(
-    () => createChange(root, "sample", "ambiguous-target", { date: "2026-07-14" }),
-    (error) =>
-      error instanceof SddError &&
-      error.code === "REPOSITORY_REQUIRED" &&
-      error.details.includes("Available repository: sample-web (code/sample-web)") &&
-      error.details.includes("Available repository: sample-mobile (code/sample-mobile)"),
-  );
-});
-
-test("change create infers a sole repository and refuses an existing Change", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const config = await readWorkspaceConfig(root);
-  config.ideas.sample.repositories = [config.ideas.sample.repositories[0]];
-  await writeWorkspaceConfig(root, config);
-
-  const first = await createChange(root, "sample", "single-target", {
-    date: "2026-07-14",
-  });
-  assert.equal(first.repositories[0].resolvedPath, "code/sample-web");
-
-  await assert.rejects(
-    () => createChange(root, "sample", "single-target", { date: "2026-07-14" }),
-    (error) => error instanceof SddError && error.code === "CHANGE_EXISTS",
-  );
-});
-
-test("change create refuses IDs already active or closed in a selected repository", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  await writeCanonicalChange(root, "sample-web", "2026-07-14-active-collision", "in_progress");
-  await writeCanonicalChange(
-    root,
-    "sample-web",
-    "2026-07-14-closed-collision",
-    "in_review",
-    { closed: true },
-  );
-
-  for (const slug of ["active-collision", "closed-collision"]) {
-    await assert.rejects(
-      () => createChange(root, "sample", slug, {
-        date: "2026-07-14",
-        repositories: ["sample-web"],
-        dryRun: true,
-      }),
-      (error) => error instanceof SddError && error.code === "CHANGE_EXISTS",
-    );
-  }
 });
 
 test("change create rejects a planned directory through an external symlink", async (t) => {
@@ -4687,30 +3909,6 @@ async function interruptCloseProcess(
   );
 }
 
-test("change close moves an in-review Change without writing a closed status", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-14-ready-change";
-  await writeChange(root, "sample-web", changeId, "in_review");
-
-  const result = await closeChange(root, "sample", changeId, {
-    repositories: ["sample-web"],
-  });
-
-  assert.equal(result.command, "change-close");
-  assert.equal(result.dryRun, false);
-  assert.equal(result.repositories.length, 1);
-  assert.equal(result.sourcePath, `.sdd/changes/${changeId}`);
-  assert.equal(result.path, `.sdd/changes/closed/${changeId}`);
-  assert.equal(await pathExists(join(root, result.sourcePath)), false);
-  assert.equal(await pathExists(join(root, result.path)), true);
-  assert.match(
-    await readFile(join(root, result.path, "tasks.md"), "utf8"),
-    /^status: in_review$/m,
-  );
-});
-
 test("change close preserves restrictive directory modes through publication and cleanup", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -4732,368 +3930,6 @@ test("change close preserves restrictive directory modes through publication and
   assert.equal(await readFile(join(closedPath, "evidence", "review.txt"), "utf8"), "reviewed\n");
   assert.equal(await pathExists(activePath), false);
   assert.deepEqual(await readdir(getChangesRoot(root)), ["closed"]);
-});
-
-test("change close recovers after interruption at every durable phase", async (t) => {
-  const phases = [
-    "prepared",
-    "destination-claim-intent",
-    "destination-copying",
-    "destination-ready",
-    "backup-claim-intent",
-    "backup-copying",
-    "backup-ready",
-    "retiring-source",
-    "source-retired",
-    "verified",
-    "cleaning-backup",
-    "complete",
-  ];
-
-  for (const phase of phases) {
-    await t.test(phase, async (t) => {
-      const root = await createMappedWorkspace();
-      t.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const changeId = `2026-07-14-close-crash-${phase}`;
-      await writeChange(root, "sample-web", changeId, "in_review");
-      const activePath = getActiveChangePath(changeId, root);
-      const closedPath = getClosedChangePath(changeId, root);
-      const tasksSource = await readFile(join(activePath, "tasks.md"), "utf8");
-
-      await interruptCloseProcess(root, changeId, { phase });
-      const result = await closeChange(root, "sample", changeId);
-
-      assert.equal(result.path, `.sdd/changes/closed/${changeId}`);
-      assert.equal(await pathExists(activePath), false);
-      assert.equal(await readFile(join(closedPath, "tasks.md"), "utf8"), tasksSource);
-      assert.deepEqual(await readdir(getChangesRoot(root)), ["closed"]);
-    });
-  }
-});
-
-test("change close retains terminal receipts when completed topology changes before retry", async (t) => {
-  for (const mutation of ["active-reappears", "tasks-rewritten"]) {
-    await t.test(mutation, async (t) => {
-      const root = await createMappedWorkspace();
-      t.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const changeId = `2026-07-14-close-complete-${mutation}`;
-      await writeChange(root, "sample-web", changeId, "in_review");
-      const activePath = getActiveChangePath(changeId, root);
-      const closedPath = getClosedChangePath(changeId, root);
-
-      await interruptCloseProcess(root, changeId, { phase: "complete" });
-      const journalPath = getCloseTransactionJournalPath(root, changeId);
-      const journalBytes = await readFile(journalPath);
-      if (mutation === "active-reappears") {
-        await mkdir(activePath);
-        await writeFile(join(activePath, "tasks.md"), "concurrent active winner\n", "utf8");
-      } else {
-        await writeFile(join(closedPath, "tasks.md"), "concurrent closed tasks winner\n", "utf8");
-      }
-
-      await assert.rejects(
-        () => closeChange(root, "sample", changeId),
-        (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-      );
-
-      assert.deepEqual(await readFile(journalPath), journalBytes);
-      assert.equal(await pathExists(closedPath), true);
-      if (mutation === "active-reappears") {
-        assert.equal(
-          await readFile(join(activePath, "tasks.md"), "utf8"),
-          "concurrent active winner\n",
-        );
-      } else {
-        assert.equal(
-          await readFile(join(closedPath, "tasks.md"), "utf8"),
-          "concurrent closed tasks winner\n",
-        );
-      }
-    });
-  }
-});
-
-test("change close recovers after interruption at every receipt bootstrap step", async (t) => {
-  for (const step of ["intent", "proof", "staged", "visible"]) {
-    await t.test(step, async (t) => {
-      const root = await createMappedWorkspace();
-      t.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const changeId = `2026-07-14-close-bootstrap-${step}`;
-      await writeChange(root, "sample-web", changeId, "in_review");
-      const activePath = getActiveChangePath(changeId, root);
-      const closedPath = getClosedChangePath(changeId, root);
-      const tasksSource = await readFile(join(activePath, "tasks.md"), "utf8");
-
-      await interruptCloseProcess(root, changeId, {
-        hook: "afterCloseReceiptInitializationStep",
-        step,
-      });
-      const result = await closeChange(root, "sample", changeId);
-
-      assert.equal(result.path, `.sdd/changes/closed/${changeId}`);
-      assert.equal(await pathExists(activePath), false);
-      assert.equal(await readFile(join(closedPath, "tasks.md"), "utf8"), tasksSource);
-      assert.deepEqual(await readdir(getChangesRoot(root)), ["closed"]);
-    });
-  }
-});
-
-test("change close recovers after interruption inside each destructive tree operation", async (t) => {
-  const cases = [
-    { name: "destination-transfer", hook: "afterCloseTransferEntry", kind: "destination" },
-    { name: "backup-transfer", hook: "afterCloseTransferEntry", kind: "backup" },
-    {
-      name: "destination-mode",
-      hook: "afterCloseDirectoryModeMutation",
-      kind: "destination",
-    },
-    { name: "backup-mode", hook: "afterCloseDirectoryModeMutation", kind: "backup" },
-    { name: "source-retirement", hook: "afterCloseRetirementEntry" },
-    { name: "backup-cleanup", hook: "afterCloseBackupCleanupEntry" },
-    { name: "receipt-proof-cleanup", hook: "afterCloseReceiptProofCleanup" },
-    {
-      name: "visible-receipt-removal",
-      hook: "beforeCloseReceiptRemovalMutation",
-      kind: "visible",
-    },
-  ];
-
-  for (const crashCase of cases) {
-    await t.test(crashCase.name, async (t) => {
-      const root = await createMappedWorkspace();
-      t.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const changeId = `2026-07-14-close-crash-${crashCase.name}`;
-      await writeChange(root, "sample-web", changeId, "in_review");
-      const activePath = getActiveChangePath(changeId, root);
-      const closedPath = getClosedChangePath(changeId, root);
-      const tasksSource = await readFile(join(activePath, "tasks.md"), "utf8");
-
-      await interruptCloseProcess(root, changeId, crashCase);
-      await closeChange(root, "sample", changeId);
-
-      assert.equal(await pathExists(activePath), false);
-      assert.equal(await readFile(join(closedPath, "tasks.md"), "utf8"), tasksSource);
-      assert.deepEqual(await readdir(getChangesRoot(root)), ["closed"]);
-    });
-  }
-});
-
-test("change close claims the closed destination without replacing a concurrent winner", async (t) => {
-  const cases = [
-    {
-      name: "file",
-      create: (root, path) => writeFile(path, "concurrent file\n", "utf8"),
-      assertWinner: async (root, path) =>
-        assert.equal(await readFile(path, "utf8"), "concurrent file\n"),
-    },
-    {
-      name: "symlink",
-      create: async (root, path) => {
-        const target = join(root, "concurrent-symlink-target");
-        await writeFile(target, "symlink target\n", "utf8");
-        await symlink(target, path);
-      },
-      assertWinner: async (root, path) =>
-        assert.equal(await readlink(path), join(root, "concurrent-symlink-target")),
-    },
-    {
-      name: "empty-directory",
-      create: (root, path) => mkdir(path),
-      assertWinner: async (root, path) => assert.deepEqual(await readdir(path), []),
-    },
-    {
-      name: "nonempty-directory",
-      create: async (root, path) => {
-        await mkdir(path);
-        await writeFile(join(path, "winner.txt"), "concurrent directory\n", "utf8");
-      },
-      assertWinner: async (root, path) =>
-        assert.equal(await readFile(join(path, "winner.txt"), "utf8"), "concurrent directory\n"),
-    },
-  ];
-
-  for (const collision of cases) {
-    await t.test(collision.name, async (t) => {
-      const root = await createMappedWorkspace();
-      t.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const changeId = `2026-07-14-close-${collision.name}-race`;
-      await writeChange(root, "sample-web", changeId, "in_review");
-      const activePath = getActiveChangePath(changeId, root);
-      const closedPath = getClosedChangePath(changeId, root);
-      const activeTasks = await readFile(join(activePath, "tasks.md"), "utf8");
-
-      await assert.rejects(
-        () => closeChange(root, "sample", changeId, {
-          beforeDestinationClaim: () => collision.create(root, closedPath),
-        }),
-        (error) => error instanceof SddError
-          && ["CONCURRENT_CHANGE", "MUTATION_RECOVERY_FAILED"].includes(error.code),
-      );
-
-      assert.equal(await readFile(join(activePath, "tasks.md"), "utf8"), activeTasks);
-      await collision.assertWinner(root, closedPath);
-
-      await rm(closedPath, { recursive: true, force: true });
-
-      await closeChange(root, "sample", changeId);
-      assert.equal(await pathExists(activePath), false);
-      assert.equal(await readFile(join(closedPath, "tasks.md"), "utf8"), activeTasks);
-    });
-  }
-});
-test("change close preserves concurrent cleanup quarantine and payload winners", async (t) => {
-  for (const collision of ["quarantine", "payload"]) {
-    await t.test(collision, async (t) => {
-      const root = await createMappedWorkspace();
-      t.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const changeId = `2026-07-14-close-cleanup-${collision}`;
-      await writeChange(root, "sample-web", changeId, "in_review");
-      const activePath = getActiveChangePath(changeId, root);
-      const tasksSource = await readFile(join(activePath, "tasks.md"), "utf8");
-      let winnerPath = null;
-      let injected = false;
-
-      await assert.rejects(
-        () => closeChange(root, "sample", changeId, {
-          beforeCloseTreeQuarantineClaim: collision === "quarantine"
-            ? async ({ field, quarantineRoot }) => {
-                if (injected || field !== "sourceQuarantine") return;
-                injected = true;
-                winnerPath = quarantineRoot;
-                await writeFile(winnerPath, "concurrent quarantine winner\n", "utf8");
-              }
-            : null,
-          beforeCloseTreeQuarantineMove: collision === "payload"
-            ? async ({ field, payload }) => {
-                if (injected || field !== "sourceQuarantine") return;
-                injected = true;
-                winnerPath = payload;
-                await mkdir(winnerPath);
-              }
-            : null,
-        }),
-        (error) => error instanceof SddError
-          && ["CONCURRENT_CHANGE", "MUTATION_RECOVERY_FAILED"].includes(error.code),
-      );
-
-      if (collision === "quarantine") {
-        assert.equal(await readFile(winnerPath, "utf8"), "concurrent quarantine winner\n");
-        await rm(winnerPath, { force: true });
-      } else {
-        assert.deepEqual(await readdir(winnerPath), []);
-        await rm(winnerPath, { recursive: true });
-      }
-      assert.equal(await readFile(join(activePath, "tasks.md"), "utf8"), tasksSource);
-
-      await closeChange(root, "sample", changeId);
-      assert.equal(await pathExists(activePath), false);
-      assert.equal(
-        await readFile(join(getClosedChangePath(changeId, root), "tasks.md"), "utf8"),
-        tasksSource,
-      );
-    });
-  }
-});
-
-test("change close rejects replacement of its claimed closed directory", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-14-close-claim-replacement";
-  await writeChange(root, "sample-web", changeId, "in_review");
-  const activePath = getActiveChangePath(changeId, root);
-  const closedPath = getClosedChangePath(changeId, root);
-  const displacedClaim = `${closedPath}.displaced-claim`;
-  const activeTasks = await readFile(join(activePath, "tasks.md"), "utf8");
-  const winner = "concurrent closed winner\n";
-
-  await assert.rejects(
-    () => closeChange(root, "sample", changeId, {
-      afterDestinationClaim: async ({ destinationPath }) => {
-        await rename(destinationPath, displacedClaim);
-        await writeFile(destinationPath, winner, "utf8");
-      },
-    }),
-    (error) => error instanceof SddError
-      && ["CONCURRENT_CHANGE", "MUTATION_RECOVERY_FAILED"].includes(error.code),
-  );
-
-  assert.equal(await readFile(join(activePath, "tasks.md"), "utf8"), activeTasks);
-  assert.equal(await readFile(closedPath, "utf8"), winner);
-  assert.deepEqual(await readdir(displacedClaim), []);
-
-  await rm(closedPath, { force: true });
-  await rm(displacedClaim, { recursive: true });
-  await closeChange(root, "sample", changeId);
-  assert.equal(await readFile(join(closedPath, "tasks.md"), "utf8"), activeTasks);
-});
-
-test("change close exclusively claims its recovery backup before retiring the active Change", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-14-close-backup-claim-race";
-  await writeChange(root, "sample-web", changeId, "in_review");
-  const activePath = getActiveChangePath(changeId, root);
-  const closedPath = getClosedChangePath(changeId, root);
-  const tasksSource = await readFile(join(activePath, "tasks.md"), "utf8");
-  let recoveryPath = null;
-  let winnerIdentity = null;
-
-  await assert.rejects(
-    () => closeChange(root, "sample", changeId, {
-      beforeBackupClaim: async ({ recoveryPath: claimedPath }) => {
-        recoveryPath = claimedPath;
-        await mkdir(recoveryPath);
-        winnerIdentity = await lstat(recoveryPath, { bigint: true });
-      },
-    }),
-    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-  );
-
-  const retainedWinner = await lstat(recoveryPath, { bigint: true });
-  assert.equal(retainedWinner.dev, winnerIdentity.dev);
-  assert.equal(retainedWinner.ino, winnerIdentity.ino);
-  assert.deepEqual(await readdir(recoveryPath), []);
-  assert.equal(await readFile(join(activePath, "tasks.md"), "utf8"), tasksSource);
-  assert.equal(await pathExists(closedPath), false);
-
-  await rm(recoveryPath, { recursive: true });
-  await closeChange(root, "sample", changeId);
-  assert.equal(await pathExists(activePath), false);
-  assert.equal(await readFile(join(closedPath, "tasks.md"), "utf8"), tasksSource);
-});
-
-test("change close binds the active directory before its commit boundary", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-14-close-active-identity";
-  await writeChange(root, "sample-web", changeId, "in_review");
-  const activePath = getActiveChangePath(changeId, root);
-  const originalPath = `${activePath}.original`;
-  const tasksSource = await readFile(join(activePath, "tasks.md"), "utf8");
-
-  await assert.rejects(
-    () => closeChange(root, "sample", changeId, {
-      beforeCommit: async () => {
-        await rename(activePath, originalPath);
-        await mkdir(activePath);
-        await writeFile(join(activePath, "tasks.md"), tasksSource, "utf8");
-      },
-    }),
-    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-  );
-
-  assert.equal(await readFile(join(activePath, "tasks.md"), "utf8"), tasksSource);
-  assert.equal(await readFile(join(originalPath, "tasks.md"), "utf8"), tasksSource);
-  assert.equal(await pathExists(getClosedChangePath(changeId, root)), false);
 });
 
 test("change close dry-run validates without moving the Change", async (t) => {
@@ -5161,448 +3997,18 @@ test("change close rechecks status at commit time", async (t) => {
   await initWorkspace(root);
   const changeId = "2026-07-14-close-status-race";
   await writeChange(root, "sample-web", changeId, "in_review");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-  const latestTasks = "---\nstatus: in_progress\nspace: sample\nrepositories:\n  - sample-web\n---\n# Tasks: reopened during close\n";
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
+  const latestChange = (await readFile(changeFilePath, "utf8"))
+    .replace("status: in_review", "status: in_progress");
 
   await assert.rejects(
     () => closeChange(root, "sample", changeId, {
-      beforeCommit: () => writeFile(tasksPath, latestTasks, "utf8"),
+      beforeCommit: () => writeFile(changeFilePath, latestChange, "utf8"),
     }),
     (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
   );
-  assert.equal(await readFile(tasksPath, "utf8"), latestTasks);
+  assert.equal(await readFile(changeFilePath, "utf8"), latestChange);
 });
-
-test("change close restores the active Change when post-move verification fails", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-14-close-verification-rollback";
-  await writeChange(root, "sample-web", changeId, "in_review");
-  const activePath = join(root, ".sdd", "changes", changeId);
-  const closedPath = join(root, ".sdd", "changes", "closed", changeId);
-  const changedTasks = "---\nstatus: in_progress\nspace: sample\nrepositories:\n  - sample-web\n---\n# Tasks: changed after move\n";
-
-  await assert.rejects(
-    () => closeChange(root, "sample", changeId, {
-      afterMove: ({ destinationPath }) =>
-        writeFile(join(destinationPath, "tasks.md"), changedTasks, "utf8"),
-    }),
-    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-  );
-
-  assert.equal(await readFile(join(activePath, "tasks.md"), "utf8"), changedTasks);
-  assert.equal(await pathExists(closedPath), false);
-});
-
-test("change close reports both retained copies when the active Change reappears during recovery", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-14-close-recovery-race";
-  await writeChange(root, "sample-web", changeId, "in_review");
-  const activePath = join(root, ".sdd", "changes", changeId);
-  const closedPath = join(root, ".sdd", "changes", "closed", changeId);
-  const activeTasks = "---\nstatus: in_progress\nspace: sample\nrepositories:\n  - sample-web\n---\n# Tasks: concurrently reopened\n";
-  const closedTasks = "---\nstatus: in_review\nspace: sample\nrepositories:\n  - sample-web\n---\n# Tasks: changed after close publication\n";
-
-  await assert.rejects(
-    () => closeChange(root, "sample", changeId, {
-      afterMove: async ({ sourcePath, destinationPath }) => {
-        await mkdir(sourcePath);
-        await writeFile(join(sourcePath, "tasks.md"), activeTasks, "utf8");
-        await writeFile(join(destinationPath, "tasks.md"), closedTasks, "utf8");
-      },
-    }),
-    (error) => {
-      assert.equal(error instanceof SddError, true);
-      assert.equal(error.code, "MUTATION_RECOVERY_FAILED");
-      assert.deepEqual(error.details, [
-        `Original error: CONCURRENT_CHANGE: Change changed during close: .sdd/changes/${changeId}`,
-        `Retained active Change: .sdd/changes/${changeId}`,
-        `Retained closed Change: .sdd/changes/closed/${changeId}`,
-      ]);
-      return true;
-    },
-  );
-
-  assert.equal(await readFile(join(activePath, "tasks.md"), "utf8"), activeTasks);
-  assert.equal(await readFile(join(closedPath, "tasks.md"), "utf8"), closedTasks);
-});
-
-test("change close retries after a successful post-move rollback", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-14-close-rollback-retry";
-  await writeChange(root, "sample-web", changeId, "in_review");
-  const activePath = getActiveChangePath(changeId, root);
-  const closedPath = getClosedChangePath(changeId, root);
-  const tasksSource = await readFile(join(activePath, "tasks.md"), "utf8");
-
-  await assert.rejects(
-    () => closeChange(root, "sample", changeId, {
-      afterMove: () => {
-        throw new Error("injected post-move failure");
-      },
-    }),
-    /injected post-move failure/,
-  );
-  assert.equal(await readFile(join(activePath, "tasks.md"), "utf8"), tasksSource);
-  assert.equal(await pathExists(closedPath), false);
-
-  await closeChange(root, "sample", changeId);
-  assert.equal(await pathExists(activePath), false);
-  assert.equal(await readFile(join(closedPath, "tasks.md"), "utf8"), tasksSource);
-});
-
-test("change close recovery never replaces a concurrent active entry", async (t) => {
-  const cases = [
-    {
-      name: "file",
-      create: (root, path) => writeFile(path, "concurrent active file\n", "utf8"),
-      assertWinner: async (root, path) =>
-        assert.equal(await readFile(path, "utf8"), "concurrent active file\n"),
-    },
-    {
-      name: "symlink",
-      create: async (root, path) => {
-        const target = join(root, "concurrent-active-target");
-        await writeFile(target, "active target\n", "utf8");
-        await symlink(target, path);
-      },
-      assertWinner: async (root, path) =>
-        assert.equal(await readlink(path), join(root, "concurrent-active-target")),
-    },
-    {
-      name: "empty-directory",
-      create: (root, path) => mkdir(path),
-      assertWinner: async (root, path) => assert.deepEqual(await readdir(path), []),
-    },
-  ];
-
-  for (const collision of cases) {
-    await t.test(collision.name, async (t) => {
-      const root = await createMappedWorkspace();
-      t.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const changeId = `2026-07-14-close-recovery-${collision.name}`;
-      await writeChange(root, "sample-web", changeId, "in_review");
-      const activePath = getActiveChangePath(changeId, root);
-      const closedPath = getClosedChangePath(changeId, root);
-      const closedTasks = "---\nstatus: in_progress\nspace: sample\nrepositories:\n  - sample-web\n---\n# Tasks: changed after publication\n";
-
-      await assert.rejects(
-        () => closeChange(root, "sample", changeId, {
-          afterMove: async ({ sourcePath, destinationPath }) => {
-            await collision.create(root, sourcePath);
-            await writeFile(join(destinationPath, "tasks.md"), closedTasks, "utf8");
-          },
-        }),
-        (error) => error instanceof SddError && error.code === "MUTATION_RECOVERY_FAILED",
-      );
-
-      await collision.assertWinner(root, activePath);
-      assert.equal(await readFile(join(closedPath, "tasks.md"), "utf8"), closedTasks);
-      assert.deepEqual(
-        (await readdir(getChangesRoot(root))).sort(),
-        ["closed", changeId].sort(),
-      );
-    });
-  }
-});
-
-test("change close recovery preserves a replacement of its active claim", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-14-close-recovery-claim-replacement";
-  await writeChange(root, "sample-web", changeId, "in_review");
-  const activePath = getActiveChangePath(changeId, root);
-  const closedPath = getClosedChangePath(changeId, root);
-  const displacedClaim = `${activePath}.displaced-claim`;
-  const winner = "concurrent active winner\n";
-  const changedTasks = "---\nstatus: in_progress\nspace: sample\nrepositories:\n  - sample-web\n---\n# Tasks: changed after publication\n";
-
-  await assert.rejects(
-    () => closeChange(root, "sample", changeId, {
-      afterMove: ({ destinationPath }) =>
-        writeFile(join(destinationPath, "tasks.md"), changedTasks, "utf8"),
-      afterRecoveryClaim: async ({ sourcePath }) => {
-        await rename(sourcePath, displacedClaim);
-        await writeFile(sourcePath, winner, "utf8");
-      },
-    }),
-    (error) => error instanceof SddError && error.code === "MUTATION_RECOVERY_FAILED",
-  );
-
-  assert.equal(await readFile(activePath, "utf8"), winner);
-  assert.deepEqual(await readdir(displacedClaim), []);
-  assert.equal(await readFile(join(closedPath, "tasks.md"), "utf8"), changedTasks);
-  const recoveryEntries = (await readdir(getChangesRoot(root)))
-    .filter((entry) => entry.startsWith(`.${changeId}.sdd-close-`));
-  assert.equal(recoveryEntries.length, 1);
-  assert.equal(
-    await readFile(join(getChangesRoot(root), recoveryEntries[0], "tasks.md"), "utf8"),
-    changedTasks,
-  );
-});
-
-test("change close recovery preserves a same-byte closed replacement", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-14-close-closed-identity";
-  await writeChange(root, "sample-web", changeId, "in_review");
-  const activePath = getActiveChangePath(changeId, root);
-  const closedPath = getClosedChangePath(changeId, root);
-  const displacedClosedPath = `${closedPath}.owned`;
-  const tasksSource = await readFile(join(activePath, "tasks.md"), "utf8");
-
-  await assert.rejects(
-    () => closeChange(root, "sample", changeId, {
-      afterMove: async ({ destinationPath }) => {
-        await rename(destinationPath, displacedClosedPath);
-        await mkdir(destinationPath);
-        await writeFile(join(destinationPath, "tasks.md"), tasksSource, "utf8");
-      },
-    }),
-    (error) => error instanceof SddError && error.code === "MUTATION_RECOVERY_FAILED",
-  );
-
-  assert.equal(await readFile(join(activePath, "tasks.md"), "utf8"), tasksSource);
-  assert.equal(await readFile(join(closedPath, "tasks.md"), "utf8"), tasksSource);
-  assert.equal(await readFile(join(displacedClosedPath, "tasks.md"), "utf8"), tasksSource);
-});
-
-test("change close recovery does not trust a replaced closed child", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-14-close-closed-child-identity";
-  await writeChange(root, "sample-web", changeId, "in_review");
-  const activePath = getActiveChangePath(changeId, root);
-  const closedPath = getClosedChangePath(changeId, root);
-  const tasksSource = await readFile(join(activePath, "tasks.md"), "utf8");
-  const displacedTasksPath = join(closedPath, "tasks.md.owned");
-
-  await assert.rejects(
-    () => closeChange(root, "sample", changeId, {
-      afterMove: async ({ destinationPath }) => {
-        await rename(join(destinationPath, "tasks.md"), displacedTasksPath);
-        await writeFile(join(destinationPath, "tasks.md"), tasksSource, "utf8");
-        throw new Error("injected after child replacement");
-      },
-    }),
-    (error) => error instanceof SddError && error.code === "MUTATION_RECOVERY_FAILED",
-  );
-
-  assert.equal(await readFile(join(activePath, "tasks.md"), "utf8"), tasksSource);
-  assert.equal(await readFile(join(closedPath, "tasks.md"), "utf8"), tasksSource);
-  assert.equal(await readFile(displacedTasksPath, "utf8"), tasksSource);
-});
-
-test("change close preserves receipt quarantine collisions for every receipt file", async (t) => {
-  for (const kind of ["proof", "staged", "intent", "visible"]) {
-    await t.test(kind, async (t) => {
-      const root = await createMappedWorkspace();
-      t.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const changeId = `2026-07-14-close-receipt-collision-${kind}`;
-      await writeChange(root, "sample-web", changeId, "in_review");
-      const activePath = getActiveChangePath(changeId, root);
-      const closedPath = getClosedChangePath(changeId, root);
-      const tasksSource = await readFile(join(activePath, "tasks.md"), "utf8");
-      let collisionPath = null;
-      let injected = false;
-
-      await assert.rejects(
-        () => closeChange(root, "sample", changeId, {
-          beforeCloseReceiptQuarantine: async (context) => {
-            if (injected || context.kind !== kind) return;
-            injected = true;
-            collisionPath = context.quarantine;
-            await writeFile(collisionPath, `${kind} concurrent quarantine\n`, "utf8");
-          },
-        }),
-        (error) => error instanceof SddError
-          && ["CONCURRENT_CHANGE", "MUTATION_RECOVERY_FAILED"].includes(error.code),
-      );
-
-      assert.equal(await readFile(collisionPath, "utf8"), `${kind} concurrent quarantine\n`);
-      assert.equal(await pathExists(activePath), false);
-      assert.equal(await readFile(join(closedPath, "tasks.md"), "utf8"), tasksSource);
-      await rm(collisionPath, { force: true });
-      const result = await closeChange(root, "sample", changeId);
-      assert.equal(result.path, `.sdd/changes/closed/${changeId}`);
-    });
-  }
-});
-
-test("change close preserves receipt replacements after identity-bound quarantine", async (t) => {
-  for (const kind of ["proof", "staged", "intent", "visible"]) {
-    await t.test(kind, async (t) => {
-      const root = await createMappedWorkspace();
-      t.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const changeId = `2026-07-14-close-receipt-swap-${kind}`;
-      await writeChange(root, "sample-web", changeId, "in_review");
-      const activePath = getActiveChangePath(changeId, root);
-      const closedPath = getClosedChangePath(changeId, root);
-      const tasksSource = await readFile(join(activePath, "tasks.md"), "utf8");
-      let quarantinePath = null;
-      let authenticatedPath = null;
-      let injected = false;
-
-      await assert.rejects(
-        () => closeChange(root, "sample", changeId, {
-          afterCloseReceiptQuarantine: async (context) => {
-            if (injected || context.kind !== kind) return;
-            injected = true;
-            quarantinePath = context.quarantine;
-            authenticatedPath = `${context.quarantine}.authenticated`;
-            await rename(context.quarantine, authenticatedPath);
-            await writeFile(context.quarantine, `${kind} concurrent replacement\n`, "utf8");
-          },
-        }),
-        (error) => error instanceof SddError
-          && ["CONCURRENT_CHANGE", "MUTATION_RECOVERY_FAILED"].includes(error.code),
-      );
-
-      assert.equal(
-        await readFile(quarantinePath, "utf8"),
-        `${kind} concurrent replacement\n`,
-      );
-      assert.equal(await pathExists(authenticatedPath), true);
-      assert.equal(await pathExists(activePath), false);
-      assert.equal(await readFile(join(closedPath, "tasks.md"), "utf8"), tasksSource);
-    });
-  }
-});
-
-test("change close never unlinks a receipt path replaced after quarantine linking", async (t) => {
-  for (const kind of ["proof", "staged", "intent", "visible"]) {
-    await t.test(kind, async (t) => {
-      const root = await createMappedWorkspace();
-      t.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const changeId = `2026-07-14-close-receipt-canonical-swap-${kind}`;
-      await writeChange(root, "sample-web", changeId, "in_review");
-      const activePath = getActiveChangePath(changeId, root);
-      const closedPath = getClosedChangePath(changeId, root);
-      const tasksSource = await readFile(join(activePath, "tasks.md"), "utf8");
-      let receiptPath = null;
-      let authenticatedPath = null;
-      let injected = false;
-
-      await assert.rejects(
-        () => closeChange(root, "sample", changeId, {
-          beforeCloseReceiptRemovalMutation: async (context) => {
-            if (injected
-              || context.kind !== kind
-              || context.action !== "remove-canonical") return;
-            injected = true;
-            receiptPath = context.path;
-            authenticatedPath = `${context.path}.authenticated`;
-            await rename(context.path, authenticatedPath);
-            await writeFile(context.path, `${kind} concurrent canonical winner\n`, "utf8");
-          },
-        }),
-        (error) => error instanceof SddError
-          && ["CONCURRENT_CHANGE", "MUTATION_RECOVERY_FAILED"].includes(error.code),
-      );
-
-      assert.equal(
-        await readFile(receiptPath, "utf8"),
-        `${kind} concurrent canonical winner\n`,
-      );
-      assert.equal(await pathExists(authenticatedPath), true);
-      assert.equal(await pathExists(activePath), false);
-      assert.equal(await readFile(join(closedPath, "tasks.md"), "utf8"), tasksSource);
-    });
-  }
-});
-
-test("change close preserves same-inode receipt rewrites instead of adopting their bytes", async (t) => {
-  for (const kind of ["proof", "staged", "intent", "visible"]) {
-    await t.test(kind, async (t) => {
-      const root = await createMappedWorkspace();
-      t.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const changeId = `2026-07-14-close-receipt-rewrite-${kind}`;
-      await writeChange(root, "sample-web", changeId, "in_review");
-      const activePath = getActiveChangePath(changeId, root);
-      const closedPath = getClosedChangePath(changeId, root);
-      const tasksSource = await readFile(join(activePath, "tasks.md"), "utf8");
-      const winner = `${kind} same-inode winner\n`;
-      let receiptPath = null;
-      let beforeIdentity = null;
-      let afterIdentity = null;
-      let injected = false;
-
-      await assert.rejects(
-        () => closeChange(root, "sample", changeId, {
-          beforeCloseReceiptCleanup: async (context) => {
-            if (injected || context.kind !== kind) return;
-            injected = true;
-            receiptPath = context.path;
-            const before = await lstat(receiptPath);
-            beforeIdentity = { dev: before.dev, ino: before.ino };
-            await writeFile(receiptPath, winner, "utf8");
-            const afterRewrite = await lstat(receiptPath);
-            afterIdentity = { dev: afterRewrite.dev, ino: afterRewrite.ino };
-          },
-        }),
-        (error) => error instanceof SddError
-          && ["CONCURRENT_CHANGE", "MUTATION_RECOVERY_FAILED"].includes(error.code),
-      );
-
-      assert.deepEqual(afterIdentity, beforeIdentity);
-      assert.equal(await readFile(receiptPath, "utf8"), winner);
-      assert.equal(await pathExists(activePath), false);
-      assert.equal(await readFile(join(closedPath, "tasks.md"), "utf8"), tasksSource);
-    });
-  }
-});
-
-async function interruptTransitionProcess(root, changeId, phase) {
-  const transitionModule = pathToFileURL(
-    join(PACKAGE_ROOT, "src", "commands", "change-transition.js"),
-  ).href;
-  const source = `
-    import { transitionChange } from ${JSON.stringify(transitionModule)};
-    await transitionChange(
-      ${JSON.stringify(root)},
-      "sample",
-      ${JSON.stringify(changeId)},
-      {
-        from: "in_progress",
-        to: "in_review",
-        afterTransitionTransactionPhase: ({ phase: currentPhase }) => {
-          if (currentPhase === ${JSON.stringify(phase)}) process.exit(87);
-        },
-        beforeCommit: () => {
-          if (${JSON.stringify(phase)}.startsWith("rollback-")) {
-            throw new Error("force rolled-back receipt cleanup");
-          }
-        },
-        beforeTransitionTransactionPublish: () => {
-          if (${JSON.stringify(phase)} === "journal-staged") process.exit(87);
-        },
-        afterTransitionReceiptStageCleanup: () => {
-          if (${JSON.stringify(phase)} === "receipt-stage-cleaned") process.exit(87);
-        },
-        afterTransitionReceiptCleanup: ({ kind }) => {
-          if (${JSON.stringify(phase)} === \`rollback-\${kind}-cleaned\`) process.exit(87);
-        },
-      },
-    );
-  `;
-  await assert.rejects(
-    execFileAsync(process.execPath, ["--input-type=module", "--eval", source]),
-    (error) => error.code === 87,
-  );
-}
 
 test("change transition updates an active Change with compare-and-set semantics", async (t) => {
   const root = await createMappedWorkspace();
@@ -5610,8 +4016,8 @@ test("change transition updates an active Change with compare-and-set semantics"
   await initWorkspace(root);
   const changeId = "2026-07-15-design-revision";
   await writeChange(root, "sample-web", changeId, "in_review");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-  await chmod(tasksPath, 0o640);
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
+  await chmod(changeFilePath, 0o640);
 
   const result = await transitionChange(root, "sample", changeId, {
     repositories: ["sample-web"],
@@ -5620,220 +4026,12 @@ test("change transition updates an active Change with compare-and-set semantics"
   });
 
   assert.equal(result.command, "change-transition");
-  assert.equal(result.tasksPath, `.sdd/changes/${changeId}/tasks.md`);
+  assert.equal(result.changeFilePath, `.sdd/changes/${changeId}/change.md`);
   assert.match(
-    await readFile(join(root, result.tasksPath), "utf8"),
+    await readFile(join(root, result.changeFilePath), "utf8"),
     /^status: in_progress$/m,
   );
-  assert.equal((await lstat(tasksPath)).mode & 0o777, 0o640);
-});
-
-test("change transition rollback restores the original tasks mode", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-transition-mode-rollback";
-  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-  await chmod(tasksPath, 0o604);
-  const originalTasks = await readFile(tasksPath, "utf8");
-
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web"],
-      from: "in_progress",
-      to: "in_review",
-      afterBackup: () => {
-        throw new Error("injected transition mode failure");
-      },
-    }),
-    /injected transition mode failure/,
-  );
-
-  assert.equal(await readFile(tasksPath, "utf8"), originalTasks);
-  assert.equal((await lstat(tasksPath)).mode & 0o777, 0o604);
-});
-
-test("change transition recovers after process death at every durable phase", async (t) => {
-  for (const phase of ["prepared", "backed-up", "source-retired", "published", "complete"]) {
-    await t.test(phase, async (t) => {
-      const root = await createMappedWorkspace();
-      t.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const changeId = `2026-07-15-transition-crash-${phase}`;
-      await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-      const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-
-      await interruptTransitionProcess(root, changeId, phase);
-      const diagnosis = await diagnoseWorkspace(root);
-      assert.ok(diagnosis.findings.some((finding) =>
-        finding.code === "CHANGE_TRANSITION_RECOVERY_REQUIRED"
-        && finding.message.includes(changeId)));
-      const result = await transitionChange(root, "sample", changeId, {
-        repositories: ["sample-web"],
-        from: "in_progress",
-        to: "in_review",
-      });
-
-      assert.equal(result.command, "change-transition");
-      assert.match(await readFile(tasksPath, "utf8"), /^status: in_review$/m);
-      assert.equal(
-        (await readdir(getChangesRoot(root)))
-          .some((entry) => entry.includes("sdd-transition")),
-        false,
-      );
-      assert.equal(
-        (await readdir(dirname(tasksPath)))
-          .some((entry) => entry.includes(".sdd-transition")
-            || entry.includes(".sdd-backup")),
-        false,
-      );
-    });
-  }
-});
-
-test("change transition retries prepublication cleanup after process death between receipt removals", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-transition-receipt-cleanup-crash";
-  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-  const originalTasks = await readFile(tasksPath, "utf8");
-
-  await interruptTransitionProcess(root, changeId, "journal-staged");
-  let receiptNames = await readdir(getChangesRoot(root));
-  assert.equal(
-    receiptNames.some((name) => name.includes(`${changeId}.sdd-transition-journal-stage-`)),
-    true,
-  );
-  assert.equal(
-    receiptNames.some((name) => name.includes(`${changeId}.sdd-transition-proof-`)),
-    true,
-  );
-
-  await interruptTransitionProcess(root, changeId, "receipt-stage-cleaned");
-  receiptNames = await readdir(getChangesRoot(root));
-  assert.equal(
-    receiptNames.some((name) => name.includes(`${changeId}.sdd-transition-journal-stage-`)),
-    false,
-  );
-  assert.equal(
-    receiptNames.some((name) => name.includes(`${changeId}.sdd-transition-proof-`)),
-    true,
-  );
-  assert.equal(await readFile(tasksPath, "utf8"), originalTasks);
-
-  const result = await transitionChange(root, "sample", changeId, {
-    repositories: ["sample-web"],
-    from: "in_progress",
-    to: "in_review",
-  });
-
-  assert.equal(result.command, "change-transition");
-  assert.match(await readFile(tasksPath, "utf8"), /^status: in_review$/m);
-  assert.equal(
-    (await readdir(getChangesRoot(root)))
-      .some((name) => name.includes(`${changeId}.sdd-transition-`)),
-    false,
-  );
-});
-
-test("change transition retries rolled-back receipt cleanup after every removal", async (t) => {
-  for (const cleanupKind of ["visible", "staged", "proof"]) {
-    await t.test(cleanupKind, async (t) => {
-      const root = await createMappedWorkspace();
-      t.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const changeId = `2026-07-15-transition-rollback-cleanup-${cleanupKind}`;
-      await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-      const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-      const originalTasks = await readFile(tasksPath, "utf8");
-
-      await interruptTransitionProcess(root, changeId, `rollback-${cleanupKind}-cleaned`);
-      const receiptNames = await readdir(getChangesRoot(root));
-      assert.equal(
-        receiptNames.includes(`.${changeId}.sdd-transition-journal.jsonl`),
-        false,
-      );
-      assert.equal(
-        receiptNames.some((name) => name.includes(`${changeId}.sdd-transition-journal-stage-`)),
-        cleanupKind === "visible",
-      );
-      assert.equal(
-        receiptNames.some((name) => name.includes(`${changeId}.sdd-transition-proof-`)),
-        cleanupKind !== "proof",
-      );
-      assert.equal(await readFile(tasksPath, "utf8"), originalTasks);
-
-      const result = await transitionChange(root, "sample", changeId, {
-        repositories: ["sample-web"],
-        from: "in_progress",
-        to: "in_review",
-      });
-
-      assert.equal(result.command, "change-transition");
-      assert.match(await readFile(tasksPath, "utf8"), /^status: in_review$/m);
-      assert.equal(
-        (await readdir(getChangesRoot(root)))
-          .some((name) => name.includes(`${changeId}.sdd-transition-`)),
-        false,
-      );
-    });
-  }
-});
-
-test("status recovers a published transition after process death", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-transition-status-recovery";
-  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-
-  await interruptTransitionProcess(root, changeId, "published");
-  const result = await getStatus(root, "sample");
-
-  assert.equal(result.command, "status");
-  assert.match(await readFile(tasksPath, "utf8"), /^status: in_review$/m);
-  assert.equal(
-    (await readdir(getChangesRoot(root)))
-      .some((entry) => entry.includes("sdd-transition")),
-    false,
-  );
-});
-
-test("change transition removes only its publication when closed history wins after publish", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-transition-closed-after-publish";
-  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const activeTasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-  const closedPath = join(root, ".sdd", "changes", "closed", changeId);
-  const closedTasks = "---\nstatus: in_review\nspace: sample\nrepositories:\n  - sample-web\n---\n# Tasks: closed winner after publish\n";
-
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web"],
-      from: "in_progress",
-      to: "in_review",
-      afterTransitionTransactionPhase: async ({ phase }) => {
-        if (phase !== "published") return;
-        await mkdir(closedPath, { recursive: true });
-        await writeFile(join(closedPath, "tasks.md"), closedTasks, "utf8");
-      },
-    }),
-    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-  );
-
-  assert.equal(await pathExists(activeTasksPath), false);
-  assert.equal(await readFile(join(closedPath, "tasks.md"), "utf8"), closedTasks);
-  assert.equal(
-    (await readdir(getChangesRoot(root)))
-      .some((entry) => entry.includes(`${changeId}.sdd-transition`)),
-    true,
-  );
+  assert.equal((await lstat(changeFilePath)).mode & 0o777, 0o640);
 });
 
 test("change transition rejects an active Change through an external symlink ancestor", async (t) => {
@@ -5846,8 +4044,8 @@ test("change transition rejects an active Change through an external symlink anc
   await symlink(external, join(root, ".sdd", "changes"));
   const changeId = "2026-07-15-external-transition";
   await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const tasksPath = join(external, changeId, "tasks.md");
-  const before = await readFile(tasksPath, "utf8");
+  const changeFilePath = join(external, changeId, "change.md");
+  const before = await readFile(changeFilePath, "utf8");
 
   await assert.rejects(
     () => transitionChange(root, "sample", changeId, {
@@ -5857,7 +4055,7 @@ test("change transition rejects an active Change through an external symlink anc
     }),
     (error) => error instanceof SddError && error.code === "UNSAFE_ARTIFACT_PATH",
   );
-  assert.equal(await readFile(tasksPath, "utf8"), before);
+  assert.equal(await readFile(changeFilePath, "utf8"), before);
 });
 
 test("an explicit workspace override ignores a nested unrelated workspace configuration", async (t) => {
@@ -5891,578 +4089,6 @@ test("an explicit workspace override ignores a nested unrelated workspace config
   );
   assert.equal(await readFile(tasksPath, "utf8"), before);
 });
-
-test("change transition preserves and can retry a concurrent pre-backup tasks edit", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-concurrent-transition";
-  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-  const latestTasks = "---\nstatus: in_progress\nspace: sample\nrepositories:\n  - sample-web\n---\n# Tasks: concurrent latest edit\n";
-
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web"],
-      from: "in_progress",
-      to: "in_review",
-      beforeCommit: () => writeFile(tasksPath, latestTasks, "utf8"),
-    }),
-    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-  );
-  assert.equal(await readFile(tasksPath, "utf8"), latestTasks);
-
-  const retry = await transitionChange(root, "sample", changeId, {
-    repositories: ["sample-web"],
-    from: "in_progress",
-    to: "in_review",
-  });
-  const retriedTasks = await readFile(tasksPath, "utf8");
-  assert.equal(retry.command, "change-transition");
-  assert.match(retriedTasks, /^status: in_review$/m);
-  assert.match(retriedTasks, /# Tasks: concurrent latest edit/);
-});
-
-test("change transition rejects an identical-byte pre-backup inode replacement", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-identical-inode-transition-race";
-  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-  const displacedPath = `${tasksPath}.displaced`;
-  const originalTasks = await readFile(tasksPath, "utf8");
-
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web"],
-      from: "in_progress",
-      to: "in_review",
-      beforeCommit: async () => {
-        await rename(tasksPath, displacedPath);
-        await writeFile(tasksPath, originalTasks, "utf8");
-      },
-    }),
-    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-  );
-  assert.equal(await readFile(tasksPath, "utf8"), originalTasks);
-  assert.equal(await readFile(displacedPath, "utf8"), originalTasks);
-  assert.notEqual((await lstat(tasksPath)).ino, (await lstat(displacedPath)).ino);
-
-  await transitionChange(root, "sample", changeId, {
-    repositories: ["sample-web"],
-    from: "in_progress",
-    to: "in_review",
-  });
-  assert.match(await readFile(tasksPath, "utf8"), /^status: in_review$/m);
-});
-
-test("change transition classifies a pre-backup tasks disappearance as concurrent", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-pre-backup-disappearance";
-  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-  const concurrentPath = `${tasksPath}.concurrent-move`;
-  const originalTasks = await readFile(tasksPath, "utf8");
-
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web"],
-      from: "in_progress",
-      to: "in_review",
-      beforeCommit: () => rename(tasksPath, concurrentPath),
-    }),
-    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-  );
-
-  assert.equal(await pathExists(tasksPath), false);
-  assert.equal(await readFile(concurrentPath, "utf8"), originalTasks);
-});
-
-test("change transition preserves an opaque preexisting backup destination", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-backup-destination-race";
-  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-  const originalTasks = await readFile(tasksPath, "utf8");
-  const backupWinner = "opaque concurrent backup content\n";
-  let plantedBackupPath;
-
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web"],
-      from: "in_progress",
-      to: "in_review",
-      beforeCommit: ({ backupPath }) => {
-        plantedBackupPath = backupPath;
-        return writeFile(backupPath, backupWinner, "utf8");
-      },
-    }),
-    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-  );
-
-  assert.equal(await readFile(tasksPath, "utf8"), originalTasks);
-  assert.equal(await readFile(plantedBackupPath, "utf8"), backupWinner);
-
-  await transitionChange(root, "sample", changeId, {
-    repositories: ["sample-web"],
-    from: "in_progress",
-    to: "in_review",
-  });
-  assert.match(await readFile(tasksPath, "utf8"), /^status: in_review$/m);
-  assert.equal(await readFile(plantedBackupPath, "utf8"), backupWinner);
-});
-
-test("change transition never publishes a staging path swapped to a symlink", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-staging-symlink-race";
-  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-  const originalTasks = await readFile(tasksPath, "utf8");
-  const externalPath = join(root, "concurrent-transition-staging");
-  const concurrentSource = "concurrent staging content\n";
-  await writeFile(externalPath, concurrentSource, "utf8");
-  let temporaryPath;
-  let ownedRetainedPath;
-
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web"],
-      from: "in_progress",
-      to: "in_review",
-      afterTemporaryWrite: async ({ temporaryPath: path }) => {
-        temporaryPath = path;
-        ownedRetainedPath = `${path}.owned-by-transition`;
-        await rename(path, ownedRetainedPath);
-        await symlink(externalPath, path, "file");
-      },
-    }),
-    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-  );
-
-  assert.equal((await lstat(temporaryPath)).isSymbolicLink(), true);
-  assert.equal(await readFile(temporaryPath, "utf8"), concurrentSource);
-  assert.match(await readFile(ownedRetainedPath, "utf8"), /^status: in_review$/m);
-  assert.equal(await readFile(tasksPath, "utf8"), originalTasks);
-});
-
-test("change transition preserves a tasks edit published after backup and remains retryable", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-post-backup-transition-race";
-  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-  const originalTasks = await readFile(tasksPath, "utf8");
-  const latestTasks = "---\nstatus: in_progress\nspace: sample\nrepositories:\n  - sample-web\n---\n# Tasks: published after backup\n";
-  let retainedBackupPath;
-
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web"],
-      from: "in_progress",
-      to: "in_review",
-      afterBackup: async ({ backupPath }) => {
-        retainedBackupPath = backupPath;
-        assert.equal(await readFile(backupPath, "utf8"), originalTasks);
-        await writeFile(tasksPath, latestTasks, "utf8");
-      },
-    }),
-    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-  );
-  assert.equal(await readFile(tasksPath, "utf8"), latestTasks);
-  assert.equal(await readFile(retainedBackupPath, "utf8"), originalTasks);
-
-  const retry = await transitionChange(root, "sample", changeId, {
-    repositories: ["sample-web"],
-    from: "in_progress",
-    to: "in_review",
-  });
-  const retriedTasks = await readFile(tasksPath, "utf8");
-  assert.equal(retry.command, "change-transition");
-  assert.match(retriedTasks, /^status: in_review$/m);
-  assert.match(retriedTasks, /# Tasks: published after backup/);
-  assert.equal(await readFile(retainedBackupPath, "utf8"), originalTasks);
-  const retainedBackups = (await readdir(dirname(tasksPath)))
-    .filter((entry) => entry.startsWith(".tasks.md.sdd-backup-"));
-  assert.deepEqual(
-    retainedBackups.map((entry) => join(dirname(tasksPath), entry)),
-    [retainedBackupPath],
-  );
-});
-
-test("change transition rejects a closed-location collision created after backup", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-post-backup-closed-race";
-  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-  const originalTasks = await readFile(tasksPath, "utf8");
-  const closedPath = join(root, ".sdd", "changes", "closed", changeId);
-  const closedTasks = "---\nstatus: in_review\nspace: sample\nrepositories:\n  - sample-web\n---\n# Tasks: concurrently closed\n";
-  let retainedBackupPath;
-
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web"],
-      from: "in_progress",
-      to: "in_review",
-      afterBackup: async ({ backupPath }) => {
-        retainedBackupPath = backupPath;
-        await mkdir(closedPath, { recursive: true });
-        await writeFile(join(closedPath, "tasks.md"), closedTasks, "utf8");
-      },
-    }),
-    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-  );
-
-  assert.equal(await pathExists(tasksPath), false);
-  assert.equal(await readFile(retainedBackupPath, "utf8"), originalTasks);
-  assert.equal(await readFile(join(closedPath, "tasks.md"), "utf8"), closedTasks);
-  assert.equal(
-    (await readdir(getChangesRoot(root)))
-      .some((entry) => entry.includes(`${changeId}.sdd-transition`)),
-    true,
-  );
-});
-
-test("change transition reports incomplete recovery when its backup is replaced", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-post-backup-recovery-race";
-  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-  const originalTasks = await readFile(tasksPath, "utf8");
-  const opaqueBackup = "opaque replacement backup\n";
-  let backupPath;
-  let retainedOriginalPath;
-
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web"],
-      from: "in_progress",
-      to: "in_review",
-      afterBackup: async ({ backupPath: path }) => {
-        backupPath = path;
-        retainedOriginalPath = `${path}.retained-original`;
-        await rename(path, retainedOriginalPath);
-        await writeFile(path, opaqueBackup, "utf8");
-        throw new Error("injected post-backup interruption");
-      },
-    }),
-    (error) =>
-      error instanceof SddError
-      && error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.includes("Original error: injected post-backup interruption")
-      && error.details.some((detail) => detail.includes(backupPath)),
-  );
-
-  assert.equal(await pathExists(tasksPath), false);
-  assert.equal(await readFile(backupPath, "utf8"), opaqueBackup);
-  assert.equal(await readFile(retainedOriginalPath, "utf8"), originalTasks);
-});
-
-test("change transition retains committed recovery when final tasks inspection fails", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-transition-final-inspection-error";
-  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-  let backupPath;
-
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web"],
-      from: "in_progress",
-      to: "in_review",
-      afterBackup: ({ backupPath: path }) => {
-        backupPath = path;
-      },
-      inspectFinalTasks: async () => {
-        throw Object.assign(new Error("injected tasks read failure"), { code: "EIO" });
-      },
-    }),
-    (error) =>
-      error instanceof SddError
-      && error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes("injected tasks read failure")),
-  );
-
-  assert.match(await readFile(tasksPath, "utf8"), /^status: in_review$/m);
-  assert.equal(await pathExists(backupPath), true);
-  assert.equal(
-    (await readdir(getChangesRoot(root)))
-      .some((name) => name.includes(`${changeId}.sdd-transition-journal`)),
-    true,
-  );
-
-  const retry = await transitionChange(root, "sample", changeId, {
-    repositories: ["sample-web"],
-    from: "in_progress",
-    to: "in_review",
-  });
-
-  assert.equal(retry.command, "change-transition");
-  assert.equal(await pathExists(backupPath), false);
-  assert.equal(
-    (await readdir(getChangesRoot(root)))
-      .some((name) => name.includes(`${changeId}.sdd-transition-`)),
-    false,
-  );
-});
-
-test("change transition cleanup never deletes a concurrently swapped file", async (t) => {
-  for (const cleanupKind of ["backup", "temporary"]) {
-    for (const cleanupPhase of [
-      "before-quarantine",
-      "before-source-remove",
-      "before-remove",
-    ]) {
-      const root = await createMappedWorkspace();
-      t.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const changeId = `2026-07-15-${cleanupKind}-${cleanupPhase}-race`;
-      await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-      const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-      const concurrentSource = `concurrent ${cleanupKind} ${cleanupPhase} content\n`;
-      let cleanupPath;
-      let ownedRetainedPath;
-
-      await assert.rejects(
-        () => transitionChange(root, "sample", changeId, {
-          repositories: ["sample-web"],
-          from: "in_progress",
-          to: "in_review",
-          beforeCleanup: async ({ kind, phase, path }) => {
-            if (kind !== cleanupKind || phase !== cleanupPhase) return;
-            cleanupPath = path;
-            ownedRetainedPath = `${path}.owned-by-transition`;
-            await rename(path, ownedRetainedPath);
-            await writeFile(path, concurrentSource, "utf8");
-          },
-        }),
-        (error) =>
-          error instanceof SddError
-          && error.code === "MUTATION_RECOVERY_FAILED"
-          && error.details.includes(`Concurrent content retained at ${cleanupPath}.`),
-      );
-
-      assert.equal(await readFile(cleanupPath, "utf8"), concurrentSource);
-      assert.equal(await pathExists(ownedRetainedPath), true);
-      assert.match(await readFile(tasksPath, "utf8"), /^status: in_review$/m);
-    }
-  }
-});
-
-test("change transition cleanup preserves an opaque quarantine destination", async (t) => {
-  for (const cleanupKind of ["backup", "temporary"]) {
-    const root = await createMappedWorkspace();
-    t.after(() => rm(root, { recursive: true, force: true }));
-    await initWorkspace(root);
-    const changeId = `2026-07-15-${cleanupKind}-quarantine-claim-race`;
-    await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-    const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-    const quarantineWinner = `opaque ${cleanupKind} quarantine content\n`;
-    let ownedCleanupPath;
-    let plantedQuarantinePath;
-
-    await assert.rejects(
-      () => transitionChange(root, "sample", changeId, {
-        repositories: ["sample-web"],
-        from: "in_progress",
-        to: "in_review",
-        beforeCleanup: async ({ kind, phase, path, quarantinePath }) => {
-          if (kind !== cleanupKind || phase !== "before-quarantine-claim") return;
-          ownedCleanupPath = path;
-          plantedQuarantinePath = quarantinePath;
-          await writeFile(quarantinePath, quarantineWinner, "utf8");
-        },
-      }),
-      (error) =>
-        error instanceof SddError
-        && error.code === "MUTATION_RECOVERY_FAILED"
-        && error.details.includes(`Concurrent content retained at ${plantedQuarantinePath}.`),
-    );
-
-    assert.equal(await pathExists(ownedCleanupPath), true);
-    assert.equal(await readFile(plantedQuarantinePath, "utf8"), quarantineWinner);
-    assert.match(await readFile(tasksPath, "utf8"), /^status: in_review$/m);
-  }
-});
-
-test("change transition preserves its primary collision when cleanup also races", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-primary-and-cleanup-race";
-  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-  const latestTasks = "---\nstatus: in_progress\nspace: sample\nrepositories:\n  - sample-web\n---\n# Tasks: primary winner\n";
-  const concurrentTemporary = "concurrent temporary cleanup content\n";
-  let cleanupPath;
-  let ownedRetainedPath;
-
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web"],
-      from: "in_progress",
-      to: "in_review",
-      afterBackup: () => writeFile(tasksPath, latestTasks, "utf8"),
-      beforeCleanup: async ({ kind, path }) => {
-        if (kind !== "temporary") return;
-        cleanupPath = path;
-        ownedRetainedPath = `${path}.owned-by-transition`;
-        await rename(path, ownedRetainedPath);
-        await writeFile(path, concurrentTemporary, "utf8");
-      },
-    }),
-    (error) =>
-      error instanceof SddError
-      && error.code === "CONCURRENT_CHANGE"
-      && error.details.includes(
-        `Cleanup recovery: Concurrent content retained at ${cleanupPath}.`,
-      ),
-  );
-
-  assert.equal(await readFile(tasksPath, "utf8"), latestTasks);
-  assert.equal(await readFile(cleanupPath, "utf8"), concurrentTemporary);
-  assert.equal(await pathExists(ownedRetainedPath), true);
-});
-
-
-
-test("change transition dry-run reports without updating tasks", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-transition-preview";
-  await writeChange(root, "sample-web", changeId, "in_review");
-
-  const result = await transitionChange(root, "sample", changeId, {
-    repositories: ["sample-web"],
-    from: "in_review",
-    to: "in_progress",
-    dryRun: true,
-  });
-
-  assert.equal(result.dryRun, true);
-  assert.match(
-    await readFile(join(root, ".sdd", "changes", changeId, "tasks.md"), "utf8"),
-    /^status: in_review$/m,
-  );
-});
-
-test("change transition ignores an unrelated mapped repository without portable identity", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  await rm(join(root, "code", "sample-web", ".sdd"), { recursive: true });
-
-  const healthyChangeId = "2026-07-15-transition-healthy-target";
-  await writeChange(root, "sample-mobile", healthyChangeId, "in_progress");
-  const result = await transitionChange(root, "sample", healthyChangeId, {
-    from: "in_progress",
-    to: "in_review",
-  });
-
-  assert.deepEqual(result.repositories.map((repository) => repository.id), ["sample-mobile"]);
-  assert.match(
-    await readFile(join(root, ".sdd", "changes", healthyChangeId, "tasks.md"), "utf8"),
-    /^status: in_review$/m,
-  );
-
-  const unresolvedChangeId = "2026-07-15-transition-unresolved-target";
-  await writeChange(root, "sample-web", unresolvedChangeId, "in_progress");
-  await assert.rejects(
-    () => transitionChange(root, "sample", unresolvedChangeId, {
-      from: "in_progress",
-      to: "in_review",
-    }),
-    (error) => error instanceof SddError
-      && error.code === "REPOSITORY_ID_REQUIRED"
-      && error.details.includes("code/sample-web: REPOSITORY_ID_REQUIRED"),
-  );
-  assert.match(
-    await readFile(join(root, ".sdd", "changes", unresolvedChangeId, "tasks.md"), "utf8"),
-    /^status: in_progress$/m,
-  );
-});
-
-test("change transition reports unknown and duplicate target identities deterministically", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-
-  const unknownChangeId = "2026-07-15-transition-unknown-target";
-  await writeChange(root, "missing-repository", unknownChangeId, "in_progress");
-  await assert.rejects(
-    () => transitionChange(root, "sample", unknownChangeId, {
-      from: "in_progress",
-      to: "in_review",
-    }),
-    (error) => error instanceof SddError
-      && error.code === "REPOSITORY_NOT_FOUND"
-      && error.details.includes("Available repository: sample-web (code/sample-web)")
-      && error.details.includes("Available repository: sample-mobile (code/sample-mobile)"),
-  );
-
-  await writeRepositoryConfig(
-    join(root, "code", "sample-web"),
-    createRepositoryConfig("shared-app"),
-  );
-  await writeRepositoryConfig(
-    join(root, "code", "sample-mobile"),
-    createRepositoryConfig("shared-app"),
-  );
-  const duplicateChangeId = "2026-07-15-transition-duplicate-target";
-  await writeChange(root, "shared-app", duplicateChangeId, "in_progress");
-  await assert.rejects(
-    () => transitionChange(root, "sample", duplicateChangeId, {
-      from: "in_progress",
-      to: "in_review",
-    }),
-    (error) => error instanceof SddError
-      && error.code === "REPOSITORY_ID_COLLISION"
-      && error.message === "Repository ID shared-app is claimed by multiple mapped repositories."
-      && error.details[0] === "code/sample-web"
-      && error.details[1] === "code/sample-mobile",
-  );
-});
-
-test("change transition rejects stale or invalid lifecycle requests", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-transition-guard";
-  await writeChange(root, "sample-web", changeId, "in_progress");
-
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web"],
-      from: "in_review",
-      to: "in_progress",
-    }),
-    (error) => error instanceof SddError && error.code === "CHANGE_STATUS_MISMATCH",
-  );
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web"],
-      from: "in_progress",
-      to: "planned",
-    }),
-    (error) => error instanceof SddError && error.code === "INVALID_CHANGE_TRANSITION",
-  );
-});
-
 
 test("CLI exposes change transition with JSON output", async (t) => {
   const root = await createMappedWorkspace();
@@ -6702,16 +4328,16 @@ test("validate scopes equal repository IDs by owning Space", async (t) => {
     (await readFile(otherTasksPath, "utf8")).replace("space: sample", "space: other"),
     "utf8",
   );
-  const sampleProposalPath = join(root, ".sdd", "changes", sampleChangeId, "proposal.md");
-  const otherProposalPath = join(root, ".sdd", "changes", otherChangeId, "proposal.md");
+  const sampleChangeFilePath = join(root, ".sdd", "changes", sampleChangeId, "change.md");
+  const otherChangeFilePath = join(root, ".sdd", "changes", otherChangeId, "change.md");
   await writeFile(
-    sampleProposalPath,
-    `${await readFile(sampleProposalPath, "utf8")}\n## Epic Actions\n\n### New Epic Directories\n\n- Create \`docs/epics/sample-e001-projected/epic.md\`.\n`,
+    sampleChangeFilePath,
+    `${await readFile(sampleChangeFilePath, "utf8")}\n## Epic Actions\n\n### New Epic Directories\n\n- Create \`docs/epics/sample-e001-projected/epic.md\`.\n`,
     "utf8",
   );
   await writeFile(
-    otherProposalPath,
-    `${await readFile(otherProposalPath, "utf8")}\n## Epic Actions\n\n### New Epic Directories\n\n- Create \`docs/epics/other-e001-projected/epic.md\`.\n`,
+    otherChangeFilePath,
+    `${await readFile(otherChangeFilePath, "utf8")}\n## Epic Actions\n\n### New Epic Directories\n\n- Create \`docs/epics/other-e001-projected/epic.md\`.\n`,
     "utf8",
   );
 
@@ -6786,10 +4412,10 @@ test("validate rejects absent and cross-Space Change repository IDs deterministi
 
   const changeId = "2026-08-07-invalid-repository-ownership";
   await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
   await writeFile(
-    tasksPath,
-    (await readFile(tasksPath, "utf8")).replace(
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace(
       "  - sample-web",
       "  - other-web\n  - missing-repository",
     ),
@@ -6817,13 +4443,13 @@ test("validate rejects absent and cross-Space Change repository IDs deterministi
       {
         repositoryId: "missing-repository",
         spaceId: "sample",
-        path: `.sdd/changes/${changeId}/tasks.md`,
+        path: `.sdd/changes/${changeId}/change.md`,
         message: "Change references repository ID missing-repository, which is not owned by Space sample.",
       },
       {
         repositoryId: "other-web",
         spaceId: "sample",
-        path: `.sdd/changes/${changeId}/tasks.md`,
+        path: `.sdd/changes/${changeId}/change.md`,
         message: "Change references repository ID other-web, which is not owned by Space sample.",
       },
     ],
@@ -6836,10 +4462,10 @@ test("validate rejects a central Change owned by an unknown Space", async (t) =>
   await initWorkspace(root);
   const changeId = "2026-08-07-unknown-space";
   await writeCanonicalChange(root, "sample-web", changeId, "proposed");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
   await writeFile(
-    tasksPath,
-    (await readFile(tasksPath, "utf8")).replace(
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace(
       "space: sample\nrepositories:\n  - sample-web",
       "space: deleted-space\nrepositories: []",
     ),
@@ -6859,7 +4485,7 @@ test("validate rejects a central Change owned by an unknown Space", async (t) =>
       })),
     [{
       spaceId: "deleted-space",
-      path: `.sdd/changes/${changeId}/tasks.md`,
+      path: `.sdd/changes/${changeId}/change.md`,
       message: "Change references unknown Space ID deleted-space.",
     }],
   );
@@ -6873,10 +4499,10 @@ test("change-scoped validation includes Epic paths declared by the Change", asyn
   await writeCanonicalChange(root, "sample-web", changeId, "in_review");
   const epicPath = await writeCanonicalEpic(root, "sample-web");
   const changePath = join(root, ".sdd", "changes", changeId);
-  const proposalPath = join(changePath, "proposal.md");
+  const changeFilePath = join(changePath, "change.md");
   await writeFile(
-    proposalPath,
-    `${await readFile(proposalPath, "utf8")}\n## Epic Actions\n\n### Existing Epic Directory Updates\n\n- Revise \`docs/epics/sample-e001-core/epic.md\`.\n`,
+    changeFilePath,
+    `${await readFile(changeFilePath, "utf8")}\n## Epic Actions\n\n### Existing Epic Directory Updates\n\n- Revise \`docs/epics/sample-e001-core/epic.md\`.\n`,
     "utf8",
   );
   await writeFile(
@@ -6904,10 +4530,10 @@ test("change-scoped validation reports a declared Epic path that does not exist"
   await initWorkspace(root);
   const changeId = "2026-07-14-missing-affected-epic";
   await writeCanonicalChange(root, "sample-web", changeId, "in_review");
-  const proposalPath = join(root, ".sdd", "changes", changeId, "proposal.md");
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
   await writeFile(
-    proposalPath,
-    `${await readFile(proposalPath, "utf8")}\n## Epic Actions\n\n### New Epic Directories\n\n- Create \`docs/epics/sample-e002-missing/epic.md\`.\n`,
+    changeFilePath,
+    `${await readFile(changeFilePath, "utf8")}\n## Epic Actions\n\n### New Epic Directories\n\n- Create \`docs/epics/sample-e002-missing/epic.md\`.\n`,
     "utf8",
   );
 
@@ -6930,20 +4556,19 @@ test("change-scoped Epic IDs resolve once across all declared repositories", asy
   await initWorkspace(root);
   const changeId = "2026-08-09-cross-repository-affected-epic";
   await writeCanonicalChange(root, "sample-web", changeId, "in_review");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
   await writeFile(
-    tasksPath,
-    (await readFile(tasksPath, "utf8")).replace(
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace(
       "  - sample-web",
       "  - sample-web\n  - sample-mobile",
     ),
     "utf8",
   );
   await writeCanonicalEpic(root, "sample-web");
-  const proposalPath = join(root, ".sdd", "changes", changeId, "proposal.md");
   await writeFile(
-    proposalPath,
-    `${await readFile(proposalPath, "utf8")}\n## Epic Actions\n\n### Existing Epic Directory Updates\n\n- Revise \`SAMPLE-E001\`.\n`,
+    changeFilePath,
+    `${await readFile(changeFilePath, "utf8")}\n## Epic Actions\n\n### Existing Epic Directory Updates\n\n- Revise \`SAMPLE-E001\`.\n`,
     "utf8",
   );
 
@@ -6962,19 +4587,18 @@ test("change-scoped Epic paths report one missing finding across all declared re
   await initWorkspace(root);
   const changeId = "2026-08-09-cross-repository-missing-epic";
   await writeCanonicalChange(root, "sample-web", changeId, "in_review");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
   await writeFile(
-    tasksPath,
-    (await readFile(tasksPath, "utf8")).replace(
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace(
       "  - sample-web",
       "  - sample-web\n  - sample-mobile",
     ),
     "utf8",
   );
-  const proposalPath = join(root, ".sdd", "changes", changeId, "proposal.md");
   await writeFile(
-    proposalPath,
-    `${await readFile(proposalPath, "utf8")}\n## Epic Actions\n\n### Existing Epic Directory Updates\n\n- Revise \`docs/epics/sample-e001-core/epic.md\`.\n`,
+    changeFilePath,
+    `${await readFile(changeFilePath, "utf8")}\n## Epic Actions\n\n### Existing Epic Directory Updates\n\n- Revise \`docs/epics/sample-e001-core/epic.md\`.\n`,
     "utf8",
   );
 
@@ -6994,10 +4618,10 @@ test("change-scoped Epic paths reject ambiguous matches across declared reposito
   await initWorkspace(root);
   const changeId = "2026-08-09-cross-repository-ambiguous-epic";
   await writeCanonicalChange(root, "sample-web", changeId, "in_review");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
   await writeFile(
-    tasksPath,
-    (await readFile(tasksPath, "utf8")).replace(
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace(
       "  - sample-web",
       "  - sample-web\n  - sample-mobile",
     ),
@@ -7005,10 +4629,9 @@ test("change-scoped Epic paths reject ambiguous matches across declared reposito
   );
   await writeCanonicalEpic(root, "sample-web");
   await writeCanonicalEpic(root, "sample-mobile");
-  const proposalPath = join(root, ".sdd", "changes", changeId, "proposal.md");
   await writeFile(
-    proposalPath,
-    `${await readFile(proposalPath, "utf8")}\n## Epic Actions\n\n### Existing Epic Directory Updates\n\n- Revise \`docs/epics/sample-e001-core/epic.md\`.\n`,
+    changeFilePath,
+    `${await readFile(changeFilePath, "utf8")}\n## Epic Actions\n\n### Existing Epic Directory Updates\n\n- Revise \`docs/epics/sample-e001-core/epic.md\`.\n`,
     "utf8",
   );
 
@@ -7033,9 +4656,15 @@ test("validate accepts the documented lightweight interactive Change shape", asy
   const changePath = join(root, ".sdd", "changes", changeId);
   await mkdir(changePath, { recursive: true });
   await writeFile(
-    join(changePath, "proposal.md"),
+    join(changePath, "change.md"),
     [
-      "# Proposal: Interactive Shape",
+      "---",
+      "status: in_progress",
+      "space: sample",
+      "repositories:",
+      "  - sample-web",
+      "---",
+      "# Change: Interactive Shape",
       "## Why",
       "## Interactive Scope Boundary",
       "## Epic / Story Impact",
@@ -7059,12 +4688,6 @@ test("validate accepts the documented lightweight interactive Change shape", asy
   await writeFile(
     join(changePath, "tasks.md"),
     [
-      "---",
-      "status: in_progress",
-      "space: sample",
-      "repositories:",
-      "  - sample-web",
-      "---",
       "# Tasks: Interactive Shape",
       "## Resume Here",
       "## Interactive Log",
@@ -7095,10 +4718,10 @@ test("validate warns instead of failing on historical closed-Change section drif
   await initWorkspace(root);
   const changeId = "2026-07-14-historical-shape";
   await writeCanonicalChange(root, "sample-web", changeId, "ready_to_close", { closed: true });
-  const proposalPath = join(root, ".sdd", "changes", "closed", changeId, "proposal.md");
+  const changeFilePath = join(root, ".sdd", "changes", "closed", changeId, "change.md");
   await writeFile(
-    proposalPath,
-    (await readFile(proposalPath, "utf8")).replace("## Open Questions", "## Historical Questions"),
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace("## Open Questions", "## Historical Questions"),
     "utf8",
   );
 
@@ -7146,24 +4769,6 @@ test("validate discovers a private planned Change", async (t) => {
   assert.equal(result.summary.changes, 1);
   assert.ok(result.findings.some((finding) => finding.code === "UNRESOLVED_TEMPLATE_PLACEHOLDER"));
   assert.ok(!result.findings.some((finding) => finding.code === "ARTIFACT_NOT_FOUND"));
-});
-
-test("validate ignores undated Change Brief files", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const plannedRoot = join(root, "ideas", "sample", "planned-changes");
-  await mkdir(plannedRoot, { recursive: true });
-  await writeFile(
-    join(plannedRoot, "future-outcome.md"),
-    "---\ntype: change-brief\ncreated: 2026-07-14\nmodified: 2026-07-14\n---\n# Change Brief: Future Outcome\n",
-    "utf8",
-  );
-
-  const result = await validateArtifacts(root, { spaceId: "sample" });
-
-  assert.equal(result.valid, true);
-  assert.equal(result.summary.changes, 0);
 });
 
 test("validate reports an active and closed Change collision", async (t) => {
@@ -8723,10 +6328,10 @@ test("validate reports unresolved scaffolding in an active Change", async (t) =>
   await initWorkspace(root);
   const changeId = "2026-07-14-unresolved-placeholder";
   await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const proposalPath = join(root, ".sdd", "changes", changeId, "proposal.md");
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
   await writeFile(
-    proposalPath,
-    `${await readFile(proposalPath, "utf8")}\n## Deferred Detail\n\nCHANGE TITLE\n`,
+    changeFilePath,
+    `${await readFile(changeFilePath, "utf8")}\n## Deferred Detail\n\nCHANGE TITLE\n`,
     "utf8",
   );
 
@@ -8739,7 +6344,7 @@ test("validate reports unresolved scaffolding in an active Change", async (t) =>
   assert.equal(result.valid, false);
   assert.ok(result.findings.some((finding) =>
     finding.code === "UNRESOLVED_TEMPLATE_PLACEHOLDER"
-    && finding.path.endsWith("proposal.md")));
+    && finding.path.endsWith("change.md")));
 });
 
 
@@ -8749,11 +6354,11 @@ test("validate accepts every active central Change status", async (t) => {
   await initWorkspace(root);
   const changeId = "2026-07-14-active-statuses";
   await writeCanonicalChange(root, "sample-web", changeId, "proposed");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
 
   for (const status of ["proposed", "planned", "in_progress", "in_review"]) {
-    const source = await readFile(tasksPath, "utf8");
-    await writeFile(tasksPath, source.replace(/^status: \S+$/m, `status: ${status}`), "utf8");
+    const source = await readFile(changeFilePath, "utf8");
+    await writeFile(changeFilePath, source.replace(/^status: \S+$/m, `status: ${status}`), "utf8");
     const result = await validateArtifacts(root, {
       spaceId: "sample",
       changeId,
@@ -9002,157 +6607,6 @@ test("CLI update keeps a positional target across explicit, environment, target,
   assert.equal(environmentResult.dryRun, true);
 });
 
-test("CLI update validates explicit legacy and current targets against authority before decoy cwd", async (t) => {
-  const root = await createWorkspace("sdd-update-legacy-target-routing-");
-  const decoyWorkspace = join(root, "decoy-workspace");
-  await populateMappedWorkspace(decoyWorkspace);
-  await initWorkspace(decoyWorkspace);
-  const decoyCwd = join(decoyWorkspace, "code", "sample-web");
-  const decoyConfigBefore = await readFile(getWorkspaceConfigPath(decoyWorkspace), "utf8");
-  const legacyArtifacts = {
-    activeChanges: "docs/changes",
-    closedChanges: "docs/changes/closed",
-    epics: "docs/epics",
-    adrs: "docs/adrs",
-    audits: "docs/audits",
-  };
-  const cases = [
-    { label: "v1", version: 1 },
-    { label: "v2", version: 2 },
-    { label: "v3", version: 3 },
-  ];
-  t.after(() => rm(root, { recursive: true, force: true }));
-
-  for (const scenario of cases) {
-    const workspaceRoot = join(root, `${scenario.label}-workspace`);
-    const planningRoot = join(root, `${scenario.label}-planning`);
-    const repositoryCollection = join(root, `${scenario.label}-repositories`);
-    const repositoryRoot = join(repositoryCollection, "sample-web");
-    const unmappedTarget = join(root, `${scenario.label}-unmapped`);
-    await populateMappedWorkspace(workspaceRoot);
-    await initWorkspace(workspaceRoot);
-    await Promise.all([
-      mkdir(join(planningRoot, "sample"), { recursive: true }),
-      mkdir(repositoryRoot, { recursive: true }),
-      mkdir(unmappedTarget, { recursive: true }),
-    ]);
-    await writeRepositoryConfig(repositoryRoot, createRepositoryConfig("sample-web"));
-
-    const currentConfig = await readWorkspaceConfig(workspaceRoot);
-    let sourceConfig;
-    if (scenario.version === 1) {
-      sourceConfig = {
-        version: 1,
-        schema: "sdd-v1",
-        skills: { directory: ".agents/skills" },
-        planning: { root: planningRoot },
-        repositories: { roots: [repositoryCollection] },
-        repositoryArtifacts: legacyArtifacts,
-        ideas: {
-          sample: {
-            status: "active",
-            planning: join(planningRoot, "sample"),
-            repositories: [{
-              path: repositoryRoot,
-              role: "web",
-              status: "active",
-            }],
-          },
-        },
-      };
-    } else if (scenario.version === 2) {
-      sourceConfig = {
-        version: 2,
-        schema: "sdd-v2",
-        skills: { directory: ".agents/skills" },
-        planning: {
-          root: planningRoot,
-          plannedChangesDirectory: "planned-changes",
-        },
-        repositories: { roots: { code: repositoryCollection } },
-        repositoryArtifacts: legacyArtifacts,
-        ideas: {
-          sample: {
-            status: "active",
-            planningPath: join(planningRoot, "sample"),
-            repositories: [{
-              root: "code",
-              path: "sample-web",
-              role: "web",
-              status: "active",
-            }],
-          },
-        },
-      };
-    } else {
-      sourceConfig = currentConfig;
-      sourceConfig.planning.root = planningRoot;
-      sourceConfig.repositories.roots = { code: repositoryCollection };
-      sourceConfig.ideas.sample.planningPath = join(planningRoot, "sample");
-      sourceConfig.ideas.sample.repositories = [{
-        root: "code",
-        path: "sample-web",
-        role: "web",
-        status: "active",
-      }];
-    }
-    await writeFile(
-      getWorkspaceConfigPath(workspaceRoot),
-      `${JSON.stringify(sourceConfig, null, 2)}\n`,
-      "utf8",
-    );
-
-    for (const authority of ["explicit", "environment"]) {
-      const assertionLabel = `${scenario.label}-${authority}`;
-      const authorityArgs = authority === "explicit"
-        ? ["--workspace", workspaceRoot]
-        : [];
-      const env = {
-        ...process.env,
-        HOME: decoyWorkspace,
-        SDD_USER_HOME: decoyWorkspace,
-        SDD_WORKSPACE_ROOT: authority === "environment"
-          ? workspaceRoot
-          : decoyWorkspace,
-      };
-      const command = (target) => [
-        join(PACKAGE_ROOT, "bin", "sdd.js"),
-        "update",
-        target,
-        ...authorityArgs,
-        "--dry-run",
-        "--json",
-      ];
-      await assert.rejects(
-        execFileAsync(process.execPath, command(unmappedTarget), { cwd: decoyCwd, env }),
-        (error) => {
-          assert.equal(JSON.parse(error.stderr).error.code, "WORKSPACE_TARGET_UNMAPPED");
-          return true;
-        },
-        assertionLabel,
-      );
-      const { stdout } = await execFileAsync(
-        process.execPath,
-        command(repositoryRoot),
-        { cwd: decoyCwd, env },
-      );
-      const result = JSON.parse(stdout);
-      assert.equal(result.workspaceRoot, workspaceRoot, assertionLabel);
-      assert.equal(result.dryRun, true, assertionLabel);
-    }
-    assert.equal(
-      (await readWorkspaceConfig(workspaceRoot)).version,
-      scenario.version,
-      scenario.label,
-    );
-  }
-
-  assert.equal(
-    await readFile(getWorkspaceConfigPath(decoyWorkspace), "utf8"),
-    decoyConfigBefore,
-  );
-});
-
 test("CLI configure keeps its positional scan target under environment and explicit workspace authority", async (t) => {
   const root = await createWorkspace("sdd-configure-target-routing-");
   const workspaceRoot = join(root, "workspace");
@@ -9270,10 +6724,10 @@ test("explicit workspace routes repository-only CLI operations without borrowing
   authorityConfig.repositories.roots.standalone = repositoryRoot;
   await writeWorkspaceConfig(workspaceRoot, authorityConfig);
   await writeCanonicalChange(workspaceRoot, repositoryId, changeId, "in_review");
-  const tasksPath = join(workspaceRoot, ".sdd", "changes", changeId, "tasks.md");
+  const changeFilePath = join(workspaceRoot, ".sdd", "changes", changeId, "change.md");
   await writeFile(
-    tasksPath,
-    (await readFile(tasksPath, "utf8")).replace("space: sample", `space: ${repositoryId}`),
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace("space: sample", `space: ${repositoryId}`),
     "utf8",
   );
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -9381,10 +6835,10 @@ test("observational status falls back to workspace authority past an unrelated c
   await writeWorkspaceConfig(workspaceRoot, config);
   await symlink("looped-app", loopPath);
   await writeCanonicalChange(workspaceRoot, repositoryId, changeId, "in_review");
-  const tasksPath = join(workspaceRoot, ".sdd", "changes", changeId, "tasks.md");
+  const changeFilePath = join(workspaceRoot, ".sdd", "changes", changeId, "change.md");
   await writeFile(
-    tasksPath,
-    (await readFile(tasksPath, "utf8")).replace("space: sample", `space: ${repositoryId}`),
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace("space: sample", `space: ${repositoryId}`),
     "utf8",
   );
 
@@ -9539,10 +6993,10 @@ test("workspace-root inventory retains repository-only Change history without in
   );
 
   await writeCanonicalChange(workspaceRoot, repositoryId, changeId, "in_review");
-  const tasksPath = join(workspaceRoot, ".sdd", "changes", changeId, "tasks.md");
+  const changeFilePath = join(workspaceRoot, ".sdd", "changes", changeId, "change.md");
   await writeFile(
-    tasksPath,
-    (await readFile(tasksPath, "utf8")).replace("space: sample", `space: ${repositoryId}`),
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace("space: sample", `space: ${repositoryId}`),
     "utf8",
   );
 
@@ -10650,7 +8104,7 @@ function prepublicationCrashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "proposal.md", "tasks.md"],
+      expectedFiles: ["design.md", "change.md", "tasks.md"],
     };
   });
   const epicPoints = [
@@ -10702,7 +8156,7 @@ function crashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "proposal.md", "tasks.md"],
+      expectedFiles: ["design.md", "change.md", "tasks.md"],
     },
     {
       kind: "Change",
@@ -10713,7 +8167,7 @@ function crashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "proposal.md", "tasks.md"],
+      expectedFiles: ["design.md", "change.md", "tasks.md"],
     },
     {
       kind: "Epic",
@@ -10764,7 +8218,7 @@ function crashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "proposal.md", "tasks.md"],
+      expectedFiles: ["design.md", "change.md", "tasks.md"],
     },
     {
       kind: "Change",
@@ -10776,7 +8230,7 @@ function crashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "proposal.md", "tasks.md"],
+      expectedFiles: ["design.md", "change.md", "tasks.md"],
     },
     {
       kind: "Change",
@@ -10788,7 +8242,7 @@ function crashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "proposal.md", "tasks.md"],
+      expectedFiles: ["design.md", "change.md", "tasks.md"],
     },
     {
       kind: "Change",
@@ -10800,7 +8254,7 @@ function crashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "proposal.md", "tasks.md"],
+      expectedFiles: ["design.md", "change.md", "tasks.md"],
     },
     {
       kind: "Epic",
@@ -10897,7 +8351,7 @@ function crashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "proposal.md", "tasks.md"],
+      expectedFiles: ["design.md", "change.md", "tasks.md"],
     },
     {
       kind: "Change",
@@ -10908,7 +8362,7 @@ function crashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "proposal.md", "tasks.md"],
+      expectedFiles: ["design.md", "change.md", "tasks.md"],
     },
     {
       kind: "Change",
@@ -10920,7 +8374,7 @@ function crashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "proposal.md", "tasks.md"],
+      expectedFiles: ["design.md", "change.md", "tasks.md"],
     },
     {
       kind: "Epic",

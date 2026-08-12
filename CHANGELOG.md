@@ -1,5 +1,5 @@
 ---
-modified: 2026-08-09
+modified: 2026-08-10
 ---
 # Changelog
 
@@ -11,27 +11,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- Added one canonical Change store per workspace at `<workspace>/.sdd/changes/`, Change IDs unique within that workspace, and `tasks.md` ownership metadata for the Space and target repositories.
+- Added one progressive Change record per outcome under `<workspace>/.sdd/changes/`; `change.md` owns intent, lifecycle status, Space, and repository IDs from intent capture through close.
+- Added complete README matrices for every packaged skill and CLI command, including their lifecycle responsibilities and handoffs.
 
 ### Changed
 
+- **Breaking:** `/sdd-change` is now one adaptive workflow: it creates or resumes a proposed Change, captures intent, and asks before continuing into technical planning. Proposed Changes require only `change.md`; planning adds `design.md` and `tasks.md`.
+- **Breaking:** `sdd change create` now creates only the proposed `change.md` record and allows repository ownership to remain empty until planning settles the target set.
+- **Breaking:** Change status and ownership metadata moved from `tasks.md` to `change.md`; status, validation, `sdd change transition`, and `sdd change close` read the progressive record, and lifecycle mutations now use proportional workspace-locked local filesystem operations instead of bespoke crash-recovery journals.
+- `sdd validate` now applies lifecycle-aware Change requirements: proposed Changes need only `change.md`, while later states require repository ownership, `design.md`, and `tasks.md`.
 - **Breaking:** installation ownership moves from the operating-system user to one explicit workspace; configuration, Changes, managed workflow state, and recovery live under `<workspace>/.sdd/`, while managed skills default to `<workspace>/.agents/skills/`.
-- `sdd update` now discovers one workspace and preflights compatible workspace-local legacy planned, repository-active, and repository-closed Changes plus undated briefs; it retains migration sources until commit, consolidates identical copies, resumes interrupted transactions only from durable evidence re-authorized against current source and topology, and fails without writes on divergent, cross-Space, unsafe-path, missing-identity, or ambiguous-target conflicts.
+- `sdd update` now performs one bounded job: reconcile the current workspace's checksum-managed doctrine and skills.
 - Planning, Apply, Review, PR, Release, Interactive, Epic verification, audits, and Space status now share one workspace-central Change record and treat repository entries only as stable targets or filtered projections.
 - Status and validation keep Space-owned Changes visible when repository mappings go stale, reject unresolved repository ownership, and report active/closed ID collisions within the selected workspace even through scoped projections.
-- Update recovery now treats durable journals as untrusted replay hints: every destructive path is re-authorized against current topology and physical identity, malformed configured paths fail before filesystem access, and an interruption between configuration backup and publication restores the original before replanning. If committed partial cleanup has already removed evidence needed to reconstruct the complete source-derived destination guard set, `sdd update` fails closed and retains every recovery artifact still present—including the remaining backup, unchanged journal, and staging directory—instead of inferring cleanup authority.
 - `/sdd-release` now records repository-keyed candidates, checks, authorization, and handoffs for the complete target set, with one aggregate coordination and closeout gate.
-
-### Migration
-
-- Added `sdd setup <workspace> --from-user <old-user-root> [--dry-run]` for explicit, fail-closed migration of supported home-root workspace v1-v3 or released `kind: user` version 1 and version 2 state into the selected workspace; there is no home-directory fallback or implicit import.
-- Interrupted home-migration cleanup resumes only from complete source-derived transaction provenance. If a crash leaves a committed migration partially cleaned after that provenance is unavailable, setup fails closed and retains the remaining state for manual inspection.
 
 ### Removed
 
+- Removed separate Change Brief storage, `--brief`/`--plan`/`--replan` modes, and the brief/proposal templates.
+- Removed Change transition and close transaction-journal machinery that was disproportionate for the local pre-1.0 workflow.
+- Removed programmatic migration of pre-1.0 home installations, configuration schemas, and legacy Change locations, including `sdd setup --from-user` and the update migration/recovery subsystem. Alpha data must be recreated or converted manually.
 - Removed `sdd change promote` and repository-configured Change roots; transition and close now operate once on the canonical central record.
-- Removed the transitional `sdd setup --from-workspace` and `sdd init --legacy-workspace` entry points; migrate supported home-root workspace v1-v3 or released user-v1/v2 installations explicitly with `sdd setup <workspace> --from-user <old-user-root>`.
-- Removed `schemas/user.schema.json` as a current public contract; released user-v1/v2 shapes remain migration inputs validated by the CLI.
+- Removed `schemas/user.schema.json` and all user-v1/v2 compatibility handling.
 
 ## [0.12.0] - 2026-07-23
 

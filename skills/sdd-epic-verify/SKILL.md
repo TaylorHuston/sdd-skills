@@ -11,9 +11,9 @@ Audit one Epic as a durable capability truth source. It works with embedded Stor
 
 Resolve the workspace, Space ID, idea-owned planning path, target implementation repository, and its stable repository ID with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before judging artifact authority, traceability, evidence, or Change-status drift.
 
-Run `sdd status <space-id> --json`. Use the selected repository's filtered `activeChanges` and `recentChanges` projection to select the corresponding unique top-level central records, and read only records whose `tasks.md` `repositories` metadata targets that repository.
+Run `sdd status <space-id> --json`. Use the selected repository's filtered `activeChanges` and `recentChanges` projection to select the corresponding unique top-level central records, and read only records whose `change.md` `repositories` metadata targets that repository.
 
-Keep Epics and their verification reports under `docs/epics/` in the implementation repository. Every dated Change lives once under `<workspace>/.sdd/changes/<change-id>/`, or under `<workspace>/.sdd/changes/closed/<change-id>/` after close. Legacy planned or repository-local active/closed Change paths are migration input only: direct the user to the selected workspace's supported `sdd update` path and do not treat them as live owners. Project guidance owns test, security, and truth-bearing supporting-doc commands and requirements. If workspace setup is missing, direct the user to `sdd setup [workspace-path]`.
+Keep Epics and their verification reports under `docs/epics/` in the implementation repository. Every dated Change lives once under `<workspace>/.sdd/changes/<change-id>/`, or under `<workspace>/.sdd/changes/closed/<change-id>/` after close. Legacy planned or repository-local active/closed Change paths are unsupported historical data: do not treat them as live owners, and route worthwhile remediation through `/sdd-change`. Project guidance owns test, security, and truth-bearing supporting-doc commands and requirements. If workspace setup is missing, direct the user to `sdd setup [workspace-path]`.
 
 This skill verifies truth; it does not implement missing behavior and does not replace `/sdd-review` for a specific change. Use `/sdd-review` for change-local PR readiness. Use `/sdd-epic-verify` when the question is whether the whole Epic still matches product intent, current code, tests, docs, and evidence.
 
@@ -23,7 +23,7 @@ Delegation authorization: invoking `/sdd-epic-verify`, naming `sdd-epic-verify`,
 
 - Default: run a full Epic audit, run practical verification, write an Epic-local report, and report findings. Do not edit source artifacts except the report.
 - `--check`: read-only terminal output only. Do not write a report or edit files.
-- `--propose-fixes`: after reporting findings, use repository-targeted status metadata to resume an existing matching central Change or, for a new fix proposal, run `sdd change create <space-id> <epic>-drift-fixes --repo <stable-repository-id>` with every impacted repository selected, then refine the generated central `proposal.md`, `design.md`, and `tasks.md`. Never hand-create a repository-local Change.
+- `--propose-fixes`: after reporting findings, use repository-targeted status metadata to resume an existing matching central Change or, for a new fix proposal, run `sdd change create <space-id> <epic>-drift-fixes --repo <stable-repository-id>` with every impacted repository selected, then refine the generated central `change.md`, `design.md`, and `tasks.md`. Never hand-create a repository-local Change.
 
 If mode is ambiguous, default to the full audit report.
 
@@ -44,7 +44,7 @@ Use `sdd validate <space-id> --epic <epic-id> --repo <stable-repository-id> --wo
 The report is the durable audit record. Findings are addressed through the workflow named in the report:
 
 - `artifact-only`: after reporting, ask the user whether to apply the listed safe artifact fixes in the same thread.
-- `needs-change`: run `/sdd-change --plan` or `/sdd-epic-verify --propose-fixes`, then `/sdd-apply`, then `/sdd-review`. Use `/sdd-change --brief` instead when the remediation should be retained but not planned yet.
+- `needs-change`: run `/sdd-change` or `/sdd-epic-verify --propose-fixes`, then `/sdd-apply`, then `/sdd-review`. `/sdd-change` can stop after intent capture when implementation should wait.
 - `needs-verification`: add or run the missing checks through a SDD change unless no source files need to change.
 - `needs-prd`: run `/sdd-prd` before changing Epic scope.
 - `blocked`: ask the user for the named decision.
@@ -58,7 +58,7 @@ Before auditing, read:
 - parent or workspace guidance when the project points to it
 - this skill's `assets/epic-template.md`, to check the target Epic against the canonical template shape
 - target `docs/epics/<key>-<###>-epic-name>/epic.md`
-- relevant central `proposal.md`, `design.md`, `tasks.md`, and `review.md` selected through the target repository's `sdd status` projection when they mention the Epic, its Story labels, full Story references, or legacy Story IDs
+- relevant central `change.md`, `design.md`, `tasks.md`, and `review.md` selected through the target repository's `sdd status` projection when they mention the Epic, its Story labels, full Story references, or legacy Story IDs
 - enough of every active `docs/epics/*/epic.md` to detect duplicate Story labels inside an Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs
 - planning-root docs or the PRD/Product Brief when product direction exists or drift is suspected
 - the project-defined truth-bearing supporting-doc set; when none is declared, inspect the README and documents whose current claims intersect the Epic, such as testing, architecture, ADR, data-model, current-state, or release docs
@@ -130,7 +130,7 @@ Check git status in every repo that may be inspected or touched. Preserve unrela
    - `scope-drift`: Story/Requirement/Scenario no longer belongs, is missing, has moved to another Epic, or is too broad/narrow for the Epic or Story.
    - `product-drift`: Epic conflicts with PRD/product direction or current product reality.
    - `security-drift`: security, privacy, auth, data, dependency, or destructive-flow risk is unresolved.
-   - `status-drift`: a related central Change's `tasks.md` status, active/closed location, repository-specific work/review/PR/release ledger, review records, manual confirmation status, release-communication state, PR/merge state, or deferred gaps contradict each other. Active status must be `proposed`, `planned`, `in_progress`, or `in_review`; location under `<workspace>/.sdd/changes/closed/<change-id>/` means closed. Historical closed Changes may retain an older status that was valid when they closed. For a multi-repository Change, repository-specific state and the Change-wide transition/close state must agree.
+   - `status-drift`: a related central Change's `change.md` status, active/closed location, repository-specific work/review/PR/release ledger, review records, manual confirmation status, release-communication state, PR/merge state, or deferred gaps contradict each other. Active status must be `proposed`, `planned`, `in_progress`, or `in_review`; location under `<workspace>/.sdd/changes/closed/<change-id>/` means closed. Historical closed Changes may retain an older status that was valid when they closed. For a multi-repository Change, repository-specific state and the Change-wide transition/close state must agree.
    - `superseded-truth-drift`: later Stories, Requirements, Scenarios, implementation, or docs changed a boundary but earlier Epic truth still reads as current.
 9. Write or print the report.
    - Capture the first complete audit outcome as `initial_result`, then derive `result` only from the final current gate state.
@@ -191,7 +191,7 @@ Do not edit these as post-run artifact fixes:
 - external services, deployments, branches, PRs, git history
 - behavior semantics that need the user judgment
 
-If a finding requires code, tests, product behavior, or a debatable scope change, leave it in the report and recommend `/sdd-change --plan`, or `/sdd-change --brief` when implementation should be deferred.
+If a finding requires code, tests, product behavior, or a debatable scope change, leave it in the report and recommend `/sdd-change`; stop after intent capture when implementation should be deferred.
 
 ## Result Labels
 

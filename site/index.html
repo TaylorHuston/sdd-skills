@@ -687,10 +687,9 @@ skil
               <h4>Space-owned context</h4>
               <pre aria-label="Default planning document layout"><code>&lt;planning-path&gt;/
   prd.md
-  exploration/
-  change-briefs/</code></pre>
-              <p class="recordNote">Product direction, exploratory notes, and undated Change Briefs stay here. A brief
-                is not a Change and carries no lifecycle status.</p>
+  exploration/</code></pre>
+              <p class="recordNote">Product direction and exploratory notes stay here. Desired outcomes become
+                proposed central Changes as soon as they need a durable lifecycle record.</p>
             </article>
 
             <article class="recordType recordProject implementationRecord">
@@ -709,22 +708,20 @@ skil
               <h4>Workspace-owned work</h4>
               <pre aria-label="Default Change document layout"><code>&lt;workspace&gt;/.sdd/changes/
   &lt;date&gt;-&lt;change&gt;/
-    proposal.md
-    design.md
-    tasks.md
+    change.md
+    design.md  # added during planning
+    tasks.md   # added during planning
   closed/
     &lt;date&gt;-&lt;change&gt;/</code></pre>
-              <p class="recordNote"><code>sdd change create</code> writes one canonical record whose
-                <code>tasks.md</code> names its Space and target repositories. The ID is unique within this workspace,
-                and closeout moves the folder once under <code>&lt;workspace&gt;/.sdd/changes/closed/</code> after
-                project truth has been reconciled.
+              <p class="recordNote"><code>sdd change create</code> writes one proposed <code>change.md</code> whose
+                frontmatter owns status, Space, and repository IDs. Planning adds <code>design.md</code> and
+                <code>tasks.md</code>. The ID is unique within this workspace, and closeout moves the folder once under
+                <code>&lt;workspace&gt;/.sdd/changes/closed/</code> after project truth has been reconciled.
               </p>
-              <p class="recordNote">To migrate an old home-root workspace v1-v3, user-v1, or user-v2 installation,
-                preview <code>sdd setup /path/to/workspace --from-user /path/to/old-user-root --dry-run</code>, then
-                run the same command without <code>--dry-run</code>. Setup preflights every collision and ownership
-                boundary, publishes and verifies the workspace before retiring checksum-owned source state, and leaves
-                unrelated skills untouched. Post-crash cleanup resumes only from complete source-derived transaction
-                provenance; without it, setup fails closed and retains the remaining state for manual inspection.</p>
+              <p class="recordNote">Pre-1.0 installation and Change formats are unsupported alpha data. Recreate a
+                current workspace with <code>sdd setup</code> and <code>sdd init</code>, then manually preserve only
+                records still worth keeping. <code>sdd update</code> reconciles current managed doctrine and skills;
+                it does not migrate product artifacts.</p>
             </article>
           </div>
         </section>
@@ -745,7 +742,7 @@ skil
                 <li>Validate artifacts, ownership metadata, audit-report coherence, and optional Git-relative freshness
                 </li>
                 <li>Report central Change status across mapped repositories</li>
-                <li>Preflight and safely migrate compatible legacy Change locations during update</li>
+                <li>Reconcile checksum-managed doctrine and skills during update</li>
                 <li>Guard one-record lifecycle transitions</li>
               </ul>
             </section>
@@ -775,8 +772,8 @@ skil
           </div>
           <ol class="workflowMap">
             <li><span>01</span><strong>Explore</strong><code>/sdd-explore</code></li>
-            <li><span>02</span><strong>Capture intent</strong><code>/sdd-change --brief</code></li>
-            <li><span>03</span><strong>Plan just in time</strong><code>/sdd-change --plan</code></li>
+            <li><span>02</span><strong>Capture intent</strong><code>/sdd-change</code></li>
+            <li><span>03</span><strong>Continue planning when ready</strong><code>/sdd-change</code></li>
             <li><span>04</span><strong>Converge the experience</strong><code>/sdd-design --plan</code></li>
             <li><span>05</span><strong>Commit to a work
                 scope</strong><code>sdd validate &lt;space-id&gt; --change &lt;change-id&gt; --workspace &lt;path&gt;</code>

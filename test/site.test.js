@@ -28,24 +28,19 @@ test("public guide separates portable methodology from package implementation an
   assert.doesNotMatch(html, /Scenario R\d+\.\d+/);
 });
 
-test("public guide documents workspace-owned Changes and explicit fail-closed user migration", async () => {
+test("public guide documents progressive workspace-owned Changes and current-only setup", async () => {
   const { html } = await readSite();
 
   assert.match(html, /workspace-owned work/i);
   assert.match(html, /&lt;workspace&gt;\/\.sdd\/changes\//);
   assert.match(html, /&lt;workspace&gt;\/\.sdd\/config\.yaml/);
   assert.match(html, /&lt;workspace&gt;\/\.agents\/skills\//);
-  assert.match(html, /change-briefs\//);
-  assert.match(html, /sdd setup \/path\/to\/workspace/);
-  assert.match(
-    html,
-    /sdd setup \/path\/to\/workspace --from-user \/path\/to\/old-user-root --dry-run/,
-  );
-  assert.match(html, /old home-root workspace v1-v3, user-v1, or user-v2 installation/);
-  assert.match(
-    html,
-    /Post-crash cleanup resumes only from complete source-derived transaction\s+provenance; without it, setup fails closed and retains the remaining state for manual inspection\./,
-  );
+  assert.match(html, /change\.md/);
+  assert.match(html, /Planning adds <code>design\.md<\/code> and\s+<code>tasks\.md<\/code>/);
+  assert.match(html, /Pre-1\.0 installation and Change formats are unsupported alpha data/);
+  assert.match(html, /<code>sdd update<\/code> reconciles current managed doctrine and skills/);
+  assert.doesNotMatch(html, /change-briefs\//);
+  assert.doesNotMatch(html, /--from-user/);
   assert.match(
     html,
     /<code>sdd validate &lt;space-id&gt; --change &lt;change-id&gt; --workspace &lt;path&gt;<\/code>/,

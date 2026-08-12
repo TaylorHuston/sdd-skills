@@ -2,7 +2,6 @@ import { assertRepositoryArtifactRoots } from "../change-repositories.js";
 import {
   getRepositoryConfigPath,
   getWorkspaceConfigPath,
-  isSupportedLegacyWorkspaceConfig,
   readRepositoryConfig,
   resolveIdeaPlanningPath,
   resolveRepositoryPath,
@@ -16,8 +15,6 @@ import { inspectProjectGuidance } from "../guidance.js";
 import { inspectSkillInstallation } from "../skills.js";
 import { inspectWorkflowInstallation } from "../workflow.js";
 import { findOperationConfiguration, resolveOperationConfiguration } from "../workspace.js";
-import { inspectCloseTransactionReceipts } from "../change-close-transaction.js";
-import { inspectTransitionTransactionReceipts } from "../change-transition-transaction.js";
 
 function repositoryMappingLabel({ ideaId, resolvedPath }) {
   return `${ideaId} (${resolvedPath})`;
@@ -122,14 +119,7 @@ export async function diagnoseWorkspace(
     ...(requestedWorkspaceRoot ? { workspaceRoot: requestedWorkspaceRoot } : {}),
   };
   let { workspaceRoot, config } = await findOperationConfiguration(startPath, discoveryOptions);
-  const migrationPending = isSupportedLegacyWorkspaceConfig(config);
-  const findings = migrationPending
-    ? [{
-        level: "error",
-        code: "CONFIG_MIGRATION_REQUIRED",
-        message: "SDD workspace configuration migration is required. Run `sdd update` before using this workspace.",
-      }]
-    : [...validateConfig(config)];
+  const findings = [...validateConfig(config)];
 
   if (findings.some((finding) => finding.level === "error")) {
     const counts = {
@@ -220,8 +210,6 @@ export async function diagnoseWorkspace(
   findings.push(...(await inspectSkillInstallation(workspaceRoot, config)));
   findings.push(...(await inspectWorkflowInstallation(workspaceRoot)));
   findings.push(...(await inspectProjectGuidance(workspaceRoot, config)));
-  findings.push(...(await inspectCloseTransactionReceipts(workspaceRoot)));
-  findings.push(...(await inspectTransitionTransactionReceipts(workspaceRoot)));
   findings.push(...(await inspectChangeStatuses(
     workspaceRoot,
     config,

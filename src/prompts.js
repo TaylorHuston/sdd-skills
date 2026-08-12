@@ -26,7 +26,7 @@ export async function collectSetupOptions(
     ask,
   } = {},
 ) {
-  if (options.fromUser || !interactive || (await hasWorkspaceConfiguration(workspaceRoot))) {
+  if (!interactive || (await hasWorkspaceConfiguration(workspaceRoot))) {
     return options;
   }
 

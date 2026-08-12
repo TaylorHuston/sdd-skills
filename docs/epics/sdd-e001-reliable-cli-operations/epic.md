@@ -3,8 +3,8 @@ schema: sdd-epic-v2
 id: SDD-E001
 status: active
 created: 2026-07-20
-modified: 2026-08-09
-last_verified: 2026-08-09
+modified: 2026-08-10
+last_verified: 2026-08-10
 stories:
   - S1
   - S2
@@ -21,7 +21,7 @@ stories:
 
 - PRD: not applicable; this is a repository-only toolchain package.
 - Related docs: `README.md`, `docs/story-driven-development.md`, `docs/audits/2026-07-20-code-audit.md`
-- Related ADRs: `docs/adrs/2026-08-07-centralize-change-storage.md`, `docs/adrs/2026-08-07-workspace-scoped-installation.md`.
+- Related ADRs: `docs/adrs/2026-08-07-centralize-change-storage.md`, `docs/adrs/2026-08-07-workspace-scoped-installation.md`, `docs/adrs/2026-08-10-progressive-change-record.md`.
 
 Developers and agents rely on the CLI and packaged skills as one toolchain. Deterministic results must be trustworthy, mutations must remain inside declared ownership, audit reports must distinguish current from historical state, and review/release handoffs must contain only classified scope.
 
@@ -58,12 +58,12 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 | Story | Implementation | Verification | Capability | Last Verified | Notes |
 |---|---|---|---|---|---|
 | S1 | implemented | verified | Validate navigable behavior and real evidence. | 2026-07-23 | Structure, anchors, evidence, report integrity, metadata, and focused reads fail closed with current proof. |
-| S2 | implemented | verified | Mutate only inside physical owner boundaries and recover authenticated state safely. | 2026-08-09 | Central lifecycle, migration, configuration, and managed-install mutations reject drift; `sdd update` committed partial cleanup fails closed and retains recovery artifacts when complete source-derived destination guards cannot be reconstructed. |
-| S3 | implemented | verified | Route one workspace-unique central Change across portable repository targets. | 2026-08-09 | Creation, lifecycle, physical confinement, deterministic discovery, and explicit fail-closed user-v1/v2 migration use one workspace-owned store. |
+| S2 | implemented | verified | Mutate only inside physical owner boundaries and preserve concurrent state safely. | 2026-08-10 | Current setup, update, configuration, installation, and lifecycle mutations remain confined and concurrency-aware without legacy migration protocols. |
+| S3 | implemented | verified | Route one workspace-unique central Change across portable repository targets. | 2026-08-10 | Creation, lifecycle, physical confinement, and deterministic discovery use current workspace and repository contracts; legacy alpha formats are unsupported. |
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
 | S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-23 | Reports are versioned; PR/release paths are classified and rechecked; Git baselines are immutable and bounded. |
-| S6 | implemented | verified | Carry one central multi-repository workflow through a complete evidence-backed handoff. | 2026-08-09 | Every shipped workflow shares one target set and one workspace-wide Change lifecycle while preserving repository-owned truth. |
-| S7 | implemented | partial | Explain the portable method and package through accessible responsive documentation. | 2026-08-09 | User-v1/v2 and provenance-limited migration copy is current; current-source responsive rendering awaits Main capture and manual confirmation awaits the user. |
+| S6 | partial | partial | Carry one progressive central Change through planning and an evidence-backed multi-repository handoff. | 2026-08-10 | The new `change.md` contract is implemented at the CLI seam; package-wide verification remains. |
+| S7 | implemented | partial | Explain the portable method and package through accessible responsive documentation. | 2026-08-10 | The public guide describes progressive Changes and current-only setup; responsive rendering and owner confirmation remain pending. |
 
 ## Stories
 
@@ -277,8 +277,8 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 Implementation: implemented
 Verification: verified
 Created: 2026-07-20
-Modified: 2026-08-09
-Last verified: 2026-08-09
+Modified: 2026-08-10
+Last verified: 2026-08-10
 
 As a developer, I want filesystem mutations to stay inside their physical repository or selected workspace owner and preserve concurrent work, so that setup and lifecycle commands cannot silently damage unrelated data.
 
@@ -299,18 +299,8 @@ The CLI SHALL compare the commit-time Change state with the state it prepared an
 
 ###### Scenario R2-S1: Concurrent Transition Edit
 
-- WHEN `tasks.md` changes after transition preflight but before replacement
-- THEN the transition restores the current content and reports concurrent modification.
-
-###### Scenario R2-S2: Concurrent Migration Source Edit
-
-- WHEN a legacy Change source changes after migration preflight
-- THEN migration aborts before publication and preserves the newer source.
-
-###### Scenario R2-S3: Post-Publication Failure During Migration
-
-- WHEN a later migration stage fails after central publication or configuration upgrade
-- THEN rollback restores prior sources and configs without overwriting newer destination content, or reports exact incomplete recovery.
+- WHEN `change.md` changes after transition preflight but before replacement
+- THEN the transition preserves the current content and reports concurrent modification.
 
 ###### Scenario R2-S4: Close-Time Status Drift
 
@@ -352,12 +342,8 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 | S2/R1 | `src/fs.js#isPathPhysicallyInside` | primary | Resolves existing ancestors before authorizing a child path. |
 | S2/R1 | `src/skills.js#applySkillSync` | support | Rechecks every managed-skill target immediately before mutation. |
 | S2/R1 | `src/config.js#writeWorkspaceConfig` | support | Refuses a configuration file below a symlinked external `.sdd` directory. |
-| S2/R1 | `src/update-migration.js#collectTreeEntries` | support | Rejects symbolic links anywhere inside a legacy Change before migration reads or copies its content. |
-| S2/R2 | `src/commands/change-transition.js#transitionChange` | primary | Compares staged `tasks.md` with commit-time content and preserves concurrent edits. |
-| S2/R2 | `src/change-transition-transaction.js#createTransitionTransactionJournal` | support | Binds transition intent and recovery state to durable identity-checked receipts. |
-| S2/R2 | `src/update-migration.js#applyUpdateMigration` | primary | Rechecks planned inputs, publishes without replacement, and rolls the multi-stage transaction back on failure. |
+| S2/R2 | `src/commands/change-transition.js#transitionChange` | primary | Compares staged `change.md` with commit-time content and preserves concurrent edits. |
 | S2/R2 | `src/commands/change-close.js#closeChange` | primary | Rechecks central status and ownership at commit time. |
-| S2/R2 | `src/change-close-transaction.js#createCloseTransactionJournal` | support | Binds close intent and recovery state to durable identity-checked receipts. |
 | S2/R2-S5 | `src/commands/init-installation.js#initRepository` | primary | Serializes first repository-contract publication under the physical repository owner lock. |
 | S2/R2-S5 | `src/mutation.js#withWorkspaceMutationLock` | support | Exclusively reserves the repository mutation boundary and returns an actionable contention error. |
 | S2/R3 | `src/fs.js#writeFileAtomically` | primary | Durably replaces configuration and JSON lock state through a synced temporary file. |
@@ -366,16 +352,10 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 | S2/R3 | `src/directory-publication.js#publishFlatDirectoryWithoutReplace` | primary | Publishes staged directory trees without replacement and retains identity-bound recovery state. |
 | S2/R3 | `src/mutation.js#withWorkspaceMutationLock` | support | Serializes managed setup and update operations. |
 | S2/R3 | `src/installation.js#applyManagedInstallation` | support | Treats workflow, skill, and install-lock updates as one recoverable unit. |
-| S2/R3 | `src/update-migration.js#applyUpdateMigration` | support | Coordinates central publication, config upgrades, legacy-source removal, rollback, and explicit incomplete recovery. |
-| S2/R3 | `src/update-migration.js#recoverUpdateMigration` | primary | Re-authorizes interrupted update state and completes committed cleanup only when the complete source-derived destination guard set remains reconstructable; otherwise retains recovery artifacts and reports failure. |
 | S2/R3 | `src/commands/init-installation.js#setupInstallation` | support | Runs first-time workspace setup under the managed transaction and removes newly created durable state on failure. |
 | S2/R3 | `src/commands/update.js#updateWorkspace` | support | Serializes workspace-local managed refresh through the shared installation transaction. |
 | S2/R3 | `src/workflow.js#applyWorkflowSync` | support | Applies, verifies, rolls back, and finalizes managed workflow replacement. |
-| S2/R3 | `src/update-migration.js#rollbackTransaction` | support | Restores sources and configs conservatively and reports any state it cannot safely replace. |
-| S2/R3 | `src/legacy-user-migration.js#publish` | support | Persists backup and publication intent before each rename so rollback can distinguish not-started from completed moves. |
-| S2/R3 | `src/legacy-user-migration.js#retire` | support | Persists deterministic home-migration source-retirement intent and resumes authenticated states on either side of the rename only after journal and provenance authorization. |
-| S2/R3 | `src/legacy-user-migration.js#assertJournal` | support | Treats recovery journals as untrusted input and validates record states plus lexical and physical transaction confinement before mutation. |
-| S2/R4 | `src/commands/init-installation.js#setupInstallation` | primary | Creates or migrates the selected workspace's configuration, workflow, install lock, and contained managed-skill registry. |
+| S2/R4 | `src/commands/init-installation.js#setupInstallation` | primary | Creates or reconciles the selected workspace's configuration, workflow, install lock, and contained managed-skill registry. |
 | S2/R4 | `src/config.js#resolveWorkspaceSkillsDirectory` | support | Rejects lexical or physical managed-skill paths outside the workspace owner. |
 
 #### Implementation Gaps
@@ -390,10 +370,7 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 | S2/R1-S1 | Automated test `test/cli.test.js#change transition rejects an active Change through an external symlink ancestor` | Lifecycle mutation refuses an external artifact root and preserves its contents. | Passing 2026-07-20 |
 | S2/R1-S1 | Automated test `test/cli.test.js#validate rejects implementation and test evidence that resolve outside the repository` | Evidence acceptance uses the same physical ownership rule. | Passing 2026-07-20 |
 | S2/R1-S1 | Automated test `test/mutation.test.js#fixed SDD mutation paths reject a symlinked config directory` | Workflow, configuration, and lock paths cannot escape through `.sdd`. | Passing 2026-07-20 |
-| S2/R1-S1 | Automated test `test/update-migration.test.js#migration preflight fails before writes for divergent copies, cross-Space IDs, destination conflicts, brief collisions, missing identities, and symlink escapes` | Migration rejects symbolic links inside legacy Changes before writing. | Passing 2026-08-07 |
-| S2/R2-S1 | Automated tests `test/cli.test.js#change transition preserves and can retry a concurrent pre-backup tasks edit` and `test/change-file-authority.test.js#close and transition cannot commit after same-byte tasks inode substitution` | Commit-time drift and same-byte identity replacement abort without losing the latest `tasks.md`. | Passing 2026-08-10 |
-| S2/R2-S2 | Automated test `test/update-migration.test.js#migration detects commit-time drift and rolls published state back on a later failure` | A source edit after preflight aborts before publication and preserves the newer source. | Passing 2026-08-07 |
-| S2/R2-S3 | Automated test `test/update-migration.test.js#migration detects commit-time drift and rolls published state back on a later failure` | A later failure restores published central state, upgraded configs, and legacy sources while preserving concurrent destination edits. | Passing 2026-08-07 |
+| S2/R2-S1 | Automated test `test/change-contract.test.js#planning completes the same Change before lifecycle work continues` | A commit-time `change.md` edit aborts the simplified transition with `CONCURRENT_CHANGE`, preserves `planned`, and remains retryable. | Passing 2026-08-10 |
 | S2/R2-S4 | Automated test `test/cli.test.js#change close rechecks status at commit time` | Close refuses a Change reopened after preflight. | Passing 2026-07-20 |
 | S2/R2-S5 | Automated test `test/cli.test.js#repository init rejects concurrent first initialization without losing the winner` | One initial repository contract wins; the concurrent caller receives `OPERATION_IN_PROGRESS`, and no mutation lock remains. | Passing 2026-07-23 |
 | S2/R3-S1 | Automated test `test/mutation.test.js#atomic JSON writes leave one complete parseable document` | Competing lock writes leave one whole parseable document. | Passing 2026-07-20 |
@@ -414,14 +391,7 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 | S2/R3-S1 | Automated test `test/mutation.test.js#skill replacement preserves an edit made inside the replacement window` | Directory replacement compares the moved target with the expected hash and preserves newer content. | Passing 2026-07-20 |
 | S2/R3-S1 | Automated test `test/mutation.test.js#file replacement preserves a target recreated at publish time` | Exclusive file publication cannot overwrite a target recreated after the original is moved. | Passing 2026-07-20 |
 | S2/R3-S1 | Automated test `test/mutation.test.js#directory replacement preserves a target recreated at publish time` | Exclusive directory reservation cannot overwrite a target recreated after the original is moved. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/update-migration.test.js#migration detects commit-time drift and rolls published state back on a later failure` | Central migration rollback restores the pre-transaction state and reports incomplete recovery instead of overwriting newer data. | Passing 2026-08-07 |
-| S2/R3-S1 | Automated test `test/update-migration.test.js#committed cleanup fails closed when an external receipt outlives source authority` | When an update journal is committed after partial cleanup and the complete source-derived destination guard set cannot be reconstructed, `sdd update` reports `MUTATION_RECOVERY_FAILED`, retains the remaining backup byte-for-byte, leaves source paths absent, and preserves the unchanged journal and staging directory rather than inferring cleanup authority. | Pending aggregate execution 2026-08-10 |
-| S2/R3-S1 | Automated tests `test/legacy-user-migration.test.js#legacy user migration recovery rolls back an install interrupted after publication rename`, `test/legacy-user-migration.test.js#legacy user migration recovery removes only its owned empty publication reservation`, `test/legacy-user-migration.test.js#legacy user migration recovery completes an install interrupted after source-retirement rename`, and `test/legacy-user-migration.test.js#legacy user migration recovery completes a replacement interrupted after source-retirement rename` | Durable intent, exclusive file publication, authenticated directory reservations, and exact snapshots recover install and replacement transactions only across the publication and retirement boundaries authenticated by transaction-created evidence. | Passing 2026-08-07 |
-| S2/R1-S1, S2/R3-S1 | Automated tests `test/legacy-user-migration.test.js#legacy user migration recovery rejects malformed journal records and states`, `test/legacy-user-migration.test.js#legacy user migration recovery rejects same-basename journal redirects outside configured owners`, `test/legacy-user-migration.test.js#legacy user migration recovery rejects configured owner paths through external symlinks`, `test/legacy-user-migration.test.js#legacy user migration preserves a replacement edited between its check and backup rename`, `test/legacy-user-migration.test.js#legacy user migration exclusively publishes without overwriting a destination that reappears`, `test/legacy-user-migration.test.js#legacy user migration restores a source edited immediately before retirement rename`, `test/legacy-user-migration.test.js#legacy user migration preserves a source that reappears after retirement rename`, and `test/legacy-user-migration.test.js#legacy user migration restores an opaque destination moved during rollback` | Untrusted journal paths stay bound to authenticated configured owners, and every injected destination/source rename race preserves concurrent regular, directory, or opaque state instead of overwriting or deleting it. | Passing 2026-08-07 |
-| S2/R3-S1 | Automated test `test/legacy-user-migration.test.js#legacy user migration recovery completes a partially removed directory retirement` | A surviving subset of an interrupted directory retirement may complete when source-derived transaction provenance authenticates the original full directory and remaining entries and is independently bound outside the staged transaction. | Source-inspected 2026-08-09 |
-| S2/R3-S1 | Automated test `test/legacy-user-migration.test.js#legacy user migration never recursively removes opaque transfer-tree replacements` | The `retiring source` subcase proves a concurrent opaque replacement fails closed, preserves both the replacement and displaced owned source, and retains the stage instead of inferring recursive ownership. | Pending aggregate execution 2026-08-10 |
 | S2/R3-S1 | Automated test `test/cli.test.js#update refuses to overlap another managed mutation` | A held operation lock blocks updates without altering durable install state. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/cli.test.js#change transition preserves and can retry a concurrent pre-backup tasks edit` | Central lifecycle mutation returns a concurrent-change error, preserves the latest tasks content, and remains retryable. | Passing 2026-08-10 |
 | S2/R4-S1 | Automated tests `test/workspace-config.test.js#managed skill directory is lexically and physically workspace-contained` and `test/cli.test.js#setup rejects a managed skills path through an external symlink ancestor` | Setup rejects absolute, traversal, and symlink escapes before installation writes. | Passing 2026-08-07 |
 | S2/R4-S2 | Automated tests `test/cli.test.js#CLI setup owns only the explicit workspace and exposes workspace output fields` and `test/workspace-config.test.js#workspace discovery never falls back to HOME or SDD_USER_HOME` | Setup and discovery ignore decoy home installations and write only below the selected workspace. | Passing 2026-08-07 |
 
@@ -433,16 +403,14 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 
 - Physical ownership is evaluated after resolving existing symlink ancestors; it is stronger than lexical `..` rejection.
 - Dead-owner mutation locks are reclaimed from a matching ownership record. An alive or unknown PID is conservative: the CLI reports PID and creation time for manual inspection because PID reuse cannot be distinguished portably without platform-specific process-start identity.
-- `sdd update` recovery has an explicit committed-cleanup limit. If partial cleanup has removed evidence needed to reconstruct the complete source-derived destination guard set, recovery fails closed with `MUTATION_RECOVERY_FAILED` and retains every recovery artifact still present, including the remaining backup, unchanged journal, and staging directory, for manual inspection.
-- Home-migration recovery has a separate transaction-provenance contract. A partially removed retirement may resume only while transaction-created recursive proofs authenticate the original source and every surviving entry and an independent workspace authority binds the exact provenance bytes and stage identity. Missing complete authenticated provenance or an opaque, new, or replaced entry fails closed and leaves state for manual inspection; in particular, a committed stage residue whose journal/provenance was removed before stage-root cleanup has no automatic recovery path.
 
 ### Story S3: Unambiguous Topology And Lifecycle Routing
 
 Implementation: implemented
 Verification: verified
 Created: 2026-07-20
-Modified: 2026-08-09
-Last verified: 2026-08-09
+Modified: 2026-08-10
+Last verified: 2026-08-10
 
 As a developer, I want one workspace-unique Change record with explicit portable repository targets, so that lifecycle commands cannot invent ownership, split status across copies, or mutate outside the selected workspace.
 
@@ -450,17 +418,17 @@ As a developer, I want one workspace-unique Change record with explicit portable
 
 ##### Requirement R1: Portable Central Change Creation
 
-The CLI SHALL create one central Change under `<workspace>/.sdd/changes/<change-id>/`, record its owning Space and stable repository IDs in `tasks.md`, and allow repository-only Spaces when a portable repository contract provides identity.
+The CLI SHALL create one proposed central `change.md` under `<workspace>/.sdd/changes/<change-id>/`, record its owning Space there, allow repository ownership to remain empty until planning, and use stable repository IDs when targets are selected.
 
 ###### Scenario R1-S1: Repository-Only Change Create
 
 - WHEN `change create` targets a repository-only synthetic Space with a valid `.sdd/config.yaml` repository ID
 - THEN it creates one central Change with that Space and repository ID and writes no repository-local Change folder.
 
-###### Scenario R1-S2: Ambiguous Repository Selection
+###### Scenario R1-S2: Deferred Repository Selection
 
-- WHEN an Idea maps to multiple eligible repositories and no target set is supplied
-- THEN creation refuses to guess and writes nothing.
+- WHEN a Space maps to multiple eligible repositories and no target set is supplied
+- THEN creation writes one proposed Change with an empty repository list instead of guessing.
 
 ##### Requirement R2: Strict Physical Configuration And Storage
 
@@ -498,36 +466,12 @@ The CLI SHALL enforce unique dated Change IDs across active and closed central s
 ###### Scenario R3-S2: Compare-And-Set Transition
 
 - WHEN `change transition` receives the expected current status
-- THEN it updates the one central `tasks.md`; a stale expected status or concurrent edit leaves the record unchanged.
+- THEN it updates the one central `change.md`; a stale expected status or concurrent edit leaves the record unchanged.
 
 ###### Scenario R3-S3: Central Close
 
 - WHEN `change close` receives an `in_review` Change
 - THEN it moves the one record to `<workspace>/.sdd/changes/closed/<change-id>/` without writing a synthetic `closed` status.
-
-##### Requirement R4: Explicit Fail-Closed User Migration
-
-`sdd setup <workspace> --from-user <old-user-root>` SHALL accept home-root workspace v1-v3 and released legacy `kind: user` version 1 and version 2 state only as explicit migration input, support a no-write `--dry-run`, preflight the complete source and destination before writing, preserve exact Change contents and safe relative topology, keep explicit external repository roots absolute, retire only SDD-owned legacy state after commit, and remain idempotent only for provenance-complete remaining work.
-
-###### Scenario R4-S1: Dry-Run Migration
-
-- WHEN a developer selects a valid legacy user root and passes `--dry-run`
-- THEN setup reports the complete migration plan and conflicts without changing the source, destination, managed skills, workflow, or configuration.
-
-###### Scenario R4-S2: Compatible Explicit Migration
-
-- WHEN the legacy source is supported and every destination is unambiguous and unmodified
-- THEN setup imports its configuration and Changes into the selected workspace, rebases contained paths, retains explicit external roots, installs workspace-managed assets, retires only SDD-owned source state after commit, and a rerun is a no-op.
-
-###### Scenario R4-S3: Conflicting Or Modified Source
-
-- WHEN source/destination state collides, a source changes after preflight, identity is ambiguous, or a path escapes its declared owner
-- THEN migration fails closed without overwriting newer or unrelated data and reports any exact recovery action still required.
-
-###### Scenario R4-S4: Interrupted Migration
-
-- WHEN migration terminates after publishing destination state but before source retirement completes
-- THEN the next locked non-dry-run migration recovers or safely resumes only when complete source-derived transaction provenance is independently bound outside the staged transaction and authenticates the remaining work; otherwise it fails closed and retains state for manual inspection, while dry-run reports the required recovery without mutation.
 
 ##### Requirement R5: Deterministic Workspace Discovery
 
@@ -547,7 +491,7 @@ The CLI SHALL resolve an explicit command workspace first, then `SDD_WORKSPACE_R
 
 | Requirement / Scenario | Location / Anchor | Kind | Responsibility |
 |---|---|---|---|
-| S3/R1, S3/R3-S1 | `src/commands/change-create.js#createChange` | primary | Creates the one central record, publishes Space/repository metadata in `tasks.md`, and rejects an active or closed ID both before staging and immediately before publication. |
+| S3/R1, S3/R3-S1 | `src/commands/change-create.js#createChange` | primary | Creates one proposed `change.md`, records Space and optional repository metadata, and rejects an active or closed ID before publication. |
 | S3/R1 | `src/change-repositories.js#resolveRepositoryTargets` | support | Resolves stable mapped or repository-only target IDs without inventing repository-local Change ownership. |
 | S3/R2 | `src/config.js#validateConfig` | primary | Enforces current config shape, portable repository IDs, and physical ownership invariants. |
 | S3/R2 | `schemas/workspace.schema.json#sdd-v3` | support | Publishes the checked workspace configuration contract. |
@@ -555,15 +499,12 @@ The CLI SHALL resolve an explicit command workspace first, then `SDD_WORKSPACE_R
 | S3/R2 | `src/workspace.js#resolveWorkspaceContext` | primary | Rejects duplicate physical repositories and ambiguous portable identities while retaining valid repository-only context. |
 | S3/R2-S3 | `src/change-store.js#assertChangeStoreConfinement` | primary | Confines active and closed central paths to the selected workspace. |
 | S3/R3 | `src/change-store.js#listStoredChanges` | support | Enumerates the active and closed workspace inventory without assigning uniqueness-enforcement responsibility to the inventory helper. |
-| S3/R3-S2 | `src/commands/change-transition.js#transitionChange` | primary | Applies compare-and-set status mutation to one central `tasks.md`. |
+| S3/R3-S2 | `src/commands/change-transition.js#transitionChange` | primary | Applies compare-and-set status mutation to one central `change.md`. |
 | S3/R3-S3 | `src/commands/change-close.js#closeChange` | primary | Moves one `in_review` central Change into closed history. |
 | S3/R2-S4, S3/R3-S1 | `src/commands/validate.js#validateCentralChanges` | primary | Rejects missing and cross-Space repository metadata and reports an active/closed ID collision for every central Change. |
 | S3/R2-S4 | `src/commands/status.js#buildSpace` | support | Keeps Space-owned Changes visible and reports unresolved target IDs when mappings drift. |
 | S3/R3-S1 | `src/commands/status.js#readCentralChanges` | support | Refuses to project an active/closed duplicate as two independent status records. |
 | S3/R3-S1 | `src/change-status.js#inspectChangeStatuses` | support | Reports active/closed duplicate identity through workspace diagnostics. |
-| S3/R4 | `src/legacy-user-migration.js#planLegacyUserMigration` | primary | Preflights supported old home state, ownership, topology, collisions, exact Change contents, managed assets, and source-retirement scope. |
-| S3/R4 | `src/legacy-user-migration.js#applyLegacyUserMigration` | primary | Stages, publishes, verifies, retires, and records one explicit home-to-workspace transaction. |
-| S3/R4-S4 | `src/legacy-user-migration.js#recoverLegacyUserMigration` | primary | Authenticates source-derived transaction provenance against its independent workspace authority before completing or rolling back interrupted work; otherwise retains state fail-closed. |
 | S3/R5 | `src/config.js#findWorkspaceRoot` | primary | Applies explicit, environment, target-ancestor, and mapped-current-workspace precedence with no home fallback. |
 
 #### Implementation Gaps
@@ -574,21 +515,12 @@ The CLI SHALL resolve an explicit command workspace first, then `SDD_WORKSPACE_R
 
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
-| S3/R1-S1 | Automated test `test/cli.test.js#change create scaffolds a planned Change for a selected repository` | Creation writes one central Change with Space/repository metadata and no repository-local lifecycle copy. | Passing 2026-08-07 |
-| S3/R1-S2 | Automated test `test/cli.test.js#change create refuses to guess among multiple mapped repositories` | Ambiguous target selection fails before writes. | Passing 2026-08-07 |
+| S3/R1-S1, S3/R1-S2 | Automated test `test/change-contract.test.js#change create captures proposed intent in one central change.md` | Creation writes only one metadata-bearing proposed `change.md`, permits deferred repository selection, and creates no repository-local lifecycle copy. | Passing 2026-08-10 |
 | S3/R2-S1 | Automated tests `test/cli.test.js#runtime config validation rejects unknown keys`, `test/cli.test.js#context rejects physical aliases claimed as different repositories`, and `test/schema-contracts.test.js#workspace and repository schemas reuse the runtime lexical path contract` | Runtime and published schemas reject unknown or unsafe shape and duplicate physical ownership consistently. | Passing 2026-08-10 |
 | S3/R2-S2 | Automated test `test/cli.test.js#context rejects a repository-only ID that collides with an existing Idea` | A duplicate portable ID cannot silently claim another owner. | Passing 2026-08-07 |
 | S3/R2-S3 | Automated tests `test/cli.test.js#validation rejects a central Change store symlinked outside its owner` and `test/cli.test.js#change transition rejects an active Change through an external symlink ancestor` | Workspace-owned Change paths cannot traverse a physical owner boundary. | Passing 2026-08-07 |
-| S3/R3-S1 | Automated tests `test/cli.test.js#change create infers a sole repository and refuses an existing Change` and `test/cli.test.js#validate reports an active and closed Change collision` | Active and closed Change IDs are unique inside the selected workspace. | Passing 2026-08-07 |
-| S3/R3-S2 | Automated tests `test/cli.test.js#change transition updates an active Change with compare-and-set semantics`, `test/cli.test.js#change transition preserves and can retry a concurrent pre-backup tasks edit`, and `test/change-file-authority.test.js#close and transition cannot commit after same-byte tasks inode substitution` | Transition changes one expected status and preserves concurrent edits or identity substitutions without committing stale authority. | Passing 2026-08-10 |
-| S3/R3-S3 | Automated tests `test/cli.test.js#change close moves an in-review Change without writing a closed status` and `test/cli.test.js#change close rechecks status at commit time` | Close uses folder location as terminal state and rechecks the commit-time status. | Passing 2026-08-07 |
+| S3/R3-S1, S3/R3-S2, S3/R3-S3 | Automated test `test/change-contract.test.js#planning completes the same Change before lifecycle work continues` | The progressive record rejects an ID already in closed history, transitions one `change.md` through planned, in-progress, and in-review, preserves commit-time edits, and closes the same record by location. | Passing 2026-08-10 |
 | S3/R2-S4 | Automated tests `test/cli.test.js#validate rejects absent and cross-Space Change repository IDs deterministically` and `test/cli.test.js#status retains Space-owned Changes whose repository IDs no longer resolve` | Invalid ownership fails validation without hiding the Space-owned work from status. | Passing 2026-08-07 |
-| S3/R4-S1, S3/R4-S2 | Automated tests `test/cli.test.js#CLI setup migrates a released legacy user v1 source through dry-run and apply`, `test/cli.test.js#CLI setup migrates an explicit legacy user v2 source and supports dry-run`, and `test/cli.test.js#CLI setup migrates an explicit legacy home-root v3 workspace` | Dry-run writes nothing; released user-v1/user-v2 and supported home-workspace sources migrate only through explicit setup into canonical workspace-v3 state and retire owned source state. | Passing 2026-08-10 |
-| S3/R4-S2 | Automated tests `test/workspace-config.test.js#released legacy user v1 is migration-only and preserves source-relative topology in workspace v3` and `test/legacy-user-migration.test.js#legacy user migration plans and applies a released v1 install while retiring owned source state` | Released v1 input is rejected as current authority, converts without mutating its source object, rebases source-relative topology from the explicit old-user root, writes canonical workspace-v3 state, and retires only owned source state. | Passing 2026-08-10 |
-| S3/R4-S3 | Automated test `test/cli.test.js#configure rejects released legacy user configurations as operational authority` | Both released user-v1 and user-v2 configurations require explicit migration and cannot become operational authority for configure. | Passing 2026-08-10 |
-| S3/R4-S2 | Automated test `test/legacy-user-migration.test.js#legacy user migration retires only owned state and reruns as a completed no-op` | Migration writes canonical workspace config, Change, workflow, lock, and skills; preserves unrelated source files and skills; retires only checksum-owned state; and reruns without mutation. | Passing 2026-08-07 |
-| S3/R4-S3 | Automated tests `test/workspace-config.test.js#released legacy user v1 rejects malformed layouts and unsupported signatures`, `test/workspace-config.test.js#legacy user v2 rejects every malformed present migration locator`, `test/legacy-user-migration.test.js#legacy user migration refuses an unresolved source-workspace locator before writing either tree`, `test/legacy-user-migration.test.js#legacy user migration refuses a divergent valid workspace config without mutation`, `test/legacy-user-migration.test.js#legacy user migration validates an existing destination config before writing either tree`, and `test/legacy-user-migration.test.js#legacy user migration aborts on source drift without overwriting or retiring source state` | Malformed or unsupported released v1/v2 input, unresolved prior migration ownership, divergent or invalid destination authority, and post-plan source drift all fail before destructive publication or retirement. | Passing 2026-08-10 |
-| S3/R4-S4 | Automated tests `test/legacy-user-migration.test.js#legacy user migration recovery completes a durable destination-verified transaction`, `test/legacy-user-migration.test.js#legacy user migration recovery rejects malformed journal records and states`, `test/legacy-user-migration.test.js#legacy user migration recovery rejects external staged, backup, and retired paths`, `test/legacy-user-migration.test.js#legacy user migration recovery rejects same-basename journal redirects outside configured owners`, `test/legacy-user-migration.test.js#legacy user migration recovery rejects coherently authenticated workspace-root skill redirects`, `test/legacy-user-migration.test.js#legacy user migration does not overwrite a retirement path that appears concurrently`, `test/legacy-user-migration.test.js#legacy user migration preserves an opaque source replacement before retirement transfer`, and `test/legacy-user-migration.test.js#legacy user migration re-verifies destinations after source retirement` | Provenance-authenticated recovery rejects malformed, owner-mismatched, or path-redirected journals; resumes covered destination or source transfers; and preserves concurrent or opaque replacements. This evidence does not authorize cleanup when complete source-derived provenance is unavailable. | Passing 2026-08-07 |
 | S3/R5-S1 | Automated tests `test/workspace-config.test.js#workspace discovery honors explicit, environment, target, and cwd precedence`, `test/workspace-config.test.js#cwd workspace resolves a physically mapped external repository`, and `test/cli.test.js#CLI context keeps cwd as the target when --workspace supplies external ownership` | Discovery selects the deterministic workspace owner while the explicit workspace option remains authority and never replaces the command's cwd target. | Passing 2026-08-07 |
 | S3/R5-S2 | Automated tests `test/workspace-config.test.js#an unmapped external target cannot borrow the cwd workspace` and `test/workspace-config.test.js#workspace discovery never falls back to HOME or SDD_USER_HOME` | Unmapped external targets fail without borrowing cwd or home authority. | Passing 2026-08-07 |
 
@@ -598,9 +530,8 @@ The CLI SHALL resolve an explicit command workspace first, then `SDD_WORKSPACE_R
 
 #### Story Notes
 
+- The focused progressive lifecycle contract passes; a clean aggregate package run remains a Change-level release gate rather than missing Scenario evidence.
 - Repository-only context remains portable through its stable repository ID, but an external repository selects a workspace only through an explicit command root, `SDD_WORKSPACE_ROOT`, or an enclosing current-directory workspace that maps it.
-- Legacy home-root workspace v1-v3 and released user-v1/v2 state are migration input only; `sdd setup <workspace> --from-user <old-user-root>` is the supported home-to-workspace cutover, while `sdd update` refreshes the already selected workspace.
-- Interrupted migration resumes only from complete source-derived transaction provenance independently bound outside the staged transaction. A committed partial-cleanup residue without that authenticated proof fails closed and remains for manual inspection.
 
 ### Story S4: Bounded And Context-Aware Diagnostics
 
@@ -773,24 +704,29 @@ The published package SHALL include the orphan-audit source and universal bundle
 
 ### Story S6: Reliable Workflow Execution
 
-Implementation: implemented
-Verification: verified
+Implementation: partial
+Verification: partial
 Created: 2026-07-23
-Modified: 2026-08-09
-Last verified: 2026-08-09
+Modified: 2026-08-10
+Last verified: 2026-08-10
 
 As a developer, I want SDD planning, implementation, and review workflows to carry work through a complete evidence-backed handoff, so that an agent does not stop at a partial task, a green command, or the first finding.
 
 #### Requirements And Scenarios
 
-##### Requirement R1: Adaptive Planning And Handoff Records
+##### Requirement R1: Progressive Planning And Handoff Records
 
-The packaged planning workflow SHALL define accepted end-state behavior and seed risk, decision fan-out, verification-environment, visual-verification, and candidate-scope obligations without freezing a file-by-file implementation sequence.
+The packaged planning workflow SHALL create or resume one central `change.md`, capture durable intent before technical planning, ask whether the user wants to continue, and add `design.md` plus `tasks.md` only when planning proceeds.
 
-###### Scenario R1-S1: Replanning After Review
+###### Scenario R1-S1: Deferred Technical Planning
+
+- WHEN the user captures a desired outcome but does not want to plan implementation yet
+- THEN `/sdd-change` leaves one central `proposed` Change containing `change.md` and can resume it later without repeating intake.
+
+###### Scenario R1-S2: Replanning After Review
 
 - WHEN review invalidates Story ownership or verification scope
-- THEN `/sdd-change --replan` returns the Change to a coherent planned state with a dated planning update and exact Apply restart point.
+- THEN `/sdd-change` returns the same Change to a coherent planned state with a planning update and exact Apply restart point.
 
 ##### Requirement R2: Persistent Verified Implementation
 
@@ -840,11 +776,11 @@ The Interactive workflow SHALL create the minimum shared Change artifacts, apply
 ###### Scenario R6-S1: Small Durable Behavior Change
 
 - WHEN a narrow change deserves a durable record but not a full planning pass
-- THEN `/sdd-interactive` creates the trimmed shared artifacts, applies and verifies the work, and routes broader scope back to `/sdd-change --plan`.
+- THEN `/sdd-interactive` creates the trimmed shared artifacts, applies and verifies the work, and routes broader scope back to `/sdd-change`.
 
 ##### Requirement R7: One Central Multi-Repository Workflow
 
-Planning, Apply, Review, PR, Release, and Space Status SHALL select one workspace-unique central Change, derive its full stable repository target set from `tasks.md`, keep repository-owned Epics/code/tests distinct, and perform lifecycle transition or close exactly once after every target passes its gate.
+Planning, Apply, Review, PR, Release, and Space Status SHALL select one workspace-unique central Change, derive its full stable repository target set from `change.md`, keep repository-owned Epics/code/tests distinct, and perform lifecycle transition or close exactly once after every target passes its gate.
 
 ###### Scenario R7-S1: Coordinated Multi-Repository Delivery
 
@@ -856,7 +792,10 @@ Planning, Apply, Review, PR, Release, and Space Status SHALL select one workspac
 
 | Requirement / Scenario | Location / Anchor | Kind | Responsibility |
 |---|---|---|---|
-| S6/R1 | `skills/sdd-change/SKILL.md#Replan Mode` | primary | Governs review-driven replanning, guarded lifecycle transitions, dated planning updates, and the exact Apply restart. |
+| S6/R1-S1, S6/R1-S2 | `skills/sdd-change/SKILL.md#Select Or Create The Change` | primary | Governs one adaptive create/resume flow and proposed intent capture. |
+| S6/R1-S1, S6/R1-S2 | `skills/sdd-change/SKILL.md#Revising An Existing Plan` | primary | Governs plan revision and exact Apply restart without a separate mode. |
+| S6/R1-S1 | `src/commands/change-create.js#createChange` | primary | Creates one proposed `change.md` and allows repository ownership to remain empty. |
+| S6/R1-S1 | `src/commands/change-transition.js#assertPlanningComplete` | primary | Requires repository ownership, `design.md`, and `tasks.md` before `planned`. |
 | S6/R1 | `docs/templates/tasks.md#Decision Fan-Out Ledger` | support | Carries planning decisions and their affected surfaces into delivery. |
 | S6/R1 | `docs/templates/tasks.md#Verification Environment` | support | Records required setups and safety boundaries before evidence is claimed. |
 | S6/R1 | `docs/templates/tasks.md#Verification Scope Decision` | support | Records aggregate and prospective-integration candidate obligations. |
@@ -878,7 +817,7 @@ Planning, Apply, Review, PR, Release, and Space Status SHALL select one workspac
 | S6/R5 | `skills/sdd-apply/references/risk-closure.md#Evidence Claim Integrity` | support | Requires exact claimed-boundary evidence to survive falsification. |
 | S6/R5 | `skills/sdd-review/SKILL.md#Systematic Review Search` | primary | Independently falsifies claimed behavior and evidence across the candidate. |
 | S6/R6 | `skills/sdd-interactive/SKILL.md#Workflow` | primary | Implements a trimmed shared-artifact session with immediate Apply-style execution and routing for broader scope. |
-| S6/R7 | `skills/sdd-change/SKILL.md#Common Setup` | primary | Creates and plans one central Change with stable target repository IDs. |
+| S6/R7 | `skills/sdd-change/SKILL.md#Select Or Create The Change` | primary | Creates or resumes one central Change and settles stable target repository IDs before planning completes. |
 | S6/R7 | `skills/sdd-apply/SKILL.md#Authority And Project Profile` | primary | Orchestrates implementation and the single workspace-wide transition across the complete target set. |
 | S6/R7 | `skills/sdd-review/SKILL.md#Authority And Project Profile` | primary | Reviews all target repositories and records one consolidated verdict and closeout state. |
 | S6/R7 | `skills/sdd-pr/SKILL.md#Authority And Project Profile` | primary | Stewards the coordinated repository PR set without duplicating lifecycle ownership. |
@@ -886,30 +825,31 @@ Planning, Apply, Review, PR, Release, and Space Status SHALL select one workspac
 | S6/R7 | `skills/sdd-release/SKILL.md#Operating Sequence` | primary | Resolves release readiness from canonical central records and repository-specific gates. |
 #### Implementation Gaps
 
-- None.
+- S6/R1-S1 and S6/R1-S2: existing workspace Change data and remaining package contract tests still need conversion to the progressive `change.md` shape.
+- S6/R7: remaining delivery skills need final semantic review after mechanical artifact-reference updates.
 
 #### Verified By
 
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
-| S6/R1-S1 | Semantic source inspection of `skills/sdd-change/SKILL.md#Replan Mode` and `docs/templates/tasks.md#Planning Updates` | The shipped planning workflow and ledger define guarded replan state, dated discovery, and an exact restart. | Passing 2026-07-23 |
+| S6/R1-S1, S6/R1-S2 | Automated tests `test/change-contract.test.js#change create captures proposed intent in one central change.md` and `test/change-contract.test.js#planning completes the same Change before lifecycle work continues` | Proposed intent needs only `change.md`; planning artifacts and repository ownership gate `planned`; status, transition, and close use the same record. | Passing 2026-08-10 |
 | S6/R2-S1 | Semantic source inspection of `skills/sdd-apply/SKILL.md#Persistence invariant` and `skills/sdd-apply/SKILL.md#Commit cadence invariant` | Apply continues beyond a green slice and commits an isolated reconciled phase before later work. | Passing 2026-07-23 |
 | S6/R3-S1, S6/R3-S2 | Semantic source inspection of `skills/sdd-review/SKILL.md#Full-review invariant` and `skills/sdd-review/SKILL.md#Execution-continuity invariant` | Review retains early findings while completing discovery and resumes yielded commands. | Passing 2026-07-23 |
 | S6/R4-S1 | Semantic source inspection of `skills/sdd-design/SKILL.md#Define The Visual Verification Matrix`, `skills/sdd-apply/SKILL.md#Apply Loop`, and `skills/sdd-review/SKILL.md#Review Gates` | Design, Apply, and Review jointly reject source-only UI confidence. | Passing 2026-07-23 |
 | S6/R5-S1 | Semantic source inspection of `skills/sdd-apply/references/risk-closure.md#Evidence Claim Integrity` and `skills/sdd-review/SKILL.md#Review Gates` | Aggregate success cannot substitute for exact high-risk Scenario proof. | Passing 2026-07-23 |
 | S6/R6-S1 | Semantic source inspection of `skills/sdd-interactive/SKILL.md#Workflow` and `skills/sdd-interactive/SKILL.md#Artifact Shape` | Interactive uses trimmed shared artifacts, immediate execution, durable Epic reconciliation, and broader-scope routing. | Passing 2026-07-23 |
-| S6/R1-S1 | Automated test `test/workflow-contracts.test.js#packaged change replan preserves a coherent planned handoff and exact Apply restart` | Replan preserves guarded state, complete planning ledgers, template parity, and an exact Apply restart. | Passing 2026-07-23 |
 | S6/R2-S1 | Automated test `test/workflow-contracts.test.js#packaged Apply continues after a verified slice and commits the phase before later work` | Full Apply persists beyond one slice and commits each isolated verified artifact-reconciled phase. | Passing 2026-07-23 |
 | S6/R3-S1 | Automated test `test/workflow-contracts.test.js#packaged Review completes every applicable gate after an early blocking finding` | Review retains early findings while completing all applicable discovery and scorecard gates. | Passing 2026-07-23 |
 | S6/R3-S2 | Automated test `test/workflow-contracts.test.js#packaged Review resumes yielded commands and preserves the full until-ready report contract` | Yielded work resumes, the default cap remains five, and every mode returns the same complete report. | Passing 2026-07-23 |
 | S6/R4-S1 | Automated test `test/workflow-contracts.test.js#packaged UI workflows reject source-only confidence without rendered current-source evidence` | Design, Apply, Review, templates, and doctrine consistently require current-source rendered evidence. | Passing 2026-07-23 |
 | S6/R5-S1 | Automated test `test/workflow-contracts.test.js#packaged evidence closure keeps high-risk Scenarios unverified when only an aggregate gate passes` | Risk closure and review require exact claimed-boundary proof beyond an aggregate green result. | Passing 2026-07-23 |
-| S6/R6-S1 | Automated test `test/workflow-contracts.test.js#packaged Interactive workflow tracks one lightweight request through an honest review handoff` | Interactive keeps trimmed shared artifacts, immediate tracked execution, validation, and honest handoff semantics. | Passing 2026-07-23 |
+| S6/R6-S1 | Automated test `test/workflow-contracts.test.js#packaged Interactive workflow tracks one lightweight progressive Change` | Interactive keeps trimmed shared artifacts, immediate tracked execution, validation, and honest handoff semantics. | Passing 2026-07-23 |
 | S6/R7-S1 | Automated test `test/workflow-contracts.test.js#packaged workflows coordinate one central Change across every target repository` | All delivery workflows share the central layout, full target-set invariant, repository-free Change-wide lifecycle, and projection semantics without legacy Change paths. | Passing 2026-08-07 |
 
 #### Verification Gaps
 
-- None.
+- S6/R1-S1 and S6/R1-S2: package-wide workflow-contract and migration tests have not yet been reconciled or rerun.
+- S6/R7-S1: full package validation remains pending after artifact conversion.
 
 #### Story Notes
 
@@ -920,8 +860,8 @@ Planning, Apply, Review, PR, Release, and Space Status SHALL select one workspac
 Implementation: implemented
 Verification: partial
 Created: 2026-07-23
-Modified: 2026-08-09
-Last verified: 2026-08-09
+Modified: 2026-08-10
+Last verified: 2026-08-10
 
 As a developer or coding agent, I want one readable public guide to explain the SDD problem, durable behavior model, general workflow, and package implementation, so that I can understand the method and find the correct entry point without reverse-engineering the repository.
 
@@ -965,12 +905,12 @@ The guide SHALL use the shared Steel semantic identity as restrained documentati
 
 ##### Requirement R5: Canonical Change Lifecycle Documentation
 
-The public package documentation SHALL distinguish one workspace-level central Change record from repository-local Epic/code/test truth, explain repository projections and workspace-wide lifecycle commands, document setup and deterministic workspace discovery, identify explicit `sdd setup <workspace> --from-user <old-user-root>` with `--dry-run` as the fail-closed path from legacy home-root workspace v1-v3 or user-v1/v2 installations, and explain that post-crash cleanup resumes only from complete source-derived transaction provenance.
+The public package documentation SHALL distinguish one progressive workspace-level central Change record from repository-local Epic/code/test truth, explain repository projections and workspace-wide lifecycle commands, document current setup and deterministic workspace discovery, and state that pre-1.0 installation and Change formats require manual recreation or conversion rather than a supported migration command.
 
-###### Scenario R5-S1: Legacy User Installation Migration
+###### Scenario R5-S1: Unsupported Alpha Format
 
-- WHEN a developer reads the installation or lifecycle guide for an older home-scoped installation
-- THEN the guide directs them to preview and run the explicit `sdd setup <workspace> --from-user <old-user-root> --dry-run` migration, explains workspace-owned destinations and conflicts, names both released user-v1 and user-v2 inputs, explains the source-derived provenance limit on interrupted cleanup, and never instructs them to preserve a user-global store or rely on automatic home discovery.
+- WHEN a developer encounters a pre-1.0 installation or Change record
+- THEN the guide identifies it as unsupported alpha data, directs the developer to recreate current workspace and repository contracts, and reserves `sdd update` for managed doctrine and skill reconciliation.
 
 
 #### Implemented By
@@ -986,8 +926,8 @@ The public package documentation SHALL distinguish one workspace-level central C
 | S7/R3 | `site/styles.css#:focus-visible` | support | Provides visible focus and touch-sized interactive treatment. |
 | S7/R4 | `site/styles.css#UI Foundations: Steel identity profile` | primary | Implements the Steel semantic palette and restrained documentation composition. |
 | S7/R4-S1 | `site/styles.css#@media (prefers-reduced-motion: reduce)` | primary | Reduces smooth scrolling and transition duration while preserving state. |
-| S7/R5 | `README.md#Installation` | primary | Defines explicit workspace setup, canonical workspace ownership, contained managed skills, external-repository selection, and fail-closed home-root workspace v1-v3 or user-v1/v2 migration with provenance-bounded cleanup. |
-| S7/R5 | `site/index.html#Planning, project truth, and Changes have distinct owners.` | primary | Presents the workspace lifecycle, explicit user-v1/v2 migration inputs, and source-derived recovery limit in the public guide. |
+| S7/R5 | `README.md#Installation` | primary | Defines current workspace setup, canonical workspace ownership, contained managed skills, external-repository selection, and the unsupported alpha-format policy. |
+| S7/R5 | `site/index.html#Planning, project truth, and Changes have distinct owners.` | primary | Presents progressive central Changes, current-only setup, and managed-only Update in the public guide. |
 
 #### Implementation Gaps
 
@@ -1006,18 +946,18 @@ The public package documentation SHALL distinguish one workspace-level central C
 | S7/R2-S1 | Historical deterministic rendered inspection of committed candidate `666de8f` at 1440×900, 768×1024, 375×812, 320×812, and 812×375 | The prior candidate kept navigation reachable, mobile controls at 44px, long content contained, and document scroll/client width equal at every viewport. | Historical passing evidence 2026-07-23; not current-source proof |
 | S7/R3-S1 | Deterministic browser interaction on `site/site.js` clipboard-fallback remediation with clipboard denial, missing command text, and keyboard skip-link interaction | Clipboard denial selects the full command and announces `Selected` when selection is available; missing command text announces `Copy failed` without a runtime error; the visible skip link moves focus to `main-content`. | Passing 2026-07-23 |
 | S7/R4-S1 | Historical deterministic rendered inspection of committed candidate `666de8f` with reduced-motion emulation and direct screenshot review | The prior candidate used `auto` scrolling, reduced transitions to `0.00001s`, retained active navigation, and kept the Steel composition readable. | Historical passing evidence 2026-07-23; not current-source proof |
-| S7/R5-S1 | Automated test `test/site.test.js#public guide documents workspace-owned Changes and explicit fail-closed user migration` | The source contract requires workspace-owned Change and skill paths, both released user-v1/v2 inputs, the dry-run command, provenance-limited cleanup, and no active user-global destination. | Current-source assertion updated 2026-08-09; execution pending Main |
-| S7/R5-S1 | Prior current-source browser inspection at 1280px with full-page screenshot and WCAG 2 A/AA axe scan | Before the 2026-08-09 migration-copy update, the rendered guide exposed the workspace layout and migration command without layout breakage and axe reported zero violations. | Superseded 2026-08-09; fresh responsive render pending |
+| S7/R5-S1 | Automated test `test/site.test.js#public guide documents progressive workspace-owned Changes and current-only setup` | The source contract requires `change.md`, deferred planning artifacts, unsupported alpha-format guidance, managed-only Update, and no `--from-user` path. | Passing 2026-08-10 |
+| S7/R5-S1 | Prior current-source browser inspection at 1280px with full-page screenshot and WCAG 2 A/AA axe scan | The earlier rendered guide had no layout breakage and axe reported zero violations, but its lifecycle copy is now superseded. | Historical; fresh responsive render pending |
 
 #### Verification Gaps
 
-- S7/R2-S1, S7/R4-S1, S7/R5-S1: current-source responsive rendering of the 2026-08-09 migration copy is pending Main capture at representative desktop and mobile widths, including direct screenshot inspection and console/network results.
+- S7/R2-S1, S7/R4-S1, S7/R5-S1: current-source responsive rendering of the progressive Change and current-only setup copy is pending at representative desktop and mobile widths, including direct screenshot inspection and console/network results.
 
 #### Story Notes
 
 - README and changelog entries communicate S7; they do not own or prove the public-guide behavior.
 - Owner manual confirmation of the current guide remains `pending user` and is tracked separately from technical verification.
-- Current-source responsive-render evidence for the 2026-08-09 migration copy remains pending until Main captures and inspects it; prior committed-candidate renders are historical evidence only.
+- Current-source responsive-render evidence for the progressive Change and current-only setup copy remains pending; prior committed-candidate renders are historical evidence only.
 
 ## Cross-Story Concerns
 
@@ -1044,4 +984,4 @@ This Epic is healthy when:
 
 ## Notes
 
-- Active and closed implementation records live in the selected workspace's central Change store. Historical home-root workspace v1-v3, user-v1/v2, and repository-local Change state is migration input only; Epics, ADRs, implementation, tests, and supporting docs remain repository-owned.
+- Active and closed implementation records live in the selected workspace's central Change store. Pre-1.0 home-scoped, older-schema, and repository-local Change state is unsupported historical data; Epics, ADRs, implementation, tests, and supporting docs remain repository-owned.

@@ -1,4 +1,4 @@
 interface:
   display_name: "SDD Change"
-  short_description: "Brief, plan, or replan SDD changes"
-  default_prompt: "Use $sdd-change to capture this outcome as an idea-owned brief, create one central planned Change for its target repositories, or replan the existing central Change."
+  short_description: "Capture or plan an SDD Change"
+  default_prompt: "Use $sdd-change to create or resume one central Change, capture its intent, and continue into technical planning when I choose."

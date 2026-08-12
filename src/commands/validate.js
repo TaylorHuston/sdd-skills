@@ -14,6 +14,7 @@ import {
   readRequiredChangeFileSnapshot,
   relativeChangeStorePath,
   REQUIRED_CHANGE_FILES,
+  PLANNED_CHANGE_FILES,
 } from "../change-store.js";
 import {
   inspectRepositoryIdentity,
@@ -46,10 +47,11 @@ import { resolveChangedFrom, validateEpicHistory } from "../epic-history.js";
 import { validateEpicVerifyReports } from "../epic-verify-report.js";
 
 const CHANGE_FILES = Object.freeze({
-  "proposal.md": [
+  "change.md": [
     ["Why"],
-    ["What Changes", "Interactive Scope Boundary"],
-    ["Impact", "Epic / Story Impact"],
+    ["Desired Outcome"],
+    ["Scope"],
+    ["Success Signals"],
     ["Open Questions"],
   ],
   "design.md": [
@@ -152,9 +154,16 @@ function changeProjectsToRepository(record, repository) {
     && record.metadata.repositories.includes(repository.id);
 }
 
+function epicImpactSource(source) {
+  const lines = source.split(/\r?\n/);
+  return ["Epic Impact", "Epic Actions"]
+    .map((heading) => headingSection(lines, 2, heading).join("\n"))
+    .find((section) => section.length > 0) ?? "";
+}
+
 function declaredEpicPaths(source) {
   const paths = new Set();
-  const epicActions = headingSection(source.split(/\r?\n/), 2, "Epic Actions").join("\n");
+  const epicActions = epicImpactSource(source);
   for (const match of epicActions.matchAll(/`([^`]+)`/g)) {
     const path = normalizePath(match[1]).replace(/^\.\//, "");
     if (path.endsWith("/epic.md")) paths.add(path);
@@ -164,7 +173,7 @@ function declaredEpicPaths(source) {
 
 function declaredEpicIds(source) {
   const ids = new Set();
-  const epicActions = headingSection(source.split(/\r?\n/), 2, "Epic Actions").join("\n");
+  const epicActions = epicImpactSource(source);
   for (const match of epicActions.matchAll(/`([^`]+)`/g)) {
     if (/^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*$/.test(match[1])) ids.add(match[1]);
   }
@@ -1051,7 +1060,9 @@ async function validateChange({
       context,
     ));
   }
-  for (const fileName of REQUIRED_CHANGE_FILES) {
+  const filesToValidate = [...REQUIRED_CHANGE_FILES];
+  for (let fileIndex = 0; fileIndex < filesToValidate.length; fileIndex += 1) {
+    const fileName = filesToValidate[fileIndex];
     const requiredHeadingGroups = CHANGE_FILES[fileName];
     const displayPath = normalizePath(join(displayRoot, fileName));
     let snapshot;
@@ -1121,8 +1132,8 @@ async function validateChange({
       ));
     }
     const h1 = headingsAtLevel(source, 1);
-    const expectedPrefix = fileName === "proposal.md"
-      ? "Proposal:"
+    const expectedPrefix = fileName === "change.md"
+      ? "Change:"
       : fileName === "design.md"
         ? "Design:"
         : "Tasks:";
@@ -1138,7 +1149,7 @@ async function validateChange({
       findings.push(finding(shapeLevel, "MISSING_ARTIFACT_SECTION", displayPath, `Missing required sections: ${missing.join(", ")}.`, context));
     }
 
-    if (fileName === "tasks.md") {
+    if (fileName === "change.md") {
       metadata = parseChangeMetadata(source);
       if (metadata.error) {
         findings.push(finding(
@@ -1158,6 +1169,17 @@ async function validateChange({
           `Expected one of: ${CHANGE_STATUSES.join(", ")}.`,
           { ...context, spaceId: metadata.space },
         ));
+      }
+      if (!metadata.error) {
+        if (metadata.status === "proposed") {
+          for (const plannedFile of PLANNED_CHANGE_FILES) {
+            if (await pathExists(join(changePath, plannedFile))) {
+              filesToValidate.push(plannedFile);
+            }
+          }
+        } else {
+          filesToValidate.push(...PLANNED_CHANGE_FILES);
+        }
       }
     }
   }
@@ -1181,19 +1203,19 @@ async function resolveAffectedEpicAssignments(
   if (!changeId || centralChanges.length !== 1) return { assignments, findings };
 
   const [record] = centralChanges;
-  const proposal = record.requiredFiles?.["proposal.md"];
-  if (proposal?.error || typeof proposal?.source !== "string") {
+  const change = record.requiredFiles?.["change.md"];
+  if (change?.error || typeof change?.source !== "string") {
     return { assignments, findings };
   }
   const repositories = selectedRepositories.filter((repository) =>
     changeProjectsToRepository(record, repository));
   const declarations = [
-    ...[...declaredEpicPaths(proposal.source)].map((path) => ({
+    ...[...declaredEpicPaths(change.source)].map((path) => ({
       artifactId: path.split("/").at(-2),
       path,
       type: "path",
     })),
-    ...[...declaredEpicIds(proposal.source)].map((id) => ({
+    ...[...declaredEpicIds(change.source)].map((id) => ({
       artifactId: id,
       path: id,
       type: "id",
@@ -1295,9 +1317,9 @@ async function validateRepository(
   const affectedEpicDirectories = new Set(resolvedAffectedEpicDirectories ?? []);
   if (changeId && resolvedAffectedEpicDirectories === null) {
     for (const record of targetedChanges) {
-      const proposal = record.requiredFiles?.["proposal.md"];
-      if (proposal?.error || typeof proposal?.source !== "string") continue;
-      for (const directory of declaredEpicDirectories(proposal.source, artifacts.epics)) {
+      const change = record.requiredFiles?.["change.md"];
+      if (change?.error || typeof change?.source !== "string") continue;
+      for (const directory of declaredEpicDirectories(change.source, artifacts.epics)) {
         affectedEpicDirectories.add(directory);
       }
     }
@@ -1533,7 +1555,7 @@ async function validateCentralRecords(
       findings.push(finding(
         "error",
         "SPACE_NOT_FOUND",
-        relativeChangeStorePath(join(record.path, "tasks.md"), workspaceRoot),
+        relativeChangeStorePath(join(record.path, "change.md"), workspaceRoot),
         `Change references unknown Space ID ${metadataSpace}.`,
         {
           artifactType: "change",
@@ -1545,7 +1567,7 @@ async function validateCentralRecords(
       findings.push(finding(
         "warning",
         "REPOSITORY_LOCATOR_UNAVAILABLE",
-        relativeChangeStorePath(join(record.path, "tasks.md"), workspaceRoot),
+        relativeChangeStorePath(join(record.path, "change.md"), workspaceRoot),
         `Repository-only Space ${result.metadata.space} has no configured repository locator; central Change artifacts were validated, but the implementation projection is unavailable.`,
         {
           artifactType: "change",
@@ -1585,7 +1607,7 @@ async function validateCentralRecords(
         findings.push(finding(
           "error",
           "REPOSITORY_NOT_FOUND",
-          relativeChangeStorePath(join(record.path, "tasks.md"), workspaceRoot),
+          relativeChangeStorePath(join(record.path, "change.md"), workspaceRoot),
           `Change references repository ID ${repositoryId}, which is not owned by Space ${result.metadata.space}.`,
           {
             artifactType: "change",
@@ -1646,7 +1668,7 @@ function missingChangeRepositoryFinding(workspaceRoot, record, repositoryId) {
   return finding(
     "error",
     "REPOSITORY_NOT_FOUND",
-    relativeChangeStorePath(join(record.path, "tasks.md"), workspaceRoot),
+    relativeChangeStorePath(join(record.path, "change.md"), workspaceRoot),
     `Change references repository ID ${repositoryId}, which is not owned by Space ${record.metadata.space}.`,
     {
       artifactType: "change",
@@ -1820,7 +1842,7 @@ export async function validateArtifacts(
         central.findings.push(finding(
           "error",
           "CHANGE_SPACE_MISMATCH",
-          relativeChangeStorePath(join(record.path, "tasks.md"), workspaceRoot),
+          relativeChangeStorePath(join(record.path, "change.md"), workspaceRoot),
           `Change belongs to Space ${record.metadata?.space ?? "unknown"}, not ${spaceId}.`,
           {
             artifactType: "change",

@@ -5,7 +5,7 @@ description: Create, draft, update, review, or reason about private project plan
 
 # SDD Product Brief / PRD
 
-Treat a Product Brief/PRD as durable private product direction above the SDD change workflow. Keep it high-level enough to guide `/sdd-change --brief`, later Change planning, Epic scope, Story shape, and scope tradeoffs without becoming a roadmap, implementation spec, status page, worklog, or SDD change artifact.
+Treat a Product Brief/PRD as durable private product direction above the SDD change workflow. Keep it high-level enough to guide `/sdd-change`, later Change planning, Epic scope, Story shape, and scope tradeoffs without becoming a roadmap, implementation spec, status page, worklog, or SDD change artifact.
 
 ## Authority And Project Profile
 
@@ -18,7 +18,7 @@ Use the smallest document that can keep future humans and agents aligned.
 The normal ladder is:
 
 ```text
-sdd-explore -> sdd-prd -> sdd-change --brief -> sdd-change --plan -> sdd-apply -> sdd-review -> optional PR/merge/close
+sdd-explore -> sdd-prd -> sdd-change -> sdd-apply -> sdd-review -> optional PR/merge/close
 ```
 
 `sdd-prd` is not required for early experiments. Suggest creating or refreshing a PRD when the project has momentum beyond experimentation, recurring product decisions, multiple Epics or SDD changes, unclear audience/scope/principles, public or monetization implications, or repeated product drift.
@@ -28,16 +28,15 @@ Use this boundary:
 | Artifact | Owns |
 |---|---|
 | `<planning-root>/prd.md` | product purpose, audience, scope, principles, product-level capability areas, market/monetization, open product questions |
-| `<planning-path>/change-briefs/<change-slug>.md` | undated idea-owned desired outcome that is not yet a Change |
-| `<workspace>/.sdd/changes/<change-id>/proposal.md` | why this specific Change exists, its target repository IDs, and what Epic actions it proposes |
+| `<workspace>/.sdd/changes/<change-id>/change.md` | intent, status, Space, repository ownership, scope, and Epic impact from proposal onward |
 | `<workspace>/.sdd/changes/<change-id>/design.md` | high-level technical approach plus proposed Epic/Story/Requirement/Scenario changes |
-| `<workspace>/.sdd/changes/<change-id>/tasks.md` | status, owning Space, stable target repository IDs, implementation ledger, resume state, verification ledger, and closeout state |
+| `<workspace>/.sdd/changes/<change-id>/tasks.md` | implementation ledger, resume state, verification ledger, and closeout state |
 | `docs/epics/<key>-<###>-<epic-name>/epic.md` | durable capability/Epic truth, embedded Stories, Requirements, Scenarios, code map, verification map, gaps |
 | `<workspace>/.sdd/changes/<change-id>/review.md` | Change-local review findings when `sdd-review` is not clean |
 
-An active dated Change lives once at `<workspace>/.sdd/changes/<change-id>/`; closed history lives at `<workspace>/.sdd/changes/closed/<change-id>/`. Change IDs are unique within the selected workspace, while Epics, ADRs, implementation, tests, and supporting docs remain repository-local. Legacy planned or repository-local active/closed Change paths are migration input only; direct the user to the selected workspace's supported `sdd update` path instead of reading them as live owners.
+An active dated Change lives once at `<workspace>/.sdd/changes/<change-id>/`; closed history lives at `<workspace>/.sdd/changes/closed/<change-id>/`. Change IDs are unique within the selected workspace, while Epics, ADRs, implementation, tests, and supporting docs remain repository-local. Legacy planned or repository-local active/closed Change paths are unsupported historical data; do not read them as live owners, and recreate worthwhile intent through `/sdd-change`.
 
-`/sdd-change --brief` and `--plan` should read the PRD when available and flag drift. `/sdd-apply` should stop when implementation reveals meaningful product drift. `/sdd-review` should include a lightweight PRD alignment check when product scope changed.
+`/sdd-change` should read the PRD when available and flag drift. `/sdd-apply` should stop when implementation reveals meaningful product drift. `/sdd-review` should include a lightweight PRD alignment check when product scope changed.
 
 ## Locations
 
@@ -70,7 +69,7 @@ Steps:
 1. Inspect relevant existing context first.
    - Read current `prd.md`, older `project-brief.md`, the project folder note, README, app docs, `docs/epics/*/epic.md`, and code only when they materially inform product direction.
    - Run `sdd status <space-id> --json`, use each relevant repository's filtered projection to select the corresponding unique top-level central active and recent Change records, and read only records whose metadata targets those repositories.
-   - If legacy planned or repository-local active/closed Change paths are present, direct the user to `sdd update`; do not use them as current product context.
+   - If legacy planned or repository-local active/closed Change paths are present, do not use them as current product context; recreate worthwhile intent through `/sdd-change`.
 2. Infer what can be inferred before asking questions.
 3. Start the lightweight product interview.
    - Ask one high-leverage product question at a time.
@@ -188,7 +187,7 @@ Treat implementation and Epic truth as current behavioral reality. Treat the PRD
 When drift is found:
 
 - If product intent changed, recommend updating `prd.md`.
-- If a proposed SDD change conflicts with product direction, flag the conflict before `/sdd-change --plan` or `/sdd-review` proceeds.
+- If a proposed SDD change conflicts with product direction, flag the conflict before `/sdd-change` or `/sdd-review` proceeds.
 - If the PRD is intentionally broader than current implementation, leave it alone and make current implementation state clear in repository-local Epic truth and the relevant central Change records.
 
 ## Completion Check
@@ -212,4 +211,4 @@ Summarize:
 - product decisions captured
 - open questions
 - SDD drift findings, if any
-- recommended next workflow, usually `/sdd-change --brief` when a bounded outcome is worth retaining or `/sdd-change --plan` when implementation planning should begin now
+- recommended next workflow, usually `/sdd-change` when a bounded outcome is worth retaining or planning

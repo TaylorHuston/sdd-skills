@@ -28,7 +28,7 @@ Complete only the assigned Requirement or Scenario slice in the named target rep
 Read:
 
 - project-local guidance for the assigned repository named by the orchestrator
-- the central `proposal.md`, `design.md`, and `tasks.md`
+- the central `change.md`, `design.md`, and `tasks.md`
 - the repository-local target Epic `epic.md`
 - files in the assigned repository listed or implied by the Requirement or Scenario
 - every selected skill and guidance item named by the orchestrator

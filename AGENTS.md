@@ -49,7 +49,7 @@ test/
 
 - Keep skills self-contained and compliant with the OpenAI/Codex skill format.
 - Keep CLI behavior deterministic and expose machine-readable JSON for agent-facing commands.
-- Treat `<workspace>/.sdd/config.yaml` as private workspace topology, `<repo>/.sdd/config.yaml` as the portable repository contract, the workspace-managed doctrine as the canonical workflow, and `<workspace>/.sdd/install-lock.json` as generated installation evidence. The current workspace config is `version: 3`, `schema: sdd-v3`, with `ideas` and no `kind`; home-root workspace v1-v3 and released `kind: user` version 1 and version 2 configurations are explicit migration input only.
+- Treat `<workspace>/.sdd/config.yaml` as private workspace topology, `<repo>/.sdd/config.yaml` as the portable repository contract, the workspace-managed doctrine as the canonical workflow, and `<workspace>/.sdd/install-lock.json` as generated installation evidence. The current workspace config is `version: 3`, `schema: sdd-v3`, with `ideas` and no `kind`; older alpha configuration shapes are unsupported and should not add compatibility branches to the live CLI.
 - Never overwrite locally modified managed skills or workflow guidance without an explicit `--force` operation.
 - Keep the checked workspace schema, runtime validation, README examples, and generated configuration shape aligned.
 - Keep package docs public-safe. Do not add private vault notes, local paths, credentials, or project-specific secrets.

@@ -40,7 +40,7 @@ Review the assigned central or repository-specific surface independently. Do not
 Read only the context needed for the assigned pass:
 
 - project-local guidance named by the orchestrator for the assigned repository
-- the central `proposal.md`, `design.md`, `tasks.md`, and existing `review.md` when relevant
+- the central `change.md`, `design.md`, `tasks.md`, and existing `review.md` when relevant
 - target Epic files in the assigned repository when traceability, artifact truth, or coverage is in scope
 - the assigned repository's source-vs-target changed files and surrounding code needed to understand the diff
 - materially relevant callers, consumers, registrations, schemas, configuration, generated boundaries, and downstream tests in the assigned repository for changed public or behavior-owning symbols

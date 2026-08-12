@@ -69,7 +69,7 @@ Status: audit complete | no material findings | blocked
 
 - Recommendation:
 - Why first:
-- Suggested next workflow: discuss | `/sdd-change --brief` | `/sdd-change --plan` | dedicated security response
+- Suggested next workflow: discuss | `/sdd-change` | dedicated security response
 
 ## Guardrail
 

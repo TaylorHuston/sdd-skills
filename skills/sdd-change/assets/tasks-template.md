@@ -1,15 +1,9 @@
----
-status: proposed
-space: <space-id>
-repositories:
-  - <repository-id>
----
 # Tasks: CHANGE TITLE
 
 ## Resume Here
 
 - Last completed action: change artifacts drafted
-- Next action: review proposal, design, and tasks
+- Next action: review change, design, and tasks
 - Active branches / refs by repository: unknown
 - Expected dirty files: `<workspace>/.sdd/changes/yyyy-mm-dd-change-name/` plus repository-local implementation, Epic, ADR, test, and supporting-doc files grouped by target repository
 - Known blockers: none identified yet
@@ -26,11 +20,11 @@ repositories:
 - [ ] 1.6 For UI-bearing changes with material experience uncertainty, complete `/sdd-design` or record why existing product conventions already make the direction implementation-ready.
 - [ ] 1.7 For UI-bearing changes, define a proportional Visual Verification Matrix with affected surfaces, routes or fixtures, representative desktop/mobile viewports, relevant states/interactions, expected rendered behavior, and preferred tooling or fallback.
 - [ ] 1.8 Seed the living risk, triggered boundary-contract applicability, decision fan-out, verification-environment, and Verification Scope Decision sections with end-state obligations already known. Include any known project-defined aggregate or prospective-integration gate. Do not turn them into an exhaustive implementation sequence; `/sdd-apply` must refine them from real implementation evidence.
-- [ ] 1.9 Set `status: planned` only after the proposal, design, tasks, Epic actions, and verification strategy are coherent and validated.
+- [ ] 1.9 Set `status: planned` only after the change, design, tasks, Epic actions, and verification strategy are coherent and validated.
 
 ### 2. Epic Artifacts
 
-- [ ] 2.1 Create or update the Epic directories named in `proposal.md` and `design.md`.
+- [ ] 2.1 Create or update the Epic directories named in `change.md` and `design.md`.
 - [ ] 2.2 Create or update each Epic's `epic.md` file.
 - [ ] 2.3 Confirm each Story has a stable Epic-scoped label or documented legacy Story ID, local Requirement IDs, local Scenario IDs, independent implementation/verification state, behavior-mapped Implemented By, Implementation Gaps, scenario-mapped Verified By, and Verification Gaps.
 - [ ] 2.4 Check whether this change supersedes earlier Story, Requirement, Scenario, implementation ownership/gaps, or verification evidence/gaps; reconcile any stale truth.
@@ -71,12 +65,12 @@ repositories:
 
 ### 6. Review And Closeout
 
-- [ ] 6.1 Update the project-defined release communication when `proposal.md` says release-communication impact is required or TBD.
+- [ ] 6.1 Update the project-defined release communication when `change.md` says release-communication impact is required or TBD.
 - [ ] 6.2 Run `sdd-review` as the local PR gate across every target repository for Requirements, Scenarios, Epic truth, tests, security, docs, release communication, ADR consistency, and branch readiness.
 - [ ] 6.3 Record each target repository's review outcome in the one central `review.md`, or record a clean review in this ledger or an explicit user-approved review waiver.
 - [ ] 6.4 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
 - [ ] 6.5 Record manual UI confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
-- [ ] 6.6 Confirm proposal/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
+- [ ] 6.6 Confirm change/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
 - [ ] 6.7 Confirm machine-readable Change status agrees with Resume Here, checklist, review, manual confirmation, release communication, ADR, PR/merge, deferred-gap, and folder-location claims.
 - [ ] 6.8 Keep `status: in_review` while independent review and closeout gates are underway.
 - [ ] 6.9 Before `in_review`, record an immutable candidate commit for every target repository, confirm intended implementation is committed, pass commit-sensitive contract/diff checks and every required aggregate candidate gate on each exact candidate, and leave no required risk, fan-out, environment, or verification obligation silently pending.
@@ -110,11 +104,11 @@ Record the user's manual testing feedback after implementation starts.
 
 ## Planning Updates
 
-Record `/sdd-change --replan` updates when implementation or feedback discovers planning-level requirements.
+Record `/sdd-change` planning updates when implementation or feedback changes the accepted plan.
 
 | Date | Discovery | Classification | Planning Updates | Next Apply Starting Point |
 |---|---|---|---|---|
-| YYYY-MM-DD | TBD | in-scope refinement / scope expansion / product drift / Epic ownership change / technical constraint / follow-up change | proposal.md / design.md / tasks.md | `/sdd-apply` TBD |
+| YYYY-MM-DD | TBD | in-scope refinement / scope expansion / product drift / Epic ownership change / technical constraint / follow-up change | change.md / design.md / tasks.md | `/sdd-apply` TBD |
 
 ## Design Updates
 

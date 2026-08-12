@@ -14,10 +14,12 @@ function normalizePath(value) {
   return value.split("\\").join("/") || ".";
 }
 
-export const REQUIRED_CHANGE_FILES = Object.freeze([
-  "proposal.md",
-  "design.md",
-  "tasks.md",
+export const CHANGE_METADATA_FILE = "change.md";
+export const REQUIRED_CHANGE_FILES = Object.freeze([CHANGE_METADATA_FILE]);
+export const PLANNED_CHANGE_FILES = Object.freeze(["design.md", "tasks.md"]);
+export const CHANGE_FILE_NAMES = Object.freeze([
+  ...REQUIRED_CHANGE_FILES,
+  ...PLANNED_CHANGE_FILES,
 ]);
 
 function requireWorkspaceRoot(workspaceRoot) {
@@ -154,7 +156,7 @@ export async function assertChangeStoreConfinement(path, workspaceRoot) {
 }
 
 function requireRequiredChangeFile(fileName) {
-  if (!REQUIRED_CHANGE_FILES.includes(fileName)) {
+  if (!CHANGE_FILE_NAMES.includes(fileName)) {
     throw new TypeError(`Unknown required Change file: ${fileName}`);
   }
   return fileName;

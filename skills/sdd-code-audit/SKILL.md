@@ -34,7 +34,7 @@ Do not claim a reasoning level the runtime cannot select. Record the actual dele
 1. Resolve the git root and read project-local `AGENTS.md` plus referenced guidance.
 2. Check branch, HEAD, worktrees, submodules, and dirty state. Include current tracked and untracked work in the snapshot unless the user selects a committed revision. Never stash, reset, switch branches, or clean files for an audit.
 3. Identify the stack, package boundaries, entry points, tests, generated/vendor/build paths, and project-native verification commands.
-4. If the repository has `.sdd/config.yaml`, run `sdd context <target> --json`, read its returned `workflowPath`, resolve the Space and stable repository ID, then run `sdd status <space-id> --json`. Use the selected repository's filtered `activeChanges` and `recentChanges` projection to select corresponding unique top-level central records, and read only records whose metadata targets that repository and materially informs the audit. Treat legacy planned or repository-local active/closed Change paths as migration input and direct the user to `sdd update`; never use them as live traceability owners. If SDD setup is unavailable or unhealthy, report that limitation rather than blocking the conventional code audit.
+4. If the repository has `.sdd/config.yaml`, run `sdd context <target> --json`, read its returned `workflowPath`, resolve the Space and stable repository ID, then run `sdd status <space-id> --json`. Use the selected repository's filtered `activeChanges` and `recentChanges` projection to select corresponding unique top-level central records, and read only records whose metadata targets that repository and materially informs the audit. Treat legacy planned or repository-local active/closed Change paths as unsupported historical data; never use them as live traceability owners, and route accepted work through `/sdd-change`. If SDD setup is unavailable or unhealthy, report that limitation rather than blocking the conventional code audit.
 5. Pin every reviewer to the same repository, scope, HEAD SHA, and working-tree state. Reviewers must not read each other's conclusions.
 
 Exclude dependencies, generated output, vendored code, caches, coverage artifacts, and build output unless their configuration or checked-in contents are themselves part of the risk.
@@ -84,9 +84,9 @@ Consolidate validated findings into an actionable sequence:
 3. Maintainability and experience improvements worth scheduling.
 4. Explicitly deferred or rejected observations with rationale.
 
-Group related findings into coherent candidate Changes. For each group, state the desired outcome, why it matters, likely scope, dependencies, and verification direction. Do not perform detailed technical planning unless the user asks to continue with `/sdd-change --plan`.
+Group related findings into coherent candidate Changes. For each group, state the desired outcome, why it matters, likely scope, dependencies, and verification direction. Do not perform detailed technical planning unless the user asks to continue with `/sdd-change`.
 
-Present the recommended first improvement and invite the user to refine, accept, defer, or reject groups. Use `/sdd-change --brief` for accepted outcomes that should be retained without immediate technical planning. Use `/sdd-change --plan` only when implementation is approaching.
+Present the recommended first improvement and invite the user to refine, accept, defer, or reject groups. Use `/sdd-change` for accepted outcomes; the user can stop after intent capture or continue into technical planning.
 
 ## Output
 

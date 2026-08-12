@@ -128,7 +128,7 @@ Use only `pass`, `findings`, `blocked`, or `not applicable`. `aligned` requires 
 
 | Finding | Recommended Workflow | Owner Decision Needed |
 |---|---|---|
-| TBD | `ask to apply safe artifact fixes / sdd-change --brief or --plan -> sdd-apply -> sdd-review / sdd-prd / manual decision` | TBD |
+| TBD | `ask to apply safe artifact fixes / sdd-change -> sdd-apply -> sdd-review / sdd-prd / manual decision` | TBD |
 
 ## Evidence Inspected
 

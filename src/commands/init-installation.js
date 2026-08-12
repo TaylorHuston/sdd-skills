@@ -5,7 +5,6 @@ import { basename, dirname, join, resolve } from "node:path";
 import {
   assertValidConfig,
   assertWorkspaceConfigSnapshotCurrent,
-  assertWorkspaceRootIsNotLegacyHome,
   assertValidRepositoryConfig,
   createInitialConfig,
   createRepositoryConfig,
@@ -37,13 +36,6 @@ import {
   removeBoundRegularFile,
 } from "../fs.js";
 import { applyManagedInstallation } from "../installation.js";
-import {
-  applyLegacyUserMigration,
-  assertSupportedLegacyMigrationSkillsDirectory,
-  cleanupRetiredLegacyDirectories,
-  planLegacyUserMigration,
-  recoverLegacyUserMigration,
-} from "../legacy-user-migration.js";
 import { withWorkspaceMutationLock } from "../mutation.js";
 import { planSkillSync, readInstallLockSnapshot } from "../skills.js";
 import { findOperationConfiguration } from "../workspace.js";
@@ -61,33 +53,19 @@ function installationResult(workspaceRoot, config, {
   dryRun,
   workflow,
   skills,
-  migrationSource = null,
-  migration = null,
 }) {
   return {
     command: "setup",
     mode: "workspace",
     workspaceRoot,
     createdWorkspaceConfig,
-    migrationSource,
     dryRun,
     workspaceConfigPath: getWorkspaceConfigPath(workspaceRoot),
     config,
     workflowPath: resolve(workspaceRoot, WORKFLOW_RELATIVE_PATH),
     workflow,
     skills,
-    ...(migration ? { migration } : {}),
   };
-}
-
-async function withMutationLocks(roots, callback, index = 0) {
-  const uniqueRoots = [...new Set(roots.map((root) => resolve(root)))]
-    .sort((left, right) => left.localeCompare(right));
-  if (index === uniqueRoots.length) return callback();
-  return withWorkspaceMutationLock(
-    uniqueRoots[index],
-    () => withMutationLocks(uniqueRoots, callback, index + 1),
-  );
 }
 
 async function lstatIfPresent(path) {
@@ -654,108 +632,11 @@ export async function setupInstallation(
   options = {},
 ) {
   const workspaceRoot = resolve(workspacePath);
-  await assertWorkspaceRootIsNotLegacyHome(workspaceRoot, options.env ?? process.env);
-  const fromUser = options.fromUser ? resolve(options.fromUser) : null;
-  if (fromUser) {
-    assertSupportedLegacyMigrationSkillsDirectory(workspaceRoot, options.skillsDirectory);
-  }
-  if (fromUser && (options.planningRoot !== undefined || options.repositoryRoots !== undefined)) {
-    throw new SddError(
-      "--from-user cannot be combined with planning or repository layout overrides.",
-      { code: "INVALID_MIGRATION_OPTIONS" },
-    );
-  }
-
-  if (!fromUser) {
-    if (options.dryRun) return setupInstallationUnlocked(workspaceRoot, options);
-    return withWorkspaceMutationLock(
-      workspaceRoot,
-      () => setupInstallationUnlocked(workspaceRoot, options),
-    );
-  }
-
-  const recoveryPreview = await recoverLegacyUserMigration(workspaceRoot, fromUser, { dryRun: true });
-  const preflight = recoveryPreview.recovered === 0
-    ? await planLegacyUserMigration(workspaceRoot, fromUser, options)
-    : null;
-  if (options.dryRun) {
-    if (recoveryPreview.recovered > 0) {
-      return installationResult(workspaceRoot, null, {
-        createdWorkspaceConfig: false,
-        migrationSource: fromUser,
-        dryRun: true,
-        workflow: null,
-        skills: null,
-        migration: { required: true, actions: recoveryPreview.actions, warnings: [] },
-      });
-    }
-    return installationResult(workspaceRoot, preflight.config, {
-      createdWorkspaceConfig: !preflight.destinationConfigState,
-      migrationSource: fromUser,
-      dryRun: true,
-      workflow: preflight.completed ? null : {
-        path: WORKFLOW_RELATIVE_PATH,
-        action: preflight.workflowPlan.action,
-        hash: preflight.workflowPlan.sourceHash,
-      },
-      skills: preflight.completed ? null : {
-        skillsDirectory: preflight.skillPlan.skillsDirectory,
-        actions: preflight.skillPlan.actions.map(({ skillName, action, sourceHash }) => ({
-          skillName,
-          action,
-          hash: sourceHash,
-        })),
-      },
-      migration: preflight.result,
-    });
-  }
-
-  const { result, retiredDirectories } = await withMutationLocks(
-    [workspaceRoot, fromUser],
-    async () => {
-      await recoverLegacyUserMigration(workspaceRoot, fromUser);
-      const plan = await planLegacyUserMigration(workspaceRoot, fromUser, options);
-      const applied = await applyLegacyUserMigration(plan, options.migrationOptions ?? {});
-      return {
-        result: installationResult(workspaceRoot, applied.config, {
-          createdWorkspaceConfig: !plan.completed && !plan.destinationConfigState,
-          migrationSource: fromUser,
-          dryRun: false,
-          workflow: applied.workflow,
-          skills: applied.skills,
-          migration: applied.migration,
-        }),
-        retiredDirectories: applied.retiredDirectories,
-      };
-    },
+  if (options.dryRun) return setupInstallationUnlocked(workspaceRoot, options);
+  return withWorkspaceMutationLock(
+    workspaceRoot,
+    () => setupInstallationUnlocked(workspaceRoot, options),
   );
-  if (retiredDirectories.length > 0) {
-    try {
-      await (options.cleanupRetiredLegacyDirectories ?? cleanupRetiredLegacyDirectories)(
-        fromUser,
-        retiredDirectories,
-      );
-    } catch (cleanupError) {
-      const failure = new SddError(
-        "Legacy user migration committed, but retired-directory cleanup failed.",
-        {
-          code: "MUTATION_RECOVERY_FAILED",
-          details: [
-            `Committed workspace migration was preserved and was not rolled back: ${workspaceRoot}`,
-            ...retiredDirectories.map(({ path }) => (
-              `Legacy cleanup path requiring inspection: ${path}`
-            )),
-            `Cleanup error: ${cleanupError?.code ? `${cleanupError.code}: ` : ""}${cleanupError?.message ?? String(cleanupError)}`,
-            ...(Array.isArray(cleanupError?.details) ? cleanupError.details : []),
-          ],
-        },
-      );
-      failure.errors = [cleanupError];
-      failure.cause = cleanupError;
-      throw failure;
-    }
-  }
-  return result;
 }
 function sameRepositoryRootMap(left, right) {
   const keys = Object.keys(left).sort((a, b) => a.localeCompare(b));

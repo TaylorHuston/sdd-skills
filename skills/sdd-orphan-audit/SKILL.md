@@ -11,7 +11,7 @@ Find likely orphaned code/tests and SDD traceability gaps without brute-force re
 
 Resolve the workspace, Space ID, selected repository, and its stable repository ID with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before classifying traceability or artifact-authority gaps. Run `sdd status <space-id> --json` and use the selected repository's filtered `activeChanges` and `recentChanges` projection to select any relevant unique top-level central Change records.
 
-Keep Epics under `docs/epics/` and audit reports under `docs/audits/` in the resolved repository. Each dated Change lives once under `<workspace>/.sdd/changes/<change-id>/`, or under `<workspace>/.sdd/changes/closed/<change-id>/` after close, and is read only when its metadata targets the selected repository and it explains likely drift. Legacy planned or repository-local active/closed Change paths are migration input only: direct the user to the selected workspace's supported `sdd update` path and do not treat them as live owners. Project guidance owns source, generated, test-support, and audit-report policy.
+Keep Epics under `docs/epics/` and audit reports under `docs/audits/` in the resolved repository. Each dated Change lives once under `<workspace>/.sdd/changes/<change-id>/`, or under `<workspace>/.sdd/changes/closed/<change-id>/` after close, and is read only when its metadata targets the selected repository and it explains likely drift. Legacy planned or repository-local active/closed Change paths are unsupported historical data: do not treat them as live owners, and route worthwhile intent through `/sdd-change`. Project guidance owns source, generated, test-support, and audit-report policy.
 
 This is a report-first audit. It can identify candidates, confidence levels, and recommended follow-up workflows, but it must not delete code, remove tests, rewrite Epics, or make cleanup commits unless the user explicitly asks for a separate follow-up change.
 
@@ -34,7 +34,7 @@ Default report path:
 
 Use `assets/orphan-audit-report-template.md` when writing the report. Create `docs/audits/` only when writing a report.
 
-The report is advisory. Address findings through `/sdd-change --brief`, `/sdd-change --plan`, `/sdd-interactive`, `/sdd-apply`, `/sdd-review`, or `/sdd-epic-verify` depending on the finding.
+The report is advisory. Address findings through `/sdd-change`, `/sdd-interactive`, `/sdd-apply`, `/sdd-review`, or `/sdd-epic-verify` depending on the finding.
 
 ## Required Context
 
@@ -43,7 +43,7 @@ Before auditing, read:
 - project-local `AGENTS.md`, especially branch policy and generated-file guidance
 - parent or workspace guidance when the project points to it
 - `docs/epics/*/epic.md`
-- central active and recent `proposal.md`, `design.md`, `tasks.md`, and `review.md` selected through the target repository's `sdd status` projection, only when they explain likely drift
+- central active and recent `change.md`, `design.md`, `tasks.md`, and `review.md` selected through the target repository's `sdd status` projection, only when they explain likely drift
 - project README, test docs, package scripts, framework config, and configured release communication when they affect inventory or cleanup risk
 
 Check git status before writing a report. Preserve unrelated dirty files. Do not stage, commit, push, merge, deploy, or mutate external services.
@@ -80,7 +80,7 @@ Check git status before writing a report. Preserve unrelated dirty files. Do not
    - After refactors, explicitly search for stranded routes, registrations, imports, dependencies, tests, migrations, generated bindings, and obsolete files even when static ownership looks complete.
 6. Recommend the next workflow.
    - Use `/sdd-epic-verify` when an Epic may be stale or missing evidence.
-   - Use `/sdd-change --brief` for deferred cleanup outcomes and `/sdd-change --plan` for current Story moves, artifact corrections with implementation implications, or broad traceability repair.
+   - Use `/sdd-change` for deferred cleanup outcomes, current Story moves, artifact corrections with implementation implications, or broad traceability repair.
    - Use `/sdd-interactive` for small, obvious traceability fixes or narrowly scoped cleanup.
    - Use `/sdd-apply` only when an active change already owns the cleanup.
    - Use `/sdd-review` when cleanup has been implemented and needs local PR-style validation.

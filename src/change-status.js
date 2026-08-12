@@ -157,28 +157,28 @@ export async function inspectChangeStatuses(
           locations.set(record.changeId, record);
         }
 
-        const tasksPath = join(record.path, "tasks.md");
-        const displayPath = relativeChangeStorePath(tasksPath, workspaceRoot);
-        const tasksSnapshot = await readRequiredChangeFileSnapshot(
+        const changeFilePath = join(record.path, "change.md");
+        const displayPath = relativeChangeStorePath(changeFilePath, workspaceRoot);
+        const changeSnapshot = await readRequiredChangeFileSnapshot(
           record.path,
-          "tasks.md",
+          "change.md",
           workspaceRoot,
           {
             afterRead: afterChangeFileRead
               ? (observation) => afterChangeFileRead({
                   changeId: record.changeId,
                   closed: record.closed,
-                  fileName: "tasks.md",
+                  fileName: "change.md",
                   ...observation,
                 })
               : null,
           },
         );
-        if (tasksSnapshot === null) {
-          findings.push({ level: "error", message: `Change is missing tasks.md: ${displayPath}.` });
+        if (changeSnapshot === null) {
+          findings.push({ level: "error", message: `Change is missing change.md: ${displayPath}.` });
           continue;
         }
-        const metadata = parseChangeMetadata(tasksSnapshot.source);
+        const metadata = parseChangeMetadata(changeSnapshot.source);
         if (metadata.error) {
           findings.push({ level: "error", message: `Cannot parse Change metadata in ${displayPath}: ${metadata.error}` });
           continue;

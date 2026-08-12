@@ -149,31 +149,31 @@ async function readCentralChanges(
           });
         }
         seen.add(record.changeId);
-        const tasksPath = join(record.path, "tasks.md");
-        const tasksSnapshot = await readRequiredChangeFileSnapshot(
+        const changeFilePath = join(record.path, "change.md");
+        const changeSnapshot = await readRequiredChangeFileSnapshot(
           record.path,
-          "tasks.md",
+          "change.md",
           workspaceRoot,
           {
             afterRead: afterChangeFileRead
               ? (observation) => afterChangeFileRead({
                   changeId: record.changeId,
                   closed: record.closed,
-                  fileName: "tasks.md",
+                  fileName: "change.md",
                   ...observation,
                 })
               : null,
           },
         );
-        if (tasksSnapshot === null) {
-          throw new SddError(`Change is missing tasks.md: ${relativeChangeStorePath(record.path, workspaceRoot)}`, {
+        if (changeSnapshot === null) {
+          throw new SddError(`Change is missing change.md: ${relativeChangeStorePath(record.path, workspaceRoot)}`, {
             code: "INCOMPLETE_CHANGE",
           });
         }
-        const metadata = parseChangeMetadata(tasksSnapshot.source);
+        const metadata = parseChangeMetadata(changeSnapshot.source);
         if (metadata.error) {
           throw new SddError(
-            `Cannot parse Change metadata in ${relativeChangeStorePath(tasksPath, workspaceRoot)}: ${metadata.error}`,
+            `Cannot parse Change metadata in ${relativeChangeStorePath(changeFilePath, workspaceRoot)}: ${metadata.error}`,
             { code: "INVALID_CHANGE_METADATA" },
           );
         }

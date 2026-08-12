@@ -29,7 +29,7 @@ Review the assigned repository implementation objectively. The central Change ma
 Read:
 
 - project-local guidance for the assigned repository named by the orchestrator
-- the central `proposal.md`, `design.md`, and `tasks.md`
+- the central `change.md`, `design.md`, and `tasks.md`
 - the repository-local target Epic `epic.md`
 - changed files and relevant tests in the assigned repository
 - that repository's changed-surface reverse-traceability inventory when assigned candidate classification

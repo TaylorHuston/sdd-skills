@@ -12,16 +12,11 @@ export const INSTALL_LOCK_FILE_NAME = "install-lock.json";
 export const WORKFLOW_RELATIVE_PATH = ".sdd/story-driven-development.md";
 export const WORKSPACE_CONFIG_VERSION = 3;
 export const WORKSPACE_SCHEMA_VERSION = "sdd-v3";
-export const LEGACY_USER_CONFIG_SIGNATURES = Object.freeze([
-  Object.freeze({ version: 1, schema: "sdd-user-v1" }),
-  Object.freeze({ version: 2, schema: "sdd-user-v2" }),
-]);
 export const REPOSITORY_CONFIG_VERSION = 2;
 export const REPOSITORY_SCHEMA_VERSION = "sdd-repository-v2";
 
 export const CHANGES_DIRECTORY_NAME = "changes";
 export const CLOSED_CHANGES_DIRECTORY_NAME = "closed";
-export const CHANGE_BRIEFS_DIRECTORY_NAME = "change-briefs";
 
 export const DEFAULT_ARTIFACT_PATHS = Object.freeze({
   epics: "docs/epics",
