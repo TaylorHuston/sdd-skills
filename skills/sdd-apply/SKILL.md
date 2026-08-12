@@ -5,7 +5,7 @@ description: Apply or continue one central SDD Change across all targeted reposi
 
 # SDD Apply
 
-Apply a planned or in-progress central SDD Change from `<workspace>/.sdd/changes/<change-id>/`. This is the implementation-side companion to `/sdd-change`: `change.md` defines shared scope, `design.md` defines the end state, constraints, repository responsibilities, and Epic changes, and `tasks.md` is the one adaptive implementation ledger and cold-resume surface. Treat the plan as a contract for what must be true and confirmed, not a fixed implementation script; revise the path, risks, coordination, and evidence as implementation teaches you more.
+Apply a planned or in-progress central SDD Change from `<workspace>/.sdd/changes/<change-id>/`. This is the implementation-side companion to `/sdd-change`: `change.md` defines shared scope, end state, constraints, repository responsibilities, and Epic changes, and `tasks.md` is the one adaptive implementation ledger and cold-resume surface. Treat the plan as a contract for what must be true and confirmed, not a fixed implementation script; revise the path, risks, coordination, and evidence as implementation teaches you more.
 
 ## Authority And Project Profile
 
@@ -40,7 +40,6 @@ Use `assets/epic-template.md` when creating a new Epic or normalizing an Epic fi
 The one canonical active Change lives in the workspace-level store:
 
 - change intent and metadata: `<workspace>/.sdd/changes/<yyyy-mm-dd-change-name>/change.md`
-- design: `<workspace>/.sdd/changes/<yyyy-mm-dd-change-name>/design.md`
 - tasks ledger: `<workspace>/.sdd/changes/<yyyy-mm-dd-change-name>/tasks.md`
 - closed history: `<workspace>/.sdd/changes/closed/<yyyy-mm-dd-change-name>/`
 
@@ -52,7 +51,7 @@ Required repository-local layout in each target:
 - ADRs: the repository's canonical ADR location
 - implementation, tests, generated artifacts, supporting docs, and release communication: the repository locations defined by project guidance
 
-A proposed central Change may contain only `change.md` and cannot be applied until technical planning adds `design.md` and `tasks.md` and transitions it to `planned`. Idea-owned dated planned folders and repository-local active or closed Change folders are unsupported historical data.
+A proposed central Change may contain only `change.md` and cannot be applied until technical planning expands it, adds `tasks.md`, and transitions it to `planned`. Idea-owned dated planned folders and repository-local active or closed Change folders are unsupported historical data.
 
 Project-local guidance may adapt branch policy, release-communication location, test commands, and supporting-doc inventory. It may not relocate or duplicate the central Change record.
 
@@ -93,7 +92,7 @@ Always announce the selected central Change path, Change ID, target repository I
 Before editing, read:
 
 - `<workspace>/.sdd/changes/<change-id>/change.md`
-- `<workspace>/.sdd/changes/<change-id>/design.md`
+- an existing `<workspace>/.sdd/changes/<change-id>/design.md` when this compatible Change already has one
 - `<workspace>/.sdd/changes/<change-id>/tasks.md` as the implementation and verification ledger
 - the workspace workflow returned by `sdd context` and enough `sdd status <space-id> --json` output to resolve every target repository ID without treating its per-repository Change projections as copies
 - relevant PRD/Product Brief context under the resolved idea planning path
@@ -102,7 +101,7 @@ Before editing, read:
 - each target repository's truth-bearing supporting-doc set; when none is declared, inspect the README, changed docs, and documents whose current claims intersect the changed surface rather than inventing a universal inventory
 - target Epic files under each owning repository's `docs/epics/*/epic.md`
 - enough of every active `docs/epics/*/epic.md` in each affected repository to detect duplicate Story labels within an Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs
-- repository-local ADRs, code, tests, docs, and generated artifacts named by `design.md`, `tasks.md`, or current implementation reality
+- repository-local ADRs, code, tests, docs, and generated artifacts named by `change.md`, an existing `design.md`, `tasks.md`, or current implementation reality
 - the owning application's component previews and any project-configured shared reference catalog when a UI-bearing Change introduces or materially changes reusable components or patterns
 - routes, commands, seed data, test accounts, browser setup, screenshots, or local dev URLs needed to give the user a useful manual UI confirmation walkthrough when the Change is user-facing
 - recent central or repository-local review findings for the same Epic, subsystem, or behavior boundary when they can reveal a recurring failure class; do not turn unrelated review history into generic scope
@@ -116,9 +115,9 @@ Start every run with Discovery, even when resuming.
 Check that:
 
 - `sdd validate <space-id> --change <change-id> --workspace <workspace-root> --json` has no unresolved deterministic errors. Use `--repo` filters when a focused projection to one or more target repositories is useful; a filtered projection does not select, create, or transition a separate Change. Inspect warnings and classify intentional compatibility exceptions instead of ignoring them. This structural gate does not replace the semantic Discovery checks below.
-- `change.md`, `design.md`, and the one central `tasks.md` agree about shared scope, target repository IDs, repository-specific responsibilities, dependencies, and completion gates.
+- `change.md` and the one central `tasks.md` agree, including any compatible existing `design.md`, about shared scope, target repository IDs, repository-specific responsibilities, dependencies, and completion gates.
 - `change.md` frontmatter has exactly one valid active `status` (`proposed`, `planned`, `in_progress`, or `in_review`), the owning `space`, and the stable portable `repositories` list. Start first implementation from `planned` by running `sdd change transition <space-id> <change-id> --from planned --to in_progress` once, with no `--repo`. Resume `in_progress` in place. Route `proposed` to `/sdd-change`, and treat `in_review` as review-owned unless the requested work explicitly returns the central Change through the corresponding guarded transition.
-- `design.md` identifies, by stable repository ID, whether the Change creates new Epic directories, edits existing Epic directories, or both, and records material cross-repository dependencies.
+- `change.md` (or a compatible existing `design.md`) identifies, by stable repository ID, whether the Change creates new Epic directories, edits existing Epic directories, or both, and records material cross-repository dependencies.
 - For UI-bearing changes, any required `Experience Design` direction is confirmed, uses stable references, and resolves material responsive, state, accessibility, and visual questions before implementation begins.
 - For UI-bearing changes with material component decisions, the `Experience Design` classifies each affected pattern as an existing application component, adopted reference, application-specific component, reference candidate, or deliberate divergence, and names its initial owner plus required preview states. Do not invent a shared-catalog dependency when none is configured.
 - For UI-bearing changes, `tasks.md` contains a proportional Visual Verification Matrix naming affected surfaces, routes or fixtures, representative desktop/mobile viewports, relevant states and interactions, expected rendered behavior, and the preferred project tooling or portable fallback. Fill a missing matrix before implementation rather than leaving visual proof implicit.
@@ -163,7 +162,7 @@ Before acting on feedback:
 2. Classify the feedback.
    - `defect`: implemented behavior fails an existing Requirement or Scenario.
    - `verification gap`: behavior may work, but evidence is missing, stale, too broad, or too mock-bound.
-   - `artifact drift`: Epic, design, tasks, docs, or release communication no longer describe reality.
+   - `artifact drift`: Epic, change planning, tasks, compatible existing design, docs, or release communication no longer describe reality.
    - `requirement refinement`: feedback changes wording, edge cases, or acceptance expectations while staying inside the proposal.
    - `planning discovery`: implementation or feedback reveals a new or meaningfully changed Requirement, Scenario, constraint, or Epic ownership question that needs design work before more code changes.
    - `scope expansion`: feedback adds new user-visible behavior, product scope, data/auth/API semantics, Epic ownership, or release expectations beyond the proposal.
@@ -172,17 +171,17 @@ Before acting on feedback:
    - For `defect`, add or update the relevant Scenario/test, fix the implementation, verify, and update `tasks.md` plus Story `Verified By` or `Verification Gaps`.
    - For `verification gap`, run or add the missing proof before claiming completion.
    - For `artifact drift`, update the stale artifact and record the reconciliation in `tasks.md`.
-   - For small `requirement refinement`, update `design.md` and the target Epic Story Requirement/Scenario IDs before implementation, then add matching `tasks.md` checklist entries.
-   - For `planning discovery`, stop implementation and recommend `/sdd-change` against the central active Change. Resume with a fresh `/sdd-apply` only after the one `change.md`, `design.md`, and `tasks.md` are updated.
+   - For small `requirement refinement`, update the technical-planning sections of `change.md` and the target Epic Story Requirement/Scenario IDs before implementation, then add matching `tasks.md` checklist entries.
+   - For `planning discovery`, stop implementation and recommend `/sdd-change` against the central active Change. Resume with a fresh `/sdd-apply` only after `change.md` and `tasks.md` (plus any compatible existing `design.md`) are updated.
    - For material experience-design uncertainty that does not yet change accepted behavior, stop the UI slice and recommend `/sdd-design --plan` before implementation or `/sdd-design --revise` after implementation or manual comparison has begun. If design discovery changes Requirements, Scenarios, scope, repository or Epic ownership, contracts, data, auth, or technical constraints, route through `/sdd-change` before returning to design or implementation.
-   - For `scope expansion`, stop unless the user explicitly accepts expanding this Change. If accepted and the expansion needs planning, route to `/sdd-change`; otherwise update the central `change.md`, `design.md`, and `tasks.md` plus affected repository-local Epic truth. If not accepted, recommend `/sdd-change` for a follow-up Change.
+   - For `scope expansion`, stop unless the user explicitly accepts expanding this Change. If accepted and the expansion needs planning, route to `/sdd-change`; otherwise update the central `change.md` and `tasks.md` plus any compatible existing `design.md`, and update affected repository-local Epic truth. If not accepted, recommend `/sdd-change` for a follow-up Change.
    - For `product drift`, stop or recommend `/sdd-prd` unless the user explicitly authorizes product-direction updates in the same run.
 
 When feedback changes a Requirement or Scenario, preserve the stable Story label/reference and local Requirement/Scenario ID when the behavior is an edit to existing truth. Add a new `R#` or `R#-S#` only when it is a genuinely new behavior rule or scenario. Do not silently renumber completed Requirements or Scenarios just to keep labels tidy.
 
 When feedback or implementation reveals that a Story belongs in a different Epic or repository, treat it as an Epic ownership change. Record the old repository ID and full Story reference plus the new repository ID and full Story reference, update both repository-local Epic truths, and record the move in the central `tasks.md`; if the move was not in the proposal, stop or require explicit scope acceptance before applying it.
 
-Manual feedback is not `/sdd-review` by default. Create or update `review.md` only when the feedback is explicitly a review finding or comes from `/sdd-review`; otherwise keep the active coordination record in the central `tasks.md` and durable behavior truth in `design.md` plus the owning repository-local Epic. When the feedback becomes planning-level discovery, let `/sdd-change` revise the central planning artifacts before implementation resumes.
+Manual feedback is not `/sdd-review` by default. Create or update `review.md` only when the feedback is explicitly a review finding or comes from `/sdd-review`; otherwise keep the active coordination record in the central `tasks.md` and durable planning truth in `change.md` (or a compatible existing `design.md`) plus the owning repository-local Epic. When the feedback becomes planning-level discovery, let `/sdd-change` revise the central planning artifacts before implementation resumes.
 
 ## Phase Boundary
 
@@ -250,7 +249,7 @@ Do not load every vaguely related skill. Do not claim a skill was used unless it
 Every delegated implementation prompt must include:
 
 - target repository stable ID, implementation root, and workspace root
-- central Change folder and its `change.md`, `design.md`, and `tasks.md` paths
+- central Change folder and its `change.md` and `tasks.md` paths, plus `design.md` when already present
 - repository-local target Epic path and the exact Story label/reference, Requirement ID, and Scenario ID scope
 - relevant technical approach, constraints, and stop conditions
 - selected available skills and other required guidance to load
@@ -289,13 +288,13 @@ For every UI-bearing slice, rendered UI verification is required before review h
    - Use `assets/epic-template.md` for new or normalized Epic files. When materially editing behavior, implementation/verification state, ownership, gaps, or evidence in an unversioned legacy Epic, normalize the whole file to `sdd-epic-v2`; the schema is Epic-wide, not Story-local. Cosmetic or history-only edits may leave the legacy shape intact.
    - During normalization, do not copy legacy `Status` into both new states. Treat legacy planned/draft/not-implemented states as `Implementation: not implemented` and `Verification: unverified`; inspect code and evidence independently for partial/in-progress/implemented/complete states.
    - Preserve room for future supporting artifacts beside `epic.md`, but do not create extra folders unless needed.
-2. Select the next pending repository-qualified Requirement or Scenario from the central `tasks.md` and `design.md`.
+2. Select the next pending repository-qualified Requirement or Scenario from the central `tasks.md` and technical-planning sections of `change.md` or a compatible existing `design.md`.
    - Respect recorded cross-repository dependencies; do not mark a dependent slice complete before its upstream target has the required contract or evidence.
    - Prefer Requirement-shaped phases.
    - Split by Scenario when a Requirement is too large, has distinct failure modes, or crosses separate technical surfaces.
    - Use file-shaped work only as an enabling phase tied to the next Requirement.
    - Use the stable repository ID and labels in reports and commits: `<repository-id>:EPIC-ID/S1 R1`, `<repository-id>:EPIC-ID/S1/R1-S1`, or the documented legacy Story ID form.
-   - If the next slice came from manual feedback, confirm the central `tasks.md`, `design.md`, and the owning repository-local Epic reflect the feedback classification before editing code.
+   - If the next slice came from manual feedback, confirm the central `tasks.md`, planning sections, and the owning repository-local Epic reflect the feedback classification before editing code.
 3. Delegate the selected Requirement or Scenario when it is non-trivial and delegation is available.
    - Scope the subagent to exactly one target repository unless an inseparable cross-repository contract requires an explicitly bounded multi-root assignment.
    - Use `assets/subagent-requirement-prompt.md`.
@@ -311,7 +310,7 @@ For every UI-bearing slice, rendered UI verification is required before review h
    - Confirm the new or changed test fails for the expected reason when practical.
    - If a failing-first check is not practical, record why in `tasks.md`.
 5. Make scoped code, test, supporting-doc, or Epic changes in the owning repository.
-   - Keep implementation aligned with the central `design.md`, but update the one Change when implementation reality proves the design stale.
+   - Keep implementation aligned with the central technical plan, but update the one Change when implementation reality proves the design stale.
    - Treat repository-local Epic/Story reconciliation as part of implementation, not documentation cleanup after the fact.
    - Update existing or locally required project docs under `docs/` in the affected repository when the Change makes them stale. Do not create a broad standard doc inventory unless project-local guidance or the Change itself requires it.
    - Do not silently expand product scope or user-visible behavior.
@@ -371,7 +370,7 @@ For every UI-bearing slice, rendered UI verification is required before review h
    - Add or refresh manual UI confirmation steps and status.
    - Keep each target repository's review record, manual confirmation status, release-communication status, PR/merge state, deferred gaps, and readiness consistent while preserving one Change-wide lifecycle status and central folder location.
    - Record any superseded Story/Requirement/Scenario wording and the repository-local artifact reconciliation performed.
-   - Keep old proposal/design status text from contradicting completed work. If design sections still say `Not implemented yet`, `Not verified yet`, or implementation is pending after implementation has landed, update or clearly mark that text as historical before closeout.
+   - Keep old change-plan or compatible design status text from contradicting completed work. If planning sections still say `Not implemented yet`, `Not verified yet`, or implementation is pending after implementation has landed, update or clearly mark that text as historical before closeout.
    - Record consequential skill guidance or delegation outcomes only when they changed implementation, verification, artifacts, or stop conditions; also record blockers, departures, and repository-qualified commit hashes or commit candidates.
    - Keep `status: in_progress` while any target repository still has implementation, verification, remediation, review-handoff preparation, or unresolved blockers. Run `sdd change transition <space-id> <change-id> --from in_progress --to in_review` once, with no `--repo`, only after implementation is complete and every target repository is ready for independent `/sdd-review`.
    - Before a repository's implementation commit exists, record its relevant ledger rows as `commit pending`, `uncommitted`, or a clear commit candidate rather than inventing a hash.
@@ -421,7 +420,7 @@ Before reporting the change as implemented or ready for `/sdd-review`, run an im
 - Review Handoff Readiness: every target repository has an exact committed candidate that differs from its integration target when implementation changed; intended implementation is committed; unrelated dirty state is identified; required environments actually ran; commit-sensitive checks and required aggregate candidate gates pass on those exact commits; and remaining repository-specific or cross-repository integration-candidate obligations plus later `/sdd-review` needs are clear.
 - Commit Cadence: every completed verified phase has its coherent local commit in each participating repository, or the central `tasks.md` records the exact `--no-commit`, user-policy, repository-policy, or isolation reason it remains a repository-qualified commit candidate. Multiple independently reviewable phases have not been accumulated into one undifferentiated commit.
 - Closeout Readiness: the central `tasks.md` has no contradictory Resume Here, checklist, per-repository review record, manual confirmation status, release-communication status, PR/merge state, deferred-gap, or folder-location claims.
-- Closed-Artifact Readiness: related central proposal/design/tasks/review files do not still claim implemented work is unimplemented, unverified, pending, or accepted under obsolete status vocabulary.
+- Closed-Artifact Readiness: related central change/tasks/review files and compatible existing design do not still claim implemented work is unimplemented, unverified, pending, or accepted under obsolete status vocabulary.
 - Changed-Surface Reverse Traceability: run the packaged `sdd-orphan-audit` script in JSON mode in every affected target repository with `--changed-from <integration-target-or-merge-base>` and one `--epic <epic-id>` pass per affected Epic in that repository. Classify every behavior-test and source candidate as Epic-owned, supporting/generated/framework infrastructure, an explicit gap, or tracked cleanup before handoff. If the script is unavailable, perform and record an equivalent current-working-tree inventory for that repository; do not silently skip the gate.
 - Refactor Stranding: when the change removes, replaces, or relocates implementation, explicitly search for old imports, routes, registrations, constructors/dependencies, tests, migrations, generated bindings, and files left behind by the previous path.
 
@@ -450,10 +449,10 @@ A change is implementation-complete only when:
 - the one central `tasks.md` has an accurate final `Resume Here`, repository-qualified implementation ledger, verification ledger, blockers/open questions, per-repository readiness, and Change-wide closeout state.
 - `tasks.md` records the review outcome for every targeted repository as review paths, clean review records, or explicit user-approved review waivers before closeout.
 - `tasks.md` records manual UI confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
-- related proposal/design/tasks/review artifacts do not contain stale implementation-pending language or contradictory manual confirmation status unless clearly marked historical.
+- related change/tasks/review artifacts and compatible existing design do not contain stale implementation-pending language or contradictory manual confirmation status unless clearly marked historical.
 - affected existing or locally required project docs under `docs/` in every target repository no longer contradict implementation, Epic truth, branch/release policy, testing commands, architecture, data/API contracts, deployment behavior, operations, or visual style.
-- when `design.md` contains a confirmed `Experience Design`, implementation and Storybook/manual evidence reflect its required flow, responsive composition, states, accessibility behavior, and explicitly accepted deviations.
-- when `design.md` records material component strategies, implementation ownership, preview states, and any promotion claims agree with the implemented result; a shared or standardized claim has implemented consumer use outside the catalog itself at the level required by project guidance, or remains explicitly a candidate.
+- when the current Change plan contains a confirmed `Experience Design`, implementation and Storybook/manual evidence reflect its required flow, responsive composition, states, accessibility behavior, and explicitly accepted deviations.
+- when the current Change plan records material component strategies, implementation ownership, preview states, and any promotion claims agree with the implemented result; a shared or standardized claim has implemented consumer use outside the catalog itself at the level required by project guidance, or remains explicitly a candidate.
 - every target repository's project-defined release communication is current when required.
 - every completed verified phase has been committed at a coherent boundary in each participating repository, or its repository-qualified commit candidate and exact blocking/opt-out reason are recorded.
 - every living risk row and decision fan-out row is resolved, explicitly accepted, or blocking; every required verification environment actually ran or has an explicit accepted gap.

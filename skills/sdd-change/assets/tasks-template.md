@@ -3,7 +3,7 @@
 ## Resume Here
 
 - Last completed action: change artifacts drafted
-- Next action: review change, design, and tasks
+- Next action: review change and tasks
 - Active branches / refs by repository: unknown
 - Expected dirty files: `<workspace>/.sdd/changes/yyyy-mm-dd-change-name/` plus repository-local implementation, Epic, ADR, test, and supporting-doc files grouped by target repository
 - Known blockers: none identified yet
@@ -20,11 +20,11 @@
 - [ ] 1.6 For UI-bearing changes with material experience uncertainty, complete `/sdd-design` or record why existing product conventions already make the direction implementation-ready.
 - [ ] 1.7 For UI-bearing changes, define a proportional Visual Verification Matrix with affected surfaces, routes or fixtures, representative desktop/mobile viewports, relevant states/interactions, expected rendered behavior, and preferred tooling or fallback.
 - [ ] 1.8 Seed the living risk, triggered boundary-contract applicability, decision fan-out, verification-environment, and Verification Scope Decision sections with end-state obligations already known. Include any known project-defined aggregate or prospective-integration gate. Do not turn them into an exhaustive implementation sequence; `/sdd-apply` must refine them from real implementation evidence.
-- [ ] 1.9 Set `status: planned` only after the change, design, tasks, Epic actions, and verification strategy are coherent and validated.
+- [ ] 1.9 Set `status: planned` only after the intent and technical-planning sections in `change.md`, tasks, Epic actions, and verification strategy are coherent and validated.
 
 ### 2. Epic Artifacts
 
-- [ ] 2.1 Create or update the Epic directories named in `change.md` and `design.md`.
+- [ ] 2.1 Create or update the Epic directories named in `change.md` or a compatible existing `design.md`.
 - [ ] 2.2 Create or update each Epic's `epic.md` file.
 - [ ] 2.3 Confirm each Story has a stable Epic-scoped label or documented legacy Story ID, local Requirement IDs, local Scenario IDs, independent implementation/verification state, behavior-mapped Implemented By, Implementation Gaps, scenario-mapped Verified By, and Verification Gaps.
 - [ ] 2.4 Check whether this change supersedes earlier Story, Requirement, Scenario, implementation ownership/gaps, or verification evidence/gaps; reconcile any stale truth.
@@ -32,8 +32,8 @@
 
 ### 3. Architecture Decisions
 
-- [ ] 3.1 Confirm `design.md` compares viable technical options or records why only one path is reasonable.
-- [ ] 3.2 Create or update ADRs named in `design.md` when the change makes durable architecture decisions.
+- [ ] 3.1 Confirm `change.md` delegates viable technical options to `/sdd-adr` or records why only one path is reasonable.
+- [ ] 3.2 Create or update ADRs named in `change.md` when the change makes durable architecture decisions.
 - [ ] 3.3 Confirm ADR status is accurate: proposed / accepted / superseded / not applicable.
 
 ### 4. Implementation
@@ -70,7 +70,7 @@
 - [ ] 6.3 Record each target repository's review outcome in the one central `review.md`, or record a clean review in this ledger or an explicit user-approved review waiver.
 - [ ] 6.4 Address any `review.md` findings or explicitly defer accepted non-blocking risks.
 - [ ] 6.5 Record manual UI confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
-- [ ] 6.6 Confirm change/design/tasks/review artifacts do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
+- [ ] 6.6 Confirm change/tasks/review artifacts and any compatible existing design do not still claim completed work is not implemented, not verified, pending, or accepted under obsolete manual status vocabulary.
 - [ ] 6.7 Confirm machine-readable Change status agrees with Resume Here, checklist, review, manual confirmation, release communication, ADR, PR/merge, deferred-gap, and folder-location claims.
 - [ ] 6.8 Keep `status: in_review` while independent review and closeout gates are underway.
 - [ ] 6.9 Before `in_review`, record an immutable candidate commit for every target repository, confirm intended implementation is committed, pass commit-sensitive contract/diff checks and every required aggregate candidate gate on each exact candidate, and leave no required risk, fan-out, environment, or verification obligation silently pending.
@@ -108,7 +108,7 @@ Record `/sdd-change` planning updates when implementation or feedback changes th
 
 | Date | Discovery | Classification | Planning Updates | Next Apply Starting Point |
 |---|---|---|---|---|
-| YYYY-MM-DD | TBD | in-scope refinement / scope expansion / product drift / Epic ownership change / technical constraint / follow-up change | change.md / design.md / tasks.md | `/sdd-apply` TBD |
+| YYYY-MM-DD | TBD | in-scope refinement / scope expansion / product drift / Epic ownership change / technical constraint / follow-up change | change.md / tasks.md | `/sdd-apply` TBD |
 
 ## Design Updates
 
@@ -116,7 +116,7 @@ Record `/sdd-design --revise` work when implementation, comparison, review, or m
 
 | Date | Feedback / Discovery | Classification | Reference / Target | Preserve / Change / Non-Goals | Artifact Updates | Next Apply Starting Point |
 |---|---|---|---|---|---|---|
-| YYYY-MM-DD | TBD | experience refinement / experience defect / accessibility correction / responsive correction | TBD | TBD | design.md / tasks.md | `/sdd-apply` TBD |
+| YYYY-MM-DD | TBD | experience refinement / experience defect / accessibility correction / responsive correction | TBD | TBD | change.md / tasks.md | `/sdd-apply` TBD |
 
 ## Implementation Risk And Confirmation Matrix
 

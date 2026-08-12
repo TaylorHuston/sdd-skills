@@ -1539,6 +1539,25 @@ test("all lifecycle operations route through one workspace Change store", async 
   assert.equal(await pathExists(centralPath), true);
   assert.equal(await pathExists(join(decoyHome, ".sdd", "changes", changeId)), false);
 
+  await writeFile(
+    join(centralPath, "change.md"),
+    `${await readFile(join(centralPath, "change.md"), "utf8")}\n## Current Context\n\nCurrent system.\n\n## Behavioral Changes\n\nObservable behavior.\n\n## Technical Decision Handoffs\n\nOne constrained path.\n\n## Selected Approach\n\nUse the existing seam.\n\n## Alternatives Considered\n\nNone.\n\n## Implementation Constraints\n\nPreserve compatibility.\n\n## Verification Strategy\n\nFocused proof.\n\n## Risks / Trade-Offs\n\nLow risk.\n`,
+    "utf8",
+  );
+  await writeFile(
+    join(centralPath, "tasks.md"),
+    [
+      "# Tasks: Central Routing",
+      "## Resume Here",
+      "## Checklist",
+      "## Implementation Ledger",
+      "## Verification Ledger",
+      "## Open Questions",
+      "## Closeout",
+    ].join("\n"),
+    "utf8",
+  );
+
   const lockPath = join(root, ".sdd", "mutation.lock");
   await writeFile(lockPath, "held\n", "utf8");
   await assert.rejects(
@@ -4666,21 +4685,20 @@ test("validate accepts the documented lightweight interactive Change shape", asy
       "---",
       "# Change: Interactive Shape",
       "## Why",
+      "## Desired Outcome",
+      "## Scope",
+      "## Success Signals",
       "## Interactive Scope Boundary",
       "## Epic / Story Impact",
       "## Release Communication Impact",
-      "## Open Questions",
-    ].join("\n"),
-    "utf8",
-  );
-  await writeFile(
-    join(changePath, "design.md"),
-    [
-      "# Design: Interactive Shape",
-      "## Current Understanding",
-      "## Technical Approach",
-      "## Affected Epic Truth",
-      "## Alternatives / Deferred",
+      "## Current Context",
+      "## Behavioral Changes",
+      "## Technical Decision Handoffs",
+      "## Selected Approach",
+      "## Alternatives Considered",
+      "## Implementation Constraints",
+      "## Verification Strategy",
+      "## Risks / Trade-Offs",
       "## Open Questions",
     ].join("\n"),
     "utf8",
@@ -8104,7 +8122,7 @@ function prepublicationCrashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "change.md", "tasks.md"],
+      expectedFiles: ["change.md"],
     };
   });
   const epicPoints = [
@@ -8156,7 +8174,7 @@ function crashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "change.md", "tasks.md"],
+      expectedFiles: ["change.md"],
     },
     {
       kind: "Change",
@@ -8167,7 +8185,7 @@ function crashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "change.md", "tasks.md"],
+      expectedFiles: ["change.md"],
     },
     {
       kind: "Epic",
@@ -8218,7 +8236,7 @@ function crashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "change.md", "tasks.md"],
+      expectedFiles: ["change.md"],
     },
     {
       kind: "Change",
@@ -8230,7 +8248,7 @@ function crashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "change.md", "tasks.md"],
+      expectedFiles: ["change.md"],
     },
     {
       kind: "Change",
@@ -8242,7 +8260,7 @@ function crashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "change.md", "tasks.md"],
+      expectedFiles: ["change.md"],
     },
     {
       kind: "Change",
@@ -8254,7 +8272,7 @@ function crashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "change.md", "tasks.md"],
+      expectedFiles: ["change.md"],
     },
     {
       kind: "Epic",
@@ -8351,7 +8369,7 @@ function crashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "change.md", "tasks.md"],
+      expectedFiles: ["change.md"],
     },
     {
       kind: "Change",
@@ -8362,7 +8380,7 @@ function crashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "change.md", "tasks.md"],
+      expectedFiles: ["change.md"],
     },
     {
       kind: "Change",
@@ -8374,7 +8392,7 @@ function crashRecoveryCreateCases(root) {
         date: "2026-08-09",
         repositories: ["sample-web"],
       }),
-      expectedFiles: ["design.md", "change.md", "tasks.md"],
+      expectedFiles: ["change.md"],
     },
     {
       kind: "Epic",

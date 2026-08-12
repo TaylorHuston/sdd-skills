@@ -7,6 +7,8 @@ import {
   assertRequiredChangeFileSnapshotCurrent,
   getActiveChangePath,
   getClosedChangePath,
+  missingCompatibleDesignSections,
+  missingPlannedChangeSections,
   readRequiredChangeFileSnapshot,
   relativeChangeStorePath,
 } from "../change-store.js";
@@ -43,20 +45,30 @@ function assertTransition(from, to) {
   }
 }
 
-async function assertPlanningComplete(changePath, workspaceRoot, metadata) {
-  const missing = [];
-  for (const fileName of ["design.md", "tasks.md"]) {
-    const snapshot = await readRequiredChangeFileSnapshot(
-      changePath,
-      fileName,
-      workspaceRoot,
-    );
-    if (snapshot === null) missing.push(fileName);
-  }
-  if (missing.length > 0) {
+async function assertPlanningComplete(changePath, workspaceRoot, metadata, changeSource) {
+  const tasks = await readRequiredChangeFileSnapshot(
+    changePath,
+    "tasks.md",
+    workspaceRoot,
+  );
+  const existingDesign = await readRequiredChangeFileSnapshot(
+    changePath,
+    "design.md",
+    workspaceRoot,
+  );
+  const missing = tasks === null ? ["tasks.md"] : [];
+  const missingSections = existingDesign === null
+    ? missingPlannedChangeSections(changeSource)
+    : missingCompatibleDesignSections(existingDesign.source);
+  if (missing.length > 0 || missingSections.length > 0) {
+    const planningFile = existingDesign === null ? "change.md" : "design.md";
+    const details = [
+      ...missing,
+      ...missingSections.map((section) => `${planningFile}: ${section}`),
+    ];
     throw new SddError(
-      `Planning is incomplete; missing ${missing.join(" and ")}.`,
-      { code: "INCOMPLETE_CHANGE", details: missing },
+      `Planning is incomplete; missing ${details.join(" and ")}.`,
+      { code: "INCOMPLETE_CHANGE", details },
     );
   }
   if (metadata.repositories.length === 0) {
@@ -171,7 +183,7 @@ export async function transitionChange(
     });
   }
   if (from === "proposed" && to === "planned") {
-    await assertPlanningComplete(activePath, workspaceRoot, metadata);
+    await assertPlanningComplete(activePath, workspaceRoot, metadata, snapshot.source);
   }
 
   const selectedRepositories = await resolveRepositoriesForMetadata(

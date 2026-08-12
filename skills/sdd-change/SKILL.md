@@ -15,12 +15,11 @@ Every Change starts in the central workspace store:
 
 ```text
 <workspace>/.sdd/changes/<change-id>/
-  change.md
-  design.md    # added during technical planning
+  change.md    # intent, lifecycle, and progressively added technical plan
   tasks.md     # added during technical planning
 ```
 
-`change.md` is the durable intent and lifecycle record. Its frontmatter contains `status`, `space`, and `repositories`.
+`change.md` is the durable intent, lifecycle, and technical-planning record. Its frontmatter contains `status`, `space`, and `repositories`. Existing Changes may also contain a legacy `design.md`; read and reconcile it when present, but do not create one for new or newly planned Changes.
 
 - `proposed`: intent exists, but ownership or technical planning may be incomplete.
 - `planned`: repositories, behavior, approach, and verification are settled enough to implement.
@@ -76,7 +75,7 @@ Confirm the target repositories before finalizing the plan.
 
 Describe the affected Stories, Requirements, and concrete Scenarios. Cover important success and failure paths without enumerating every imaginable edge case.
 
-Keep technical constraints in `design.md` unless users or external clients can observe them. Do not invent implementation locations or verification evidence for work that does not exist yet.
+Keep technical constraints in the technical-planning sections of `change.md` unless users or external clients can observe them. Do not invent implementation locations or verification evidence for work that does not exist yet.
 
 ### 3. Resolve technical approach decisions
 
@@ -86,7 +85,7 @@ When current evidence reveals two or more meaningfully different viable technica
 
 A meaningful difference changes an important boundary, contract, data or state model, dependency, security posture, operational model, migration path, or future constraint. Do not invoke `/sdd-adr` merely to manufacture alternatives for a straightforward implementation detail. Route unresolved product direction to `/sdd-prd` and material experience-design choices to `/sdd-design`.
 
-When only one technical approach is viable, state the constraining reason in `design.md`; do not invent alternatives or invoke `/sdd-adr` ceremonially. After the handoff, record the selected approach and any repository-relative ADR path in `design.md`, and record follow-up work in `tasks.md`. Do not duplicate `/sdd-adr`'s full option analysis in the central Change.
+When only one technical approach is viable, state the constraining reason in `change.md`; do not invent alternatives or invoke `/sdd-adr` ceremonially. After the handoff, record the selected approach and any repository-relative ADR path in `change.md`, and record follow-up work in `tasks.md`. Do not duplicate `/sdd-adr`'s full option analysis in the central Change.
 
 Do not finalize while a material product or technical choice remains unresolved.
 
@@ -94,16 +93,13 @@ Do not finalize while a material product or technical choice remains unresolved.
 
 Identify the public seams where behavior will be tested and any manual confirmation still needed. Prefer focused behavioral evidence over implementation-coupled tests or generic checklists.
 
-Create:
+Progressively append or update the sections from `assets/planning-sections.md` in `change.md`: current context, behavioral changes, technical decision handoffs, selected approach, applicable experience design, alternatives, constraints, verification strategy, and risks. Create `tasks.md` as a short capability-level implementation ledger, blockers, verification obligations, and resume point using its template.
 
-- `design.md`: behavior, selected approach, alternatives, constraints, risks, and verification strategy;
-- `tasks.md`: a short capability-level implementation ledger, blockers, verification obligations, and resume point.
-
-Use the templates in `assets/`. Keep tasks adaptive and outcome-oriented, not a file-by-file script.
+Do not create `design.md` for future Changes. If the selected Change already has one, treat it as compatible source context: update it only when continuing that existing record would otherwise leave two contradictory current plans. Keep tasks adaptive and outcome-oriented, not a file-by-file script.
 
 ### 5. Validate and hand off
 
-Check that `change.md`, `design.md`, and `tasks.md` agree, then run:
+Check that `change.md` and `tasks.md` agree, including any compatible existing `design.md`, then run:
 
 ```text
 sdd change transition <space-id> <change-id> --from proposed --to planned
@@ -118,7 +114,7 @@ When implementation, review, or feedback changes scope, observable behavior, rep
 
 1. Confirm that the discovery belongs to the current Change.
 2. Return the Change to `proposed` with `sdd change transition` when needed.
-3. Update `change.md`, `design.md`, `tasks.md`, and relevant ADRs.
+3. Update the intent and technical-planning sections of `change.md`, `tasks.md`, and relevant ADRs. Reconcile an existing `design.md` only when the Change already has one.
 4. Preserve stable Story, Requirement, and Scenario IDs when their meaning has not changed.
 5. Record what changed and the `/sdd-apply` restart point.
 6. Transition back to `planned` only when the revised plan is coherent.

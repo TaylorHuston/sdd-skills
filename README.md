@@ -74,7 +74,7 @@ CHANGE_ID="${CHANGE_DATE}-invoice-retry"
 sdd change create billing invoice-retry --repo services/billing-api --date "$CHANGE_DATE"
 ```
 
-`sdd change create` writes a central `change.md` immediately with `status: proposed`. Repository selection is optional at this stage. Run `/sdd-change` to capture intent and, when the user chooses, continue into technical planning. Planning adds `design.md` and `tasks.md`; the Change becomes `planned` only when ownership and the plan are coherent. Then validate the same record:
+`sdd change create` writes a central `change.md` immediately with `status: proposed`. Repository selection is optional at this stage. Run `/sdd-change` to capture intent and, when the user chooses, continue into technical planning. Planning expands `change.md` with the technical plan and adds `tasks.md`; the Change becomes `planned` only when ownership and the plan are coherent. Then validate the same record:
 
 ```bash
 sdd validate billing --change "$CHANGE_ID"
@@ -134,7 +134,7 @@ The CLI supplies deterministic filesystem and validation operations; skills supp
 | `sdd validate [space-id]` | Validate canonical Changes, repository Epics, verification reports, ownership, traceability, placeholders, and artifact links. | Structural gate used by `/sdd-change`, `/sdd-design`, `/sdd-interactive`, `/sdd-apply`, `/sdd-review`, and `/sdd-epic-verify`; it does not replace contextual review. |
 | `sdd epic create <space-id> <epic-id> <slug>` | Atomically scaffold and structurally validate a canonical Epic in one selected active repository. | Low-level creation primitive for planning workflows when a genuinely new Epic is accepted. The planning skill still owns its product content. |
 | `sdd change create <space-id> <slug>` | Create one workspace-unique proposed Change containing `change.md`; repeated `--repo` options may establish initial repository ownership. | Creation primitive used by `/sdd-change`, `/sdd-interactive`, and remediation flows that need a new central Change. |
-| `sdd change transition <space-id> <change-id> --from <status> --to <status>` | Compare-and-set one allowed lifecycle transition in `change.md`. `proposed -> planned` requires repository ownership, `design.md`, and `tasks.md`. | Lifecycle primitive used by planning, design revision, interactive implementation, Apply, and Review. It never decides whether the work is actually ready. |
+| `sdd change transition <space-id> <change-id> --from <status> --to <status>` | Compare-and-set one allowed lifecycle transition in `change.md`. `proposed -> planned` requires repository ownership, technical-planning sections in `change.md`, and `tasks.md`. | Lifecycle primitive used by planning, design revision, interactive implementation, Apply, and Review. It never decides whether the work is actually ready. |
 | `sdd change close <space-id> <change-id>` | Move one `in_review` Change to `changes/closed/` after skill-owned closeout gates pass. | Final storage transition used only after `/sdd-review` and any required `/sdd-pr` or `/sdd-release` policy gates; the command itself does not prove acceptance. |
 | `sdd --version` | Print the installed package version. | Diagnostic utility independent of the workflow lifecycle. |
 
@@ -151,7 +151,7 @@ An initialized workspace and repository look like:
     changes/
       yyyy-mm-dd-change-name/
         change.md
-        design.md    # added during technical planning
+        design.md    # compatible existing Changes only
         tasks.md     # added during technical planning
       closed/
         yyyy-mm-dd-change-name/
@@ -218,12 +218,12 @@ Space and repository `status` use one shared vocabulary: `active`, `inactive`, o
 
 1. `/sdd-change` creates or resumes one central `change.md` in `proposed` status and captures the desired outcome, scope, success signals, constraints, and open questions.
 2. The skill asks whether to continue into technical planning. If the user stops, the proposed Change remains the backlog record and can be resumed later.
-3. Technical planning settles repository ownership and observable behavior, compares meaningful approaches with the user, and adds `design.md` plus `tasks.md`.
+3. Technical planning settles repository ownership and observable behavior, compares meaningful approaches with the user, expands `change.md`, and adds `tasks.md`.
 4. When a UI-bearing Change still has material experience uncertainty, optional `/sdd-design --plan` converges the experience in that same Change.
 5. After scoped validation passes, the Change becomes `planned` and `/sdd-apply` begins implementation without moving or copying it. Planning-level discoveries return the same Change to `proposed` and `/sdd-change`.
 6. When review and project-specific integration gates pass at `in_review`, `sdd change close` moves the one folder to closed history.
 
-`change create` accepts optional repeated `--repo` selections and otherwise leaves repository ownership empty while proposed. `change transition` and `change close` read status, Space, and repositories from `change.md`. The `proposed -> planned` transition requires at least one repository plus `design.md` and `tasks.md`. Close preserves `status: in_review` because closure is represented by the directory location.
+`change create` accepts optional repeated `--repo` selections and otherwise leaves repository ownership empty while proposed. `change transition` and `change close` read status, Space, and repositories from `change.md`. The `proposed -> planned` transition requires at least one repository, technical-planning sections in `change.md`, and `tasks.md`; a compatible existing `design.md` remains accepted. Close preserves `status: in_review` because closure is represented by the directory location.
 
 ### Artifact Validation
 
@@ -280,8 +280,8 @@ The usual path is:
 | `/sdd-gather-context` | Shared minimum context acquisition for an exploration, ADR, or Change. | Evidence-linked same-session context result; no durable artifact or mutation. | Uses `context` and `status` for deterministic topology and inventory. | Invoked by `/sdd-explore`, `/sdd-adr`, and `/sdd-change`; returns control without taking over their judgment. |
 | `/sdd-explore` | Any substantial discussion the user wants preserved beyond chat, including feasibility, marketing, future features, product, technical, operational, design, business, or workflow topics. | One synthesized durable record, usually under the owning idea's `explorations/` directory but placed elsewhere when authority or local guidance makes another home more appropriate. | Uses `context` and `status` only when SDD ownership or artifact truth matters. | May invoke `/sdd-prd`, `/sdd-change`, `/sdd-adr`, or another owning workflow when conclusions mature; never implements code. |
 | `/sdd-prd` | Create, revise, or check private Product Brief/PRD direction. | Planning-root `prd.md` or feature/capability brief. | Uses `context` and `status`; routes setup drift to `doctor`, `setup`, `init`, or `update`. | Precedes `/sdd-change` when product direction is not settled; may receive drift from audits or review. |
-| `/sdd-change` | Capture intent, continue technical planning, or revise an existing plan. | Central `change.md`; when planning proceeds, `design.md` and `tasks.md`. | Uses `change create`, `validate`, and `change transition`, with `context`/`status` for selection. | Invokes `/sdd-adr` whenever planning reveals meaningfully different viable technical approaches; otherwise hands planned work to `/sdd-design` or `/sdd-apply`. |
-| `/sdd-design` | Converge initial experience design or revise UI direction without changing accepted behavior. | Updates existing `design.md` and `tasks.md`; may add stable external design references. | Uses `context`, `validate`, and guarded `change transition` for revisions. | Runs after `/sdd-change` and before `/sdd-apply`, or after implementation/review feedback; routes changed behavior back to `/sdd-change`. |
+| `/sdd-change` | Capture intent, continue technical planning, or revise an existing plan. | Progressive central `change.md`; `tasks.md` when planning proceeds. | Uses `change create`, `validate`, and `change transition`, with `context`/`status` for selection. | Invokes `/sdd-adr` whenever planning reveals meaningfully different viable technical approaches; otherwise hands planned work to `/sdd-design` or `/sdd-apply`. |
+| `/sdd-design` | Converge initial experience design or revise UI direction without changing accepted behavior. | Updates `change.md` and `tasks.md`, or an existing compatible `design.md`; may add stable external design references. | Uses `context`, `validate`, and guarded `change transition` for revisions. | Runs after `/sdd-change` and before `/sdd-apply`, or after implementation/review feedback; routes changed behavior back to `/sdd-change`. |
 | `/sdd-adr` | Compare meaningfully different technical approaches and assess or record the resulting durable architecture, data, dependency, integration, deployment, security, storage, or cross-cutting decision. | Decision result and, when warranted, a repository-owned ADR linked to Changes and Epic truth. | Uses `context`/`status`; setup commands only when project structure is missing. | Required handoff from `/sdd-change` for branching viable technical approaches; returns the selected or unresolved decision to the invoking workflow. |
 | `/sdd-interactive` | Small UI tweaks, narrow defects, polish, or minor behavior refinements in one tracked session. | Minimal central Change plus implementation, Epic reconciliation, and verification evidence. | Uses `change create`, `change transition`, `validate`, and authorized `change close`. | Shortcut for a lightweight `/sdd-change` + `/sdd-apply`; normally hands off to `/sdd-review`. Routes broader scope to `/sdd-change`. |
 | `/sdd-apply` | Implement or continue every safe slice of one planned central Change. | Code, tests, Epic evidence, and a living `tasks.md` ledger; transitions to `in_review` when ready. | Uses `context`, `status`, `validate`, and `change transition`; close is only an explicitly authorized closeout action. | Follows `/sdd-change` or `/sdd-design`; sends review-ready work to `/sdd-review`; planning discoveries return to `/sdd-change`. |
@@ -301,7 +301,7 @@ The managed workflow defines artifact roles and authority across one workspace-s
   changes/
     yyyy-mm-dd-change-name/
       change.md
-      design.md        # added during technical planning
+      design.md        # compatible existing Changes only
       tasks.md         # added during technical planning
       review.md        # only when review finds deficiencies
     closed/
@@ -327,7 +327,7 @@ Review and handoff truth is equally explicit. `/sdd-review` generates candidates
 
 `/sdd-code-audit` is the broader point-in-time codebase health assessment. It reviews a whole repository or selected area through independent specialist passes, validates their evidence, and groups confirmed findings into candidate improvements. It does not replace the Change-local `/sdd-review` gate, modify application code, or make its report a competing source of implementation truth. Accepted outcomes should move into Epics and Changes before implementation.
 
-Every active Change folder under `<workspace>/.sdd/changes/` is one canonical working record from initial intent onward. `change.md` defines intent, scope, success signals, lifecycle status, Space, and repository ownership. `design.md` records the selected technical direction and alternatives; `tasks.md` is the adaptive implementation ledger. Proposed Changes require only `change.md`; planning adds the other files. The Change ID is unique within its workspace. The lifecycle is `proposed -> planned -> in_progress -> in_review -> closed`, with closure represented by moving the directory once under `changes/closed/`.
+Every active Change folder under `<workspace>/.sdd/changes/` is one canonical working record from initial intent onward. `change.md` defines intent, scope, success signals, lifecycle status, Space, repository ownership, and the progressively added technical plan. `tasks.md` is the adaptive implementation ledger. Proposed Changes require only `change.md`; planning adds `tasks.md`. Existing Changes may retain a compatible `design.md`, but future workflows do not create one. The Change ID is unique within its workspace. The lifecycle is `proposed -> planned -> in_progress -> in_review -> closed`, with closure represented by moving the directory once under `changes/closed/`.
 
 When implementation adds a surface parallel to an established adapter, client, route, workspace, worker, migration, or command, Apply uses a triggered Pattern Parity Matrix instead of assuming similar code has equivalent safety and recovery behavior. Stateful surfaces use a triggered transition matrix for identity changes, pending writes, navigation, recovery, session changes, authoritative refresh, and slow or hung requests. New or high-risk verification claims name exact tests or stable anchors and important assertions; Review independently opens that evidence, confirms the passing command discovers it, and checks the claimed implementation boundary rather than trusting aggregate green gates.
 
@@ -341,7 +341,7 @@ Shared component or pattern catalogs are optional incubators, not mandatory appl
 
 A reusable pattern may move through `reference candidate -> controlled preview -> application-owned adoption -> consumer validation -> standardized reference`. Promotion requires evidence from an implemented consumer outside the catalog itself. Applications may remain application-specific or deliberately diverge, and foundation-first work should not block application delivery unless the active Change explicitly requires it.
 
-When `/sdd-change` finds two or more meaningfully different viable technical approaches, it invokes `/sdd-adr` rather than duplicating technical option analysis. `/sdd-adr` compares the approaches, recommends a direction, asks the user to decide, and determines whether the result is durable enough for an ADR under `docs/adrs/`. Straightforward implementation details with one viable path remain in `design.md` without a ceremonial ADR handoff.
+When `/sdd-change` finds two or more meaningfully different viable technical approaches, it invokes `/sdd-adr` rather than duplicating technical option analysis. `/sdd-adr` compares the approaches, recommends a direction, asks the user to decide, and determines whether the result is durable enough for an ADR under `docs/adrs/`. Straightforward implementation details with one viable path remain in `change.md` without a ceremonial ADR handoff.
 
 Product Briefs/PRDs and app visual/style guidance are private planning artifacts. By default, an idea lives at `<planning-root>/<idea>/`, stores its PRD at `<planning-root>/<idea>/prd.md`, and maps zero or more implementation repositories through `.sdd/config.yaml`. Reference planning artifacts when product scope, UI identity, or release readiness depends on them; keep accepted implementation truth in each code repository's Epic and Story map.
 

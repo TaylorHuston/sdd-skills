@@ -29,7 +29,7 @@ Use this boundary:
 |---|---|
 | `<planning-root>/prd.md` | product purpose, audience, scope, principles, product-level capability areas, market/monetization, open product questions |
 | `<workspace>/.sdd/changes/<change-id>/change.md` | intent, status, Space, repository ownership, scope, and Epic impact from proposal onward |
-| `<workspace>/.sdd/changes/<change-id>/design.md` | high-level technical approach plus proposed Epic/Story/Requirement/Scenario changes |
+| `<workspace>/.sdd/changes/<change-id>/change.md` technical-planning sections | high-level technical approach plus proposed Epic/Story/Requirement/Scenario changes |
 | `<workspace>/.sdd/changes/<change-id>/tasks.md` | implementation ledger, resume state, verification ledger, and closeout state |
 | `docs/epics/<key>-<###>-<epic-name>/epic.md` | durable capability/Epic truth, embedded Stories, Requirements, Scenarios, code map, verification map, gaps |
 | `<workspace>/.sdd/changes/<change-id>/review.md` | Change-local review findings when `sdd-review` is not clean |
@@ -140,7 +140,7 @@ Keep `Core Functionality` at the level used to explain the product. Do not turn 
 
 Include technical traits only when they define the product promise, such as `local-first`, `filesystem-backed`, `AI-native`, `persistent-memory`, `privacy-first`, `auditable`, `provenance-preserving`, `Obsidian-vault-native`, or `offline-capable`.
 
-If a conversation drifts into exact metadata keys, config storage, parser choices, plugin APIs, permission mechanics, deployment mechanics, or implementation sequencing, capture only the product-level principle in the PRD and recommend the central Change's `design.md` or `tasks.md`, a repository-local ADR, or an Epic `epic.md` for the implementation details.
+If a conversation drifts into exact metadata keys, config storage, parser choices, plugin APIs, permission mechanics, deployment mechanics, or implementation sequencing, capture only the product-level principle in the PRD and recommend the central Change's technical-planning sections in `change.md` or its `tasks.md`, a repository-local ADR, or an Epic `epic.md` for the implementation details.
 
 ## Feature Briefs
 
@@ -152,7 +152,7 @@ Create a Feature or Capability Brief only when:
 - non-goals or product tradeoffs matter across multiple SDD changes
 - technical traits are integral to the capability's product identity
 
-Do not create Feature Briefs for content that fits cleanly in one Epic `epic.md` or one central Change `design.md`.
+Do not create Feature Briefs for content that fits cleanly in one Epic `epic.md` or one central Change `change.md`.
 
 Use only sections that make the brief useful:
 

@@ -1,6 +1,6 @@
 ---
 name: sdd-interactive
-description: Create and apply a lightweight SDD change in one tracked interactive working session. Use when the user invokes /sdd-interactive or asks for small UI tweaks, minor behavior refinements, polish, narrow bug fixes, or other concrete changes that deserve a durable change record but do not need a full upfront /sdd-change pass. Combines a minimal change/design/tasks setup with an immediate /sdd-apply-style loop, including BDD/TDD where practical, Epic/Requirement/Scenario reconciliation, relevant available-skill guidance, verification, manual confirmation tracking, and closeout consistency.
+description: Create and apply a lightweight SDD change in one tracked interactive working session. Use when the user invokes /sdd-interactive or asks for small UI tweaks, minor behavior refinements, polish, narrow bug fixes, or other concrete changes that deserve a durable change record but do not need a full upfront /sdd-change pass. Combines a minimal progressive change plus tasks ledger with an immediate /sdd-apply-style loop, including BDD/TDD where practical, Epic/Requirement/Scenario reconciliation, relevant available-skill guidance, verification, manual confirmation tracking, and closeout consistency.
 ---
 
 # SDD Interactive
@@ -21,7 +21,6 @@ Create or update the one canonical record:
 
 ```text
 <workspace>/.sdd/changes/<yyyy-mm-dd-change-name>/change.md
-<workspace>/.sdd/changes/<yyyy-mm-dd-change-name>/design.md
 <workspace>/.sdd/changes/<yyyy-mm-dd-change-name>/tasks.md
 ```
 
@@ -45,8 +44,7 @@ Use existing central artifacts when the session continues an active Change. Keep
    - Check git status in every target repository and preserve unrelated dirty files.
 3. Complete the lightweight central artifacts.
    - Fill the scaffold created by `sdd change create`; do not replace it with a separately authored repository record.
-   - `change.md`: record why the session exists, in-scope work, explicit out-of-scope work, known Epic/Story impact, release-communication impact, target repositories, and when to stop and route to `/sdd-change`.
-   - `design.md`: record the current understanding, high-level technical approach, cross-repository boundaries or sequencing when applicable, alternatives or deferred approaches, affected Epic truth, and open questions.
+   - `change.md`: record why the session exists, in-scope work, explicit out-of-scope work, known Epic/Story impact, release-communication impact, target repositories, when to stop and route to `/sdd-change`, current understanding, high-level technical approach, cross-repository boundaries or sequencing when applicable, alternatives or deferred approaches, affected Epic truth, and open questions.
    - `tasks.md`: record `Resume Here`, target responsibilities, coordination gates, the interactive request log, task checklist, implementation ledger, verification ledger, manual UI confirmation checklist, artifact updates, open questions, and closeout state. Status, Space, and repositories remain in `change.md`.
    - Keep these short. For a small UI tweak, a few bullets are enough, but every targeted repository must have an explicit responsibility and readiness state.
 4. Confirm the scope boundary and enter implementation status.
@@ -61,8 +59,8 @@ Use existing central artifacts when the session continues an active Change. Keep
    - For `cosmetic` changes, make the smallest safe edit, verify the affected surface, and record why no Epic truth changed.
    - For `defect` changes, add or update a focused failing-first test/check when practical, fix the defect, verify, and update scenario-mapped Story evidence.
    - For `verification gap`, produce the missing proof before claiming completion.
-   - For `artifact drift`, reconcile `change.md`, `design.md`, `tasks.md`, Epic truth, docs, or release communication before continuing.
-   - For `requirement refinement`, update `design.md` and the target Epic Requirement/Scenario before or alongside implementation.
+   - For `artifact drift`, reconcile `change.md`, `tasks.md`, any compatible existing `design.md`, Epic truth, docs, or release communication before continuing.
+   - For `requirement refinement`, update the technical-planning sections of `change.md` and the target Epic Requirement/Scenario before or alongside implementation.
    - For `small in-scope behavior`, add or update the relevant Requirement/Scenario, then implement and verify it.
    - For `scope expansion` or `product drift`, stop unless the user explicitly accepts the expansion in this change.
    - For work spanning repositories, respect recorded ordering and boundary dependencies, keep each repository's implementation and evidence distinct in the shared ledger, and do not call the request complete until every required target slice is complete.
@@ -99,11 +97,11 @@ Use existing central artifacts when the session continues an active Change. Keep
    - Keep the central status `in_progress` while any target has implementation, verification, remediation, or unresolved coordination work. Only after every targeted repository is ready for independent review, run `sdd change transition <space-id> <change-id> --from in_progress --to in_review` once, without `--repo`.
    - Recommend `/sdd-review` before merge or closeout when code, user-visible behavior, security, data, or release state changed.
    - Do not run `sdd change close` unless the user explicitly asks or the closeout path is already authorized by the active workflow.
-   - When the user asks to close, finish, merge-and-close, or otherwise complete the Change, first confirm `change.md` remains `status: in_review` and every targeted repository has met its review, manual-confirmation, release-communication, PR/merge, and accepted-gap gates, and no Resume Here, checklist, change, design, task, or review text contradicts completion. Then run `sdd change close <space-id> <change-id> --workspace <workspace-root>` exactly once. Do not pass `--repo`, close targets independently, or move the folder manually. The resulting `<workspace>/.sdd/changes/closed/<change-id>/` location is the closed state; `change.md` retains `status: in_review`.
+   - When the user asks to close, finish, merge-and-close, or otherwise complete the Change, first confirm `change.md` remains `status: in_review` and every targeted repository has met its review, manual-confirmation, release-communication, PR/merge, and accepted-gap gates, and no Resume Here, checklist, change, task, compatible existing design, or review text contradicts completion. Then run `sdd change close <space-id> <change-id> --workspace <workspace-root>` exactly once. Do not pass `--repo`, close targets independently, or move the folder manually. The resulting `<workspace>/.sdd/changes/closed/<change-id>/` location is the closed state; `change.md` retains `status: in_review`.
 
 ## Artifact Shape
 
-Use this minimum structure when creating new artifacts. Treat these as trimmed subsets of the `/sdd-change` change, design, and tasks templates, not as an independent template family. If a lightweight session needs fields beyond this shape, either add only the needed `/sdd-change` template section or route the work to `/sdd-change`.
+Use this minimum structure when creating new artifacts. Treat these as trimmed subsets of the `/sdd-change` change and tasks templates, not as an independent template family. If a lightweight session needs fields beyond this shape, either add only the needed `/sdd-change` template section or route the work to `/sdd-change`.
 
 `change.md`:
 
@@ -118,6 +116,12 @@ repositories:
 
 ## Why
 
+## Desired Outcome
+
+## Scope
+
+## Success Signals
+
 ## Interactive Scope Boundary
 - In scope:
 - Out of scope:
@@ -130,23 +134,19 @@ repositories:
 
 ## Release Communication Impact
 
-## Open Questions
-```
-
-`design.md`:
-
-```markdown
-# Design: <Title>
-
 ## Current Understanding
 
-## Technical Approach
+## Selected Approach
 
 ## Affected Epic Truth
 | Epic | Story | Requirement / Scenario | Impact | Needed Update |
 |---|---|---|---|---|
 
 ## Alternatives / Deferred
+
+## Verification Strategy
+
+## Risks / Trade-Offs
 
 ## Open Questions
 ```

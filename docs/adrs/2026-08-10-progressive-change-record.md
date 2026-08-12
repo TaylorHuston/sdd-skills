@@ -15,8 +15,9 @@ Use one progressive workspace-central Change from initial intent onward.
 
 - `change.md` owns intent, status, Space, and repository IDs.
 - A `proposed` Change requires only `change.md`; repositories may be empty.
-- Technical planning adds `design.md` and `tasks.md`.
-- Transition to `planned` requires repository ownership plus both planning artifacts.
+- Technical planning progressively expands `change.md` and adds `tasks.md`; future Changes do not create `design.md`.
+- Transition to `planned` requires repository ownership, technical-planning sections in `change.md`, and `tasks.md`.
+- Existing Changes that already contain `design.md` remain compatible and need no bulk migration.
 - `/sdd-change` infers whether to create, resume, plan, or revise from context and current status rather than mode flags.
 - When planning reveals two or more meaningfully different viable technical approaches, `/sdd-change` invokes `/sdd-adr`; that skill owns comparison, recommendation, user decision, and whether the result warrants a repository-owned ADR.
 - Lifecycle mutations use proportional workspace-locked filesystem operations rather than bespoke transaction journals.
@@ -46,7 +47,7 @@ Use one progressive workspace-central Change from initial intent onward.
 
 ## Consequences
 
-- Positive: one adaptive entry point, one intent record, one lifecycle authority, and status-aware artifact requirements.
+- Positive: one adaptive entry point, one progressive intent-and-plan record, one lifecycle authority, and status-aware artifact requirements.
 - Positive: branching technical decisions compose through `/sdd-adr` instead of duplicating option-analysis and ADR-threshold logic inside `/sdd-change`.
 - Positive: proposed work appears in status immediately and can be resumed naturally.
 - Positive: lifecycle command code and tests become substantially smaller.

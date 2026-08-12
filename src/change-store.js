@@ -16,11 +16,50 @@ function normalizePath(value) {
 
 export const CHANGE_METADATA_FILE = "change.md";
 export const REQUIRED_CHANGE_FILES = Object.freeze([CHANGE_METADATA_FILE]);
-export const PLANNED_CHANGE_FILES = Object.freeze(["design.md", "tasks.md"]);
+export const PLANNED_CHANGE_FILES = Object.freeze(["tasks.md"]);
+export const OPTIONAL_CHANGE_FILES = Object.freeze(["design.md"]);
 export const CHANGE_FILE_NAMES = Object.freeze([
   ...REQUIRED_CHANGE_FILES,
   ...PLANNED_CHANGE_FILES,
+  ...OPTIONAL_CHANGE_FILES,
 ]);
+
+export const PLANNED_CHANGE_SECTION_GROUPS = Object.freeze([
+  Object.freeze(["Current Context"]),
+  Object.freeze(["Behavioral Changes"]),
+  Object.freeze(["Technical Decision Handoffs"]),
+  Object.freeze(["Selected Approach"]),
+  Object.freeze(["Alternatives Considered"]),
+  Object.freeze(["Implementation Constraints"]),
+  Object.freeze(["Verification Strategy"]),
+  Object.freeze(["Risks / Trade-Offs"]),
+]);
+
+export const COMPATIBLE_DESIGN_SECTION_GROUPS = Object.freeze([
+  Object.freeze(["Context", "Current Understanding"]),
+  Object.freeze(["Selected Approach", "Technical Approach"]),
+  Object.freeze(["Risks / Trade-Offs", "Alternatives / Deferred"]),
+]);
+
+function missingSectionGroups(source, groups) {
+  const headings = new Set(
+    source
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith("## "))
+      .map((line) => line.slice(3).trim()),
+  );
+  return groups
+    .filter((alternatives) => !alternatives.some((heading) => headings.has(heading)))
+    .map((alternatives) => alternatives.join(" or "));
+}
+
+export function missingPlannedChangeSections(source) {
+  return missingSectionGroups(source, PLANNED_CHANGE_SECTION_GROUPS);
+}
+
+export function missingCompatibleDesignSections(source) {
+  return missingSectionGroups(source, COMPATIBLE_DESIGN_SECTION_GROUPS);
+}
 
 function requireWorkspaceRoot(workspaceRoot) {
   if (typeof workspaceRoot !== "string" || workspaceRoot.trim().length === 0) {

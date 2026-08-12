@@ -45,7 +45,7 @@ If the source branch, target branch, provider, or project policy cannot be infer
 1. Read workspace guidance, the one central Change, and every target repository's local guidance before mutating files:
    - root and repository-local `AGENTS.md`, especially branch policy
    - relevant README or workflow docs
-   - central `change.md`, `design.md`, `tasks.md`, and `review.md` when present
+   - central `change.md`, `tasks.md`, and `review.md`, plus a compatible existing `design.md` when present
 2. Inspect git state, remotes, and current branches in every target repository.
 3. Preserve unrelated dirty files. Do not stash, reset, or overwrite user changes unless explicitly approved.
 4. For each target repository, ensure the source branch contains its intended implementation, tests, Epic/ADR/supporting truth, and review remediation:

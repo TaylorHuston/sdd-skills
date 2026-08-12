@@ -39,7 +39,7 @@ Before release work, read:
 - root `README.md`, package scripts, test docs, deployment docs, and CI docs when present
 - remote review, branch-protection, or release-provider configuration when present
 - each target repository's `CHANGELOG.md` when present, plus its project-defined changelog, release notes, version metadata, or release manifest when different or otherwise required
-- the release-relevant central Change records selected from top-level `sdd status <space-id> --json` output, reading `change.md`, `design.md`, `tasks.md`, and `review.md` from their canonical `<workspace>/.sdd/changes/**` locations without copying workspace-local paths into public release artifacts
+- the release-relevant central Change records selected from top-level `sdd status <space-id> --json` output, reading `change.md`, `tasks.md`, and `review.md`, plus an existing `design.md` when present, from their canonical `<workspace>/.sdd/changes/**` locations without copying workspace-local paths into public release artifacts
 - relevant Epic files from each owning repository's configured Epic path when release notes, changelog entries, or readiness depend on Epic truth
 - project PRD/Product Brief when product scope changed or release contents are ambiguous
 - project visual/style guidance or app visual identity docs when a release includes prominent UI, layout, branding, or app-identity changes and those docs affect release risk or communication

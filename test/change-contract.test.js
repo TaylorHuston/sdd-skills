@@ -56,19 +56,38 @@ async function completePlanning(changePath) {
     repositories: ["sample-web"],
   });
   assert.notEqual(withRepository, null);
-  await writeFile(changePathname, withRepository);
   await writeFile(
-    join(changePath, "design.md"),
+    changePathname,
     [
-      "# Design: Capture Intent",
+      withRepository.trimEnd(),
       "",
-      "## Context",
+      "## Current Context",
       "",
       "The current system has been inspected.",
+      "",
+      "## Behavioral Changes",
+      "",
+      "The public behavior changes observably.",
+      "",
+      "## Technical Decision Handoffs",
+      "",
+      "Only one path is viable because the public boundary already exists.",
       "",
       "## Selected Approach",
       "",
       "Use the existing public boundary.",
+      "",
+      "## Alternatives Considered",
+      "",
+      "None beyond the constrained path.",
+      "",
+      "## Implementation Constraints",
+      "",
+      "Preserve the public boundary.",
+      "",
+      "## Verification Strategy",
+      "",
+      "Exercise the public behavior.",
       "",
       "## Risks / Trade-Offs",
       "",
@@ -164,14 +183,31 @@ test("planning completes the same Change before lifecycle work continues", async
     invalidPlan.findings
       .filter((finding) => finding.code === "MISSING_CHANGE_FILE")
       .map((finding) => finding.path),
-    [
-      `.sdd/changes/${result.changeId}/design.md`,
-      `.sdd/changes/${result.changeId}/tasks.md`,
-    ],
+    [`.sdd/changes/${result.changeId}/tasks.md`],
+  );
+  const plannedWithoutDesignOrSections = await validateArtifacts(root, {
+    changeId: result.changeId,
+  });
+  assert.match(
+    plannedWithoutDesignOrSections.findings.find((finding) =>
+      finding.code === "MISSING_ARTIFACT_SECTION" && finding.path.endsWith("change.md"))?.message ?? "",
+    /technical planning sections/,
   );
   await writeFile(changeFilePath, proposedSource);
 
   await completePlanning(changePath);
+  assert.equal(await pathExists(join(changePath, "design.md")), false);
+  await writeFile(join(changePath, "design.md"), "# Design: Incomplete\n");
+  await assert.rejects(
+    () => transitionChange(root, "sample", result.changeId, {
+      from: "proposed",
+      to: "planned",
+    }),
+    (error) => error instanceof SddError
+      && error.code === "INCOMPLETE_CHANGE"
+      && error.details.some((detail) => detail.startsWith("design.md:")),
+  );
+  await rm(join(changePath, "design.md"));
   await transitionChange(root, "sample", result.changeId, {
     from: "proposed",
     to: "planned",

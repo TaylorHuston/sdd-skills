@@ -36,7 +36,8 @@ test("public guide documents progressive workspace-owned Changes and current-onl
   assert.match(html, /&lt;workspace&gt;\/\.sdd\/config\.yaml/);
   assert.match(html, /&lt;workspace&gt;\/\.agents\/skills\//);
   assert.match(html, /change\.md/);
-  assert.match(html, /Planning adds <code>design\.md<\/code> and\s+<code>tasks\.md<\/code>/);
+  assert.match(html, /Planning expands <code>change\.md<\/code> and adds\s+<code>tasks\.md<\/code>/);
+  assert.match(html, /existing records may retain a compatible <code>design\.md<\/code>/);
   assert.match(html, /Pre-1\.0 installation and Change formats are unsupported alpha data/);
   assert.match(html, /<code>sdd update<\/code> reconciles current managed doctrine and skills/);
   assert.doesNotMatch(html, /change-briefs\//);

@@ -107,7 +107,7 @@ Add a Decision Fan-Out Ledger entry whenever user feedback, implementation disco
 
 Inspect every materially affected surface, including:
 
-- proposal, design, Requirements, Scenarios, Epics, ADRs, and accepted gaps
+- progressive Change planning, compatible existing design, Requirements, Scenarios, Epics, ADRs, and accepted gaps
 - application logic, adapters, workers, routes, clients, generated contracts, schemas, migrations, configuration, and environment examples
 - focused tests, fixtures, E2E paths, provider checks, visual states, and manual confirmation
 - README, architecture/testing/security/current-state docs, private Idea guidance, and release communication

@@ -709,14 +709,13 @@ skil
               <h4>Workspace-owned work</h4>
               <pre aria-label="Default Change document layout"><code>&lt;workspace&gt;/.sdd/changes/
   &lt;date&gt;-&lt;change&gt;/
-    change.md
-    design.md  # added during planning
+    change.md  # intent plus progressive plan
     tasks.md   # added during planning
   closed/
     &lt;date&gt;-&lt;change&gt;/</code></pre>
               <p class="recordNote"><code>sdd change create</code> writes one proposed <code>change.md</code> whose
-                frontmatter owns status, Space, and repository IDs. Planning adds <code>design.md</code> and
-                <code>tasks.md</code>. The ID is unique within this workspace, and closeout moves the folder once under
+                frontmatter owns status, Space, and repository IDs. Planning expands <code>change.md</code> and adds
+                <code>tasks.md</code>; existing records may retain a compatible <code>design.md</code>. The ID is unique within this workspace, and closeout moves the folder once under
                 <code>&lt;workspace&gt;/.sdd/changes/closed/</code> after project truth has been reconciled.
               </p>
               <p class="recordNote">Pre-1.0 installation and Change formats are unsupported alpha data. Recreate a

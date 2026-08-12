@@ -57,7 +57,7 @@ Read at minimum:
 
 Read at minimum:
 
-- the selected `change.md` and `design.md`/`tasks.md` when they exist;
+- the selected `change.md` and `tasks.md` when it exists, plus an existing `design.md` only for a Change that already has one;
 - matching explorations and relevant PRD direction;
 - active/recent Changes that overlap or constrain the outcome;
 - governing ADRs;

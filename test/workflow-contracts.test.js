@@ -55,16 +55,16 @@ test("packaged change workflow progresses one central intent record into plannin
     "assets",
     "change-template.md",
   );
-  const designTemplate = await readPackageFile("docs", "templates", "design.md");
-  const packagedDesignTemplate = await readPackageFile(
+  const planningSections = await readPackageFile("docs", "templates", "planning-sections.md");
+  const packagedPlanningSections = await readPackageFile(
     "skills",
     "sdd-change",
     "assets",
-    "design-template.md",
+    "planning-sections.md",
   );
 
   assert.equal(packagedChangeTemplate, changeTemplate);
-  assert.equal(packagedDesignTemplate, designTemplate);
+  assert.equal(packagedPlanningSections, planningSections);
   assert.match(changeSkill, /Select Or Create The Change/);
   assert.match(changeSkill, /## Capture Intent/);
   assert.match(changeSkill, /## Technical Planning/);
@@ -78,18 +78,19 @@ test("packaged change workflow progresses one central intent record into plannin
   );
   assert.match(
     changeSkill,
-    /When only one technical approach is viable, state the constraining reason in `design\.md`; do not invent alternatives or invoke `\/sdd-adr` ceremonially/,
+    /When only one technical approach is viable, state the constraining reason in `change\.md`; do not invent alternatives or invoke `\/sdd-adr` ceremonially/,
   );
   assert.match(changeSkill, /Revising An Existing Plan/);
   assert.match(changeSkill, /`proposed`: intent exists, but ownership or technical planning may be incomplete/);
-  assert.match(changeSkill, /- `design\.md`: behavior, selected approach[\s\S]*- `tasks\.md`: a short capability-level implementation ledger/);
+  assert.match(changeSkill, /Progressively append or update the sections from `assets\/planning-sections\.md` in `change\.md`/);
+  assert.match(changeSkill, /Do not create `design\.md` for future Changes/);
   assert.doesNotMatch(changeSkill, /--brief|--plan|--replan|proposal\.md|change-briefs/);
   assert.match(changeTemplate, /status: proposed/);
   assert.match(changeTemplate, /space: <space-id>/);
   assert.match(changeTemplate, /repositories: \[\]/);
-  assert.match(designTemplate, /## Technical Decision Handoffs/);
+  assert.match(planningSections, /## Technical Decision Handoffs/);
   assert.match(
-    designTemplate,
+    planningSections,
     /invoke `\/sdd-adr` and summarize its result here instead of duplicating the full option analysis/,
   );
 });
@@ -634,8 +635,9 @@ test("packaged Interactive workflow tracks one lightweight progressive Change", 
   const interactiveSkill = await readPackageFile("skills", "sdd-interactive", "SKILL.md");
 
   assert.match(interactiveSkill, /sdd change create <space-id> <slug>/);
-  assert.match(interactiveSkill, /`change\.md`: record why the session exists/);
+  assert.match(interactiveSkill, /`change\.md`: record why the session exists[\s\S]*high-level technical approach/);
   assert.match(interactiveSkill, /Status, Space, and repositories remain in `change\.md`/);
+  assert.doesNotMatch(interactiveSkill, /<yyyy-mm-dd-change-name>\/design\.md/);
   assert.match(interactiveSkill, /sdd change transition <space-id> <change-id> --from proposed --to planned/);
   assert.match(interactiveSkill, /Recommend `\/sdd-review` before merge or closeout/);
   assert.doesNotMatch(interactiveSkill, /proposal\.md|--brief|\/sdd-change --plan|--replan/);

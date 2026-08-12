@@ -43,7 +43,7 @@ Before auditing, read:
 - project-local `AGENTS.md`, especially branch policy and generated-file guidance
 - parent or workspace guidance when the project points to it
 - `docs/epics/*/epic.md`
-- central active and recent `change.md`, `design.md`, `tasks.md`, and `review.md` selected through the target repository's `sdd status` projection, only when they explain likely drift
+- central active and recent `change.md`, `tasks.md`, and `review.md`, plus a compatible existing `design.md` when present, selected through the target repository's `sdd status` projection only when they explain likely drift
 - project README, test docs, package scripts, framework config, and configured release communication when they affect inventory or cleanup risk
 
 Check git status before writing a report. Preserve unrelated dirty files. Do not stage, commit, push, merge, deploy, or mutate external services.

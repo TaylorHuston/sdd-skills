@@ -28,7 +28,7 @@ Complete only the assigned Requirement or Scenario slice in the named target rep
 Read:
 
 - project-local guidance for the assigned repository named by the orchestrator
-- the central `change.md`, `design.md`, and `tasks.md`
+- the central `change.md` and `tasks.md`, plus an existing `design.md` when present
 - the repository-local target Epic `epic.md`
 - files in the assigned repository listed or implied by the Requirement or Scenario
 - every selected skill and guidance item named by the orchestrator
@@ -50,7 +50,7 @@ Read every selected skill completely, including its required references, and app
 - Do not introduce, rename, or renumber Stories. If the assigned Story label/reference appears duplicated or wrong, report it as traceability drift instead of choosing a new label.
 - If the assigned work supersedes earlier Story, Requirement, Scenario, `Verified By`, or `Verification Gaps` wording, report the needed reconciliation instead of leaving the older truth contradictory.
 - Treat Requirements and Scenarios as observable behavior unless the orchestrator says a technical detail is user-visible.
-- Keep shared technical implementation guarantees in the central `design.md` or `tasks.md`; keep repository-owned guarantees in local ADRs or current-state docs. Do not turn them into user-visible Requirements.
+- Keep shared technical implementation guarantees in the central `change.md` or `tasks.md`; keep repository-owned guarantees in local ADRs or current-state docs. Do not turn them into user-visible Requirements.
 - Stay within the assigned slice and selected guidance.
 - Do not claim a selected skill was used unless its instructions were read and applied.
 - If selected guidance is unavailable, report it only when the absence changes implementation confidence, verification, or a stop condition; otherwise use the best project-local fallback.

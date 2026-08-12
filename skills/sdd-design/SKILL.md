@@ -18,7 +18,7 @@ This is an optional design-readiness workflow for Changes with meaningful user-i
 - `/sdd-apply` owns application code, production components, Storybook stories, and implementation evidence.
 - `/sdd-review` independently checks the implemented experience against accepted behavior and the confirmed design direction.
 
-Do not add a Change status or a mandatory `ui-design.md`. Use the existing `design.md` and `tasks.md`, plus app-level visual identity docs when the decision is broader than one Change.
+Do not add a Change status, `design.md`, or `ui-design.md` for future Changes. Record the accepted experience contract in `change.md` and revision history in `tasks.md`, plus app-level visual identity docs when the decision is broader than one Change. If an older Change already has `design.md`, continue using its existing `Experience Design` section rather than splitting that record across two current locations.
 
 ## Modes
 
@@ -33,7 +33,7 @@ When no flag is supplied, infer the mode only when the Change state and request 
 
 1. Resolve the workspace, owning Space, one central Change, and every relevant target repository ID from explicit user input or `sdd context <relevant-path> --json`. Retain the resolved workspace root and pass `--workspace <workspace-root>` to subsequent SDD commands whenever the target repository is external to the workspace or the command's current directory is not inside that workspace.
 2. Read the `workflowPath` returned by `sdd context` completely. If workspace setup is missing, direct the user to `sdd setup [workspace-path]`; if a target repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
-3. Require one selected central open Change at `<workspace>/.sdd/changes/<change-id>/`, where the flat Change ID is unique within that workspace. Read `change.md` frontmatter and require `status` to be one of `proposed`, `planned`, `in_progress`, or `in_review`, `space` to match the resolved Space, and `repositories` to contain the stable portable target repository IDs. A proposed Change with only `change.md` is intent awaiting technical planning; route it through `/sdd-change` before design work.
+3. Require one selected central open Change at `<workspace>/.sdd/changes/<change-id>/`, where the flat Change ID is unique within that workspace. Read `change.md` frontmatter and require `status` to be one of `proposed`, `planned`, `in_progress`, or `in_review`, `space` to match the resolved Space, and `repositories` to contain the stable portable target repository IDs. A proposed Change without technical-planning sections or `tasks.md` is intent awaiting technical planning; route it through `/sdd-change` before design work.
 4. Resolve repository paths from those IDs for repository-local implementation, visual identity, prototype, Storybook, Epic, ADR, and design-evidence context. Never create or use a repository-local Change copy.
 5. Ask when one Space maps to multiple plausible Changes, or when the Change's target repository IDs do not resolve unambiguously.
 6. Treat a Change under `<workspace>/.sdd/changes/closed/<change-id>/` as history. Create or select a follow-up Change instead of rewriting closed intent.
@@ -43,7 +43,7 @@ This skill does not start implementation, replan behavior, review, close, merge,
 - `--plan` preserves the central Change's current status. `proposed` is its normal entry point; `planned` is also valid when experience readiness remains the final pre-implementation gate.
 - `--revise` requires a central Change in `in_progress` or `in_review` and an explicit user request, review finding, or recorded manual feedback identifying the experience concern in one or more target repositories.
 - Keep an `in_review` Change in review while auditing, comparing, classifying feedback, and converging with the user. Do not transition it during setup merely because `--revise` was invoked.
-- After feedback is confirmed as an experience revision within accepted behavior and the user confirms the revised direction, run `sdd change transition <space-id> <change-id> --from in_review --to in_progress` immediately before editing `design.md` or `tasks.md`. This repo-free compare-and-set mutates the one central ledger once; never transition repository targets independently. Stop and refresh context if it fails.
+- After feedback is confirmed as an experience revision within accepted behavior and the user confirms the revised direction, run `sdd change transition <space-id> <change-id> --from in_review --to in_progress` immediately before editing `change.md`, `tasks.md`, or an existing compatible `design.md`. This repo-free compare-and-set mutates the one central ledger once; never transition repository targets independently. Stop and refresh context if it fails.
 - Route behavioral discovery from `in_review` directly to `/sdd-change` without first transitioning it to `in_progress`.
 - A central `in_progress` Change already has the correct status for `--revise`; do not perform a no-op transition.
 - A `proposed` Change returns to `/sdd-change` or `--replan` after `--plan` resolves its experience questions.
@@ -53,7 +53,7 @@ This skill does not start implementation, replan behavior, review, close, merge,
 
 Read only the context that can materially change the design:
 
-- central `change.md`, `design.md`, and `tasks.md`
+- central `change.md` and `tasks.md`, plus an existing `design.md` when this Change already has one
 - affected repository-local Epic/Story/Requirement/Scenario definitions, grouped by target repository ID
 - Product Brief, PRD, or relevant exploration conclusions
 - repository-local visual identity, project design guidance, and optional shared foundations
@@ -155,7 +155,7 @@ For an `in_review` Change, perform the guarded repo-free `in_review -> in_progre
 
 ### 8. Record The Experience Contract
 
-Create or update one `## Experience Design` section in the central Change's existing `design.md`. It is the canonical current accepted experience contract, not the revision history. Keep it proportional to the Change and use the canonical section in the installed `/sdd-change` `assets/design-template.md` when available. For an older or independently managed central Change without that template, record the confirmed direction, user confirmation, stable reference artifacts, user flow and information architecture, responsive composition, component and state contract, material component strategies, accessibility and interaction behavior, visual direction, and open design questions.
+Create or update one `## Experience Design` section in the central Change's `change.md`. It is the canonical current accepted experience contract, not the revision history. Keep it proportional to the Change and use the canonical section in the installed `/sdd-change` `assets/planning-sections.md` when available. For an older Change that already has `design.md`, update the existing `Experience Design` section there instead and do not create a competing section in `change.md`. Record the confirmed direction, user confirmation, stable reference artifacts, user flow and information architecture, responsive composition, component and state contract, material component strategies, accessibility and interaction behavior, visual direction, and open design questions.
 
 Reference Requirements and Scenarios where the design contract clarifies how accepted behavior appears. Qualify repository-local artifacts and evidence with their stable target repository ID. Do not restate every Requirement or turn visual details into Stories.
 
@@ -169,9 +169,9 @@ Update `tasks.md` only as needed to preserve cold-resume state:
 - repository-local Storybook states, screenshots, prototypes, or manual UI checks the implementation should create
 - the Visual Verification Matrix covering affected repositories, surfaces, viewports, states, interactions, expected observations, and preferred tooling or fallback
 
-For `--revise`, update `Experience Design` to the newly confirmed current contract and append a dated `Design Updates` entry containing the feedback, classification, target repository ID, reference and target, preserve/change/non-goal summary, artifacts changed, and exact `/sdd-apply` restart point. The one central ledger preserves the superseded direction and why it changed; `design.md` must not leave the old and revised directions competing as simultaneous current truth. Keep implementation and rendered-design evidence in the repository that owns it, and link or identify that evidence from the central record instead of copying it into another Change location.
+For `--revise`, update `Experience Design` to the newly confirmed current contract and append a dated `Design Updates` entry containing the feedback, classification, target repository ID, reference and target, preserve/change/non-goal summary, artifacts changed, and exact `/sdd-apply` restart point. The one central ledger preserves the superseded direction and why it changed; the current planning location must not leave old and revised directions competing as simultaneous truth. Keep implementation and rendered-design evidence in the repository that owns it, and link or identify that evidence from the central record instead of copying it into another Change location.
 
-When a decision changes app-wide identity rather than only this Change, update or propose the owning repository's resolved visual-identity document with user authorization and link it from `design.md`. Keep reusable cross-app foundations optional unless the user explicitly adopts a proven pattern as shared.
+When a decision changes app-wide identity rather than only this Change, update or propose the owning repository's resolved visual-identity document with user authorization and link it from the Change's current `Experience Design` section. Keep reusable cross-app foundations optional unless the user explicitly adopts a proven pattern as shared.
 
 ## Behavioral Discovery
 
@@ -183,13 +183,13 @@ Design work often exposes missing or changed behavior. Classify it before editin
 - **broader product-direction change**: route to `/sdd-prd` or `/sdd-explore`.
 - **durable architecture decision**: route to `/sdd-adr`.
 
-Do not edit actual Epic files from this skill. Planned Epic definitions inside `design.md` remain planning material; accepted Epic truth changes through the owning planning or implementation workflow.
+Do not edit actual Epic files from this skill. Planned Epic definitions inside `change.md` or a compatible existing `design.md` remain planning material; accepted Epic truth changes through the owning planning or implementation workflow.
 
 ## Validate And Hand Off
 
 Before reporting design readiness:
 
-1. Re-read `change.md`, `design.md`, and `tasks.md` for contradictions.
+1. Re-read `change.md` and `tasks.md`, plus any compatible existing `design.md`, for contradictions.
 2. Confirm each material design decision traces to accepted behavior or is explicitly identified as a visual implementation choice.
 3. Confirm desktop/mobile composition, required states, accessibility, and design-system deviations are sufficiently resolved for implementation.
 4. Confirm the Visual Verification Matrix is proportional, covers every materially affected surface, and gives `/sdd-apply` and `/sdd-review` a reproducible rendered-state plan.

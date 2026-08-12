@@ -23,7 +23,7 @@ Delegation authorization: invoking `/sdd-epic-verify`, naming `sdd-epic-verify`,
 
 - Default: run a full Epic audit, run practical verification, write an Epic-local report, and report findings. Do not edit source artifacts except the report.
 - `--check`: read-only terminal output only. Do not write a report or edit files.
-- `--propose-fixes`: after reporting findings, use repository-targeted status metadata to resume an existing matching central Change or, for a new fix proposal, run `sdd change create <space-id> <epic>-drift-fixes --repo <stable-repository-id>` with every impacted repository selected, then refine the generated central `change.md`, `design.md`, and `tasks.md`. Never hand-create a repository-local Change.
+- `--propose-fixes`: after reporting findings, use repository-targeted status metadata to resume an existing matching central Change or, for a new fix proposal, run `sdd change create <space-id> <epic>-drift-fixes --repo <stable-repository-id>` with every impacted repository selected, then invoke `/sdd-change` to refine the generated central `change.md`, add its technical-planning sections, and create `tasks.md`. Never hand-create a repository-local Change.
 
 If mode is ambiguous, default to the full audit report.
 
@@ -58,7 +58,7 @@ Before auditing, read:
 - parent or workspace guidance when the project points to it
 - this skill's `assets/epic-template.md`, to check the target Epic against the canonical template shape
 - target `docs/epics/<key>-<###>-epic-name>/epic.md`
-- relevant central `change.md`, `design.md`, `tasks.md`, and `review.md` selected through the target repository's `sdd status` projection when they mention the Epic, its Story labels, full Story references, or legacy Story IDs
+- relevant central `change.md`, `tasks.md`, and `review.md`, plus an existing `design.md` when present, selected through the target repository's `sdd status` projection when they mention the Epic, its Story labels, full Story references, or legacy Story IDs
 - enough of every active `docs/epics/*/epic.md` to detect duplicate Story labels inside an Epic, duplicate full Story references, or conflicting legacy app-wide Story IDs
 - planning-root docs or the PRD/Product Brief when product direction exists or drift is suspected
 - the project-defined truth-bearing supporting-doc set; when none is declared, inspect the README and documents whose current claims intersect the Epic, such as testing, architecture, ADR, data-model, current-state, or release docs

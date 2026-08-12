@@ -66,7 +66,7 @@ If the project has no `docs/adrs/`, create it only when the user has asked to dr
    - When invoked by `/sdd-change`, compare the meaningfully different viable approaches using project evidence, recommend one, and ask the user to settle the choice. Do not silently choose for the user.
    - If the decision remains unresolved, return that state to `/sdd-change`; the Change must remain `proposed`.
 3. Decide whether an ADR is warranted.
-   - If not warranted, report why and return a concise decision summary for the central Change's `design.md` or `tasks.md`, or for an exploration summary.
+   - If not warranted, report why and return a concise decision summary for the central Change's technical-planning sections in `change.md` or its `tasks.md`, or for an exploration summary.
    - If warranted but undecided, draft an ADR candidate with status `Proposed`.
 4. Create or update the ADR.
    - Use `assets/adr-template.md`.
@@ -74,7 +74,7 @@ If the project has no `docs/adrs/`, create it only when the user has asked to dr
    - Use status values that match the project when present; otherwise use `Proposed`, `Accepted`, `Superseded`, or `Rejected`.
 5. Link the ADR.
    - Link related Changes by stable Change ID, and link repository-local Epics, Stories, Requirements, Scenarios, PRs, or implementation evidence when known. Never put a private absolute central Change path in a repository-local ADR.
-   - If invoked during `/sdd-change`, ensure the central `design.md` and `tasks.md` identify the repository-relative ADR path and its repository ID.
+   - If invoked during `/sdd-change`, ensure the central `change.md` and `tasks.md` identify the repository-relative ADR path and its repository ID.
    - If invoked during `/sdd-explore`, offer to link the ADR from an exploration summary or later `/sdd-change`.
 6. Verify the ADR.
    - Re-read the ADR.
@@ -101,4 +101,4 @@ Summarize:
 - decision
 - options considered
 - links to related stable Change IDs and repository-local SDD artifacts
-- follow-up needed in the central `design.md` or `tasks.md`, repository-local Epic truth, or review
+- follow-up needed in the central `change.md` or `tasks.md`, repository-local Epic truth, or review

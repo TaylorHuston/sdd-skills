@@ -15,6 +15,8 @@ import {
   relativeChangeStorePath,
   REQUIRED_CHANGE_FILES,
   PLANNED_CHANGE_FILES,
+  OPTIONAL_CHANGE_FILES,
+  missingPlannedChangeSections,
 } from "../change-store.js";
 import {
   inspectRepositoryIdentity,
@@ -1171,14 +1173,32 @@ async function validateChange({
         ));
       }
       if (!metadata.error) {
-        if (metadata.status === "proposed") {
+        if (metadata.status !== "proposed") {
+          const hasCompatibleDesign = await pathExists(join(changePath, "design.md"));
+          const missingPlanningSections = hasCompatibleDesign
+            ? []
+            : missingPlannedChangeSections(source);
+          if (missingPlanningSections.length > 0) {
+            findings.push(finding(
+              shapeLevel,
+              "MISSING_ARTIFACT_SECTION",
+              displayPath,
+              `Planned Change is missing technical planning sections: ${missingPlanningSections.join(", ")}.`,
+              context,
+            ));
+          }
+          filesToValidate.push(...PLANNED_CHANGE_FILES);
+        } else {
           for (const plannedFile of PLANNED_CHANGE_FILES) {
             if (await pathExists(join(changePath, plannedFile))) {
               filesToValidate.push(plannedFile);
             }
           }
-        } else {
-          filesToValidate.push(...PLANNED_CHANGE_FILES);
+        }
+        for (const optionalFile of OPTIONAL_CHANGE_FILES) {
+          if (await pathExists(join(changePath, optionalFile))) {
+            filesToValidate.push(optionalFile);
+          }
         }
       }
     }

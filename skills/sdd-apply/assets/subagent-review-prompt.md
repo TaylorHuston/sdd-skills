@@ -29,7 +29,7 @@ Review the assigned repository implementation objectively. The central Change ma
 Read:
 
 - project-local guidance for the assigned repository named by the orchestrator
-- the central `change.md`, `design.md`, and `tasks.md`
+- the central `change.md` and `tasks.md`, plus an existing `design.md` when present
 - the repository-local target Epic `epic.md`
 - changed files and relevant tests in the assigned repository
 - that repository's changed-surface reverse-traceability inventory when assigned candidate classification
@@ -42,7 +42,7 @@ Read every selected skill completely, including its required references, and app
 
 Apply the assigned `REVIEW_PASS`:
 
-- `artifact-truth`: check the central proposal, design, and tasks plus this repository's Epic Story labels/references, Requirement IDs, Scenario IDs, independent implementation/verification state, behavior-mapped Implemented By, Implementation Gaps, scenario-mapped Verified By, Verification Gaps, review record, manual confirmation status, release-communication status, PR/merge state, and readiness agree with reality. Require one current implementation map and one current verification map per Story; flag competing prior/detailed/legacy maps. Flag `Verified By` sections that are only command logs or unmapped broad gates, and flag proposal/design/tasks text that still says completed work is not implemented, not verified, or pending.
+- `artifact-truth`: check the central change and tasks, plus any compatible existing design plus this repository's Epic Story labels/references, Requirement IDs, Scenario IDs, independent implementation/verification state, behavior-mapped Implemented By, Implementation Gaps, scenario-mapped Verified By, Verification Gaps, review record, manual confirmation status, release-communication status, PR/merge state, and readiness agree with reality. Require one current implementation map and one current verification map per Story; flag competing prior/detailed/legacy maps. Flag `Verified By` sections that are only command logs or unmapped broad gates, and flag change/tasks or compatible existing design text that still says completed work is not implemented, not verified, or pending.
 - `cold-navigation`: begin from each changed Requirement and any Scenario with a distinct owner. Confirm the repository-local Epic names a concrete repository-relative primary code location, stable symbol or searchable anchor, responsibility, and concrete verification evidence without repository-wide rediscovery. Open the anchor and reject imports, call sites, incidental handlers, broad tokens, or files cited for another symbol as governing ownership. Flag missing paths, missing anchors, undifferentiated file dumps, and maps that stop at UI/tests while hiding application logic.
 - `coverage`: check Story label/reference plus Requirement/Scenario coverage, negative paths, browser or production-path proof, mock/fake boundaries, regression risk, flaky risk, scenario-mapped verification evidence, evidence type separation, and verification gaps. Evidence type separation means deterministic E2E, live-provider playtests, manual UI confirmation, broad gates, and debug/log inspection are not treated as interchangeable.
 - `evidence-integrity`: treat completion checkboxes, `Verified By` rows, E2E/security/recovery claims, and review-handoff statements as falsifiable. Open the cited tests or runtime evidence; identify the exact test title or stable named anchor and important assertion, route, selector, injected failure, or observation; reject generic framework tokens such as `#it(`; confirm the passing command discovers it; reject Scenario aggregation that the named proof does not exercise; and distinguish server-side enforcement from client-side retry, redirect, timeout, draft, navigation, and recovery behavior.
@@ -91,6 +91,6 @@ Return:
 - whether the central `tasks.md` Resume Here and this repository's state are accurate enough for cold-start recovery
 - whether this repository's readiness and closeout fields are internally consistent, without inferring Change-wide readiness
 - whether the central risk matrix, Pattern Parity Matrix, Stateful Transition Matrix, decision fan-out ledger, verification-environment record, evidence claims, and this repository's immutable review-handoff candidate match the actual implementation and evidence
-- whether related central proposal/design/tasks/review artifacts and repository-local truth use the same manual confirmation status vocabulary and no longer contain stale implementation-pending text
+- whether related central change/tasks/review artifacts, compatible existing design, and repository-local truth use the same manual confirmation status vocabulary and no longer contain stale implementation-pending text
 - recommended remediation slices, if fixes are safe and in scope
 - residual risks and blockers

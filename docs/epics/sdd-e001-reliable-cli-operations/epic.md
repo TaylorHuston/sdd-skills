@@ -63,7 +63,7 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 | S3 | implemented | verified | Route one workspace-unique central Change across portable repository targets. | 2026-08-10 | Creation, lifecycle, physical confinement, and deterministic discovery use current workspace and repository contracts; legacy alpha formats are unsupported. |
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
 | S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-23 | Reports are versioned; PR/release paths are classified and rechecked; Git baselines are immutable and bounded. |
-| S6 | partial | partial | Carry one progressive central Change through planning and an evidence-backed multi-repository handoff. | 2026-08-10 | The new `change.md` contract is implemented at the CLI seam; package-wide verification remains. |
+| S6 | partial | partial | Carry one progressive central Change through planning and an evidence-backed multi-repository handoff. | 2026-08-11 | The progressive intent-and-plan `change.md` contract is implemented at the CLI seam; package-wide verification remains. |
 | S7 | implemented | partial | Explain the portable method and package through accessible responsive documentation. | 2026-08-10 | The public guide describes progressive Changes and current-only setup; responsive rendering and owner confirmation remain pending. |
 
 ## Stories
@@ -708,8 +708,8 @@ The published package SHALL include the orphan-audit source and universal bundle
 Implementation: partial
 Verification: partial
 Created: 2026-07-23
-Modified: 2026-08-10
-Last verified: 2026-08-10
+Modified: 2026-08-11
+Last verified: 2026-08-11
 
 As a developer, I want SDD planning, implementation, and review workflows to carry work through a complete evidence-backed handoff, so that an agent does not stop at a partial task, a green command, or the first finding.
 
@@ -717,7 +717,7 @@ As a developer, I want SDD planning, implementation, and review workflows to car
 
 ##### Requirement R1: Progressive Planning And Handoff Records
 
-The packaged planning workflow SHALL create or resume one central `change.md`, capture durable intent before technical planning, ask whether the user wants to continue, and add `design.md` plus `tasks.md` only when planning proceeds.
+The packaged planning workflow SHALL create or resume one central `change.md`, capture durable intent before technical planning, ask whether the user wants to continue, progressively add the technical plan to the same record, and create `tasks.md` only when planning proceeds. Existing `design.md` files SHALL remain compatible without being created for future Changes.
 
 ###### Scenario R1-S1: Deferred Technical Planning
 
@@ -803,9 +803,9 @@ Explore, ADR, and Change SHALL invoke one read-only same-session context workflo
 | Requirement / Scenario | Location / Anchor | Kind | Responsibility |
 |---|---|---|---|
 | S6/R1-S1, S6/R1-S2 | `skills/sdd-change/SKILL.md#Select Or Create The Change` | primary | Governs one adaptive create/resume flow and proposed intent capture. |
-| S6/R1-S1, S6/R1-S2 | `skills/sdd-change/SKILL.md#Revising An Existing Plan` | primary | Governs plan revision and exact Apply restart without a separate mode. |
+| S6/R1-S1, S6/R1-S2 | `skills/sdd-change/SKILL.md#Revising An Existing Plan` | primary | Governs progressive in-place plan revision and exact Apply restart without a separate mode or new `design.md`. |
 | S6/R1-S1 | `src/commands/change-create.js#createChange` | primary | Creates one proposed `change.md` and allows repository ownership to remain empty. |
-| S6/R1-S1 | `src/commands/change-transition.js#assertPlanningComplete` | primary | Requires repository ownership, `design.md`, and `tasks.md` before `planned`. |
+| S6/R1-S1 | `src/commands/change-transition.js#assertPlanningComplete` | primary | Requires repository ownership, technical-planning sections in `change.md`, and `tasks.md` before `planned`, while accepting an existing compatible `design.md`. |
 | S6/R1 | `docs/templates/tasks.md#Decision Fan-Out Ledger` | support | Carries planning decisions and their affected surfaces into delivery. |
 | S6/R1 | `docs/templates/tasks.md#Verification Environment` | support | Records required setups and safety boundaries before evidence is claimed. |
 | S6/R1 | `docs/templates/tasks.md#Verification Scope Decision` | support | Records aggregate and prospective-integration candidate obligations. |
@@ -848,7 +848,7 @@ Explore, ADR, and Change SHALL invoke one read-only same-session context workflo
 
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
-| S6/R1-S1, S6/R1-S2 | Automated tests `test/change-contract.test.js#change create captures proposed intent in one central change.md` and `test/change-contract.test.js#planning completes the same Change before lifecycle work continues` | Proposed intent needs only `change.md`; planning artifacts and repository ownership gate `planned`; status, transition, and close use the same record. | Passing 2026-08-10 |
+| S6/R1-S1, S6/R1-S2 | Automated tests `test/change-contract.test.js#change create captures proposed intent in one central change.md` and `test/change-contract.test.js#planning completes the same Change before lifecycle work continues` | Proposed intent needs only `change.md`; progressive technical sections, `tasks.md`, and repository ownership gate `planned`; no new `design.md` is created, while compatible existing records remain valid. | Passing 2026-08-11 |
 | S6/R2-S1 | Semantic source inspection of `skills/sdd-apply/SKILL.md#Persistence invariant` and `skills/sdd-apply/SKILL.md#Commit cadence invariant` | Apply continues beyond a green slice and commits an isolated reconciled phase before later work. | Passing 2026-07-23 |
 | S6/R3-S1, S6/R3-S2 | Semantic source inspection of `skills/sdd-review/SKILL.md#Full-review invariant` and `skills/sdd-review/SKILL.md#Execution-continuity invariant` | Review retains early findings while completing discovery and resumes yielded commands. | Passing 2026-07-23 |
 | S6/R4-S1 | Semantic source inspection of `skills/sdd-design/SKILL.md#Define The Visual Verification Matrix`, `skills/sdd-apply/SKILL.md#Apply Loop`, and `skills/sdd-review/SKILL.md#Review Gates` | Design, Apply, and Review jointly reject source-only UI confidence. | Passing 2026-07-23 |

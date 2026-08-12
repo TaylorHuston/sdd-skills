@@ -76,7 +76,7 @@ Before deciding any verdict, build one central review bundle plus one branch/dif
 Capture centrally:
 
 - workspace root, managed `workflowPath`, Space ID, central Change ID and path, stored status, and stable target repository IDs
-- central proposal, design, task-ledger, and existing review state
+- central progressive change, task-ledger, compatible existing design, and review state
 - repository-specific manual confirmation, release-communication, review, PR/merge, accepted-gap, and closeout state from the one ledger
 - available PR descriptions, linked issues, review discussion, and cross-repository coordination context; record material context that is unavailable rather than silently assuming it does not exist
 
@@ -134,8 +134,8 @@ Require integration-candidate proof separately in each repository whose target h
 Before reviewing, read:
 
 - `<workspace>/.sdd/changes/<change-id>/change.md`
-- `<workspace>/.sdd/changes/<change-id>/design.md`
 - `<workspace>/.sdd/changes/<change-id>/tasks.md`
+- an existing `<workspace>/.sdd/changes/<change-id>/design.md` when this compatible Change already has one
 - existing `<workspace>/.sdd/changes/<change-id>/review.md`, if present
 
 Validate that active `change.md` frontmatter uses `proposed`, `planned`, `in_progress`, or `in_review`, names the selected Space, and lists every target repository by stable portable ID. In mutating modes, run `sdd change transition <space-id> <change-id> --from in_progress --to in_review` once when implementation is complete in every targeted repository and independent review begins; retain `in_review` when review is already underway. Do not transition targets independently or pass repository flags. If a Change ID collides in the selected workspace's active and closed stores, stop rather than selecting either record.
@@ -236,7 +236,7 @@ Treat subagent output as evidence, not final truth. Validate important claims by
 
 Run every gate that applies and record `pass`, `findings`, `blocked`, or `not applicable`. Do not short-circuit this list because an earlier gate already guarantees `changes-requested` or `blocked`; complete later independent gates so the user receives one comprehensive finding set. Before finalizing, confirm that every gate has an explicit result and that no delegated or main-thread review pass remains uncollected. Apply the detailed semantics from the managed workflow document, the canonical templates, selected available review skills, and project guidance instead of restating them here.
 
-1. **Artifact truth**: the one central proposal, design, task ledger, and review; repository-local Epic/Story truth; Requirements; Scenarios; independent implementation/verification state; behavior and evidence maps; implementation/verification gaps; target repository metadata; repository-specific ledger results; and Change-wide status agree with implementation reality in every target.
+1. **Artifact truth**: the one central progressive change, task ledger, compatible existing design, and review; repository-local Epic/Story truth; Requirements; Scenarios; independent implementation/verification state; behavior and evidence maps; implementation/verification gaps; target repository metadata; repository-specific ledger results; and Change-wide status agree with implementation reality in every target.
 2. **Canonical map authority and cold navigation**: confirm every Story has one current `Implemented By` map and one current `Verified By` map, with no competing `Prior`, `Detailed`, `Legacy`, or migration-era maps. For every changed Requirement, and for Scenarios with distinct owners, start from the Epic and identify the primary governing definition, registration, or configuration plus stable anchor without a repository-wide rediscovery search. Treat imports, call sites, incidental handlers, broad file tokens, files cited for a different symbol, undifferentiated dumps, mappings that stop at UI/tests, missing paths/anchors, and unclassified support files as findings.
 3. **Source-vs-target code review**: review the actual diff and source-only commits for correctness, regressions, maintainability, accidental scope, project-pattern fit, and user-visible state handling.
 4. **Pattern conformance**: when the diff adds or changes a surface parallel to an established adapter, client, route, workspace, worker, migration, command, or similar implementation, identify the closest current reference and compare applicable auth/session/CSRF, retry, timeout/cancel, error/conflict, recovery, pending-write, identity, route-context, configuration, generated-contract, accessibility, and visual-token behavior plus focused tests. Unexplained divergence or copied defects are findings.
