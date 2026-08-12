@@ -41,6 +41,12 @@ sdd change create <space-id> <slug> [--repo <repository-id> ...]
 
 Repository selection is optional while the Change is proposed. Announce the selected Change and allow the user to correct the choice.
 
+## Gather Context
+
+Invoke `/sdd-gather-context` with action `change`, the focused desired outcome, the selected Change path, and known Space/repository IDs. It owns the shared minimum-read contract. Use its evidence-linked result for intent capture and planning, and deepen only where this Change exposes a remaining gap.
+
+Do not finalize intent or technical planning while the result is insufficient for the focused outcome.
+
 ## Capture Intent
 
 Before technical planning, ensure `change.md` captures:
@@ -62,7 +68,7 @@ When resuming an existing proposed Change, read it first and continue from the n
 
 ### 1. Understand the current system
 
-Read only the project guidance, product context, Epics, ADRs, code, tests, dependencies, and prior Changes needed to plan this outcome accurately. Use current vendor documentation when a decision depends on version-specific behavior.
+Start from the `/sdd-gather-context` result. Resolve its gaps and inspect additional implementation or current vendor evidence only when needed to plan this outcome accurately.
 
 Confirm the target repositories before finalizing the plan.
 
@@ -72,18 +78,15 @@ Describe the affected Stories, Requirements, and concrete Scenarios. Cover impor
 
 Keep technical constraints in `design.md` unless users or external clients can observe them. Do not invent implementation locations or verification evidence for work that does not exist yet.
 
-### 3. Choose the technical approach
+### 3. Resolve technical approach decisions
 
 Identify decisions that materially affect architecture, contracts, data, dependencies, security, operations, or future work.
 
-For each non-trivial decision:
+When current evidence reveals two or more meaningfully different viable technical approaches, invoke `/sdd-adr` before selecting or finalizing the approach. Pass it the stable Change ID, owning repository, decision question, relevant constraints, and approaches already discovered. `/sdd-adr` owns option comparison, recommendation, user decision, and the judgment about whether to create or update a durable ADR. Resume `/sdd-change` after it returns the selected decision or an explicit unresolved state.
 
-1. Present two or three viable approaches.
-2. Compare their meaningful tradeoffs in this project.
-3. Recommend one and explain why.
-4. Ask the user to settle the choice.
+A meaningful difference changes an important boundary, contract, data or state model, dependency, security posture, operational model, migration path, or future constraint. Do not invoke `/sdd-adr` merely to manufacture alternatives for a straightforward implementation detail. Route unresolved product direction to `/sdd-prd` and material experience-design choices to `/sdd-design`.
 
-When only one approach is sensible, state why instead of inventing alternatives. Record the selected approach, rejected alternatives, and reconsideration triggers in `design.md`. Use `/sdd-adr` when future Changes should respect the decision.
+When only one technical approach is viable, state the constraining reason in `design.md`; do not invent alternatives or invoke `/sdd-adr` ceremonially. After the handoff, record the selected approach and any repository-relative ADR path in `design.md`, and record follow-up work in `tasks.md`. Do not duplicate `/sdd-adr`'s full option analysis in the central Change.
 
 Do not finalize while a material product or technical choice remains unresolved.
 

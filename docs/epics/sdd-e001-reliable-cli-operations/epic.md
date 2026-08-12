@@ -3,7 +3,7 @@ schema: sdd-epic-v2
 id: SDD-E001
 status: active
 created: 2026-07-20
-modified: 2026-08-10
+modified: 2026-08-11
 last_verified: 2026-08-10
 stories:
   - S1
@@ -37,6 +37,7 @@ Developers can validate SDD artifacts, mutate lifecycle state, resolve topology,
 - Bounded, context-aware `doctor` and `status` diagnostics.
 - Current-state Epic audit reports and exact-diff PR/release handoffs.
 - Persistent evidence-backed planning, implementation, review, design, and interactive workflows.
+- Shared same-session minimum context acquisition for exploration, ADR, and Change planning.
 - An accessible public methodology reference with restrained Steel documentation presentation.
 
 ## Deferred Scope
@@ -787,6 +788,15 @@ Planning, Apply, Review, PR, Release, and Space Status SHALL select one workspac
 - WHEN one Change targets multiple repositories
 - THEN every workflow uses the same central artifacts and repository-keyed evidence, never creates or selects a repository-local copy, and never treats one target's completion as global completion.
 
+##### Requirement R8: Shared Minimum Context
+
+Explore, ADR, and Change SHALL invoke one read-only same-session context workflow with a focused question, SHALL read or explicitly mark missing the action-specific planning and repository minimum, and SHALL surface authority/freshness conflicts and gaps before making substantive claims.
+
+###### Scenario R8-S1: Planning Begins With Partial Context
+
+- WHEN the current session has read only part of the evidence required for an exploration, ADR, or Change
+- THEN the shared context workflow reuses current reads, opens the missing minimum, and returns an evidence-linked sufficiency result without creating another artifact or context boundary.
+
 
 #### Implemented By
 
@@ -823,6 +833,12 @@ Planning, Apply, Review, PR, Release, and Space Status SHALL select one workspac
 | S6/R7 | `skills/sdd-pr/SKILL.md#Authority And Project Profile` | primary | Stewards the coordinated repository PR set without duplicating lifecycle ownership. |
 | S6/R7 | `skills/sdd-space-status/SKILL.md#Workflow` | support | Presents top-level unique Changes and repository-filtered projections without double-counting. |
 | S6/R7 | `skills/sdd-release/SKILL.md#Operating Sequence` | primary | Resolves release readiness from canonical central records and repository-specific gates. |
+| S6/R8, S6/R8-S1 | `skills/sdd-gather-context/SKILL.md#Common Minimum` | primary | Defines shared topology, guidance, planning, status, and repository context that every action must read or explicitly mark missing. |
+| S6/R8, S6/R8-S1 | `skills/sdd-gather-context/SKILL.md#Action Minimums` | primary | Defines the exploration-, ADR-, and Change-specific minimum evidence. |
+| S6/R8-S1 | `skills/sdd-gather-context/SKILL.md#Completion Criterion` | primary | Requires an evidence-linked same-session sufficiency result and preserves parent-workflow ownership. |
+| S6/R8-S1 | `skills/sdd-explore/SKILL.md#Gather Context` | support | Invokes the shared context workflow for durable exploration. |
+| S6/R8-S1 | `skills/sdd-adr/SKILL.md#Gather Context` | support | Invokes the shared context workflow before technical recommendation or decision capture. |
+| S6/R8-S1 | `skills/sdd-change/SKILL.md#Gather Context` | support | Invokes the shared context workflow before intent finalization or technical planning. |
 #### Implementation Gaps
 
 - S6/R1-S1 and S6/R1-S2: existing workspace Change data and remaining package contract tests still need conversion to the progressive `change.md` shape.
@@ -845,6 +861,7 @@ Planning, Apply, Review, PR, Release, and Space Status SHALL select one workspac
 | S6/R5-S1 | Automated test `test/workflow-contracts.test.js#packaged evidence closure keeps high-risk Scenarios unverified when only an aggregate gate passes` | Risk closure and review require exact claimed-boundary proof beyond an aggregate green result. | Passing 2026-07-23 |
 | S6/R6-S1 | Automated test `test/workflow-contracts.test.js#packaged Interactive workflow tracks one lightweight progressive Change` | Interactive keeps trimmed shared artifacts, immediate tracked execution, validation, and honest handoff semantics. | Passing 2026-07-23 |
 | S6/R7-S1 | Automated test `test/workflow-contracts.test.js#packaged workflows coordinate one central Change across every target repository` | All delivery workflows share the central layout, full target-set invariant, repository-free Change-wide lifecycle, and projection semantics without legacy Change paths. | Passing 2026-08-07 |
+| S6/R8-S1 | Automated test `test/workflow-contracts.test.js#packaged planning workflows share one same-session minimum context contract` | The shared skill owns all action profiles, reuses current reads, stays artifact-free and same-session, and is invoked by Explore, ADR, and Change. | Passing 2026-08-11 |
 
 #### Verification Gaps
 

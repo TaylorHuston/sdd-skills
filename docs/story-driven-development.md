@@ -248,7 +248,7 @@ Use just-in-time elaboration instead of making early technical assumptions durab
 
 1. `/sdd-change` uses `sdd change create <space-id> <slug>` to create one central `change.md` in `proposed` status as soon as durable intent is captured. Repository ownership may remain empty while proposed.
 2. The skill asks whether the user wants to continue into technical planning. If not, the proposed Change remains the backlog record. A later invocation recognizes and resumes it.
-3. Technical planning refreshes current implementation context, settles repository ownership and observable behavior, compares meaningful approaches with the user, and adds `design.md` plus `tasks.md`.
+3. Technical planning refreshes current implementation context, settles repository ownership and observable behavior, and adds `design.md` plus `tasks.md`. When it reveals two or more meaningfully different viable technical approaches, `/sdd-change` invokes `/sdd-adr` to compare them, recommend a direction, obtain the user's decision, and decide whether the result warrants a repository-owned ADR before planning resumes.
 4. When a UI-bearing Change has material experience uncertainty, `/sdd-design --plan` may converge flow, responsive composition, state behavior, accessibility, and visual direction in the same Change.
 5. After validation, `/sdd-change` transitions the Change to `planned`. `/sdd-apply` then implements it in place. Planning-level discoveries return the same Change to `proposed` and resume `/sdd-change`; no separate mode flag or duplicate artifact is required.
 
@@ -264,7 +264,7 @@ Use the canonical central dated Change layout:
 
 `change.md` defines the problem, desired outcome, scope, non-goals, success signals, durable constraints, target repositories, affected repository-local Epics, open questions, and lifecycle metadata.
 
-`design.md` is the high-level solution approach. It should explain the chosen technical approach, important alternatives considered, risks, dependencies, migration or data implications, repository boundaries when more than one repository is targeted, and how repository-local Epic/Story/Requirement truth will change. For UI-bearing Changes, its concise `Experience Design` section is the current accepted experience contract linking the user-confirmed flow, responsive composition, component/state behavior, accessibility, visual direction, and stable prototype references. Revision history belongs in the `tasks.md` `Design Updates` ledger so superseded and current directions do not compete. `design.md` should not become a step-by-step implementation plan or duplicate behavioral truth.
+`design.md` is the high-level solution approach. It should explain the chosen technical approach, important alternatives considered, risks, dependencies, migration or data implications, repository boundaries when more than one repository is targeted, and how repository-local Epic/Story/Requirement truth will change. `/sdd-change` does not independently settle meaningfully different viable technical approaches: it hands that decision to `/sdd-adr`, then records the returned decision summary and repository-relative ADR path when one is warranted. For UI-bearing Changes, its concise `Experience Design` section is the current accepted experience contract linking the user-confirmed flow, responsive composition, component/state behavior, accessibility, visual direction, and stable prototype references. Revision history belongs in the `tasks.md` `Design Updates` ledger so superseded and current directions do not compete. `design.md` should not become a step-by-step implementation plan or duplicate behavioral truth.
 
 `tasks.md` is the adaptive implementation ledger for the whole Change. It records `Resume Here`, end-state task progress, implementation evidence, verification evidence, a living implementation-risk and confirmation matrix, decision fan-out, verification-environment readiness, planning updates, design revisions, manual UI confirmation status, the immutable review-handoff candidate, release-communication impact, review status, branch/PR/merge/release state, deferred gaps, and closeout readiness. For a multi-repository Change, all repository-specific work, evidence, review, PR, merge, and release state is recorded once in repository-keyed sections of this ledger. Planning seeds what is knowable; Apply adds, refines, and resolves rows as implementation reveals the real path.
 
@@ -459,14 +459,21 @@ Avoid:
 - Using repository filters with `sdd change transition` or `sdd change close`, or advancing the Change-wide lifecycle before every targeted repository has met the gate.
 - Closing or merging a Change while Epic truth, central tasks, repository-specific review/release/PR/merge state, or manual confirmation status remains contradictory.
 
+## Shared Context Gathering
+
+Before `/sdd-explore`, `/sdd-adr`, or `/sdd-change` makes substantive claims, it invokes `/sdd-gather-context` in the same session with an action and focused question. The shared skill owns the minimum-read policy across planning direction, governing decisions, accepted behavior, current implementation/tests, and repository state. It reuses current reads, opens missing evidence, surfaces authority/freshness conflicts and gaps, and returns an evidence-linked sufficiency result without creating an artifact or taking over the caller's judgment.
+
+The minimum is action-shaped rather than repository-wide. Exploration emphasizes prior discussion and relevant planning; ADR work emphasizes governing decisions and the affected technical seam; Change work emphasizes accepted intent and behavior, overlapping work, implementation, tests, contracts, and Git state. The caller deepens only where the shared result leaves a material gap.
+
 ## Skill Workflow
 
 Use the skills to apply this doctrine consistently:
 
 | Skill | Purpose |
 |---|---|
+| `/sdd-gather-context` | Read and reconcile the minimum evidence required for an exploration, ADR, or Change in the caller's current session; create no artifact and make no parent-workflow decision. |
 | `/sdd-prd` | Create or revise the private Product Brief/PRD that guides product scope, audience, principles, market context, monetization, and open product questions. |
-| `/sdd-explore` | Think through product ideas, technical options, codebase findings, or requirement questions before deciding whether to create a change. |
+| `/sdd-explore` | Preserve any substantial discussion the user wants to survive chat as one synthesized durable record. Choose its destination deliberately—usually the owning idea's `explorations/` directory—and invoke `/sdd-prd`, `/sdd-change`, `/sdd-adr`, or another owning workflow when conclusions mature. |
 | `/sdd-adr` | Create, update, or assess ADRs for durable technical decisions that future SDD work should respect. |
 | `/sdd-change` | Create or resume one central Change, capture intent, and continue into technical planning when the user chooses. |
 | `/sdd-design` | Plan initial experience readiness or revise an implemented experience within accepted behavior without editing application or component-preview code. |

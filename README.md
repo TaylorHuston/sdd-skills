@@ -1,4 +1,4 @@
----
+-Exp--
 modified: 2026-08-10
 ---
 # SDD Toolchain
@@ -266,22 +266,23 @@ The usual path is:
 ```text
 /sdd-space-status or /sdd-explore
         -> /sdd-prd when product direction is unresolved
-        -> /sdd-change -> optional /sdd-design and /sdd-adr
+        -> /sdd-change -> optional /sdd-design; required /sdd-adr for branching technical approaches
         -> /sdd-apply -> /sdd-review
         -> /sdd-release -> /sdd-pr when production handoff uses a PR
         -> sdd change close
 ```
 
-`/sdd-interactive` is the narrow-change shortcut across Change creation and Apply-style implementation. The three audit skills can enter the flow at any time: they report evidence, then route accepted remediation into `/sdd-change` or `/sdd-interactive`. Skills do not automatically authorize commits, pushes, merges, releases, deployments, or closure unless their own contract and the user's request explicitly do so.
+`/sdd-gather-context` is a lightweight shared-reference skill invoked inside Explore, ADR, and Change. It reads the action-specific minimum evidence in the same session, creates no artifact, and returns an evidence-linked sufficiency result to its caller. `/sdd-interactive` is the narrow-change shortcut across Change creation and Apply-style implementation. The three audit skills can enter the flow at any time: they report evidence, then route accepted remediation into `/sdd-change` or `/sdd-interactive`. Skills do not automatically authorize commits, pushes, merges, releases, deployments, or closure unless their own contract and the user's request explicitly do so.
 
 | Skill | Use it for | Durable output or effect | Main CLI relationship | Typical relationship to other skills |
 |---|---|---|---|---|
 | `/sdd-space-status` | Read-only re-entry after time away or when current state is unclear. | Concise status brief; no artifact mutation. | Wraps `sdd status --json` and uses `sdd context`. | Usually first; routes to the active skill or next useful workflow. |
-| `/sdd-explore` | Substantial product, technical, design, business, architecture, workflow, or requirement exploration before implementation. | Living private exploration note. | Uses `context` and `status`; may use `change create` once an outcome is mature. | Feeds `/sdd-prd`, `/sdd-change`, or `/sdd-adr`; never implements code. |
+| `/sdd-gather-context` | Shared minimum context acquisition for an exploration, ADR, or Change. | Evidence-linked same-session context result; no durable artifact or mutation. | Uses `context` and `status` for deterministic topology and inventory. | Invoked by `/sdd-explore`, `/sdd-adr`, and `/sdd-change`; returns control without taking over their judgment. |
+| `/sdd-explore` | Any substantial discussion the user wants preserved beyond chat, including feasibility, marketing, future features, product, technical, operational, design, business, or workflow topics. | One synthesized durable record, usually under the owning idea's `explorations/` directory but placed elsewhere when authority or local guidance makes another home more appropriate. | Uses `context` and `status` only when SDD ownership or artifact truth matters. | May invoke `/sdd-prd`, `/sdd-change`, `/sdd-adr`, or another owning workflow when conclusions mature; never implements code. |
 | `/sdd-prd` | Create, revise, or check private Product Brief/PRD direction. | Planning-root `prd.md` or feature/capability brief. | Uses `context` and `status`; routes setup drift to `doctor`, `setup`, `init`, or `update`. | Precedes `/sdd-change` when product direction is not settled; may receive drift from audits or review. |
-| `/sdd-change` | Capture intent, continue technical planning, or revise an existing plan. | Central `change.md`; when planning proceeds, `design.md` and `tasks.md`. | Uses `change create`, `validate`, and `change transition`, with `context`/`status` for selection. | Receives outcomes from exploration, PRD, audits, Apply, or Review; hands planned work to `/sdd-design` or `/sdd-apply`. |
+| `/sdd-change` | Capture intent, continue technical planning, or revise an existing plan. | Central `change.md`; when planning proceeds, `design.md` and `tasks.md`. | Uses `change create`, `validate`, and `change transition`, with `context`/`status` for selection. | Invokes `/sdd-adr` whenever planning reveals meaningfully different viable technical approaches; otherwise hands planned work to `/sdd-design` or `/sdd-apply`. |
 | `/sdd-design` | Converge initial experience design or revise UI direction without changing accepted behavior. | Updates existing `design.md` and `tasks.md`; may add stable external design references. | Uses `context`, `validate`, and guarded `change transition` for revisions. | Runs after `/sdd-change` and before `/sdd-apply`, or after implementation/review feedback; routes changed behavior back to `/sdd-change`. |
-| `/sdd-adr` | Assess or record a durable architecture, data, dependency, integration, deployment, security, storage, or cross-cutting decision. | Repository-owned ADR linked to Changes and Epic truth. | Uses `context`/`status`; setup commands only when project structure is missing. | May be called from `/sdd-change`, `/sdd-apply`, or `/sdd-review`; returns the decision to the invoking workflow. |
+| `/sdd-adr` | Compare meaningfully different technical approaches and assess or record the resulting durable architecture, data, dependency, integration, deployment, security, storage, or cross-cutting decision. | Decision result and, when warranted, a repository-owned ADR linked to Changes and Epic truth. | Uses `context`/`status`; setup commands only when project structure is missing. | Required handoff from `/sdd-change` for branching viable technical approaches; returns the selected or unresolved decision to the invoking workflow. |
 | `/sdd-interactive` | Small UI tweaks, narrow defects, polish, or minor behavior refinements in one tracked session. | Minimal central Change plus implementation, Epic reconciliation, and verification evidence. | Uses `change create`, `change transition`, `validate`, and authorized `change close`. | Shortcut for a lightweight `/sdd-change` + `/sdd-apply`; normally hands off to `/sdd-review`. Routes broader scope to `/sdd-change`. |
 | `/sdd-apply` | Implement or continue every safe slice of one planned central Change. | Code, tests, Epic evidence, and a living `tasks.md` ledger; transitions to `in_review` when ready. | Uses `context`, `status`, `validate`, and `change transition`; close is only an explicitly authorized closeout action. | Follows `/sdd-change` or `/sdd-design`; sends review-ready work to `/sdd-review`; planning discoveries return to `/sdd-change`. |
 | `/sdd-review` | Independent local integration review across all repositories targeted by one Change. | Consolidated verdict, `review.md` when findings exist, and reconciled Change/Epic evidence. | Uses `context`, `status`, `validate`, guarded `change transition`, and authorized `change close`. | Follows `/sdd-apply`; findings return to Apply or Change planning; ready work proceeds to `/sdd-release` or `/sdd-pr`. |
@@ -340,7 +341,7 @@ Shared component or pattern catalogs are optional incubators, not mandatory appl
 
 A reusable pattern may move through `reference candidate -> controlled preview -> application-owned adoption -> consumer validation -> standardized reference`. Promotion requires evidence from an implemented consumer outside the catalog itself. Applications may remain application-specific or deliberately diverge, and foundation-first work should not block application delivery unless the active Change explicitly requires it.
 
-For non-trivial changes, `design.md` should compare viable technical options before selecting an approach. When a change creates a durable architecture, data, dependency, integration, deployment, security, storage, or cross-cutting project decision, record it as an ADR under `docs/adrs/`.
+When `/sdd-change` finds two or more meaningfully different viable technical approaches, it invokes `/sdd-adr` rather than duplicating technical option analysis. `/sdd-adr` compares the approaches, recommends a direction, asks the user to decide, and determines whether the result is durable enough for an ADR under `docs/adrs/`. Straightforward implementation details with one viable path remain in `design.md` without a ceremonial ADR handoff.
 
 Product Briefs/PRDs and app visual/style guidance are private planning artifacts. By default, an idea lives at `<planning-root>/<idea>/`, stores its PRD at `<planning-root>/<idea>/prd.md`, and maps zero or more implementation repositories through `.sdd/config.yaml`. Reference planning artifacts when product scope, UI identity, or release readiness depends on them; keep accepted implementation truth in each code repository's Epic and Story map.
 
@@ -369,7 +370,7 @@ The package ships with the same general Space/repository relationship and worksp
       product-one.md
       prd.md
       visual-identity.md
-      exploration/
+      explorations/
   code/
     product-one-web/
       AGENTS.md
@@ -425,7 +426,7 @@ Start by defining project-local guidance. A good `AGENTS.md` should identify any
 Common adaptation points:
 
 - Idea/repository mapping: the skills resolve the one-idea-to-many-repositories mapping from `.sdd/config.yaml` through `sdd context`. Declare an exception in project guidance, or change the packaged default as described below.
-- Planning docs: `/sdd-prd`, `/sdd-explore`, `/sdd-space-status`, `/sdd-change`, `/sdd-design`, `/sdd-apply`, `/sdd-review`, `/sdd-epic-verify`, and `/sdd-release` resolve private context from the owning idea when relevant.
+- Planning docs: `/sdd-gather-context` centralizes the minimum-read policy used by Explore, ADR, and Change; `/sdd-explore` chooses a durable discussion destination deliberately and usually defaults to the owning idea's `explorations/`; the other planning and delivery skills resolve private context from the owning idea when relevant.
 - SDD artifact paths: `<workspace>/.sdd/changes/` is the fixed workspace home for dated Changes; repository contracts configure `docs/epics/`, `docs/adrs/`, and `docs/audits/`. These are package conventions, not `AGENTS.md` configuration points.
 - Branch and merge policy: `/sdd-review`, `/sdd-pr`, and `/sdd-release` are intentionally conservative. Update them or your app `AGENTS.md` for trunk-based development, no-PR workflows, required PR workflows, nonstandard production branches, or release trains.
 - Verification commands: `/sdd-apply`, `/sdd-review`, and `/sdd-release` should be aligned with your real test, lint, typecheck, security, build, migration, and manual acceptance gates.
@@ -458,6 +459,7 @@ Using different repository-owned Epic, ADR, or audit paths requires a coordinate
 Update these locations together:
 
 - `docs/story-driven-development.md`: `Core Doctrine And Project Profile`, `Core Terms`, and `Change Workflow`.
+- `skills/sdd-gather-context/SKILL.md`: shared minimum reads, action profiles, evidence reconciliation, and same-session return contract.
 - `skills/sdd-change/SKILL.md`: artifact model, adaptive planning workflow, and guardrails.
 - `skills/sdd-apply/SKILL.md`: canonical artifact layout, Change selection, required context, and closeout path operations.
 - `skills/sdd-review/SKILL.md`: Change and branch selection, required context, review-artifact output, and closeout path operations.

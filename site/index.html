@@ -687,9 +687,10 @@ skil
               <h4>Space-owned context</h4>
               <pre aria-label="Default planning document layout"><code>&lt;planning-path&gt;/
   prd.md
-  exploration/</code></pre>
-              <p class="recordNote">Product direction and exploratory notes stay here. Desired outcomes become
-                proposed central Changes as soon as they need a durable lifecycle record.</p>
+  explorations/</code></pre>
+              <p class="recordNote">Substantial discussions usually stay here as synthesized durable records, while
+                local guidance or stronger artifact authority may provide a better home. Mature desired outcomes and
+                decisions can move through the Change or ADR workflows without making every exploration formal.</p>
             </article>
 
             <article class="recordType recordProject implementationRecord">
@@ -750,6 +751,7 @@ skil
               <div class="columnLabel">Contextual layer</div>
               <h3 id="skills-title">Agent skills</h3>
               <ul>
+                <li>Gather the minimum relevant context</li>
                 <li>Refine outcomes and requirements</li>
                 <li>Compare technical paths</li>
                 <li>Route specialist guidance</li>
@@ -771,6 +773,7 @@ skil
             </div>
           </div>
           <ol class="workflowMap">
+            <li><span>00</span><strong>Gather action-specific context</strong><code>/sdd-gather-context</code></li>
             <li><span>01</span><strong>Explore</strong><code>/sdd-explore</code></li>
             <li><span>02</span><strong>Capture intent</strong><code>/sdd-change</code></li>
             <li><span>03</span><strong>Continue planning when ready</strong><code>/sdd-change</code></li>

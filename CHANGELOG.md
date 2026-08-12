@@ -11,12 +11,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Added `/sdd-gather-context`, a lightweight same-session shared skill that reads and reconciles the action-specific minimum planning, decision, behavior, implementation, test, and Git evidence before Explore, ADR, or Change proceeds.
 - Added one progressive Change record per outcome under `<workspace>/.sdd/changes/`; `change.md` owns intent, lifecycle status, Space, and repository IDs from intent capture through close.
 - Added complete README matrices for every packaged skill and CLI command, including their lifecycle responsibilities and handoffs.
 
 ### Changed
 
 - **Breaking:** `/sdd-change` is now one adaptive workflow: it creates or resumes a proposed Change, captures intent, and asks before continuing into technical planning. Proposed Changes require only `change.md`; planning adds `design.md` and `tasks.md`.
+- `/sdd-change` now composes with `/sdd-adr` whenever planning reveals two or more meaningfully different viable technical approaches; `/sdd-adr` owns option comparison, recommendation, user decision, and ADR-threshold assessment before Change planning resumes.
+- `/sdd-explore` now serves any substantial discussion the user wants preserved beyond chat, chooses the record location by authority and local guidance, defaults unsettled idea-owned discussions to `<idea>/explorations/`, and may hand mature outcomes to `/sdd-prd`, `/sdd-change`, `/sdd-adr`, or another owning workflow.
 - **Breaking:** `sdd change create` now creates only the proposed `change.md` record and allows repository ownership to remain empty until planning settles the target set.
 - **Breaking:** Change status and ownership metadata moved from `tasks.md` to `change.md`; status, validation, `sdd change transition`, and `sdd change close` read the progressive record, and lifecycle mutations now use proportional workspace-locked local filesystem operations instead of bespoke crash-recovery journals.
 - `sdd validate` now applies lifecycle-aware Change requirements: proposed Changes need only `change.md`, while later states require repository ownership, `design.md`, and `tasks.md`.

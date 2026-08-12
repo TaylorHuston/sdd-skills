@@ -18,6 +18,7 @@ Use one progressive workspace-central Change from initial intent onward.
 - Technical planning adds `design.md` and `tasks.md`.
 - Transition to `planned` requires repository ownership plus both planning artifacts.
 - `/sdd-change` infers whether to create, resume, plan, or revise from context and current status rather than mode flags.
+- When planning reveals two or more meaningfully different viable technical approaches, `/sdd-change` invokes `/sdd-adr`; that skill owns comparison, recommendation, user decision, and whether the result warrants a repository-owned ADR.
 - Lifecycle mutations use proportional workspace-locked filesystem operations rather than bespoke transaction journals.
 - Pre-1.0 installations, schemas, and Change formats have no supported programmatic migration path. `sdd update` reconciles only current managed doctrine and skills.
 
@@ -45,7 +46,8 @@ Use one progressive workspace-central Change from initial intent onward.
 
 ## Consequences
 
-- Positive: one command, one intent record, one lifecycle authority, and status-aware artifact requirements.
+- Positive: one adaptive entry point, one intent record, one lifecycle authority, and status-aware artifact requirements.
+- Positive: branching technical decisions compose through `/sdd-adr` instead of duplicating option-analysis and ADR-threshold logic inside `/sdd-change`.
 - Positive: proposed work appears in status immediately and can be resumed naturally.
 - Positive: lifecycle command code and tests become substantially smaller.
 - Negative: existing Changes and old workflow references require one-time manual conversion or recreation.

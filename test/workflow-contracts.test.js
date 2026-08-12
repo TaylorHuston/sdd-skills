@@ -55,11 +55,31 @@ test("packaged change workflow progresses one central intent record into plannin
     "assets",
     "change-template.md",
   );
+  const designTemplate = await readPackageFile("docs", "templates", "design.md");
+  const packagedDesignTemplate = await readPackageFile(
+    "skills",
+    "sdd-change",
+    "assets",
+    "design-template.md",
+  );
 
   assert.equal(packagedChangeTemplate, changeTemplate);
+  assert.equal(packagedDesignTemplate, designTemplate);
   assert.match(changeSkill, /Select Or Create The Change/);
   assert.match(changeSkill, /## Capture Intent/);
   assert.match(changeSkill, /## Technical Planning/);
+  assert.match(
+    changeSkill,
+    /two or more meaningfully different viable technical approaches, invoke `\/sdd-adr` before selecting or finalizing the approach/,
+  );
+  assert.match(
+    changeSkill,
+    /`\/sdd-adr` owns option comparison, recommendation, user decision, and the judgment about whether to create or update a durable ADR/,
+  );
+  assert.match(
+    changeSkill,
+    /When only one technical approach is viable, state the constraining reason in `design\.md`; do not invent alternatives or invoke `\/sdd-adr` ceremonially/,
+  );
   assert.match(changeSkill, /Revising An Existing Plan/);
   assert.match(changeSkill, /`proposed`: intent exists, but ownership or technical planning may be incomplete/);
   assert.match(changeSkill, /- `design\.md`: behavior, selected approach[\s\S]*- `tasks\.md`: a short capability-level implementation ledger/);
@@ -67,6 +87,93 @@ test("packaged change workflow progresses one central intent record into plannin
   assert.match(changeTemplate, /status: proposed/);
   assert.match(changeTemplate, /space: <space-id>/);
   assert.match(changeTemplate, /repositories: \[\]/);
+  assert.match(designTemplate, /## Technical Decision Handoffs/);
+  assert.match(
+    designTemplate,
+    /invoke `\/sdd-adr` and summarize its result here instead of duplicating the full option analysis/,
+  );
+});
+
+test("packaged planning workflows share one same-session minimum context contract", async () => {
+  const [gather, explore, adr, change, doctrine] = await Promise.all([
+    readPackageFile("skills", "sdd-gather-context", "SKILL.md"),
+    readPackageFile("skills", "sdd-explore", "SKILL.md"),
+    readPackageFile("skills", "sdd-adr", "SKILL.md"),
+    readPackageFile("skills", "sdd-change", "SKILL.md"),
+    readPackageFile("docs", "story-driven-development.md"),
+  ]);
+
+  assert.match(gather, /action: `exploration`, `adr`, or `change`/);
+  assert.match(gather, /## Common Minimum/);
+  assert.match(gather, /### `exploration`/);
+  assert.match(gather, /### `adr`/);
+  assert.match(gather, /### `change`/);
+  assert.match(
+    gather,
+    /Reuse files already read in the current session when they are current and complete/,
+  );
+  assert.match(
+    gather,
+    /every applicable minimum above was read or explicitly marked missing or not applicable/,
+  );
+  assert.match(
+    gather,
+    /For an exploration with no SDD or repository owner, mark SDD-only entries `not applicable`/,
+  );
+  assert.match(gather, /Sufficiency: sufficient \/ insufficient for <focused question>/);
+  assert.match(
+    gather,
+    /Stay read-only\. Create no artifact, mutate no lifecycle, make no product or architecture decision, and launch no subagent/,
+  );
+  assert.match(explore, /Invoke `\/sdd-gather-context` with action `exploration`/);
+  assert.match(adr, /Invoke `\/sdd-gather-context` with action `adr`/);
+  assert.match(change, /Invoke `\/sdd-gather-context` with action `change`/);
+  assert.match(doctrine, /## Shared Context Gathering/);
+  assert.match(
+    doctrine,
+    /invokes `\/sdd-gather-context` in the same session with an action and focused question/,
+  );
+});
+
+test("packaged Explore preserves generalized durable discussions and routes mature outcomes", async () => {
+  const [exploreSkill, exploreAgent, readme, doctrine] = await Promise.all([
+    readPackageFile("skills", "sdd-explore", "SKILL.md"),
+    readPackageFile("skills", "sdd-explore", "agents", "openai.yaml"),
+    readPackageFile("README.md"),
+    readPackageFile("docs", "story-driven-development.md"),
+  ]);
+
+  assert.match(
+    exploreSkill,
+    /any substantial discussion the user wants to survive the chat session/,
+  );
+  assert.match(
+    exploreSkill,
+    /technical feasibility, marketing strategy, future capabilities/,
+  );
+  assert.match(exploreSkill, /## Choose The Record Destination/);
+  assert.match(
+    exploreSkill,
+    /Established topic home:[\s\S]*Idea-owned default:[\s\S]*<idea>\/explorations\/yyyy-mm-dd-<topic>\.md/,
+  );
+  assert.match(
+    exploreSkill,
+    /New idea-owned records default to the plural `explorations\/` directory; do not bulk-move older records merely to normalize the folder name/,
+  );
+  assert.match(
+    exploreSkill,
+    /An exploration may remain useful indefinitely, end with no action, or produce one or more stronger artifacts/,
+  );
+  assert.match(exploreSkill, /\| A bounded desired outcome, including a possible future feature \| `\/sdd-change` \|/);
+  assert.match(exploreSkill, /\| A durable architecture,[^\n]+\| `\/sdd-adr` \|/);
+  assert.match(
+    exploreSkill,
+    /The exploration remains source context; the new artifact owns its own decision or lifecycle truth/,
+  );
+  assert.doesNotMatch(exploreSkill, /<planning-root>\/exploration\/yyyy-mm-dd/);
+  assert.match(exploreAgent, /Keep a durable discussion record/);
+  assert.match(readme, /owning idea's `explorations\/` directory/);
+  assert.match(doctrine, /Preserve any substantial discussion the user wants to survive chat/);
 });
 
 test("packaged workflows coordinate one central Change across every target repository", async () => {

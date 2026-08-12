@@ -11,9 +11,15 @@ Create or update Architecture Decision Records for durable technical decisions i
 
 Resolve the workspace, Space ID, repository, and stable repository ID with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before interpreting SDD artifact roles or Change status. Use the resolved repository and keep ADRs under its `docs/adrs/`. When Change context matters, run `sdd status <space-id> --json` and select relevant central Change records through that repository's filtered projection and their `change.md` metadata. Project guidance still owns ADR status vocabulary, required links, and write policy. If user setup is missing, direct the user to `sdd setup`; if the repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
 
-Use this skill from `/sdd-explore` when a discussion reaches a durable architecture decision, and from the technical-planning stage of `/sdd-change` when the selected approach creates a rule future work should follow. Do not create an ADR during intent capture before technical decisions are settled.
+Use this skill from `/sdd-explore` when a discussion reaches a durable architecture decision. `/sdd-change` must invoke it whenever technical planning reveals two or more meaningfully different viable technical approaches; this skill owns their comparison, recommendation, user decision, and ADR-threshold assessment before returning the result to Change planning. Do not create an ADR during intent capture before technical decisions are understood.
 
 ADRs complement SDD artifacts. They do not replace Product Briefs/PRDs, Epics, Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, change/design/tasks files, review reports, changelogs, or release records.
+
+## Gather Context
+
+Invoke `/sdd-gather-context` with action `adr`, the focused decision question, known Space/repository IDs, and the invoking exploration or Change path. It owns the shared minimum-read contract. Use its evidence-linked result to compare approaches; deepen only where the decision exposes a remaining gap.
+
+Do not recommend or record a decision while the result is insufficient for the focused question.
 
 ## ADR Threshold
 
@@ -54,20 +60,23 @@ If the project has no `docs/adrs/`, create it only when the user has asked to dr
 ## Workflow
 
 1. Resolve project root and decision context.
-   - Read project `AGENTS.md`, README, existing ADRs, relevant central SDD Change records selected through repository status/metadata, and relevant Epic files only as needed.
-   - If invoked from another skill, use the stable Change ID, central design notes, explored options, and selected approach already in context.
-2. Decide whether an ADR is warranted.
-   - If not warranted, report why and suggest recording the decision in the central Change's `design.md` or `tasks.md`, or in an exploration summary instead.
+   - Start from the `/sdd-gather-context` result.
+   - If invoked from another skill, preserve the stable Change ID, central design notes, decision question, relevant constraints, and approaches already discovered in context.
+2. Resolve the decision.
+   - When invoked by `/sdd-change`, compare the meaningfully different viable approaches using project evidence, recommend one, and ask the user to settle the choice. Do not silently choose for the user.
+   - If the decision remains unresolved, return that state to `/sdd-change`; the Change must remain `proposed`.
+3. Decide whether an ADR is warranted.
+   - If not warranted, report why and return a concise decision summary for the central Change's `design.md` or `tasks.md`, or for an exploration summary.
    - If warranted but undecided, draft an ADR candidate with status `Proposed`.
-3. Create or update the ADR.
+4. Create or update the ADR.
    - Use `assets/adr-template.md`.
    - Preserve existing ADR status unless the user or project workflow explicitly changes it.
    - Use status values that match the project when present; otherwise use `Proposed`, `Accepted`, `Superseded`, or `Rejected`.
-4. Link the ADR.
+5. Link the ADR.
    - Link related Changes by stable Change ID, and link repository-local Epics, Stories, Requirements, Scenarios, PRs, or implementation evidence when known. Never put a private absolute central Change path in a repository-local ADR.
-   - If invoked during `/sdd-change` or `--replan`, ensure the central `design.md` and `tasks.md` identify the repository-relative ADR path and its repository ID.
+   - If invoked during `/sdd-change`, ensure the central `design.md` and `tasks.md` identify the repository-relative ADR path and its repository ID.
    - If invoked during `/sdd-explore`, offer to link the ADR from an exploration summary or later `/sdd-change`.
-5. Verify the ADR.
+6. Verify the ADR.
    - Re-read the ADR.
    - Confirm it states context, decision, options considered, consequences, validation, and reconsideration signals.
    - Confirm it does not include secrets, private credentials, raw environment values, speculative roadmap promises, or unrelated private notes.

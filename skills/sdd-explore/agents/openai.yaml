@@ -1,4 +1,4 @@
 interface:
   display_name: "SDD Explore"
-  short_description: "Explore a space with a durable record"
-  default_prompt: "Use $sdd-explore to investigate this space-level question and maintain a durable private exploration record."
+  short_description: "Keep a durable discussion record"
+  default_prompt: "Use $sdd-explore to investigate this topic, choose the appropriate durable record location, and preserve a synthesized discussion record."

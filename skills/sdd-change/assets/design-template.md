@@ -110,39 +110,18 @@ Use this section only when the change proposes edits to an existing Epic.
 - Require implementation anchors to identify behavior-owning definitions, registrations, or configuration rather than imports, call sites, incidental handlers, or broad file tokens.
 - Require automated evidence anchors to name an exact test title or stable named test anchor, never generic syntax such as `#it(`, `#test(`, or `#describe(`.
 
-## Technical Options
+## Technical Decision Handoffs
 
-Use this section for non-trivial changes. If only one path is reasonable, record why the choice is obvious.
+When two or more meaningfully different viable technical approaches exist, invoke `/sdd-adr` and summarize its result here instead of duplicating the full option analysis.
 
-### Option 1: OPTION NAME
+- Decision question:
+- Repository ID:
+- `/sdd-adr` result: selected / unresolved
+- Selected approach or unresolved state:
+- ADR path: `docs/adrs/yyyy-mm-dd-decision-title.md` / not warranted / pending
+- Reconsider when:
 
-- Summary:
-- User impact:
-- Implementation complexity:
-- Reversibility:
-- Client surfaces:
-- API / contract shape:
-- Frontend/backend boundary:
-- Data / schema impact:
-- Auth / security impact:
-- Testability:
-- Operational risk:
-- Fit with project conventions:
-
-### Option 2: OPTION NAME
-
-- Summary:
-- User impact:
-- Implementation complexity:
-- Reversibility:
-- Client surfaces:
-- API / contract shape:
-- Frontend/backend boundary:
-- Data / schema impact:
-- Auth / security impact:
-- Testability:
-- Operational risk:
-- Fit with project conventions:
+If only one path is viable, record the constraining reason here without invoking `/sdd-adr` ceremonially.
 
 ## Selected Approach
 
