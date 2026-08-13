@@ -83,11 +83,16 @@ Keep technical constraints in the technical-planning sections of `change.md` unl
 
 Identify decisions that materially affect architecture, contracts, data, dependencies, security, operations, or future work.
 
-When current evidence reveals two or more meaningfully different viable technical approaches, invoke `/sdd-adr` before selecting or finalizing the approach. Pass it the stable Change ID, owning repository, decision question, relevant constraints, and approaches already discovered. `/sdd-adr` owns option comparison, recommendation, user decision, and the judgment about whether to create or update a durable ADR. Resume `/sdd-change` after it returns the selected decision or an explicit unresolved state.
+When current evidence reveals two or more meaningfully different viable technical approaches, invoke `/sdd-adr` before selecting or finalizing the approach. Pass it the stable Change ID, owning repository, decision question, relevant constraints, and approaches already discovered. `/sdd-adr` owns option comparison, recommendation, user decision, and the judgment about whether to create or update a durable ADR. Treat its public result explicitly:
+
+- `complete`: incorporate the confirmed direction and repository-relative ADR path.
+- `no-op`: incorporate the confirmed direction and note that no durable ADR was warranted.
+- `needs-user` or `blocked`: keep the Change `proposed`, record the unresolved decision or blocker, and return that status.
+- `routed`: return control with the owning workflow named; do not cross its mutation boundary.
 
 A meaningful difference changes an important boundary, contract, data or state model, dependency, security posture, operational model, migration path, or future constraint. Do not invoke `/sdd-adr` merely to manufacture alternatives for a straightforward implementation detail. Route unresolved product direction to `/sdd-prd` and material experience-design choices to `/sdd-design`.
 
-When only one technical approach is viable, state the constraining reason in `change.md`; do not invent alternatives or invoke `/sdd-adr` ceremonially. After the handoff, record the selected approach and any repository-relative ADR path in `change.md`, and record follow-up work in `tasks.md`. Do not duplicate `/sdd-adr`'s full option analysis in the central Change.
+When only one technical approach is viable, state the constraining reason in `change.md`; do not invent alternatives or invoke `/sdd-adr` ceremonially. After a completed ADR handoff, record the selected approach and any repository-relative ADR path in `change.md`; reflect only resulting behavioral work or binding decision constraints in `tasks.md`. Do not duplicate `/sdd-adr`'s full option analysis or add a technical decision summary to `tasks.md`.
 
 Do not finalize while a material product or technical choice remains unresolved.
 
@@ -99,12 +104,16 @@ Progressively append or update the sections from `assets/planning-sections.md` i
 
 Create `tasks.md` from its template as a requirements-oriented delivery queue:
 
-- each slice covers one distinct Requirement or a small group of closely related Requirements;
+- each slice covers one distinct Requirement or a small group of closely related Requirements as the smallest practical vertical unit that can become independently green;
+- require an observable outcome, a focused Scenario-based test cycle, and a meaningful independent review verdict so one slice may be rejected without necessarily rejecting adjacent slices;
 - identify each Requirement as new or revised and cite its full Epic/Story/Requirement reference;
 - name every Story to create or update;
 - include one short stand-alone outcome summary and cite authoritative Scenario IDs instead of duplicating their full acceptance text;
-- state only behavioral or decision dependencies needed to know whether the slice is ready;
+- state only behavioral or decision dependencies and binding constraints needed to know whether the slice is ready;
+- add concise `Consumes` and `Produces` contracts only when another slice or repository relies on that interface;
+- state focused verification intent and whether manual acceptance is required, while leaving implementation-time evidence to the owning workflows;
 - make each slice independently understandable so a future isolated subagent can gather fresh implementation context and deliver it;
+- fold setup, configuration, migrations, and documentation into the behavioral slice that requires them; batch only same-shape work that shares one acceptance and review surface;
 - describe what must be implemented, never how to implement it;
 - initialize one lightweight Implementation Ledger row per slice with repository, `not started` status, `None yet.` summary, and the current date.
 
@@ -123,7 +132,7 @@ sdd change transition <space-id> <change-id> --from proposed --to planned
 sdd validate <space-id> --change <change-id> --workspace <workspace-root> --json
 ```
 
-Resolve deterministic errors and inspect warnings. If planning remains incomplete, keep the Change `proposed` and state the next decision. A coherent planned Change proceeds to `/sdd-apply`.
+Resolve deterministic errors and inspect warnings. If planning remains incomplete, keep the Change `proposed` and return `needs-user` or `blocked` with the next decision or blocker. When the coherent Change reaches `planned`, return `complete` and recommend `/sdd-design` when material experience uncertainty remains or `/sdd-apply` otherwise. This is a terminal handoff: return control before either workflow's mutation boundary rather than invoking it automatically.
 
 ## Revising An Existing Plan
 
@@ -148,6 +157,18 @@ Create another Change for adjacent future work. Route changed product direction 
 - Do not edit application code from this skill.
 - Let project guidance own branch, release, documentation, and technology policy.
 
+## Result Contract
+
+Return exactly one composable status:
+
+- `complete` — intent capture or requested technical planning finished and the artifacts are coherent for that checkpoint;
+- `no-op` — the selected Change already satisfies the requested capture or planning checkpoint and no mutation was needed;
+- `needs-user` — product direction, repository ownership, a tradeoff, or permission to continue planning requires the user;
+- `blocked` — current evidence, validation, ownership, or repository state prevents safe completion;
+- `routed` — PRD, ADR, Design, or another workflow owns the discovered question.
+
+Report the checkpoint covered, Change path and lifecycle status, Space, repositories, artifacts read and written, important decisions, unresolved questions or blockers, validation result, and recommended next workflow. A result is terminal for this invocation: do not automatically invoke Design, Apply, implementation, review, commit, release, or closeout.
+
 ## Final Response
 
-Report the Change path and status, Space, repositories, important decisions, unresolved questions, validation result, and next step.
+Return the result contract above concisely.

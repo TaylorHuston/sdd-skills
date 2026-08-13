@@ -85,10 +85,16 @@ test("packaged change workflow progresses one central intent record into plannin
   assert.match(changeSkill, /`proposed`: intent exists, but ownership or technical planning may be incomplete/);
   assert.match(changeSkill, /Progressively append or update the sections from `assets\/planning-sections\.md` in `change\.md`/);
   assert.match(changeSkill, /Do not create `design\.md` for future Changes/);
-  assert.match(changeSkill, /one distinct Requirement or a small group of closely related Requirements/);
+  assert.match(changeSkill, /smallest practical vertical unit that can become independently green/);
+  assert.match(changeSkill, /focused Scenario-based test cycle/);
+  assert.match(changeSkill, /meaningful independent review verdict/);
+  assert.match(changeSkill, /one slice may be rejected without necessarily rejecting adjacent slices/);
   assert.match(changeSkill, /identify each Requirement as new or revised/);
   assert.match(changeSkill, /name every Story to create or update/);
   assert.match(changeSkill, /cite authoritative Scenario IDs/);
+  assert.match(changeSkill, /binding constraints/);
+  assert.match(changeSkill, /`Consumes` and `Produces` contracts/);
+  assert.match(changeSkill, /focused verification intent and whether manual acceptance is required/);
   assert.match(changeSkill, /what must be implemented, never how to implement it/);
   assert.match(changeSkill, /initialize one lightweight Implementation Ledger row per slice/);
   assert.match(changeSkill, /current-state resume aid that `\/sdd-apply` maintains/);
@@ -98,12 +104,28 @@ test("packaged change workflow progresses one central intent record into plannin
   assert.match(changeTemplate, /space: <space-id>/);
   assert.match(changeTemplate, /repositories: \[\]/);
   assert.match(tasksTemplate, /^## Requirement Slices$/m);
+  assert.match(tasksTemplate, /independently green/);
+  assert.match(tasksTemplate, /focused Scenario-based test cycle/);
+  assert.match(tasksTemplate, /- Binding constraints:/);
+  assert.match(tasksTemplate, /- Consumes:/);
+  assert.match(tasksTemplate, /- Produces:/);
+  assert.match(tasksTemplate, /- Verification intent:/);
+  assert.match(tasksTemplate, /- Manual acceptance:/);
   assert.match(tasksTemplate, /^## Implementation Ledger$/m);
   assert.match(planningSections, /## Technical Decision Handoffs/);
   assert.match(
     planningSections,
     /invoke `\/sdd-adr` and summarize its result here instead of duplicating the full option analysis/,
   );
+  assert.match(planningSections, /`\/sdd-adr` result: complete \/ no-op \/ needs-user \/ blocked \/ routed/);
+  assert.match(changeSkill, /Treat its public result explicitly/);
+  assert.match(changeSkill, /`complete`:[\s\S]*`no-op`:[\s\S]*`needs-user` or `blocked`:[\s\S]*`routed`:/);
+  assert.match(changeSkill, /## Result Contract/);
+  assert.match(changeSkill, /Return exactly one composable status/);
+  assert.match(changeSkill, /`complete`[\s\S]*`no-op`[\s\S]*`needs-user`[\s\S]*`blocked`[\s\S]*`routed`/);
+  assert.match(changeSkill, /This is a terminal handoff/);
+  assert.match(changeSkill, /return control before either workflow's mutation boundary/);
+  assert.match(changeSkill, /do not automatically invoke Design, Apply, implementation, review, commit, release, or closeout/);
 });
 
 test("packaged planning workflows share one same-session minimum context contract", async () => {

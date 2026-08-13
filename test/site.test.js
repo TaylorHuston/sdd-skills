@@ -64,6 +64,17 @@ test("public guide presents ADR as a confirmed terminal decision handoff", async
   assert.match(html, /<code>\/sdd-change<\/code><code>\/sdd-adr<\/code>/);
 });
 
+test("public guide presents Change as composable vertical-slice planning", async () => {
+  const { html } = await readSite();
+
+  assert.match(html, /independently green vertical Requirement slices/);
+  assert.match(html, /observable outcome, Scenario-based proof intent/);
+  assert.match(html, /Plan independently green slices and settle branching decisions/);
+  assert.match(html, /<code>complete<\/code>, <code>no-op<\/code>,\s+<code>needs-user<\/code>, <code>blocked<\/code>, or <code>routed<\/code>/);
+  assert.match(html, /returns control before Design or\s+Apply begins/);
+  assert.match(html, /recommended handoffs, not an automatic cascade/);
+});
+
 test("public guide has unique fragment targets and sequential navigable sections", async () => {
   const { html } = await readSite();
   const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);

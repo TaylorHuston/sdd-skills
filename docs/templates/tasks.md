@@ -9,11 +9,11 @@
 
 ## Requirement Slices
 
-Each slice describes what behavioral work remains, not how to implement it. Use one distinct Requirement or a small group of closely related Requirements. Keep each slice independently understandable so an isolated implementation agent can gather fresh repository context and deliver it without inheriting a speculative technical recipe.
+Each slice describes what behavioral work remains, not how to implement it. Use one distinct Requirement or a small group of closely related Requirements as the smallest practical vertical unit that can become independently green. Each slice needs its own observable outcome, focused Scenario-based test cycle, and meaningful review verdict; rejecting one slice should not necessarily reject adjacent slices. Keep each slice independently understandable so an isolated implementation agent can gather fresh repository context and deliver it without inheriting a speculative technical recipe.
 
 Order is advisory. `/sdd-apply` may choose any ready slice and may resequence, split, or merge slices when implementation evidence warrants it. Update this file when that happens; route genuine scope or behavioral changes back through `/sdd-change`.
 
-Omit non-applicable `New`, `Revised`, `Create`, or `Update` entries rather than retaining placeholders.
+Omit non-applicable `New`, `Revised`, `Create`, `Update`, `Consumes`, or `Produces` entries rather than retaining placeholders. Add interface contracts only when another slice or repository depends on them.
 
 ### S1: <Behavioral outcome>
 
@@ -28,6 +28,11 @@ Omit non-applicable `New`, `Revised`, `Create`, or `Update` entries rather than 
 - Outcome: <Short stand-alone summary of the observable behavior that must be true when this slice is complete.>
 - Scenarios: `EPIC-ID/S3 R1-S1`, `EPIC-ID/S1 R2-S1`
 - Dependencies: none
+- Binding constraints: none
+- Consumes: `<interface or behavior supplied elsewhere>`
+- Produces: `<interface or behavior another slice relies on>`
+- Verification intent: <Focused Scenario-based proof expected for this slice.>
+- Manual acceptance: not required / <specific observation the user must confirm>
 
 ## Implementation Ledger
 

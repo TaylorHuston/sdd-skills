@@ -720,7 +720,10 @@ skil
     &lt;date&gt;-&lt;change&gt;/</code></pre>
               <p class="recordNote"><code>sdd change create</code> writes one proposed <code>change.md</code> whose
                 frontmatter owns status, Space, and repository IDs. Planning expands <code>change.md</code> and adds
-                <code>tasks.md</code>; existing records may retain a compatible <code>design.md</code>. The ID is unique within this workspace, and closeout moves the folder once under
+                <code>tasks.md</code> with independently green vertical Requirement slices. Each slice has an
+                observable outcome, Scenario-based proof intent, and enough boundary context for a meaningful review
+                without predicting files or implementation steps; existing records may retain a compatible <code>design.md</code>.
+                The ID is unique within this workspace, and closeout moves the folder once under
                 <code>&lt;workspace&gt;/.sdd/changes/closed/</code> after project truth has been reconciled.
               </p>
               <p class="recordNote">Pre-1.0 installation and Change formats are unsupported alpha data. Recreate a
@@ -780,7 +783,7 @@ skil
             <li><span>00</span><strong>Gather action-specific context</strong><code>/sdd-gather-context</code></li>
             <li><span>01</span><strong>Explore</strong><code>/sdd-explore</code></li>
             <li><span>02</span><strong>Capture intent</strong><code>/sdd-change</code></li>
-            <li class="workflowMapMulti"><span>03</span><strong>Continue planning and settle branching decisions</strong>
+            <li class="workflowMapMulti"><span>03</span><strong>Plan independently green slices and settle branching decisions</strong>
               <div><code>/sdd-change</code><code>/sdd-adr</code></div>
             </li>
             <li><span>04</span><strong>Converge the experience</strong><code>/sdd-design --plan</code></li>
@@ -795,6 +798,9 @@ skil
               <div><code>/sdd-pr</code><code>/sdd-release</code></div>
             </li>
           </ol>
+          <p class="referenceNote"><code>/sdd-change</code> returns <code>complete</code>, <code>no-op</code>,
+            <code>needs-user</code>, <code>blocked</code>, or <code>routed</code>, then returns control before Design or
+            Apply begins. The map shows recommended handoffs, not an automatic cascade.</p>
         </section>
 
         <section class="referenceLifecycle" aria-labelledby="reference-lifecycle-title">

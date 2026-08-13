@@ -12,9 +12,9 @@ When two or more meaningfully different viable technical approaches exist, invok
 
 - Decision question:
 - Repository ID:
-- `/sdd-adr` result: selected / unresolved
-- Selected approach or unresolved state:
-- ADR path: `docs/adrs/yyyy-mm-dd-decision-title.md` / not warranted / pending
+- `/sdd-adr` result: complete / no-op / needs-user / blocked / routed
+- Selected direction or unresolved state:
+- ADR path: `docs/adrs/yyyy-mm-dd-decision-title.md` / not warranted / pending / not applicable
 - Reconsider when:
 
 If only one path is viable, record the constraining reason here without invoking `/sdd-adr` ceremonially.
