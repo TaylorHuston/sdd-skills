@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Added `/sdd-epic-update`, an independently callable candidate-bound capability that reconciles repository-owned Epic, Story, Requirement, Scenario, implementation-map, gap, and verification-map truth after reviewed or manual work. It works without fabricated Apply history, returns `complete`, `no-op`, `needs-user`, `blocked`, or `routed`, proves same-candidate idempotence, and stops before code review, code fixes, Change lifecycle changes, changelog work, and commits.
+- Added read-only `sdd epic update-input` to resolve immutable baselines and committed or working-tree candidates, reject non-ancestor committed ranges, inventory changed paths plus staged/unstaged/untracked state, and return configured Epic roots and scoped validation commands without making semantic decisions or mutating artifacts.
 - Added `/sdd-gather-context`, a lightweight same-session shared skill that reads and reconciles the action-specific minimum planning, decision, behavior, implementation, test, and Git evidence before Explore, ADR, or Change proceeds.
 - Added one progressive Change record per outcome under `<workspace>/.sdd/changes/`; `change.md` owns intent, lifecycle status, Space, and repository IDs from intent capture through close.
 - Added complete README matrices for every packaged skill and CLI command, including their lifecycle responsibilities and handoffs.

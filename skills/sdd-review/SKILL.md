@@ -283,7 +283,7 @@ Default mode performs one consolidated safe-remediation batch after the complete
 - small enough to verify in the same review pass
 - not product decisions, architecture rewrites, data migrations, destructive actions, secrets, branch operations, or broad refactors
 
-Safe automatic fixes include stale generated indexes, stale task-ledger checkboxes, missing verification entries for checks already run, small Epic evidence/date corrections, mechanical release-communication placement, formatting/lint fixes with obvious local intent, mechanical duplicate Story reference cleanup when ownership is obvious, and similarly narrow artifact drift.
+Safe automatic fixes include stale task-ledger checkboxes, mechanical release-communication placement, formatting/lint fixes with obvious local intent, and similarly narrow review-owned drift. Route generated Epic indexes, Epic evidence/date corrections, Story reference cleanup, implementation maps, gaps, and verification maps to a separately invoked `/sdd-epic-update` against the reviewed candidate.
 
 After the finding set is consolidated:
 
@@ -291,7 +291,7 @@ After the finding set is consolidated:
 2. Apply all independent safe fixes in one remediation phase, ordered so shared root causes are corrected before dependent symptoms.
 3. Rerun the union of affected focused verification and required broad gates once per affected repository after the batch, not once per finding unless an intermediate check is necessary to avoid compounding risk.
 4. Perform one regression-focused rereview of every updated repository diff. Recheck code, security, data, central artifacts, repository-local truth, and any gate touched by remediation; do not repeat unaffected discovery work without a concrete reason.
-5. Reconcile the one central `review.md` and `tasks.md` plus each affected repository's Epic evidence with post-remediation truth.
+5. Reconcile the one central `review.md` and `tasks.md`; route each affected repository's Epic evidence to `/sdd-epic-update` after the reviewed candidate is stable.
 6. Confirm every affected repository working tree contains only its intended safe-fix files plus unrelated pre-existing dirty files, and stage only the repository-local intended safe-fix files.
 7. Create one local commit per affected repository for its verified safe review batch with a concise message, such as `Address sdd-review findings`. Do not stage the central Change record, unrelated dirty files, or files from another repository; do not amend earlier commits or push.
 8. Report the final global verdict, repository-specific fixes and commit hashes, central ledger changes, residual findings, and unrelated dirty files that were preserved.
@@ -389,7 +389,7 @@ Include:
 - whether the central `review.md` was created or updated and which repository rows changed
 - Requirement/Scenario coverage result
 - Story reference traceability result
-- Epic truth result
+- Epic truth finding result and the separately pending or current `/sdd-epic-update` candidate
 - test and verification commands/results, with every pending live-provider or production-path check classified as required verification, optional confidence evidence, or manual acceptance and reflected in the verdict
 - rendered UI verification result, including surfaces, viewports, states/interactions, directly inspected evidence, console/network outcome, and any blocked or accepted rows; say `not applicable` with a reason when the change is not UI-bearing
 - manual UI confirmation walkthrough status, plus a concise `Suggested manual UI testing` list with route/setup/actions/expected result for anything the user should confirm; say `none` when no manual UI confirmation is useful

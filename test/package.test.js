@@ -15,6 +15,17 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 const packageRoot = new URL("../", import.meta.url);
 
+test("package dry run includes the Epic Update capability", async () => {
+  const { stdout } = await execFileAsync("npm", ["pack", "--dry-run", "--json"], {
+    cwd: new URL("../", import.meta.url),
+  });
+  const [packed] = JSON.parse(stdout);
+  const paths = packed.files.map((file) => file.path);
+  assert.ok(paths.includes("skills/sdd-epic-update/SKILL.md"));
+  assert.ok(paths.includes("skills/sdd-epic-update/agents/openai.yaml"));
+  assert.ok(paths.includes("src/commands/epic-update-input.js"));
+});
+
 test("package manifest excludes generated Python bytecode", async (t) => {
   const fixture = await mkdtemp(join(tmpdir(), "sdd-package-"));
   t.after(() => rm(fixture, { recursive: true, force: true }));

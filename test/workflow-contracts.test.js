@@ -322,6 +322,28 @@ test("requirement slices remain repository-qualified while review handoffs key r
   );
 });
 
+test("packaged Epic Update reconciles only repository-owned truth for an exact candidate", async () => {
+  const [epicUpdate, epicUpdateAgent, doctrine] = await Promise.all([
+    readPackageFile("skills", "sdd-epic-update", "SKILL.md"),
+    readPackageFile("skills", "sdd-epic-update", "agents", "openai.yaml"),
+    readPackageFile("docs", "story-driven-development.md"),
+  ]);
+
+  assert.match(epicUpdate, /with or without an active Change[\s\S]*Apply history/);
+  assert.match(epicUpdate, /shared diff envelope per repository/);
+  assert.match(epicUpdate, /sdd epic update-input <repository-path>/);
+  assert.match(epicUpdate, /Derive affected behavior from actual implementation, not filenames alone/);
+  assert.match(epicUpdate, /Mutate only repository-owned `epic\.md` files/);
+  assert.match(epicUpdate, /Update `Implemented By` from inspected actual changed surfaces/);
+  assert.match(epicUpdate, /Update `Verified By` only from durable evidence that directly proves/);
+  assert.match(epicUpdate, /second invocation should normally produce no Epic\/index changes and return `no-op`/);
+  assert.match(epicUpdate, /Do not:[\s\S]*review implementation quality[\s\S]*modify application code[\s\S]*Change lifecycle state[\s\S]*write changelog[\s\S]*commit/);
+  assert.match(epicUpdate, /`complete`[\s\S]*`no-op`[\s\S]*`needs-user`[\s\S]*`blocked`[\s\S]*`routed`/);
+  assert.match(epicUpdateAgent, /Reconcile Epic truth to one exact candidate/);
+  assert.match(doctrine, /## Candidate-Bound Epic Reconciliation/);
+  assert.match(doctrine, /`\/sdd-epic-update`/);
+});
+
 test("packaged Apply delivers one candidate-bound slice with optional isolated delegation", async () => {
   const [applySkill, applyAgent, doctrine, readme] = await Promise.all([
     readPackageFile("skills", "sdd-apply", "SKILL.md"),
@@ -630,6 +652,8 @@ test("packaged Interactive workflow tracks one lightweight progressive Change", 
   assert.match(interactiveSkill, /Status, Space, and repositories remain in `change\.md`/);
   assert.doesNotMatch(interactiveSkill, /<yyyy-mm-dd-change-name>\/design\.md/);
   assert.match(interactiveSkill, /sdd change transition <space-id> <change-id> --from proposed --to planned/);
-  assert.match(interactiveSkill, /Recommend `\/sdd-review` before merge or closeout/);
+  assert.match(interactiveSkill, /compose exactly one bounded Apply-style slice/);
+  assert.match(interactiveSkill, /Recommend `\/sdd-review`, then `\/sdd-epic-update`/);
+  assert.match(interactiveSkill, /Do not commit, close, merge, release, or deploy from this wrapper/);
   assert.doesNotMatch(interactiveSkill, /proposal\.md|--brief|\/sdd-change --plan|--replan/);
 });

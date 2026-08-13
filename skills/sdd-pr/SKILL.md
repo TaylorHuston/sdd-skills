@@ -1,6 +1,6 @@
 ---
 name: sdd-pr
-description: Use when the user invokes /sdd-pr or asks to open, manage, review, or steward a pull request for SDD-backed work according to project branch and review policy. Creates a PR through the configured provider when one does not exist, and on later activations checks comments, requested changes, status checks, and review threads; addresses accepted feedback; reconciles post-review changes into Epic truth; preserves review freshness against the current PR head; and asks the user to approve the actual merge only after the loop is clean. Use /sdd-release first for production release handoff preparation and /sdd-pr afterward when that handoff is a PR.
+description: Use when the user invokes /sdd-pr or asks to open, manage, review, or steward a pull request for SDD-backed work according to project branch and review policy. Creates a PR when one does not exist, and on later activations checks comments, requested changes, status checks, and review threads; routes accepted code changes to Apply and Epic reconciliation to Epic Update; preserves review freshness against the current PR head; and asks the user to approve the actual merge only after the loop is clean. Use /sdd-release first for production release handoff preparation.
 ---
 
 # SDD PR
@@ -136,10 +136,10 @@ For each actionable comment:
 
 1. Locate the referenced code and confirm the issue against current source.
 2. Classify the expected SDD impact using the reconciliation checkpoint below.
-3. Make the smallest correct change.
-4. Add or update tests when the risk warrants it.
-5. Reconcile repository-local Epic truth, evidence, supporting docs, and release communication plus the one central task state required by the classification.
-6. Run focused verification first, then broader checks or a fresh `/sdd-review` as required.
+3. Route accepted implementation changes to a separately invoked `/sdd-apply` against the reviewed finding and current candidate; do not implement them inside PR stewardship.
+4. Route repository-owned Epic/Story reconciliation to a separately invoked `/sdd-epic-update` after the fix is reviewed; route supporting docs and release communication to their owning workflows.
+5. Resume PR stewardship only after those capabilities return their exact candidate and result.
+6. Run or require focused verification and a fresh `/sdd-review` as dictated by the changed risk.
 7. Recompute the changed-file inventory and confirm every new or modified path remains inside the accepted remediation and SDD reconciliation scope.
 8. Stage only the explicit remediation allowlist, compare the staged paths to it, and inspect the staged diff.
 9. Commit accepted fixes with a clear message, then compare the committed paths to the same allowlist.
@@ -160,12 +160,12 @@ For answer-only, declined, or stale comments:
 Classify every accepted change after the last reviewed source commit. Comment disposition such as `actionable` or `declined` does not replace this impact classification.
 
 - `non-semantic`: formatting, comments, internal cleanup, or another change that does not alter observable behavior, important ownership, verification meaning, public documentation, or release communication. Record the rationale and focused verification; no Epic edit is required.
-- `code-map-or-evidence`: behavior is unchanged, but important implementation ownership, tests, assertions, or verification confidence changed. Update Story implementation/verification state, behavior-mapped `Implemented By`, `Implementation Gaps`, scenario-mapped `Verified By`, `Verification Gaps`, and affected supporting docs.
-- `existing-contract-fix`: implementation is corrected to satisfy an existing Requirement or Scenario. Update implementation/evidence maps and active task state when present, then run the affected SDD review gates. Use a fresh full `/sdd-review` when the fix materially changes the reviewed diff or risk surface.
-- `behavior-or-contract-change`: observable behavior, Requirements, Scenarios, API semantics, permissions, validation, recovery, data handling, security behavior, or user-facing release meaning changed. Reconcile the affected Epic, supporting docs, and release communication, then require a fresh `/sdd-review` before merge readiness.
+- `code-map-or-evidence`: behavior is unchanged, but important implementation ownership, tests, assertions, or verification confidence changed. Route repository-owned truth to `/sdd-epic-update`; route supporting docs separately.
+- `existing-contract-fix`: implementation must be corrected to satisfy an existing Requirement or Scenario. Route the fix to `/sdd-apply`, require scoped or full `/sdd-review` according to risk, then route candidate-bound traceability to `/sdd-epic-update`.
+- `behavior-or-contract-change`: observable behavior, Requirements, Scenarios, API semantics, permissions, validation, recovery, data handling, security behavior, or user-facing release meaning changed. Stop and route to `/sdd-change`; after implementation and fresh Review, use `/sdd-epic-update` and the owning release-communication workflow.
 - `scope-product-or-architecture-change`: the feedback expands scope or changes product direction, Epic ownership, durable architecture, data model, auth model, public API, migration, deployment, or external-service behavior. Stop PR remediation and route to `/sdd-change`, `/sdd-adr`, or `/sdd-prd` as appropriate.
 
-Do not reopen or edit a centrally closed Change merely to log ordinary PR feedback. Reconcile current repository-local Epic/Story truth and supporting docs instead; route a genuine new scope or behavior change through a new central Change.
+Do not reopen or edit a centrally closed Change merely to log ordinary PR feedback. Route current repository-local Epic/Story truth through `/sdd-epic-update` and supporting docs through their owner; route genuine new scope or behavior through a new central Change.
 
 ## Review Loop
 
@@ -182,7 +182,7 @@ Each loop iteration should:
 1. Refresh comments, review threads, checks, branch status, and every remote reviewer/check watermark for every target PR.
 2. Resolve each current PR head and compare it with that repository's reviewed source commit and latest reconciled PR head.
 3. Reclassify comments against current code and classify the SDD impact of accepted changes.
-4. Address accepted comments and reconcile repository-local truth plus the central ledger.
+4. Route accepted implementation comments to Apply and repository-local truth to Epic Update; resume only after their separately returned results.
 5. Push changes and reply/resolve threads.
 6. Update affected PR bodies or durable summary comments and central `tasks.md` with current reconciliation and remote-review watermarks whenever state materially changes.
 
@@ -247,7 +247,7 @@ Include:
 - commits pushed per repository
 - reviewed source commit, current PR head, and latest reconciled PR head per repository
 - remote reviewer/check watermarks, including required/optional classification and triggered/completed heads
-- post-review change classifications and repository-local Epic/supporting truth reconciled
+- post-review change classifications plus separately returned Apply, Review, Epic Update, and supporting-truth results
 - central `tasks.md` coordination state; never publish its workspace-local path
 - verification commands and results
 - manual confirmation status and whether acceptance blocks coordinated merge readiness

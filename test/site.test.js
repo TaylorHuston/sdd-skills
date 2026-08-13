@@ -86,6 +86,17 @@ test("public guide presents Apply as one candidate-bound terminal workflow", asy
   assert.match(html, /fresh Requirement\/Scenario verification before recommending a separate\s+Review/);
 });
 
+test("public guide presents candidate-bound Epic reconciliation as its own capability", async () => {
+  const { html } = await readSite();
+
+  assert.match(html, /Reconcile durable Epic truth/);
+  assert.match(html, /<code>\/sdd-epic-update<\/code>/);
+  assert.match(html, /exact committed or working-tree candidate/);
+  assert.match(html, /updates implementation and verification maps only from inspected durable evidence/);
+  assert.match(html, /stops before code review, code fixes, Change lifecycle mutation, changelog work, and commits/);
+  assert.match(html, /<code>sdd epic update-input<\/code>/);
+});
+
 test("public guide distinguishes structured Change validation from planning judgment", async () => {
   const { html } = await readSite();
 

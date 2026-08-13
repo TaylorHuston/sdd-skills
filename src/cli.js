@@ -9,6 +9,7 @@ import { createChange } from "./commands/change-create.js";
 import { transitionChange } from "./commands/change-transition.js";
 import { diagnoseWorkspace } from "./commands/doctor.js";
 import { createEpic } from "./commands/epic-create.js";
+import { resolveEpicUpdateInput } from "./commands/epic-update-input.js";
 import { initRepository, setupInstallation } from "./commands/init-installation.js";
 import { getStatus } from "./commands/status.js";
 import { updateWorkspace } from "./commands/update.js";
@@ -44,6 +45,7 @@ Usage:
   sdd status [space-id] [options]       List Space status or show one Space in detail
   sdd validate [space-id] [options]     Validate SDD artifact structure and references
   sdd epic create [options]             Scaffold a canonical Epic in one repository
+  sdd epic update-input [options]       Resolve one exact Epic-update diff envelope
   sdd change create [options]           Scaffold a workspace-central Change for a Space
   sdd change transition [options]       Guard one active Change status transition
   sdd change close [options]            Move an in-review Change into workspace closed history
@@ -103,6 +105,15 @@ Epic create options:
   --repo <path>                   Select the target mapped repository
   --date <yyyy-mm-dd>             Override the local creation date
   --dry-run                       Report the scaffold without writing files
+  --json                          Emit machine-readable JSON
+
+Epic update-input usage:
+  sdd epic update-input [repository-path] --baseline <commit-ish> [options]
+
+Epic update-input options:
+  --workspace <path>              Select the owning workspace explicitly
+  --baseline <commit-ish>         Resolve the immutable beginning of the candidate range
+  --candidate <value>             working-tree (default) or an explicit commit/ref
   --json                          Emit machine-readable JSON
 
 Change create usage:
@@ -189,15 +200,24 @@ const EPIC_HELP = `SDD Epic commands
 
 Usage:
   sdd epic create <space-id> <epic-id> <slug> [options]
+  sdd epic update-input [repository-path] --baseline <commit-ish> [options]
 
 Commands:
-  create   Scaffold and structurally validate a canonical Epic
+  create        Scaffold and structurally validate a canonical Epic
+  update-input  Resolve a safe read-only diff envelope for /sdd-epic-update
 
-Options:
+Create options:
   --workspace <path>  Resolve the initialized workspace (default: current directory)
   --repo <path>       Select the target mapped repository
   --date <yyyy-mm-dd> Override the local creation date
   --dry-run           Report without writing files
+
+Update-input options:
+  --workspace <path>  Select the owning workspace explicitly
+  --baseline <ref>    Resolve the immutable beginning of the candidate range
+  --candidate <value> working-tree (default) or an explicit commit/ref
+
+Shared options:
   --json              Emit machine-readable JSON
 `;
 
@@ -222,6 +242,10 @@ function requireNonEmptyPath(value, label) {
 function pathOption(values, name) {
   if (values[name] === undefined) return undefined;
   return requireNonEmptyPath(values[name], `--${name}`);
+}
+
+function terminalSafe(value) {
+  return JSON.stringify(String(value));
 }
 
 function pathOptionValues(values, name) {
@@ -744,6 +768,18 @@ function printHuman(result) {
     }
     return;
   }
+  if (result.command === "epic-update-input") {
+    console.log(`Epic update input: ${result.repository.id}`);
+    console.log(`Repository: ${result.repository.root}`);
+    console.log(`Baseline: ${result.baseline}`);
+    console.log(`Candidate: ${result.candidate.watermark}`);
+    console.log(`Changed paths: ${result.changedPaths.length}`);
+    for (const entry of result.changedPaths) {
+      console.log(`  ${entry.status} ${entry.from ? `${terminalSafe(entry.from)} -> ` : ""}${terminalSafe(entry.path)}`);
+    }
+    console.log(`Validate: ${result.validation.display}`);
+    return;
+  }
   if (result.command === "change-create") {
     console.log(`${result.dryRun ? "Would create" : "Created"} Change: ${result.changeId}`);
     console.log(`Space: ${result.spaceId}`);
@@ -1007,11 +1043,40 @@ async function executeCommand(command, args) {
     if (["--help", "-h", "help"].includes(subcommand)) {
       return { help: true, helpText: EPIC_HELP };
     }
-    if (subcommand !== "create") {
+    if (!["create", "update-input"].includes(subcommand)) {
       throw new SddError(
         subcommand ? `Unknown epic command: ${subcommand}` : "epic requires a subcommand.",
-        { code: "USAGE", details: ["Available command: epic create"] },
+        { code: "USAGE", details: ["Available commands: epic create, epic update-input"] },
       );
+    }
+    if (subcommand === "update-input") {
+      const { values, positionals } = parseCommandArgs(
+        args.slice(1),
+        commandOptions({
+          workspace: { type: "string" },
+          baseline: { type: "string" },
+          candidate: { type: "string" },
+        }),
+      );
+      if (values.help) return { help: true, helpText: EPIC_HELP };
+      if (positionals.length > 1) {
+        throw new SddError("epic update-input accepts at most one repository path.", { code: "USAGE" });
+      }
+      if (!values.baseline) {
+        throw new SddError("epic update-input requires --baseline <commit-ish>.", { code: "USAGE" });
+      }
+      const requestedWorkspaceRoot = resolvePathOption(values, "workspace");
+      return {
+        result: await resolveEpicUpdateInput(
+          requireCommandPath(positionals, "epic update-input"),
+          {
+            workspaceRoot: requestedWorkspaceRoot,
+            baseline: values.baseline,
+            candidate: values.candidate ?? "working-tree",
+          },
+        ),
+        json: values.json ?? false,
+      };
     }
     const { values, positionals } = parseCommandArgs(
       args.slice(1),

@@ -43,7 +43,7 @@ Use `sdd validate <space-id> --epic <epic-id> --repo <stable-repository-id> --wo
 
 The report is the durable audit record. Findings are addressed through the workflow named in the report:
 
-- `artifact-only`: after reporting, ask the user whether to apply the listed safe artifact fixes in the same thread.
+- `artifact-only`: route the listed safe repository-owned Epic corrections to `/sdd-epic-update` against the audited candidate; route central Change or supporting-doc drift to its owning workflow.
 - `needs-change`: run `/sdd-change` or `/sdd-epic-verify --propose-fixes`, then `/sdd-apply`, then `/sdd-review`. `/sdd-change` can stop after intent capture when implementation should wait.
 - `needs-verification`: add or run the missing checks through a SDD change unless no source files need to change.
 - `needs-prd`: run `/sdd-prd` before changing Epic scope.
@@ -141,7 +141,7 @@ Check git status in every repo that may be inspected or touched. Preserve unrela
    - For a multi-Epic request, the main coordinator performs one final batch-coherence pass after all per-Epic work. Compare every report's frontmatter, current verdict, scorecard, current findings, required checks, verified ref, predecessor link, and residual risks; rerun or correct any outlier before reporting the batch result. Story or Epic subagents do not assign the final batch verdict.
    - Summarize template-shape findings in the Epic template adherence gate and `Template drift` line.
 10. In `--propose-fixes`, create the fix proposal only after the report exists. Resume a matching central Change found through repository-targeted status metadata; otherwise execute `sdd change create <space-id> <epic>-drift-fixes --repo <stable-repository-id>` with every impacted repository selected, then populate that one generated central record.
-11. After every non-`--check` run, ask the user whether to apply any safe artifact fixes identified by the audit. Do not apply those fixes until the user explicitly agrees.
+11. After every non-`--check` run, route unambiguous repository-owned Epic corrections to `/sdd-epic-update` with the audited candidate envelope. Keep this audit diagnostic; do not apply those fixes in the verification run.
 
 ## Gates
 
@@ -174,24 +174,13 @@ Every finding should include:
 - impact
 - recommended workflow to address it
 
-## Post-Run Artifact Fixes
+## Post-Run Routing
 
-After reporting, ask the user whether to apply safe artifact fixes when the audit found unambiguous documentation or workflow drift. If the user agrees, the same thread may edit:
+Keep the written report as an immutable diagnostic snapshot. Do not mutate Epic, Change, supporting documentation, application code, tests, generated bundles, migrations, lockfiles, secrets, environment files, branches, PRs, or Git history from this audit.
 
-- Epic wording, status, notes, canonical section ordering, Candidate Stories naming, Story ordering, Story labels/references, Requirement/Scenario labels, `Verification Gaps`, stale evidence notes, safe `Verified By` normalization when existing evidence can be mapped without changing behavior semantics, and missing Requirement/Scenario additions that describe already-implemented behavior or explicit gaps without changing product semantics
-- active or closed central Change-record wording that clearly contradicts accepted Epic truth, such as stale implementation-pending text, stale verification-pending text, obsolete manual confirmation status vocabulary, or old repository-local Change-path references
-- README/docs references that clearly point at moved Epic anchors
+Route repository-owned Epic wording, state, Story/Requirement/Scenario structure, implementation maps, gaps, and durable evidence corrections to `/sdd-epic-update` against the exact audited candidate. Route central Change drift or supporting-document corrections to their owning workflow. If remediation changes the audit result, write a successor report with `supersedes` only in a later verification run after the owning mutation capability finishes.
 
-Do not edit a report after it has been written as the run's audit snapshot. If artifact remediation changes its result, evidence, refs, or current findings, write a successor report with `supersedes` after rerunning the affected gates.
-
-Do not edit these as post-run artifact fixes:
-
-- app code, tests, generated bundles, migrations, lockfiles, secrets, env files
-- PRD/product direction
-- external services, deployments, branches, PRs, git history
-- behavior semantics that need the user judgment
-
-If a finding requires code, tests, product behavior, or a debatable scope change, leave it in the report and recommend `/sdd-change`; stop after intent capture when implementation should be deferred.
+If a finding requires code, tests, product behavior, or a debatable scope change, recommend `/sdd-change` or the applicable implementation workflow; stop after the diagnostic handoff.
 
 ## Result Labels
 

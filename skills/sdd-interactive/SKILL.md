@@ -1,11 +1,11 @@
 ---
 name: sdd-interactive
-description: Create and apply a lightweight SDD change in one tracked interactive working session. Use when the user invokes /sdd-interactive or asks for small UI tweaks, minor behavior refinements, polish, narrow bug fixes, or other concrete changes that deserve a durable change record but do not need a full upfront /sdd-change pass. Combines a minimal progressive change plus tasks ledger with an immediate /sdd-apply-style loop, including BDD/TDD where practical, Epic/Requirement/Scenario reconciliation, relevant available-skill guidance, verification, manual confirmation tracking, and closeout consistency.
+description: Create and apply a lightweight SDD change in one tracked interactive working session. Use when the user invokes /sdd-interactive or asks for small UI tweaks, minor behavior refinements, polish, narrow bug fixes, or other concrete changes that deserve a durable change record but do not need a full upfront /sdd-change pass. Combines minimal progressive Change capture with exactly one public /sdd-apply-style Requirement slice, then recommends separately callable Review, Epic Update, acceptance, and commit steps.
 ---
 
 # SDD Interactive
 
-Create the smallest useful SDD change record, then immediately work through the change interactively.
+Create the smallest useful SDD Change record, then compose exactly one bounded Apply-style slice. This convenience wrapper does not own an independent implementation or Epic-reconciliation doctrine.
 
 ## Authority And Project Profile
 
@@ -57,11 +57,11 @@ Use existing central artifacts when the session continues an active Change. Keep
    - Record it in the central `tasks.md` before or immediately after acting, including the responsible repository ID.
    - Classify it as `cosmetic`, `defect`, `verification gap`, `artifact drift`, `requirement refinement`, `small in-scope behavior`, `scope expansion`, or `product drift`.
    - For `cosmetic` changes, make the smallest safe edit, verify the affected surface, and record why no Epic truth changed.
-   - For `defect` changes, add or update a focused failing-first test/check when practical, fix the defect, verify, and update scenario-mapped Story evidence.
-   - For `verification gap`, produce the missing proof before claiming completion.
-   - For `artifact drift`, reconcile `change.md`, `tasks.md`, any compatible existing `design.md`, Epic truth, docs, or release communication before continuing.
-   - For `requirement refinement`, update the technical-planning sections of `change.md` and the target Epic Requirement/Scenario before or alongside implementation.
-   - For `small in-scope behavior`, add or update the relevant Requirement/Scenario, then implement and verify it.
+   - For `defect` changes, route through the public `/sdd-apply` trigger contract, including diagnosis and failing-first proof when applicable.
+   - For `verification gap`, use the same one-slice Apply contract to produce the missing proof before claiming completion.
+   - For `artifact drift`, route repository-owned Epic truth to `/sdd-epic-update`; route Change, supporting-doc, or release-communication drift to its owning workflow.
+   - For `requirement refinement`, stop and route to `/sdd-change` before implementation.
+   - For `small in-scope behavior`, record one independently green Requirement slice and execute exactly that public `/sdd-apply` contract.
    - For `scope expansion` or `product drift`, stop unless the user explicitly accepts the expansion in this change.
    - For work spanning repositories, respect recorded ordering and boundary dependencies, keep each repository's implementation and evidence distinct in the shared ledger, and do not call the request complete until every required target slice is complete.
 6. Follow development discipline.
@@ -78,26 +78,22 @@ Use existing central artifacts when the session continues an active Change. Keep
    - If no relevant skill is available, continue from the managed workflow, project guidance, current technical documentation, and sound engineering judgment.
    - Record only concrete consequences that changed implementation, verification, artifacts, or stop conditions; do not maintain a skills-considered inventory.
    - Validate important subagent claims before updating durable truth or committing.
-8. Reconcile durable truth.
-   - Update affected repository-local Epic `Implementation`, behavior-mapped `Implemented By`, `Implementation Gaps`, `Verification`, scenario-mapped `Verified By`, and `Verification Gaps` when implementation or verification reality changes. Every implemented Requirement needs a concrete repository-relative primary code location and stable symbol or searchable anchor.
-   - Keep Epic `Verified By` as a scenario-mapped evidence index. Record chronological command output in `tasks.md` instead; broad gates are supporting evidence unless mapped to named behavior.
-   - Distinguish evidence types where useful: focused automated tests, broad supporting gates, deterministic E2E, live-provider playtests, manual UI confirmation, and debug/log inspection.
-   - Search affected Epic Stories for older Requirements, Scenarios, implementation/verification state, `Implemented By`, `Implementation Gaps`, `Verified By`, or `Verification Gaps` this quick change supersedes, and reconcile them before claiming completion.
-   - Keep Story labels or documented legacy Story IDs stable. Preserve local Requirement and Scenario IDs when editing existing truth; add new IDs only for genuinely new behavior.
-   - Keep `S#` Story labels unique within each Epic, full Story references traceable, and legacy app-wide Story IDs unique across active Epics in the app. Stop on duplicates unless the session is explicitly resolving the duplicate.
-   - Update the project-defined release communication when project policy requires it.
-   - Keep public release communication human-facing; do not include internal SDD ledgers, private planning context, secrets, or speculative roadmap promises.
+8. Return at the capability boundaries.
+   - Stop after the one selected slice reaches the public `/sdd-apply` result contract; do not consume another slice.
+   - Recommend a separately invoked `/sdd-review` for independent candidate review.
+   - After a clean review, recommend `/sdd-epic-update` with the exact candidate envelope. Epic Update owns repository-local implementation maps, gaps, durable verification maps, and same-candidate idempotence.
+   - Keep manual acceptance, changelog, commit, PR, release, and closeout as separate owning steps. Do not hide them inside this wrapper.
+   - If the slice cannot finish in one session, preserve honest Change, slice, ledger, and Resume state rather than broadening the wrapper.
 9. Close the working session.
    - Run `sdd validate <space-id> --change <change-id> --repo <repository-id> [--repo <repository-id> ...] --workspace <workspace-root> --json`, filtering the one central record through every target repository needed for the session; resolve deterministic errors introduced by the session and classify warnings. A repository filter selects contextual Epic and repository surfaces, not a Change copy. The lightweight artifact shape may omit full `/sdd-change` detail, but it must still satisfy the validator's shared core contract.
    - Run focused verification for every changed behavior in every affected target and broader checks when risk warrants.
    - For browser-visible or otherwise user-facing app changes, walk the user through what to manually confirm in the UI: app URL, setup state, routes, clicks/inputs, expected results, failure signs, and what feedback would change Requirements, Scenarios, or implementation.
    - Record that walkthrough in `tasks.md` under `Manual UI Confirmation`. If no manual UI confirmation applies, record why.
    - Record manual confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
-   - Refresh the central `tasks.md` with the final resume state, per-repository changed files and verification evidence, manual confirmation status, release-communication status, review record state, PR/merge/release state, coordination gates, unresolved gaps, accepted deferred gaps, and commit candidates or commits.
-   - Keep the central status `in_progress` while any target has implementation, verification, remediation, or unresolved coordination work. Only after every targeted repository is ready for independent review, run `sdd change transition <space-id> <change-id> --from in_progress --to in_review` once, without `--repo`.
-   - Recommend `/sdd-review` before merge or closeout when code, user-visible behavior, security, data, or release state changed.
-   - Do not run `sdd change close` unless the user explicitly asks or the closeout path is already authorized by the active workflow.
-   - When the user asks to close, finish, merge-and-close, or otherwise complete the Change, first confirm `change.md` remains `status: in_review` and every targeted repository has met its review, manual-confirmation, release-communication, PR/merge, and accepted-gap gates, and no Resume Here, checklist, change, task, compatible existing design, or review text contradicts completion. Then run `sdd change close <space-id> <change-id> --workspace <workspace-root>` exactly once. Do not pass `--repo`, close targets independently, or move the folder manually. The resulting `<workspace>/.sdd/changes/closed/<change-id>/` location is the closed state; `change.md` retains `status: in_review`.
+   - Refresh only the honest one-slice resume state and public Apply result. Do not claim Review, Epic Update, acceptance, changelog, commit, PR, release, or closeout completed unless those public capabilities were separately invoked.
+   - Keep the central status `in_progress`; `/sdd-review` owns any later transition to `in_review`.
+   - Recommend `/sdd-review`, then `/sdd-epic-update` for affected durable truth.
+   - Do not commit, close, merge, release, or deploy from this wrapper.
 
 ## Artifact Shape
 
@@ -218,7 +214,7 @@ Summarize:
 
 - canonical central Change folder path
 - requests handled
-- artifacts and Epics updated
+- Change/slice artifacts updated and the separately pending Epic Update handoff
 - tests or checks run
 - manual UI confirmations the user should perform, or why none apply
 - remaining gaps, review needs, and whether `/sdd-review` is recommended

@@ -56,6 +56,7 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
    - Record the full repository handoff set before running checks; a passing target never makes the aggregate release ready by itself.
 2. Run release preflight.
    - Confirm every target worktree is clean or only contains release-artifact edits that this skill will make.
+   - Confirm each release candidate has a current `/sdd-epic-update` result for affected repository-owned behavior and traceability, or a recorded evidence-based `no-op`; any candidate change after that watermark makes reconciliation stale.
    - Confirm each source branch is up to date with its own target or record why not.
    - Check every source/target pair for merge conflicts without performing a merge.
    - Confirm no active SDD change required for this release is missing `/sdd-review` readiness or accepted override.
@@ -161,6 +162,7 @@ Stop and report when:
 - no project-local release guidance exists and no meaningful local release gate can be identified or satisfied.
 - required release checks fail.
 - `/sdd-review` readiness is missing for release-blocking SDD changes.
+- candidate-bound `/sdd-epic-update` reconciliation is missing or stale for affected repository-owned behavior or traceability.
 - a triggered cumulative release-candidate review is missing, stale, or has unresolved findings for an initial, multi-Change, materially post-review, or high-risk cumulative release diff.
 - required manual confirmation remains `pending user` and project policy requires acceptance before the configured release handoff or requested release action.
 - release-relevant SDD closeout state is contradictory, duplicate Story labels/references make Epic traceability unreliable, or conflicting legacy app-wide Story IDs are unresolved.

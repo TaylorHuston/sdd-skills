@@ -3514,6 +3514,25 @@ test("explicit Epic validation rejects a broken duplicate claim for the selected
   }
 });
 
+test("CLI exposes the Epic Update envelope helper and package includes its skill", async () => {
+  const { stdout: epicHelp } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "epic",
+    "--help",
+  ]);
+  assert.match(epicHelp, /sdd epic update-input/);
+  assert.match(epicHelp, /--baseline <ref>/);
+  assert.match(epicHelp, /working-tree \(default\)/);
+
+  const bundledSkills = await readdir(join(PACKAGE_ROOT, "skills"));
+  assert.ok(bundledSkills.includes("sdd-epic-update"));
+  const skill = await readFile(
+    join(PACKAGE_ROOT, "skills", "sdd-epic-update", "SKILL.md"),
+    "utf8",
+  );
+  assert.match(skill, /^name: sdd-epic-update$/m);
+});
+
 test("packaged Epic templates stay synchronized", async () => {
   const canonical = await readFile(join(PACKAGE_ROOT, "docs", "templates", "epic.md"), "utf8");
   for (const skill of ["sdd-change", "sdd-epic-verify"]) {

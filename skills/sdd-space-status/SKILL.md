@@ -115,8 +115,9 @@ Use absolute clickable file links in user-facing output. Say when a conclusion i
 - `/sdd-change` or `--replan`: a new implementation plan or active planning revision is needed.
 - `/sdd-apply`: an active Change has a clear implementation or remediation slice.
 - `/sdd-review`: implementation is ready for the independent local gate.
-- `/sdd-release`: reviewed work is ready for production handoff preparation.
-- `/sdd-epic-verify`: Epic truth, Story ownership/order, Requirement quality, or implementation drift needs an audit.
+- `/sdd-epic-update`: reviewed or manual work is sound but affected Epic/Story behavior or traceability has not been reconciled to the current candidate.
+- `/sdd-release`: reviewed and Epic-reconciled work is ready for production handoff preparation.
+- `/sdd-epic-verify`: Epic truth, Story ownership/order, Requirement quality, or implementation drift needs a whole-Epic audit.
 - `/sdd-orphan-audit`: implemented behavior may not be represented by an Epic/Story.
 - `/diagnose`: an active defect, regression, flaky behavior, or performance problem needs diagnosis.
 - `/improve-codebase-architecture`: broad architecture discovery falls outside one Change.

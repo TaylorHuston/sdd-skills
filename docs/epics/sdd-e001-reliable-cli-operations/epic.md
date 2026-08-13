@@ -3,8 +3,8 @@ schema: sdd-epic-v2
 id: SDD-E001
 status: active
 created: 2026-07-20
-modified: 2026-08-11
-last_verified: 2026-08-10
+modified: 2026-08-13
+last_verified: 2026-08-13
 stories:
   - S1
   - S2
@@ -63,7 +63,7 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 | S3 | implemented | verified | Route one workspace-unique central Change across portable repository targets. | 2026-08-10 | Creation, lifecycle, physical confinement, and deterministic discovery use current workspace and repository contracts; legacy alpha formats are unsupported. |
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
 | S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-23 | Reports are versioned; PR/release paths are classified and rechecked; Git baselines are immutable and bounded. |
-| S6 | partial | partial | Carry one progressive central Change through planning and an evidence-backed multi-repository handoff. | 2026-08-11 | The progressive intent-and-plan `change.md` contract is implemented at the CLI seam; package-wide verification remains. |
+| S6 | partial | partial | Carry one progressive central Change through planning and an evidence-backed multi-repository handoff. | 2026-08-13 | Candidate-bound Epic reconciliation is implemented; broader delivery-skill and package-wide verification gaps remain. |
 | S7 | implemented | partial | Explain the portable method and package through accessible responsive documentation. | 2026-08-10 | The public guide describes progressive Changes and current-only setup; responsive rendering and owner confirmation remain pending. |
 
 ## Stories
@@ -708,8 +708,8 @@ The published package SHALL include the orphan-audit source and universal bundle
 Implementation: partial
 Verification: partial
 Created: 2026-07-23
-Modified: 2026-08-11
-Last verified: 2026-08-11
+Modified: 2026-08-13
+Last verified: 2026-08-13
 
 As a developer, I want SDD planning, implementation, and review workflows to carry work through a complete evidence-backed handoff, so that an agent does not stop at a partial task, a green command, or the first finding.
 
@@ -812,6 +812,25 @@ Explore, ADR, and Change SHALL invoke one read-only same-session context workflo
 - WHEN the current session has read only part of the evidence required for an exploration, ADR, or Change
 - THEN the shared context workflow reuses current reads, opens the missing minimum, and returns an evidence-linked sufficiency result without creating another artifact or context boundary.
 
+##### Requirement R9: Candidate-Bound Epic Reconciliation
+
+Epic Update SHALL accept one exact committed or working-tree diff envelope with or without active Change or Apply history, SHALL derive affected behavior from actual implementation, SHALL mutate only repository-owned Epic truth and directly owned generated indexes, and SHALL be idempotent for the same candidate.
+
+###### Scenario R9-S1: Reviewed Or Manual Candidate Needs Traceability
+
+- WHEN reviewed or manual implementation changes affect behavior ownership or durable proof
+- THEN `/sdd-epic-update` reconciles Stories, Requirements, Scenarios, implementation maps, gaps, and verification maps from inspected candidate evidence without fabricating Apply history or changing code, Change lifecycle, changelog content, or Git history.
+
+###### Scenario R9-S2: Deterministic Working-Tree Envelope
+
+- WHEN Epic Update targets a dirty working tree
+- THEN `sdd epic update-input` resolves an immutable baseline and HEAD, inventories staged, unstaged, and non-ignored untracked paths, returns a content-sensitive candidate watermark, and performs no artifact mutation.
+
+###### Scenario R9-S3: Same Candidate Repeated
+
+- WHEN Epic Update runs again after repository-owned truth already matches the same candidate
+- THEN it returns `no-op` without rewriting the Epic.
+
 
 #### Implemented By
 
@@ -849,6 +868,9 @@ Explore, ADR, and Change SHALL invoke one read-only same-session context workflo
 | S6/R8-S1 | `skills/sdd-explore/SKILL.md#Gather Context` | support | Invokes the shared context workflow for durable exploration. |
 | S6/R8-S1 | `skills/sdd-adr/SKILL.md#Gather Context` | support | Invokes the shared context workflow before technical recommendation or decision capture. |
 | S6/R8-S1 | `skills/sdd-change/SKILL.md#Gather Context` | support | Invokes the shared context workflow before intent finalization or technical planning. |
+| S6/R9, S6/R9-S1, S6/R9-S3 | `skills/sdd-epic-update/SKILL.md#Determine Affected Behavior` | primary | Defines candidate-bound behavior derivation, repository-owned reconciliation, routing, terminal boundaries, and idempotent results. |
+| S6/R9-S2 | `src/commands/epic-update-input.js#resolveEpicUpdateInput` | primary | Resolves immutable refs and content-sensitive committed or working-tree candidate envelopes without artifact mutation. |
+| S6/R9 | `docs/story-driven-development.md#Candidate-Bound Epic Reconciliation` | support | Defines the portable capability boundary and CLI-versus-skill ownership split. |
 #### Implementation Gaps
 
 - S6/R7: remaining delivery skills need final semantic review after mechanical artifact-reference updates.
@@ -873,6 +895,8 @@ Explore, ADR, and Change SHALL invoke one read-only same-session context workflo
 | S6/R6-S1 | Automated test `test/workflow-contracts.test.js#packaged Interactive workflow tracks one lightweight progressive Change` | Interactive keeps trimmed shared artifacts, immediate tracked execution, validation, and honest handoff semantics. | Passing 2026-07-23 |
 | S6/R7-S1 | Automated test `test/workflow-contracts.test.js#packaged workflows coordinate one central Change across every target repository` | All delivery workflows share the central layout, full target-set invariant, repository-free Change-wide lifecycle, and projection semantics without legacy Change paths. | Passing 2026-08-07 |
 | S6/R8-S1 | Automated test `test/workflow-contracts.test.js#packaged planning workflows share one same-session minimum context contract` | The shared skill owns all action profiles, reuses current reads, stays artifact-free and same-session, and is invoked by Explore, ADR, and Change. | Passing 2026-08-11 |
+| S6/R9-S1, S6/R9-S3 | Automated test `test/workflow-contracts.test.js#packaged Epic Update reconciles only repository-owned truth for an exact candidate` | The skill supports active-Change and manual candidates, limits mutation to Epic truth, routes invalid intent/evidence, returns composable statuses, and requires same-candidate no-op behavior. | Passing 2026-08-13 |
+| S6/R9-S2 | Automated tests `test/epic-update-input.test.js#epic update input resolves an immutable committed candidate and changed paths`, `test/epic-update-input.test.js#epic update input inventories staged, unstaged, and untracked working-tree state`, `test/epic-update-input.test.js#epic update input watermark changes when tracked or untracked content changes`, `test/epic-update-input.test.js#epic update input disables repository-configured content filters`, `test/epic-update-input.test.js#epic update input is read-only`, and `test/epic-update-input.test.js#epic update input rejects a baseline that is not an ancestor of a committed candidate` | The helper resolves safe committed and dirty-tree envelopes, includes changed content in its watermark, and rejects invalid committed ranges. | Passing 2026-08-13 |
 
 #### Verification Gaps
 
