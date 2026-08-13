@@ -722,7 +722,9 @@ skil
                 frontmatter owns status, Space, and repository IDs. Planning expands <code>change.md</code> and adds
                 <code>tasks.md</code> with independently green vertical Requirement slices. Each slice has an
                 observable outcome, Scenario-based proof intent, and enough boundary context for a meaningful review
-                without predicting files or implementation steps; existing records may retain a compatible <code>design.md</code>.
+                without predicting files or implementation steps. The CLI validates slice fields, references,
+                dependencies, one current ledger row per slice, and a replaceable Resume checkpoint with repository
+                candidate envelopes; it does not judge whether the slices are good. Existing records may retain a compatible <code>design.md</code>.
                 The ID is unique within this workspace, and closeout moves the folder once under
                 <code>&lt;workspace&gt;/.sdd/changes/closed/</code> after project truth has been reconciled.
               </p>
@@ -747,8 +749,8 @@ skil
                 <li>Install workspace-managed skills and map private topology</li>
                 <li>Initialize portable repository contracts</li>
                 <li>Scaffold canonical Changes and repository-owned Epics</li>
-                <li>Validate artifacts, ownership metadata, audit-report coherence, and optional Git-relative freshness
-                </li>
+                <li>Validate artifacts, structured Requirement slices, ledger/checkpoint coherence, ownership metadata,
+                  audit-report coherence, and optional Git-relative freshness</li>
                 <li>Report central Change status across mapped repositories</li>
                 <li>Reconcile checksum-managed doctrine and skills during update</li>
                 <li>Guard one-record lifecycle transitions</li>

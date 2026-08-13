@@ -9,6 +9,7 @@ import {
   parseChangeMetadata,
 } from "../change-status.js";
 import { isValidChangeId } from "../change-id.js";
+import { parseStructuredChangeTasks } from "../change-tasks.js";
 import {
   readStoredChangesSnapshot,
   readRequiredChangeFileSnapshot,
@@ -1148,6 +1149,22 @@ async function validateChange({
       .map((alternatives) => alternatives.join(" or "));
     if (missing.length > 0) {
       findings.push(finding(shapeLevel, "MISSING_ARTIFACT_SECTION", displayPath, `Missing required sections: ${missing.join(", ")}.`, context));
+    }
+
+    if (fileName === "tasks.md") {
+      const taskResult = parseStructuredChangeTasks(source, {
+        changeId,
+        repositoryIds: metadata?.repositories ?? [],
+      });
+      for (const taskIssue of taskResult.issues) {
+        findings.push(finding(
+          shapeLevel,
+          taskIssue.code,
+          displayPath,
+          taskIssue.message,
+          { ...context, ...(taskIssue.sliceId ? { sliceId: taskIssue.sliceId } : {}) },
+        ));
+      }
     }
 
     if (fileName === "change.md") {

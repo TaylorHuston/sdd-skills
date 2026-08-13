@@ -97,12 +97,17 @@ test("packaged change workflow progresses one central intent record into plannin
   assert.match(changeSkill, /focused verification intent and whether manual acceptance is required/);
   assert.match(changeSkill, /what must be implemented, never how to implement it/);
   assert.match(changeSkill, /initialize one lightweight Implementation Ledger row per slice/);
-  assert.match(changeSkill, /current-state resume aid that `\/sdd-apply` maintains/);
+  assert.match(changeSkill, /current-state resume aids that `\/sdd-apply` maintains/);
   assert.match(changeSkill, /resequence, split, or merge slices/);
   assert.doesNotMatch(changeSkill, /--brief|--plan|--replan|proposal\.md|change-briefs/);
   assert.match(changeTemplate, /status: proposed/);
   assert.match(changeTemplate, /space: <space-id>/);
   assert.match(changeTemplate, /repositories: \[\]/);
+  assert.match(tasksTemplate, /^## Resume Here$/m);
+  assert.match(tasksTemplate, /- Change: `<change-id>`/);
+  assert.match(tasksTemplate, /- Verification candidate: pending/);
+  assert.match(tasksTemplate, /- Epic-update candidate: pending/);
+  assert.match(tasksTemplate, /^\| Repository \| Root \| Baseline \| Candidate kind \| Candidate watermark \|$/m);
   assert.match(tasksTemplate, /^## Requirement Slices$/m);
   assert.match(tasksTemplate, /independently green/);
   assert.match(tasksTemplate, /focused Scenario-based test cycle/);
@@ -373,7 +378,9 @@ test("packaged Apply delivers one candidate-bound slice with optional isolated d
   assert.match(applyAgent, /exactly one next-ready or explicitly named Requirement slice/);
   assert.match(doctrine, /one fresh-context implementer/);
   assert.match(doctrine, /requires fresh candidate-bound verification/);
+  assert.match(doctrine, /structured Requirement-slice IDs, fields, references, dependency graphs, ledger alignment, and Resume checkpoint shape/);
   assert.match(readme, /one optional fresh-context implementer in an authorized dedicated isolated workspace/);
+  assert.match(readme, /deterministic slice, reference, dependency, ledger, and Resume-checkpoint validation|checks structured Requirement-slice IDs and required fields/);
 
   assert.doesNotMatch(applySkill, /Persistence invariant|Commit cadence invariant|Pattern Parity Matrix|Boundary Contract Matrix|Stateful Transition Matrix|Verification Ledger|--review-only|--no-delegate|--no-commit|transition <space-id> <change-id> --from in_progress --to in_review|sdd change close/);
 });

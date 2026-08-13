@@ -135,6 +135,38 @@ Change close options:
   --json                          Emit machine-readable JSON
 `;
 
+const UPDATE_HELP = `SDD Update
+
+Usage:
+  sdd update [path] [options]
+
+Reconcile the selected workspace's checksum-managed workflow and packaged skills.
+
+Options:
+  --workspace <path>  Select the owning workspace explicitly
+  --dry-run           Report changes without writing files
+  --force             Replace conflicting managed workflow or skills
+  --json              Emit machine-readable JSON
+  --help, -h          Show this help
+`;
+
+const VALIDATE_HELP = `SDD Validate
+
+Usage:
+  sdd validate [space-id] [options]
+
+Validate central Changes, structured Requirement slices and checkpoints, repository Epics, verification reports, ownership, references, and optional Git-relative freshness.
+
+Options:
+  --workspace <path>          Select the owning workspace explicitly
+  --repo <path>               Select a mapped repository; may be repeated
+  --change <change-id>        Validate one active or closed Change
+  --epic <epic-id>            Validate one Epic
+  --changed-from <commit-ish> Check Epic modified metadata against a Git baseline
+  --json                      Emit machine-readable JSON
+  --help, -h                  Show this help
+`;
+
 const CHANGE_HELP = `SDD Change commands
 
 Usage:
@@ -855,7 +887,7 @@ async function executeCommand(command, args) {
         force: { type: "boolean" },
       }),
     );
-    if (values.help) return { help: true };
+    if (values.help) return { help: true, helpText: UPDATE_HELP };
     const requestedWorkspaceRoot = resolvePathOption(values, "workspace");
     const result = await updateWorkspace(
       requireAtMostOnePath(positionals, command),
@@ -944,7 +976,7 @@ async function executeCommand(command, args) {
         "changed-from": { type: "string" },
       }),
     );
-    if (values.help) return { help: true };
+    if (values.help) return { help: true, helpText: VALIDATE_HELP };
     if (positionals.length > 1) {
       throw new SddError("validate accepts at most one Space ID.", { code: "USAGE" });
     }

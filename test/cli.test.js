@@ -4207,6 +4207,28 @@ test("CLI exposes changed-from validation help", async () => {
   assert.match(stdout, /--changed-from <commit-ish>/);
 });
 
+test("CLI exposes focused validate and update help", async () => {
+  const validate = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "validate",
+    "--help",
+  ]);
+  assert.match(validate.stdout, /^SDD Validate$/m);
+  assert.match(validate.stdout, /structured Requirement slices and checkpoints/);
+  assert.match(validate.stdout, /--changed-from <commit-ish>/);
+  assert.doesNotMatch(validate.stdout, /Setup options:/);
+
+  const update = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "update",
+    "--help",
+  ]);
+  assert.match(update.stdout, /^SDD Update$/m);
+  assert.match(update.stdout, /checksum-managed workflow and packaged skills/);
+  assert.match(update.stdout, /--force/);
+  assert.doesNotMatch(update.stdout, /Validate options:/);
+});
+
 test("validate accepts a canonical active Change", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));

@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added `/sdd-gather-context`, a lightweight same-session shared skill that reads and reconciles the action-specific minimum planning, decision, behavior, implementation, test, and Git evidence before Explore, ADR, or Change proceeds.
 - Added one progressive Change record per outcome under `<workspace>/.sdd/changes/`; `change.md` owns intent, lifecycle status, Space, and repository IDs from intent capture through close.
 - Added complete README matrices for every packaged skill and CLI command, including their lifecycle responsibilities and handoffs.
+- Added deterministic parsing for structured Requirement slices, dependency graphs, one-row-per-slice Implementation Ledgers, and fixed-label Resume checkpoints with repository candidate envelopes.
 
 ### Changed
 
@@ -24,7 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `/sdd-explore` now serves any substantial discussion the user wants preserved beyond chat, uses the shared context capability before substantive claims, defaults idea-owned records to `<idea>/explorations/` and workspace-owned records to `<workspace>/.sdd/explorations/`, returns an explicit composable result, and stops at a routed handoff instead of automatically crossing into PRD, Change, ADR, or another workflow.
 - **Breaking:** `sdd change create` now creates only the proposed `change.md` record and allows repository ownership to remain empty until planning settles the target set.
 - **Breaking:** Change status and ownership metadata moved from `tasks.md` to `change.md`; status, validation, `sdd change transition`, and `sdd change close` read the progressive record, and lifecycle mutations now use proportional workspace-locked local filesystem operations instead of bespoke crash-recovery journals.
-- `sdd validate` now applies lifecycle-aware Change requirements: proposed Changes need only `change.md`, while later states require repository ownership, technical-planning sections in `change.md`, and `tasks.md`. Existing `design.md` files remain accepted and validated.
+- `sdd validate` now applies lifecycle-aware Change requirements: proposed Changes need only `change.md`, while later states require repository ownership, technical-planning sections in `change.md`, and `tasks.md`. Structured Requirement-slice Changes additionally receive deterministic slice, reference, dependency, ledger, and Resume-checkpoint validation; Checklist-based legacy and Interactive task shapes remain compatible. Existing `design.md` files remain accepted and validated.
+- `sdd change transition proposed -> planned` now rejects malformed structured Requirement-slice plans before mutating lifecycle state, and `sdd validate --help` plus `sdd update --help` now provide focused command-specific usage.
 - **Breaking:** installation ownership moves from the operating-system user to one explicit workspace; configuration, Changes, managed workflow state, and recovery live under `<workspace>/.sdd/`, while managed skills default to `<workspace>/.agents/skills/`.
 - `sdd update` now performs one bounded job: reconcile the current workspace's checksum-managed doctrine and skills.
 - Planning, Apply, Review, PR, Release, Interactive, Epic verification, audits, and Space status now share one workspace-central Change record and treat repository entries only as stable targets or filtered projections.
@@ -34,6 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Removed
 
 - Removed `/sdd-apply`'s universal TDD/subagent methodology, risk and evidence matrices, verification ledger, chronological implementation diary, phase-commit policy, self-review loop, changelog/Epic templates, and closeout procedure.
+- Removed obsolete no-op Change-transition recovery exports and the status command's unnecessary mutation-lock wrapper.
 - Removed separate Change Brief storage, `--brief`/`--plan`/`--replan` modes, and the brief/proposal templates.
 - Removed Change transition and close transaction-journal machinery that was disproportionate for the local pre-1.0 workflow.
 - Removed programmatic migration of pre-1.0 home installations, configuration schemas, and legacy Change locations, including `sdd setup --from-user` and the update migration/recovery subsystem. Alpha data must be recreated or converted manually.

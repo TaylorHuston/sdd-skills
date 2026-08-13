@@ -2,6 +2,7 @@ import { rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { assertValidChangeId } from "../change-id.js";
+import { formatStructuredTaskIssues, parseStructuredChangeTasks } from "../change-tasks.js";
 import {
   assertChangeStoreConfinement,
   assertRequiredChangeFileSnapshotCurrent,
@@ -45,7 +46,7 @@ function assertTransition(from, to) {
   }
 }
 
-async function assertPlanningComplete(changePath, workspaceRoot, metadata, changeSource) {
+async function assertPlanningComplete(changePath, workspaceRoot, metadata, changeSource, changeId) {
   const tasks = await readRequiredChangeFileSnapshot(
     changePath,
     "tasks.md",
@@ -60,14 +61,21 @@ async function assertPlanningComplete(changePath, workspaceRoot, metadata, chang
   const missingSections = existingDesign === null
     ? missingPlannedChangeSections(changeSource)
     : missingCompatibleDesignSections(existingDesign.source);
-  if (missing.length > 0 || missingSections.length > 0) {
+  const taskIssues = tasks === null
+    ? []
+    : parseStructuredChangeTasks(tasks.source, {
+        changeId,
+        repositoryIds: metadata.repositories,
+      }).issues;
+  if (missing.length > 0 || missingSections.length > 0 || taskIssues.length > 0) {
     const planningFile = existingDesign === null ? "change.md" : "design.md";
     const details = [
       ...missing,
       ...missingSections.map((section) => `${planningFile}: ${section}`),
+      ...formatStructuredTaskIssues(taskIssues).map((detail) => `tasks.md: ${detail}`),
     ];
     throw new SddError(
-      `Planning is incomplete; missing ${details.join(" and ")}.`,
+      `Planning is incomplete: ${details.join("; ")}.`,
       { code: "INCOMPLETE_CHANGE", details },
     );
   }
@@ -77,17 +85,7 @@ async function assertPlanningComplete(changePath, workspaceRoot, metadata, chang
       { code: "REPOSITORY_REQUIRED" },
     );
   }
-}
-
-// Transition journals were part of the former crash-recovery protocol. New
-// transitions are one local atomic file replacement, so there is nothing to
-// recover. Keep these exports temporarily for callers during the simplification.
-export async function recoverPendingChangeTransition() {
-  return null;
-}
-
-export async function recoverPendingChangeTransitions() {
-  return [];
+  return { tasks, existingDesign };
 }
 
 export async function transitionChange(
@@ -182,9 +180,9 @@ export async function transitionChange(
       details: [`Current status: ${metadata.status}`],
     });
   }
-  if (from === "proposed" && to === "planned") {
-    await assertPlanningComplete(activePath, workspaceRoot, metadata, snapshot.source);
-  }
+  const planningSnapshots = from === "proposed" && to === "planned"
+    ? await assertPlanningComplete(activePath, workspaceRoot, metadata, snapshot.source, changeId)
+    : null;
 
   const selectedRepositories = await resolveRepositoriesForMetadata(
     workspaceRoot,
@@ -217,6 +215,31 @@ export async function transitionChange(
       workspaceRoot,
       snapshot,
     );
+    if (planningSnapshots) {
+      await assertRequiredChangeFileSnapshotCurrent(
+        activePath,
+        "tasks.md",
+        workspaceRoot,
+        planningSnapshots.tasks,
+      );
+      if (planningSnapshots.existingDesign) {
+        await assertRequiredChangeFileSnapshotCurrent(
+          activePath,
+          "design.md",
+          workspaceRoot,
+          planningSnapshots.existingDesign,
+        );
+      } else if (await readRequiredChangeFileSnapshot(
+        activePath,
+        "design.md",
+        workspaceRoot,
+      ) !== null) {
+        throw new SddError(
+          `Change design.md appeared after planning was validated: ${changeId}`,
+          { code: "CONCURRENT_CHANGE" },
+        );
+      }
+    }
     if (await pathExists(closedPath)) {
       throw new SddError(`Change moved to closed history: ${changeId}`, {
         code: "CONCURRENT_CHANGE",

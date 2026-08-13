@@ -102,7 +102,19 @@ async function completePlanning(changePath) {
       "",
       "## Resume Here",
       "",
-      "Ready to implement.",
+      "- Change: `2026-08-10-capture-intent`",
+      "- Current slice: S1",
+      "- Phase: planned",
+      "- Verification candidate: pending",
+      "- Review candidate: pending",
+      "- Epic-update candidate: pending",
+      "- Changelog candidate: pending",
+      "- Acceptance candidate: not required",
+      "- Open finding / blocker: none",
+      "",
+      "| Repository | Root | Baseline | Candidate kind | Candidate watermark |",
+      "|---|---|---|---|---|",
+      "| `sample-web` | `code/sample-web` | not captured | not started | not captured |",
       "",
       "## Requirement Slices",
       "",
@@ -117,6 +129,15 @@ async function completePlanning(changePath) {
       "- Outcome: Callers can observe the behavior through the public boundary.",
       "- Scenarios: `SAMPLE-E001/S1 R1-S1`",
       "- Dependencies: none",
+      "- Binding constraints: Preserve the public boundary.",
+      "- Verification intent: Exercise the public behavior.",
+      "- Manual acceptance: not required",
+      "",
+      "## Implementation Ledger",
+      "",
+      "| Slice | Repository | Status | Implementation Summary / Changed Surface | Updated |",
+      "|---|---|---|---|---|",
+      "| S1 | `sample-web` | not started | None yet. | 2026-08-10 |",
       "",
       "## Blockers / Open Questions",
       "",
@@ -198,6 +219,21 @@ test("planning completes the same Change before lifecycle work continues", async
   await writeFile(changeFilePath, proposedSource);
 
   await completePlanning(changePath);
+  const malformedTasks = await readFile(join(changePath, "tasks.md"), "utf8");
+  await writeFile(
+    join(changePath, "tasks.md"),
+    malformedTasks.replace("- Verification intent: Exercise the public behavior.\n", ""),
+  );
+  await assert.rejects(
+    () => transitionChange(root, "sample", result.changeId, {
+      from: "proposed",
+      to: "planned",
+    }),
+    (error) => error instanceof SddError
+      && error.code === "INCOMPLETE_CHANGE"
+      && error.details.some((detail) => detail.includes("INVALID_REQUIREMENT_SLICE")),
+  );
+  await writeFile(join(changePath, "tasks.md"), malformedTasks);
   assert.equal(await pathExists(join(changePath, "design.md")), false);
   await writeFile(join(changePath, "design.md"), "# Design: Incomplete\n");
   await assert.rejects(
@@ -208,6 +244,17 @@ test("planning completes the same Change before lifecycle work continues", async
     (error) => error instanceof SddError
       && error.code === "INCOMPLETE_CHANGE"
       && error.details.some((detail) => detail.startsWith("design.md:")),
+  );
+  await rm(join(changePath, "design.md"));
+  await assert.rejects(
+    () => transitionChange(root, "sample", result.changeId, {
+      from: "proposed",
+      to: "planned",
+      beforeCommit: async () => {
+        await writeFile(join(changePath, "design.md"), "# Design: Concurrent invalid design\n");
+      },
+    }),
+    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
   );
   await rm(join(changePath, "design.md"));
   await transitionChange(root, "sample", result.changeId, {

@@ -37,7 +37,7 @@ test("public guide documents progressive workspace-owned Changes and current-onl
   assert.match(html, /&lt;workspace&gt;\/\.agents\/skills\//);
   assert.match(html, /change\.md/);
   assert.match(html, /Planning expands <code>change\.md<\/code> and adds\s+<code>tasks\.md<\/code>/);
-  assert.match(html, /existing records may retain a compatible <code>design\.md<\/code>/);
+  assert.match(html, /Existing records may retain a compatible <code>design\.md<\/code>/);
   assert.match(html, /Pre-1\.0 installation and Change formats are unsupported alpha data/);
   assert.match(html, /<code>sdd update<\/code> reconciles current managed doctrine and skills/);
   assert.doesNotMatch(html, /change-briefs\//);
@@ -84,6 +84,15 @@ test("public guide presents Apply as one candidate-bound terminal workflow", asy
   assert.match(html, /implement inline or through one fresh-context worker in an\s+authorized dedicated isolated workspace/);
   assert.match(html, /inspects the complete\s+candidate itself/);
   assert.match(html, /fresh Requirement\/Scenario verification before recommending a separate\s+Review/);
+});
+
+test("public guide distinguishes structured Change validation from planning judgment", async () => {
+  const { html } = await readSite();
+
+  assert.match(html, /CLI validates slice fields, references,\s+dependencies, one current ledger row per slice/);
+  assert.match(html, /replaceable Resume checkpoint with repository\s+candidate envelopes/);
+  assert.match(html, /it does not judge whether the slices are good/);
+  assert.match(html, /structured Requirement slices, ledger\/checkpoint coherence/);
 });
 
 test("public guide has unique fragment targets and sequential navigable sections", async () => {

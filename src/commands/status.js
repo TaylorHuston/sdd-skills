@@ -9,7 +9,6 @@ import {
   readRequiredChangeFileSnapshot,
   relativeChangeStorePath,
 } from "../change-store.js";
-import { recoverPendingChangeTransitions } from "./change-transition.js";
 import { resolveRepositoryTargetsForStatus } from "../change-repositories.js";
 import {
   CHANGE_STATUSES,
@@ -32,7 +31,6 @@ import {
 } from "../workspace.js";
 import { SddError } from "../errors.js";
 import { isDirectory, pathExists } from "../fs.js";
-import { withWorkspaceMutationLock } from "../mutation.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -360,13 +358,10 @@ export async function getStatus(
   );
   assertValidConfig(config, "read SDD status");
   const configuredSpaceIds = new Set(Object.keys(config.ideas ?? {}));
-  const centralChanges = await withWorkspaceMutationLock(workspaceRoot, async () => {
-    await recoverPendingChangeTransitions(workspaceRoot);
-    return readCentralChanges(workspaceRoot, {
-      afterChangeFileRead,
-      afterClosedChangeInventory,
-      afterStoredChangesInventory,
-    });
+  const centralChanges = await readCentralChanges(workspaceRoot, {
+    afterChangeFileRead,
+    afterClosedChangeInventory,
+    afterStoredChangesInventory,
   });
   for (const change of centralChanges) {
     const metadata = {

@@ -2,10 +2,21 @@
 
 ## Resume Here
 
+Keep one replaceable checkpoint for the current delivery state. Candidate values are watermarks, not evidence logs: a working-tree watermark identifies HEAD plus the staged, unstaged, and relevant untracked snapshot; a committed candidate uses its resolved SHA. Replace stale values rather than appending history.
+
+- Change: `<change-id>`
 - Current slice: S1
-- Last completed: planning
-- Next action: implement or delegate S1
-- Blockers: none
+- Phase: planned
+- Verification candidate: pending
+- Review candidate: pending
+- Epic-update candidate: pending
+- Changelog candidate: pending
+- Acceptance candidate: not required
+- Open finding / blocker: none
+
+| Repository | Root | Baseline | Candidate kind | Candidate watermark |
+|---|---|---|---|---|
+| `<repository-id>` | `<resolved-root>` | not captured | not started | not captured |
 
 ## Requirement Slices
 
@@ -53,4 +64,4 @@ Keep one current-state row per slice. `/sdd-change` initializes the rows and `/s
 - Manual confirmation: pending / not applicable
 - Accepted gaps: none
 
-Add only the conditional coordination or evidence sections that this Change actually needs during delivery or review. Do not pre-create implementation steps, predicted file lists, engineering matrices, verification logs, or release questionnaires. The lightweight Implementation Ledger is a current-state resume aid, not a chronological diary or evidence store. Durable implementation and verification evidence belongs primarily in the affected Stories' `Implemented By` and `Verified By` maps and in `review.md` when review findings exist.
+Add only the conditional coordination or evidence sections that this Change actually needs during delivery or review. Do not pre-create implementation steps, predicted file lists, engineering matrices, verification logs, or release questionnaires. The checkpoint and lightweight Implementation Ledger are current-state resume aids, not a chronological diary or evidence store. Durable implementation and verification evidence belongs primarily in the affected Stories' `Implemented By` and `Verified By` maps and in `review.md` when review findings exist.
