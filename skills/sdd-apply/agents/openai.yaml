@@ -1,4 +1,4 @@
 interface:
   display_name: "SDD Apply"
   short_description: "Select and implement one Change slice"
-  default_prompt: "Use $sdd-apply to select the next ready Requirement slice from a planned or in-progress central Change, or the explicit slice I name. Tell me what behavioral outcome to implement, read applicable workspace and repository AGENTS.md guidance for how the repository expects work to proceed, check branch-policy compliance, and warn before implementation if the current branch is wrong. Apply only that slice and leave review, commits, Epic/changelog reconciliation, release, and closeout to their owning workflows."
+  default_prompt: "Use $sdd-apply to select and implement exactly one next-ready or explicitly named Requirement slice. Load governing repository guidance, establish the exact pre-slice baseline and dirty state, choose inline execution or one optional safely isolated fresh-context implementer, inspect the resulting candidate yourself, and run fresh Requirement/Scenario verification. Return complete, no-op, needs-user, blocked, or routed before review, Epic/changelog reconciliation, commits, release, or closeout."

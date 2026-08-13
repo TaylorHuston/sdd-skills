@@ -762,7 +762,7 @@ skil
                 <li>Refine outcomes and requirements</li>
                 <li>Compare viable technical paths and confirm consequential decisions</li>
                 <li>Route specialist guidance</li>
-                <li>Implement with evidence</li>
+                <li>Implement one slice against an exact baseline with fresh candidate-bound evidence</li>
                 <li>Review complete diffs through systematic search and validated findings</li>
                 <li>Audit broader codebase health</li>
               </ul>
@@ -790,7 +790,7 @@ skil
             <li><span>05</span><strong>Commit to a work
                 scope</strong><code>sdd validate &lt;space-id&gt; --change &lt;change-id&gt; --workspace &lt;path&gt;</code>
             </li>
-            <li><span>06</span><strong>Implement in verified slices</strong><code>/sdd-apply</code></li>
+            <li><span>06</span><strong>Implement one candidate-bound slice</strong><code>/sdd-apply</code></li>
             <li class="workflowMapMulti"><span>07</span><strong>Review independently</strong>
               <div><code>/sdd-review</code><code>/sdd-epic-verify</code></div>
             </li>
@@ -800,7 +800,10 @@ skil
           </ol>
           <p class="referenceNote"><code>/sdd-change</code> returns <code>complete</code>, <code>no-op</code>,
             <code>needs-user</code>, <code>blocked</code>, or <code>routed</code>, then returns control before Design or
-            Apply begins. The map shows recommended handoffs, not an automatic cascade.</p>
+            Apply begins. Apply uses the same public statuses after exactly one slice: it records the pre-slice
+            baseline for each affected repository, may implement inline or through one fresh-context worker in an
+            authorized dedicated isolated workspace, inspects the complete candidate itself, and requires fresh Requirement/Scenario verification before recommending a separate
+            Review. The map shows recommended handoffs, not an automatic cascade.</p>
         </section>
 
         <section class="referenceLifecycle" aria-labelledby="reference-lifecycle-title">

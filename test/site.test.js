@@ -75,6 +75,17 @@ test("public guide presents Change as composable vertical-slice planning", async
   assert.match(html, /recommended handoffs, not an automatic cascade/);
 });
 
+test("public guide presents Apply as one candidate-bound terminal workflow", async () => {
+  const { html } = await readSite();
+
+  assert.match(html, /Implement one candidate-bound slice/);
+  assert.match(html, /exact baseline with fresh candidate-bound evidence/);
+  assert.match(html, /Apply uses the same public statuses after exactly one slice/);
+  assert.match(html, /implement inline or through one fresh-context worker in an\s+authorized dedicated isolated workspace/);
+  assert.match(html, /inspects the complete\s+candidate itself/);
+  assert.match(html, /fresh Requirement\/Scenario verification before recommending a separate\s+Review/);
+});
+
 test("public guide has unique fragment targets and sequential navigable sections", async () => {
   const { html } = await readSite();
   const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);

@@ -317,30 +317,65 @@ test("requirement slices remain repository-qualified while review handoffs key r
   );
 });
 
-test("packaged Apply selects one behavioral slice and defers implementation method to repository guidance", async () => {
-  const applySkill = await readPackageFile("skills", "sdd-apply", "SKILL.md");
-  const applyAgent = await readPackageFile("skills", "sdd-apply", "agents", "openai.yaml");
+test("packaged Apply delivers one candidate-bound slice with optional isolated delegation", async () => {
+  const [applySkill, applyAgent, doctrine, readme] = await Promise.all([
+    readPackageFile("skills", "sdd-apply", "SKILL.md"),
+    readPackageFile("skills", "sdd-apply", "agents", "openai.yaml"),
+    readPackageFile("docs", "story-driven-development.md"),
+    readPackageFile("README.md"),
+  ]);
 
   assert.match(applySkill, /Default mode applies exactly one slice\./);
   assert.match(applySkill, /A bare `S#` argument is a slice ID/);
   assert.match(applySkill, /When no slice is supplied, choose the next ready slice/);
   assert.match(applySkill, /an `in progress` slice named by `Resume Here`[\s\S]*the first `ready` slice whose dependencies are complete/);
+  assert.match(applySkill, /## Build The Behavioral Brief/);
+  assert.match(applySkill, /Binding constraints:[\s\S]*Consumes:[\s\S]*Produces:[\s\S]*Verification intent:[\s\S]*Manual acceptance:/);
   assert.match(applySkill, /This brief states \*\*what must become true\*\*/);
   assert.match(applySkill, /Do not add predicted files, modules, classes, functions, implementation steps, test architecture, framework techniques, commit plans, or specialist workflows/);
   assert.match(applySkill, /read all applicable `AGENTS\.md` files from the workspace root through the selected repository/);
-  assert.match(applySkill, /Treat that guidance as the authority for:[\s\S]*development process;[\s\S]*required specialist skills and when to invoke them;[\s\S]*test or verification method/);
   assert.match(applySkill, /Do not scan for or select specialist skills merely because they exist/);
-  assert.match(applySkill, /Run `git branch --show-current` and `git status --short`/);
-  assert.match(applySkill, /If the branch does not comply, warn the user/);
+  assert.match(applySkill, /## Required Trigger Checks/);
+  assert.match(applySkill, /Active bug, failing test, or regression:[\s\S]*reproducible root cause/);
+  assert.match(applySkill, /preserve RED\/GREEN evidence where practical/);
+  assert.match(applySkill, /expand–migrate–contract slices/);
+  assert.match(applySkill, /Run `git branch --show-current`, `git rev-parse HEAD`, and `git status --short`/);
+  assert.match(applySkill, /Record one exact pre-slice diff envelope per repository the slice will mutate/);
+  assert.match(applySkill, /warn the user with the repository ID, current branch, required branch or branch class, and guidance path/);
+  assert.match(applySkill, /Return `needs-user` before implementation only when policy disallows work on the current branch/);
   assert.match(applySkill, /Do not create, switch, reset, merge, or rebase branches automatically/);
-  assert.match(applySkill, /Keep the selected slice's lightweight Implementation Ledger row current/);
-  assert.match(applySkill, /Keep exactly one current row per slice; replace stale text instead of appending history/);
-  assert.match(applySkill, /Do not record commands, verification evidence, commit hashes, review state, or predicted implementation steps/);
-  assert.match(applySkill, /Choose no additional slice during the same invocation/);
-  assert.match(applySkill, /does not itself own:[\s\S]*Epic or Story evidence reconciliation;[\s\S]*changelog or release communication;[\s\S]*commits, pushes, PRs, merges, or branch mutation;[\s\S]*independent review/);
-  assert.match(applyAgent, /select the next ready Requirement slice/);
+  assert.match(applySkill, /working-tree candidate[\s\S]*HEAD plus the staged, unstaged, and relevant untracked snapshot/);
+  assert.match(applySkill, /latest verification, review, Epic-update, changelog, and acceptance candidates/);
+  assert.match(applySkill, /Validate the stored Change ID, slice ID, each repository envelope and baseline, current candidates, phase/);
+  assert.match(applySkill, /## Choose Execution Strategy/);
+  assert.match(applySkill, /### Inline[\s\S]*### Delegated/);
+  assert.match(applySkill, /Use at most one fresh-context implementer/);
+  assert.match(applySkill, /dedicated isolated workspace with one-writer ownership/);
+  assert.match(applySkill, /when neither authorizes creating isolation, ask before creating it/);
+  assert.match(applySkill, /never remove them without explicit authorization/);
+  assert.match(applySkill, /Do not inherit the full conversation, permit recursive delegation, or run parallel writers against shared files or state/);
+  assert.match(applySkill, /Use one writer per working tree/);
+  assert.match(applySkill, /`complete`, `complete-with-concerns`, `needs-context`, or `blocked`/);
+  assert.match(applySkill, /Independently inspect the diff and evidence; never treat the worker report as proof/);
+  assert.match(applySkill, /Run fresh, proportional verification for the current candidate/);
+  assert.match(applySkill, /Any candidate change makes affected verification stale/);
+  assert.match(applySkill, /Manual acceptance remains separate/);
+  assert.match(applySkill, /Keep exactly one row per slice/);
+  assert.match(applySkill, /Choose no additional slice during this invocation/);
+  assert.match(applySkill, /## Terminal Handoffs/);
+  assert.match(applySkill, /stops after one slice/);
+  assert.match(applySkill, /carry the prior finding IDs, previously reviewed candidate watermark, current fix candidate watermark/);
+  assert.match(applySkill, /## Result Contract/);
+  assert.match(applySkill, /Return exactly one composable status/);
+  assert.match(applySkill, /`complete`[\s\S]*`no-op`[\s\S]*`needs-user`[\s\S]*`blocked`[\s\S]*`routed`/);
+  assert.match(applySkill, /artifacts read and written/);
+  assert.match(applySkill, /one diff envelope per affected repository/);
+  assert.match(applyAgent, /exactly one next-ready or explicitly named Requirement slice/);
+  assert.match(doctrine, /one fresh-context implementer/);
+  assert.match(doctrine, /requires fresh candidate-bound verification/);
+  assert.match(readme, /one optional fresh-context implementer in an authorized dedicated isolated workspace/);
 
-  assert.doesNotMatch(applySkill, /Persistence invariant|Commit cadence invariant|BDD\/TDD|Pattern Parity Matrix|Boundary Contract Matrix|Stateful Transition Matrix|Verification Ledger|--review-only|--no-delegate|--no-commit|transition <space-id> <change-id> --from in_progress --to in_review|sdd change close/);
+  assert.doesNotMatch(applySkill, /Persistence invariant|Commit cadence invariant|Pattern Parity Matrix|Boundary Contract Matrix|Stateful Transition Matrix|Verification Ledger|--review-only|--no-delegate|--no-commit|transition <space-id> <change-id> --from in_progress --to in_review|sdd change close/);
 });
 
 test("packaged Review completes every applicable gate after an early blocking finding", async () => {

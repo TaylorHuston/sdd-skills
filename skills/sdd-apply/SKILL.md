@@ -1,13 +1,11 @@
 ---
 name: sdd-apply
-description: Select and implement one behavioral Requirement slice from a planned or in-progress central SDD Change. By default choose the next ready slice; accept an explicit slice ID when supplied. Resolve the slice's repository, read applicable workspace and repository AGENTS.md guidance, check branch policy, and warn before implementation when the current branch does not comply. This skill defines what to implement, not how: repository guidance and explicitly chained specialist skills own implementation method, verification, Epic or changelog updates, commits, review, and release work.
+description: Select and implement exactly one next-ready or explicitly requested Requirement slice from a planned or in-progress central SDD Change. Resolve its repository, load governing guidance, check branch policy and dirty state, establish the exact pre-slice baseline, choose inline or optional isolated delegated execution, implement and freshly verify only that slice, inspect the resulting candidate, and update lightweight resume state. Return before independent review, Epic reconciliation, changelog, commits, PR, release, or closeout.
 ---
 
 # SDD Apply
 
-Select one behavioral slice from a central Change and make its implementation target unambiguous. Then implement that slice under the applicable workspace and repository guidance.
-
-`/sdd-apply` owns **what comes next**. It does not impose a universal development method.
+Select and implement one independently green behavioral Requirement slice. `/sdd-apply` owns the bounded slice-delivery contract; repository guidance and applicable specialist skills own implementation technique.
 
 ## Inputs
 
@@ -30,18 +28,20 @@ Default mode applies exactly one slice. Do not interpret an ordinary invocation 
 4. Resolve the workspace, Space, and target repositories with `sdd context <relevant-path> --json`.
 5. Read the returned `workflowPath`, central `change.md`, `tasks.md`, and an existing `design.md` only when that Change already has one.
 
-The Change must be `planned` or `in_progress`. Route `proposed` to `/sdd-change`. Treat `in_review` as review-owned unless another workflow has explicitly returned it to implementation.
+The Change must be `planned` or `in_progress`. Return `routed` to `/sdd-change` for `proposed`. Treat `in_review` as review-owned unless another workflow has explicitly returned it to implementation.
 
 Use repository IDs from `change.md`; never create or select a repository-local Change copy.
 
 ## Select The Slice
 
-Prefer the new `## Requirement Slices` shape. For compatible legacy task files without Requirement slices, treat one coherent unchecked checklist item as the slice and warn that the Change still uses the legacy shape.
+Prefer the `## Requirement Slices` shape. For compatible legacy task files without Requirement slices, treat one coherent unchecked checklist item as the slice and warn that the Change still uses the legacy shape.
 
 When a slice ID is explicit:
 
 - require that exact slice to exist;
-- report `done`, `blocked`, or `deferred` status instead of silently selecting another;
+- return `no-op` when it is already done;
+- return `blocked` for an explicit blocked slice;
+- return `needs-user` for an explicit deferred slice when the user must confirm reactivation or sequencing;
 - select it only when its dependencies are complete or the user explicitly resolves the dependency conflict.
 
 Otherwise choose in this order:
@@ -49,15 +49,15 @@ Otherwise choose in this order:
 1. an `in progress` slice named by `Resume Here`;
 2. a `ready` slice named by `Resume Here`;
 3. the first `ready` slice whose dependencies are complete;
-4. ask the user when several candidates require a product or sequencing choice that the artifacts do not settle.
+4. return `needs-user` when several candidates require a product or sequencing choice that the artifacts do not settle.
 
 Do not choose `done`, `blocked`, or `deferred` work. Ordering in `tasks.md` is advisory, but dependency and status truth is not.
 
-If no actionable slice remains, report that fact. Do not transition to `in_review`, start review, close the Change, or invent more work.
+If no actionable slice remains, return `no-op`. Do not transition to `in_review`, start review, close the Change, or invent more work.
 
-## Build The Implementation Brief
+## Build The Behavioral Brief
 
-Read enough authoritative repository-local Epic truth and Change context to make the selected slice independently understandable. Present a concise brief before editing:
+Read enough authoritative repository-local Epic truth and Change context to make the selected slice independently understandable. Present this concise brief before editing:
 
 ```markdown
 ## Selected Slice
@@ -70,14 +70,18 @@ Read enough authoritative repository-local Epic truth and Change context to make
 - Story changes: <create/update references>
 - Scenarios: <authoritative IDs and relevant behavior>
 - Dependencies: <satisfied dependencies or none>
-- Constraints: <only accepted Change/ADR constraints that bound the outcome>
+- Binding constraints: <accepted Change/ADR constraints or none>
+- Consumes: <applicable interface contracts or none>
+- Produces: <applicable interface contracts or none>
+- Verification intent: <focused Scenario-based proof>
+- Manual acceptance: <required observation or not required>
 - Guidance: <applicable AGENTS.md paths, most specific last>
 - Branch: <current branch and policy result>
 ```
 
 This brief states **what must become true**. Do not add predicted files, modules, classes, functions, implementation steps, test architecture, framework techniques, commit plans, or specialist workflows that are not required by governing guidance.
 
-If a cited Requirement or Scenario is missing or contradictory, stop and route the artifact gap to `/sdd-change` or the appropriate artifact-owning skill. Do not substitute an implementation guess for missing behavioral truth.
+If a cited Requirement, Scenario, binding constraint, or relied-upon `Consumes`/`Produces` contract is missing or contradictory, return `routed` to `/sdd-change` or the appropriate artifact owner. Do not substitute an implementation guess for missing behavioral truth.
 
 ## Load Governing Guidance
 
@@ -89,83 +93,131 @@ Treat that guidance as the authority for:
 - required specialist skills and when to invoke them;
 - test or verification method;
 - documentation and generated-artifact updates;
-- Epic, changelog, or other composed workflow handoffs;
-- delegation policy;
+- delegation and isolation policy;
 - commit and branch policy.
 
-Do not independently recreate those policies in this skill. Do not scan for or select specialist skills merely because they exist. Invoke another skill when applicable guidance or the user explicitly routes the selected slice through it.
+Do not independently recreate those policies in this skill. Do not scan for or select specialist skills merely because they exist. Invoke another skill when applicable guidance, an observable trigger, or the user routes the selected slice through it.
 
-When guidance does not prescribe a process, use the coding agent's normal project-aware implementation behavior. Missing optional methodology is not a reason for `/sdd-apply` to invent one.
+When guidance does not prescribe a process, use normal project-aware implementation behavior. Missing optional methodology is not a reason to invent one.
 
-## Check Branch Policy
+## Required Trigger Checks
+
+Use safeguards only when their observable trigger is present:
+
+- **Active bug, failing test, or regression:** require a reproducible root cause through the applicable diagnosis workflow before a speculative fix. Establish a failing regression Scenario or test where practical. Return `routed` when diagnosis owns the next work.
+- **Risk, repository policy, or specialist method requires TDD:** preserve RED/GREEN evidence where practical. Apply does not impose universal TDD.
+- **Wide mechanical transition:** when no independently green vertical slice is possible, require explicit expand–migrate–contract slices rather than hiding a broad migration inside one slice.
+- **Behavior, scope, ownership, or acceptance changes:** return `routed` to `/sdd-change`.
+- **A consequential choice between viable technical approaches:** return `routed` to `/sdd-adr`.
+
+Repeated failed hypotheses are not permission to accumulate speculative edits. Return `needs-user`, `blocked`, or `routed` with the evidence gathered.
+
+## Preflight Branch, Dirty State, And Baseline
 
 Before changing repository files:
 
-1. Read the selected repository's branch policy from applicable guidance.
-2. Run `git branch --show-current` and `git status --short` in that repository.
-3. Compare the current branch with the policy.
+1. Read branch policy from applicable guidance.
+2. Run `git branch --show-current`, `git rev-parse HEAD`, and `git status --short` in the selected repository.
+3. Compare the current branch with policy.
+4. Inventory staged, unstaged, and relevant untracked state. Preserve unrelated user work.
+5. Record one exact pre-slice diff envelope per repository the slice will mutate: stable repository ID/root, baseline commit SHA, candidate kind, and staged, unstaged, and relevant untracked state.
 
-If the branch does not comply, warn the user with:
+If the branch does not comply, warn the user with the repository ID, current branch, required branch or branch class, and guidance path. Return `needs-user` before implementation only when policy disallows work on the current branch or branch resolution requires user authority. Do not create, switch, reset, merge, or rebase branches automatically. If policy is absent or ambiguous, report that compliance could not be confirmed rather than inventing a branch model.
 
-- repository ID;
-- current branch;
-- policy-required branch or branch class;
-- the applicable guidance path.
+Stop with `blocked` when overlapping dirty work makes safe implementation or attribution uncertain. A dirty tree is otherwise a valid candidate; do not discard, overwrite, or silently absorb pre-existing edits.
 
-Do not create, switch, reset, merge, or rebase branches automatically. Pause before implementation when policy disallows the current branch. If policy is absent or ambiguous, say that compliance could not be confirmed rather than inventing a branch model.
+Record a current checkpoint under `Resume Here` with the selected Change and slice, one repository envelope per affected repository, current phase, latest verification, review, Epic-update, changelog, and acceptance candidates, and open finding or blocker. For a working-tree candidate, its watermark identifies HEAD plus the staged, unstaged, and relevant untracked snapshot; for a committed candidate, record the resolved candidate SHA. This is replaceable resumption state, not a chronological command or evidence log.
 
-Always preserve unrelated dirty work. Stop when it overlaps the selected slice enough to make safe implementation uncertain.
+On resume, reload canonical artifacts and repository state. Validate the stored Change ID, slice ID, each repository envelope and baseline, current candidates, phase, latest verification, review, Epic-update, changelog, and acceptance candidates, and open finding or blocker against Git and current artifacts. Never trust remembered or stale state. Resume at the first stale, blocked, or incomplete gate. If an exact pre-slice baseline for already-started work cannot be recovered unambiguously, return `needs-user` or `blocked` instead of guessing.
 
-## Apply The Selected Slice
+## Choose Execution Strategy
 
-After selection and branch preflight:
+Choose one proportional strategy without changing Apply's public result contract:
 
-1. If the Change is `planned`, transition it once to `in_progress` with:
+### Inline
+
+The primary agent implements the slice directly. Prefer inline execution when the slice is small, context-sensitive, already in a safely dirty working tree, or delegation adds no value.
+
+### Delegated
+
+Use at most one fresh-context implementer when the harness supports it, repository policy permits it, the slice is safely bounded, and a dedicated isolated workspace with one-writer ownership is available. Detect existing harness or Git isolation first. Follow recorded user preference or repository policy; when neither authorizes creating isolation, ask before creating it. Prefer harness-native isolation and use a Git worktree only as an authorized fallback. Preserve delegated workspaces needed for review or PR feedback, and never remove them without explicit authorization.
+
+Delegation is optional and harness-agnostic. Supply only:
+
+- the behavioral brief;
+- binding constraints and relevant `Consumes`/`Produces` contracts;
+- repository guidance and working directory;
+- baseline and permitted candidate surface;
+- required verification and report contract;
+- explicit stop conditions.
+
+Do not inherit the full conversation, permit recursive delegation, or run parallel writers against shared files or state. Parallelize only independent read-only investigation or mutations isolated in separate workspaces. Use one writer per working tree.
+
+Require the implementer to return `complete`, `complete-with-concerns`, `needs-context`, or `blocked`, plus actual changed surfaces and candidate-bound verification evidence. These are worker statuses, not Apply's public result. The primary agent remains responsible for scope, state, integration, candidate inspection, and final judgment. Independently inspect the diff and evidence; never treat the worker report as proof.
+
+Fall back cleanly to inline execution when delegation is unavailable, unsafe, or unnecessary.
+
+## Apply And Verify The Selected Slice
+
+After preflight:
+
+1. If the Change is `planned`, transition it once to `in_progress`:
 
    ```bash
    sdd change transition <space-id> <change-id> --from planned --to in_progress --workspace <workspace-root>
    ```
 
-2. Mark only the selected slice `in progress` and update `Resume Here` with the selected slice and immediate behavioral objective.
-3. Implement the selected slice according to the loaded guidance. The repository's workflow—not this skill—decides how to design, test, delegate, document, or checkpoint the work.
-4. Keep work inside the selected outcome, Requirements, Scenarios, dependencies, and accepted constraints.
-5. If implementation reveals a genuine behavior, scope, repository-ownership, or unresolved technical-decision change, stop and route the same Change back to `/sdd-change` or `/sdd-adr` as appropriate.
-6. Keep the selected slice's lightweight Implementation Ledger row current:
+2. Mark only the selected slice `in progress`; update `Resume Here` with its immediate behavioral objective and current checkpoint.
+3. Implement only that slice using the selected execution strategy and governing repository process.
+4. Keep work inside its outcome, Requirements, Scenarios, dependencies, binding constraints, and interface contracts.
+5. Inspect the complete resulting candidate against the pre-slice baseline, including staged, unstaged, and relevant untracked changes. Confirm every changed surface is attributable to the slice or identified as pre-existing.
+6. Run fresh, proportional verification for the current candidate. Cover the slice's referenced Requirements and Scenarios, its verification intent, affected interface contracts, and repository-required checks. Record the command or observation, result, exact candidate watermark, coverage, and whether evidence is automated or manual in the result or owning evidence artifact—not in the Implementation Ledger.
+7. Any candidate change makes affected verification stale. Rerun proportionate proof before claiming completion. Manual acceptance remains separate and returns `needs-user` when required now; never present automated verification as human acceptance.
+8. Mark the slice `done` only when its current candidate has passing required automated verification and no unresolved implementation blocker. If verification fails or implementation cannot safely proceed, leave it `in progress` or mark it `blocked` with one concise reason.
+9. Keep the selected slice's lightweight Implementation Ledger row current:
    - `in progress`: summarize only the actual implementation surface discovered so far;
-   - `done`: summarize the observable result and important changed surface in one concise current-state entry;
+   - `done`: summarize the observable result and important changed surface in one concise entry;
    - `blocked`: state the implementation state reached and one concise blocker.
-   Update the row's date whenever its state or summary changes. Keep exactly one current row per slice; replace stale text instead of appending history. Do not record commands, verification evidence, commit hashes, review state, or predicted implementation steps.
-7. When the repository-defined workflow says the slice is complete, mark it `done`. When it cannot proceed, mark it `blocked` and record one concise reason.
-8. Refresh `Resume Here`, `Remaining slices`, and blockers. Choose no additional slice during the same invocation.
+   Replace stale text and update the date. Keep exactly one row per slice. Do not record commands, detailed verification evidence, commit hashes, review state, or predicted implementation steps.
+10. Refresh `Resume Here`, `Remaining slices`, and blockers. Record the latest candidate, verification, and review watermarks plus any open finding or blocker in the replaceable current checkpoint. Choose no additional slice during this invocation.
 
-If implementation naturally shows that a slice should be split or merged without changing accepted behavior, update the slice boundaries and references concisely. Route changed acceptance or scope back to `/sdd-change`.
+If implementation shows that a slice should be split or merged without changing accepted behavior, update the boundaries and references concisely. Route changed acceptance or scope back to `/sdd-change`.
 
-## Composable Handoffs
+## Terminal Handoffs
 
-`/sdd-apply` does not itself own:
+`/sdd-apply` stops after one slice. It does not own or automatically cross into:
 
-- Epic or Story evidence reconciliation;
+- independent review or remediation review loops;
+- Epic or Story truth reconciliation;
 - changelog or release communication;
 - commits, pushes, PRs, merges, or branch mutation;
-- independent review or remediation review loops;
 - release or deployment;
 - Change transition to `in_review` or closeout.
 
-When applicable repository guidance requires one of these, invoke the owning skill if available and authorized, or report the exact pending handoff. Do not absorb the other workflow's procedure into Apply.
+A request to implement another slice is a new `/sdd-apply` invocation. Implemented work normally recommends separately invoked `/sdd-review`. When Apply addresses prior review findings, carry the prior finding IDs, previously reviewed candidate watermark, current fix candidate watermark, and focused fix verification into a separately invoked scoped re-review; do not silently substitute that scoped pass for a separately requested full review. Changed behavior routes to Change, and durable technical tradeoffs route to ADR. Report exact pending handoffs without executing them implicitly.
 
-A request to implement another slice is a new `/sdd-apply` invocation. A request to review implemented work routes to `/sdd-review`. A planning discovery routes to `/sdd-change`; a branching technical decision routes to `/sdd-adr`.
+## Result Contract
 
-## Report
+Return exactly one composable status:
 
-Report:
+- `complete` — the selected slice is `done`, the current candidate was independently inspected, and required automated verification is fresh; report pending manual acceptance and recommended Review separately;
+- `no-op` — the explicit slice was already done or no actionable slice remains, and no mutation was needed;
+- `needs-user` — slice choice, deferred-slice reactivation, branch or isolation resolution, overlapping-state disposition, required context, authorization, or manual acceptance requires the user;
+- `blocked` — safe implementation or required verification cannot complete with current state or evidence;
+- `routed` — diagnosis, Change, ADR, Design, or another owner must act before implementation can continue.
+
+Also report:
 
 - selected Change and slice;
-- repository and branch-policy result;
+- artifacts read and written;
+- one diff envelope per affected repository with exact baseline, candidate kind and watermark, staged/unstaged/relevant-untracked state when applicable, and branch-policy result;
+- execution strategy: inline or delegated, including isolation mode when delegated;
 - behavioral outcome implemented or attempted;
-- slice status: `done`, `blocked`, `deferred`, or still `in progress`;
-- concise changed-surface summary matching the selected slice's current Implementation Ledger row;
+- slice state: `done`, `blocked`, `deferred`, or `in progress`;
+- concise changed-surface summary matching the current Implementation Ledger row;
+- verification observations with Requirement/Scenario coverage and candidate watermark;
+- manual acceptance state;
 - remaining slices and next ready slice, if determinable;
-- composed handoffs required by repository guidance;
-- blockers or scope discoveries.
+- blockers, concerns, scope discoveries, and recommended next workflow.
 
-Do not claim the whole Change is implementation-complete merely because one slice is done.
+Do not claim the whole Change is implementation-complete merely because one slice is done. Verification and worker evidence are candidate-bound; identify stale evidence rather than carrying it forward.
