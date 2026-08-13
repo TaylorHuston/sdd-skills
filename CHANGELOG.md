@@ -17,10 +17,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- **Breaking:** `/sdd-apply` now defaults to one next-ready Requirement slice and accepts an explicit slice ID. It states what behavior to implement, reads workspace/repository `AGENTS.md` for implementation and specialist-skill policy, warns on branch-policy mismatch, and leaves Epic/changelog reconciliation, commits, independent review, release, and closeout to composed workflows. The previous full-Change orchestration and Apply-owned support bundle were removed; autonomous all-slices execution is deferred to a future explicit mode.
 - **Breaking:** `/sdd-change` is now one adaptive workflow: it creates or resumes a proposed Change, captures intent, and asks before continuing into technical planning. Proposed Changes require only `change.md`; planning progressively expands that record and adds `tasks.md`. Future workflows do not create `design.md`; existing records remain compatible.
-- Future `tasks.md` records are concise adaptive Requirement-slice queues: each slice identifies new or revised Requirements, Stories to create or update, authoritative Scenario references, and the observable outcome without prescribing implementation mechanics.
+- Future `tasks.md` records are concise adaptive Requirement-slice queues: each slice identifies new or revised Requirements, Stories to create or update, authoritative Scenario references, and the observable outcome without prescribing implementation mechanics. A lightweight current-state Implementation Ledger keeps one row per slice and is maintained by `/sdd-apply` without becoming a command, verification, commit, or review log.
 - `/sdd-change` now composes with `/sdd-adr` whenever planning reveals two or more meaningfully different viable technical approaches; `/sdd-adr` owns option comparison, recommendation, user decision, and ADR-threshold assessment before Change planning resumes.
-- `/sdd-explore` now serves any substantial discussion the user wants preserved beyond chat, chooses the record location by authority and local guidance, defaults unsettled idea-owned discussions to `<idea>/explorations/`, and may hand mature outcomes to `/sdd-prd`, `/sdd-change`, `/sdd-adr`, or another owning workflow.
+- `/sdd-explore` now serves any substantial discussion the user wants preserved beyond chat, uses the shared context capability before substantive claims, defaults idea-owned records to `<idea>/explorations/` and workspace-owned records to `<workspace>/.sdd/explorations/`, returns an explicit composable result, and stops at a routed handoff instead of automatically crossing into PRD, Change, ADR, or another workflow.
 - **Breaking:** `sdd change create` now creates only the proposed `change.md` record and allows repository ownership to remain empty until planning settles the target set.
 - **Breaking:** Change status and ownership metadata moved from `tasks.md` to `change.md`; status, validation, `sdd change transition`, and `sdd change close` read the progressive record, and lifecycle mutations now use proportional workspace-locked local filesystem operations instead of bespoke crash-recovery journals.
 - `sdd validate` now applies lifecycle-aware Change requirements: proposed Changes need only `change.md`, while later states require repository ownership, technical-planning sections in `change.md`, and `tasks.md`. Existing `design.md` files remain accepted and validated.
@@ -32,6 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Removed
 
+- Removed `/sdd-apply`'s universal TDD/subagent methodology, risk and evidence matrices, verification ledger, chronological implementation diary, phase-commit policy, self-review loop, changelog/Epic templates, and closeout procedure.
 - Removed separate Change Brief storage, `--brief`/`--plan`/`--replan` modes, and the brief/proposal templates.
 - Removed Change transition and close transaction-journal machinery that was disproportionate for the local pre-1.0 workflow.
 - Removed programmatic migration of pre-1.0 home installations, configuration schemas, and legacy Change locations, including `sdd setup --from-user` and the update migration/recovery subsystem. Alpha data must be recreated or converted manually.

@@ -90,12 +90,15 @@ test("packaged change workflow progresses one central intent record into plannin
   assert.match(changeSkill, /name every Story to create or update/);
   assert.match(changeSkill, /cite authoritative Scenario IDs/);
   assert.match(changeSkill, /what must be implemented, never how to implement it/);
+  assert.match(changeSkill, /initialize one lightweight Implementation Ledger row per slice/);
+  assert.match(changeSkill, /current-state resume aid that `\/sdd-apply` maintains/);
   assert.match(changeSkill, /resequence, split, or merge slices/);
   assert.doesNotMatch(changeSkill, /--brief|--plan|--replan|proposal\.md|change-briefs/);
   assert.match(changeTemplate, /status: proposed/);
   assert.match(changeTemplate, /space: <space-id>/);
   assert.match(changeTemplate, /repositories: \[\]/);
   assert.match(tasksTemplate, /^## Requirement Slices$/m);
+  assert.match(tasksTemplate, /^## Implementation Ledger$/m);
   assert.match(planningSections, /## Technical Decision Handoffs/);
   assert.match(
     planningSections,
@@ -163,7 +166,7 @@ test("packaged Explore preserves generalized durable discussions and routes matu
   assert.match(exploreSkill, /## Choose The Record Destination/);
   assert.match(
     exploreSkill,
-    /Established topic home:[\s\S]*Idea-owned default:[\s\S]*<idea>\/explorations\/yyyy-mm-dd-<topic>\.md/,
+    /Established topic home:[\s\S]*Idea-owned default:[\s\S]*<idea>\/explorations\/yyyy-mm-dd-<topic>\.md[\s\S]*Workspace-owned default:[\s\S]*<workspace>\/\.sdd\/explorations\/yyyy-mm-dd-<topic>\.md/,
   );
   assert.match(
     exploreSkill,
@@ -173,6 +176,10 @@ test("packaged Explore preserves generalized durable discussions and routes matu
     exploreSkill,
     /An exploration may remain useful indefinitely, end with no action, or produce one or more stronger artifacts/,
   );
+  assert.match(exploreSkill, /A mature outcome is a route or recommended-next edge, not an automatic cascade/);
+  assert.match(exploreSkill, /return `routed`, name the owning skill and context to pass, and stop before that skill's mutation boundary/);
+  assert.match(exploreSkill, /`complete`[\s\S]*`no-op`[\s\S]*`needs-user`[\s\S]*`blocked`[\s\S]*`routed`/);
+  assert.match(exploreSkill, /A route is a terminal handoff for this invocation/);
   assert.match(exploreSkill, /\| A bounded desired outcome, including a possible future feature \| `\/sdd-change` \|/);
   assert.match(exploreSkill, /\| A durable architecture,[^\n]+\| `\/sdd-adr` \|/);
   assert.match(
@@ -181,8 +188,9 @@ test("packaged Explore preserves generalized durable discussions and routes matu
   );
   assert.doesNotMatch(exploreSkill, /<planning-root>\/exploration\/yyyy-mm-dd/);
   assert.match(exploreAgent, /Keep a durable discussion record/);
-  assert.match(readme, /owning idea's `explorations\/` directory/);
-  assert.match(doctrine, /Preserve any substantial discussion the user wants to survive chat/);
+  assert.match(readme, /workspace-owned discussions without one idea default to `\.sdd\/explorations\/`/);
+  assert.match(readme, /returns control before that workflow's mutation boundary/);
+  assert.match(doctrine, /workspace `\.sdd\/explorations\/` when no one idea owns it/);
 });
 
 test("packaged workflows coordinate one central Change across every target repository", async () => {
@@ -216,7 +224,7 @@ test("packaged workflows coordinate one central Change across every target repos
   );
   assert.match(
     apply,
-    /stable repository IDs in the central `change\.md` frontmatter as the target set[\s\S]*transition <space-id> <change-id> --from in_progress --to in_review` once, with no `--repo`/,
+    /Use repository IDs from `change\.md`; never create or select a repository-local Change copy\.[\s\S]*sdd change transition <space-id> <change-id> --from planned --to in_progress/,
   );
   assert.match(
     review,
@@ -262,81 +270,30 @@ test("requirement slices remain repository-qualified while review handoffs key r
   );
 });
 
-test("packaged Apply continues after a verified slice and commits the phase before later work", async () => {
+test("packaged Apply selects one behavioral slice and defers implementation method to repository guidance", async () => {
   const applySkill = await readPackageFile("skills", "sdd-apply", "SKILL.md");
+  const applyAgent = await readPackageFile("skills", "sdd-apply", "agents", "openai.yaml");
 
-  assertContractClauses("Apply outcome contract", applySkill, [
-    [
-      "treat full mode as an outcome request rather than a one-slice request",
-      /Persistence invariant: a default or explicit full-mode invocation is an outcome request, not permission to complete only one slice\./,
-    ],
-    [
-      "continue implementation, verification, reconciliation, and safe remediation through the review handoff",
-      /Continue implementing, verifying, reconciling, and safely remediating until every implementation-completion criterion is satisfied and the Change has transitioned to `in_review`, ready for independent `\/sdd-review`\./,
-    ],
-    [
-      "reject ordinary phase completion and fixable failures as terminal conditions",
-      /A completed phase, passing focused test, subagent handoff, commentary update, or ordinary fixable failure is not a terminal condition\./,
-    ],
-    [
-      "commit each completed verified reconciled phase in every affected target before the next one",
-      /in default\/full mode, make a local commit in each affected target repository after every completed, verified, artifact-reconciled Requirement\/Scenario phase before starting the next phase\./,
-    ],
-    [
-      "allow only explicit opt-outs or isolation constraints to defer that phase commit",
-      /`--no-commit`, an explicit user prohibition, repository policy, or an inability to isolate the intended files are the only reasons to keep a completed phase as a commit candidate\./,
-    ],
-  ]);
+  assert.match(applySkill, /Default mode applies exactly one slice\./);
+  assert.match(applySkill, /A bare `S#` argument is a slice ID/);
+  assert.match(applySkill, /When no slice is supplied, choose the next ready slice/);
+  assert.match(applySkill, /an `in progress` slice named by `Resume Here`[\s\S]*the first `ready` slice whose dependencies are complete/);
+  assert.match(applySkill, /This brief states \*\*what must become true\*\*/);
+  assert.match(applySkill, /Do not add predicted files, modules, classes, functions, implementation steps, test architecture, framework techniques, commit plans, or specialist workflows/);
+  assert.match(applySkill, /read all applicable `AGENTS\.md` files from the workspace root through the selected repository/);
+  assert.match(applySkill, /Treat that guidance as the authority for:[\s\S]*development process;[\s\S]*required specialist skills and when to invoke them;[\s\S]*test or verification method/);
+  assert.match(applySkill, /Do not scan for or select specialist skills merely because they exist/);
+  assert.match(applySkill, /Run `git branch --show-current` and `git status --short`/);
+  assert.match(applySkill, /If the branch does not comply, warn the user/);
+  assert.match(applySkill, /Do not create, switch, reset, merge, or rebase branches automatically/);
+  assert.match(applySkill, /Keep the selected slice's lightweight Implementation Ledger row current/);
+  assert.match(applySkill, /Keep exactly one current row per slice; replace stale text instead of appending history/);
+  assert.match(applySkill, /Do not record commands, verification evidence, commit hashes, review state, or predicted implementation steps/);
+  assert.match(applySkill, /Choose no additional slice during the same invocation/);
+  assert.match(applySkill, /does not itself own:[\s\S]*Epic or Story evidence reconciliation;[\s\S]*changelog or release communication;[\s\S]*commits, pushes, PRs, merges, or branch mutation;[\s\S]*independent review/);
+  assert.match(applyAgent, /select the next ready Requirement slice/);
 
-  const phaseBoundary = markdownSection(applySkill, "Phase Boundary");
-  assertContractClauses("Apply phase boundary", phaseBoundary, [
-    [
-      "define a phase as completed behavior plus proof and artifact reconciliation",
-      /A phase is the smallest committable slice that completes one Requirement, or a coherent subset of that Requirement's Scenarios, with verification evidence and artifact updates\./,
-    ],
-    [
-      "finish every participating repository commit and central ledger update before selecting later work",
-      /Finish each phase with its local commit in every participating repository and an updated central ledger before selecting or delegating the next phase\./,
-    ],
-  ]);
-
-  const applyLoop = markdownSection(applySkill, "Apply Loop");
-  assertContractClauses("Apply loop", applyLoop, [
-    [
-      "keep the central Change in progress while any target has unfinished handoff work",
-      /Keep `status: in_progress` while any target repository still has implementation, verification, remediation, review-handoff preparation, or unresolved blockers\./,
-    ],
-    [
-      "commit an authorized verified commit-shaped slice in every affected target",
-      /Commit locally in each affected target repository when authorized, the slice is verified, and its changes are commit-shaped\./,
-    ],
-    [
-      "loop across the central target set after each completed phase",
-      /In default\/full mode, loop back to the next pending Requirement or Scenario anywhere in the central target set after every completed phase\./,
-    ],
-    [
-      "continue until every target is independently review-ready and the central transition is complete",
-      /Continue until every target repository is ready for independent `\/sdd-review` and the central Change has transitioned once, or a genuine stop condition is hit\./,
-    ],
-  ]);
-
-  const riskClosure = await readPackageFile(
-    "skills",
-    "sdd-apply",
-    "references",
-    "risk-closure.md",
-  );
-  const phaseCommit = markdownSection(riskClosure, "Phase Commits");
-  assertContractClauses("Risk-closure phase commit", phaseCommit, [
-    [
-      "falsify exact evidence and reconcile gaps before committing",
-      /falsify the phase's important evidence claims against their exact tests, assertions, routes, or observations[\s\S]*prove each applicable risk row or record its explicit gap[\s\S]*update repository-local Epic truth and supporting docs plus the central ledgers and current-state claims/,
-    ],
-    [
-      "commit the coherent green slice before later work",
-      /commit the coherent green slice in every participating repository before beginning the next phase/,
-    ],
-  ]);
+  assert.doesNotMatch(applySkill, /Persistence invariant|Commit cadence invariant|BDD\/TDD|Pattern Parity Matrix|Boundary Contract Matrix|Stateful Transition Matrix|Verification Ledger|--review-only|--no-delegate|--no-commit|transition <space-id> <change-id> --from in_progress --to in_review|sdd change close/);
 });
 
 test("packaged Review completes every applicable gate after an early blocking finding", async () => {
@@ -499,25 +456,8 @@ test("packaged UI workflows reject source-only confidence without rendered curre
   ]);
 
   const applySkill = await readPackageFile("skills", "sdd-apply", "SKILL.md");
-  const applyLoop = markdownSection(applySkill, "Apply Loop");
-  assertContractClauses("Apply rendered verification", applyLoop, [
-    [
-      "require rendered verification before review handoff",
-      /For every UI-bearing slice, rendered UI verification is required before review handoff\./,
-    ],
-    [
-      "render current source and inspect interactions, captures, console, and network",
-      /Start the representative runtime, open the affected surfaces, exercise changed interactions, capture and directly inspect the result, and inspect relevant console and network failures\./,
-    ],
-    [
-      "reject source, build, non-visual tests, and uninspected screenshots as rendered proof",
-      /A green build, passing non-visual tests, or generated-but-uninspected screenshots are not rendered evidence\./,
-    ],
-    [
-      "record unavailable rendering as blocked verification or an explicit accepted gap",
-      /if no available path can render a required surface, record the exact blocked verification or accepted gap\./,
-    ],
-  ]);
+  assert.match(applySkill, /Treat that guidance as the authority for:[\s\S]*test or verification method/);
+  assert.doesNotMatch(applySkill, /rendered UI verification is required|Visual Verification Matrix/);
 
   const reviewSkill = await readPackageFile("skills", "sdd-review", "SKILL.md");
   const reviewGates = markdownSection(reviewSkill, "Review Gates");
@@ -556,56 +496,9 @@ test("packaged UI workflows reject source-only confidence without rendered curre
 });
 
 test("packaged evidence closure keeps high-risk Scenarios unverified when only an aggregate gate passes", async () => {
-  const riskClosure = await readPackageFile(
-    "skills",
-    "sdd-apply",
-    "references",
-    "risk-closure.md",
-  );
-  const evidenceIntegrity = markdownSection(riskClosure, "Evidence Claim Integrity");
-  assertContractClauses("Evidence claim integrity", evidenceIntegrity, [
-    [
-      "treat completion and verification statements as falsifiable claims",
-      /Treat every completion checkbox, `Verified By` row, E2E claim, security claim, and review-handoff statement as a falsifiable claim\./,
-    ],
-    [
-      "require an exact named proof and its meaningful assertion or observation",
-      /For automated evidence, name `path#exact test title or stable test anchor` and identify the assertion, route, selector, injected failure, or observation that matters\./,
-    ],
-    [
-      "forbid Scenario aggregation unless the named proof exercises each Scenario",
-      /Do not aggregate several Scenarios into one evidence row unless the named test or parameterized case explicitly exercises each one\./,
-    ],
-    [
-      "limit a broad green command to behavior it directly asserted",
-      /A file path, test count, broad green command, manual walkthrough, or reviewer statement is evidence only for what was directly inspected or asserted\./,
-    ],
-    [
-      "reopen weak claims and record the verification gap",
-      /If the cited proof is missing, too broad, skipped, undiscovered, or weaker than the claim, reopen the checklist item and record a verification gap instead of preserving a green label\./,
-    ],
-  ]);
-
   const applySkill = await readPackageFile("skills", "sdd-apply", "SKILL.md");
-  const applyLoop = markdownSection(applySkill, "Apply Loop");
-  assertContractClauses("Apply evidence closure", applyLoop, [
-    [
-      "treat broad commands as support unless mapped to named behavior",
-      /Label the evidence type where it matters; treat broad commands as supporting evidence unless they map to named behavior\./,
-    ],
-    [
-      "inspect exact proof, execution discovery, and the claimed boundary",
-      /Before claiming E2E, migration, auth, recovery, or production-path coverage, confirm the cited source contains the relevant route, command, fixture, failure injection, and assertion, the passing command discovers it, and the evidence proves the claimed implementation boundary\./,
-    ],
-    [
-      "reopen missing, broad, undiscovered, or boundary-mismatched proof",
-      /Reopen claims with missing, skipped, broad, undiscovered, or boundary-mismatched proof\./,
-    ],
-    [
-      "derive Verification state from current scenario evidence and explicit gaps",
-      /Update `Verification` to `unverified`, `partial`, or `verified` according to current scenario evidence and `Verification Gaps`; do not use it as an implementation-progress state\./,
-    ],
-  ]);
+  assert.match(applySkill, /Treat that guidance as the authority for:[\s\S]*test or verification method/);
+  assert.doesNotMatch(applySkill, /Evidence Claim Integrity|Keep three proof layers distinct|Verification Scope And Candidate Gates/);
 
   const reviewSkill = await readPackageFile("skills", "sdd-review", "SKILL.md");
   const scope = markdownSection(reviewSkill, "Resolve Verification Scope");

@@ -27,7 +27,7 @@ When the discussion depends on artifact authority, Epic or Story truth, Change s
 
 ## Gather Context
 
-Invoke `/sdd-gather-context` with action `exploration`, the focused discussion question, known Space/repository IDs, and the selected or candidate record path. It owns the shared minimum-read contract. Use its evidence-linked result as the discussion baseline and deepen only where the exploration exposes a remaining gap.
+`/sdd-gather-context` is a required composable capability before Explore makes substantive claims. Invoke `/sdd-gather-context` with action `exploration`, the focused discussion question, known Space/repository IDs, and the selected or candidate record path. It owns the shared minimum-read contract. Use its evidence-linked result as the discussion baseline and deepen only where the exploration exposes a remaining gap.
 
 A record may still be created to preserve the discussion when repository context is unavailable, but name that gap rather than implying feasibility or current-state claims are grounded.
 
@@ -46,11 +46,17 @@ Use this priority:
    <idea>/explorations/yyyy-mm-dd-<topic>.md
    ```
 
-5. **No idea owner:** use the workspace's documented private discussion location or ask the user where the record belongs. Do not place speculative private discussion in a public application repository by default.
+5. **Workspace-owned default:** when the discussion belongs to the SDD workspace but not to one idea or an established topic home, use:
+
+   ```text
+   <workspace>/.sdd/explorations/yyyy-mm-dd-<topic>.md
+   ```
+
+6. **No SDD owner:** use the workspace's documented private discussion location or ask the user where the record belongs. Do not place speculative private discussion in a public application repository by default.
 
 For matching records, inspect the recommended directory and any existing idea-owned `explorations/` or `exploration/` directory. Resume a clearly matching active or paused record wherever it already lives. New idea-owned records default to the plural `explorations/` directory; do not bulk-move older records merely to normalize the folder name.
 
-A stronger artifact can be the better destination when the user is no longer exploring—for example, they explicitly want to revise settled product direction, capture an architecture decision, or define a bounded desired outcome. Recommend and invoke the owning skill rather than creating a redundant exploration first. When uncertainty or discussion itself remains valuable, create or continue the exploration and route later.
+A stronger artifact can be the better destination when the user is no longer exploring—for example, they explicitly want to revise settled product direction, capture an architecture decision, or define a bounded desired outcome. Return a routed handoff to the owning skill rather than creating a redundant exploration first. When uncertainty or discussion itself remains valuable, create or continue the exploration and route later.
 
 Do not create a second ledger under `.llm/discussions/` or another generic location for the same discussion.
 
@@ -127,7 +133,7 @@ If the record cannot be updated, say so rather than implying the durable record 
 
 ## Route Mature Outcomes
 
-An exploration may remain useful indefinitely, end with no action, or produce one or more stronger artifacts. Recommend and invoke the appropriate skill when the outcome matures and the user authorizes the handoff.
+An exploration may remain useful indefinitely, end with no action, or produce one or more stronger artifacts. A mature outcome is a route or recommended-next edge, not an automatic cascade. Update the exploration, return `routed`, name the owning skill and context to pass, and stop before that skill's mutation boundary. The user or caller may then invoke the public skill independently.
 
 | Mature Outcome | Preferred Handoff |
 |---|---|
@@ -139,7 +145,7 @@ An exploration may remain useful indefinitely, end with no action, or produce on
 | A maintained strategy, research, marketing, operations, or repository document with a clear owner | The applicable local workflow or direct document update with user authorization |
 | Context still worth preserving but not ready for stronger authority | Continue the exploration |
 
-When invoking another skill, pass the exploration path, stand-alone current understanding, explicit user decisions, unresolved questions, and relevant evidence. Let the receiving skill apply its own readiness and artifact rules. Link the destination from the exploration and mark whether the exploration remains active, is resolved, or has been superseded.
+When handing off to another skill, provide the exploration path, stand-alone current understanding, explicit user decisions, unresolved questions, and relevant evidence. Let the receiving skill apply its own readiness and artifact rules. After that separate workflow creates or updates its artifact, a later Explore invocation may link the destination and mark whether the exploration remains active, resolved, or superseded.
 
 Do not call an ADR or Change a conversion of the exploration. The exploration remains source context; the new artifact owns its own decision or lifecycle truth.
 
@@ -161,5 +167,12 @@ At a useful pause:
 1. Make `Current Understanding` stand alone.
 2. Reconcile decisions, options, open questions, and realistic next steps.
 3. Set status to `paused`, `resolved`, or `superseded` as appropriate.
-4. Report the record path.
-5. State whether the discussion should continue, move through another skill, update a different maintained document, or take no further action.
+4. Return one result:
+   - `complete` — the durable exploration was created or materially updated;
+   - `no-op` — the existing record already represents the current discussion;
+   - `needs-user` — ownership, privacy, destination, or a decision requires the user;
+   - `blocked` — the record cannot be safely read or updated;
+   - `routed` — a named workflow now owns the mature next outcome.
+5. Report the record path, material artifacts read or written, remaining questions or gaps, and the recommended next workflow when applicable.
+
+A route is a terminal handoff for this invocation. Do not cross directly into application implementation, Change lifecycle mutation, ADR creation, PRD revision, or another owning workflow.

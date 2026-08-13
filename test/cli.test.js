@@ -3516,7 +3516,7 @@ test("explicit Epic validation rejects a broken duplicate claim for the selected
 
 test("packaged Epic templates stay synchronized", async () => {
   const canonical = await readFile(join(PACKAGE_ROOT, "docs", "templates", "epic.md"), "utf8");
-  for (const skill of ["sdd-change", "sdd-apply", "sdd-epic-verify"]) {
+  for (const skill of ["sdd-change", "sdd-epic-verify"]) {
     assert.equal(
       await readFile(join(PACKAGE_ROOT, "skills", skill, "assets", "epic-template.md"), "utf8"),
       canonical,
@@ -3547,7 +3547,10 @@ test("packaged tasks template defines adaptive requirement slices instead of an 
   assert.match(tasksTemplate, /^  - Create: `EPIC-ID\/S3`/m);
   assert.match(tasksTemplate, /^  - Update: `EPIC-ID\/S1`/m);
   assert.match(tasksTemplate, /^- Scenarios: `EPIC-ID\/S3 R1-S1`, `EPIC-ID\/S1 R2-S1`$/m);
-  assert.doesNotMatch(tasksTemplate, /^## Implementation Ledger$/m);
+  assert.match(tasksTemplate, /^## Implementation Ledger$/m);
+  assert.match(tasksTemplate, /^\| Slice \| Repository \| Status \| Implementation Summary \/ Changed Surface \| Updated \|$/m);
+  assert.match(tasksTemplate, /Keep one current-state row per slice/);
+  assert.match(tasksTemplate, /do not record predicted implementation steps, command history, verification evidence, commit hashes, or review state here/);
   assert.doesNotMatch(tasksTemplate, /^## Verification Ledger$/m);
   assert.doesNotMatch(tasksTemplate, /^## Pattern Parity Matrix$/m);
   assert.doesNotMatch(tasksTemplate, /^## Boundary Contract Matrix$/m);
@@ -3619,12 +3622,12 @@ test("packaged tasks template defines adaptive requirement slices instead of an 
     join(PACKAGE_ROOT, "skills", "sdd-review", "SKILL.md"),
     "utf8",
   );
-  assert.match(applySkill, /Pattern Parity Matrix/);
-  assert.match(applySkill, /Boundary Contract Matrix/);
-  assert.match(applySkill, /Stateful Transition Matrix/);
-  assert.match(applySkill, /filesystem mutation-order/);
-  assert.match(applySkill, /Evidence Claim Integrity/);
-  assert.match(applySkill, /Keep three proof layers distinct/);
+  assert.match(applySkill, /Default mode applies exactly one slice/);
+  assert.match(applySkill, /read all applicable `AGENTS\.md` files/);
+  assert.match(applySkill, /If the branch does not comply, warn the user/);
+  assert.doesNotMatch(applySkill, /Pattern Parity Matrix/);
+  assert.match(applySkill, /lightweight Implementation Ledger row/);
+  assert.doesNotMatch(applySkill, /Verification Ledger/);
   assert.match(reviewSkill, /\*\*Evidence falsification\*\*/);
   assert.match(reviewSkill, /\*\*Pattern conformance\*\*/);
   assert.match(reviewSkill, /\*\*Boundary contracts\*\*/);

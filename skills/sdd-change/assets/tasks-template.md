@@ -29,6 +29,14 @@ Omit non-applicable `New`, `Revised`, `Create`, or `Update` entries rather than 
 - Scenarios: `EPIC-ID/S3 R1-S1`, `EPIC-ID/S1 R2-S1`
 - Dependencies: none
 
+## Implementation Ledger
+
+Keep one current-state row per slice. `/sdd-change` initializes the rows and `/sdd-apply` updates the selected row as implementation proceeds. Summarize the observable result and actual changed surface after discovery; do not record predicted implementation steps, command history, verification evidence, commit hashes, or review state here.
+
+| Slice | Repository | Status | Implementation Summary / Changed Surface | Updated |
+|---|---|---|---|---|
+| S1 | `<repository-id>` | not started | None yet. | yyyy-mm-dd |
+
 ## Blockers / Open Questions
 
 - None.
@@ -40,4 +48,4 @@ Omit non-applicable `New`, `Revised`, `Create`, or `Update` entries rather than 
 - Manual confirmation: pending / not applicable
 - Accepted gaps: none
 
-Add only the conditional coordination or evidence sections that this Change actually needs during delivery or review. Do not pre-create implementation steps, file lists, engineering matrices, verification logs, or release questionnaires. Durable implementation and verification evidence belongs primarily in the affected Stories' `Implemented By` and `Verified By` maps and in `review.md` when review findings exist.
+Add only the conditional coordination or evidence sections that this Change actually needs during delivery or review. Do not pre-create implementation steps, predicted file lists, engineering matrices, verification logs, or release questionnaires. The lightweight Implementation Ledger is a current-state resume aid, not a chronological diary or evidence store. Durable implementation and verification evidence belongs primarily in the affected Stories' `Implemented By` and `Verified By` maps and in `review.md` when review findings exist.

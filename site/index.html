@@ -315,7 +315,7 @@ skil
             <span class="stepIndex">01</span>
             <div class="stepBody">
               <h3>Explore</h3>
-              <p>Work through the product or technical question before turning it into a build plan.</p>
+              <p>Preserve a substantial product, technical, operational, design, or business discussion as a synthesized record. Route mature outcomes to their owning workflow without turning exploration into an automatic build cascade.</p>
             </div>
           </li>
           <li>
@@ -687,10 +687,13 @@ skil
               <h4>Space-owned context</h4>
               <pre aria-label="Default planning document layout"><code>&lt;planning-path&gt;/
   prd.md
-  explorations/</code></pre>
+  explorations/
+
+&lt;workspace&gt;/.sdd/
+  explorations/  # workspace-owned topics without one idea</code></pre>
               <p class="recordNote">Substantial discussions usually stay here as synthesized durable records, while
-                local guidance or stronger artifact authority may provide a better home. Mature desired outcomes and
-                decisions can move through the Change or ADR workflows without making every exploration formal.</p>
+                local guidance or stronger artifact authority may provide a better home. Explore returns a routed
+                handoff when an outcome matures; Change, ADR, PRD, and implementation remain separate invocations.</p>
             </article>
 
             <article class="recordType recordProject implementationRecord">

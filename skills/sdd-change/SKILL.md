@@ -105,9 +105,10 @@ Create `tasks.md` from its template as a requirements-oriented delivery queue:
 - include one short stand-alone outcome summary and cite authoritative Scenario IDs instead of duplicating their full acceptance text;
 - state only behavioral or decision dependencies needed to know whether the slice is ready;
 - make each slice independently understandable so a future isolated subagent can gather fresh implementation context and deliver it;
-- describe what must be implemented, never how to implement it.
+- describe what must be implemented, never how to implement it;
+- initialize one lightweight Implementation Ledger row per slice with repository, `not started` status, `None yet.` summary, and the current date.
 
-Do not prescribe files, modules, functions, components, schemas, framework techniques, implementation order inside a slice, test architecture, subagent specialization, or speculative enabling work. Do not add generic engineering checklists, universal risk matrices, or empty evidence ledgers. Add conditional coordination or evidence sections only when this particular Change already requires them.
+The Implementation Ledger is a current-state resume aid that `/sdd-apply` maintains. Do not predict files or steps in it. Do not prescribe files, modules, functions, components, schemas, framework techniques, implementation order inside a slice, test architecture, subagent specialization, or speculative enabling work. Do not add generic engineering checklists, universal risk matrices, or verification ledgers. Add conditional coordination or evidence sections only when this particular Change already requires them.
 
 Slice order is advisory, not a frozen implementation sequence. `/sdd-apply` may select any ready slice and may resequence, split, or merge slices when implementation discoveries warrant it, while preserving Requirement and Scenario truth. A discovery that changes accepted behavior or scope returns to `/sdd-change`.
 

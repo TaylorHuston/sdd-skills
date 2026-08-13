@@ -717,7 +717,7 @@ As a developer, I want SDD planning, implementation, and review workflows to car
 
 ##### Requirement R1: Progressive Planning And Handoff Records
 
-The packaged planning workflow SHALL create or resume one central `change.md`, capture durable intent before technical planning, ask whether the user wants to continue, progressively add the technical plan to the same record, and create `tasks.md` only when planning proceeds. Future `tasks.md` records SHALL express adaptive logical slices of one Requirement or a small group of closely related Requirements, distinguish new from revised Requirements, name Stories to create or update, cite authoritative Scenarios, and state the observable outcome without prescribing implementation mechanics. Existing `design.md` and legacy `tasks.md` files SHALL remain compatible without being generated for future Changes.
+The packaged planning workflow SHALL create or resume one central `change.md`, capture durable intent before technical planning, ask whether the user wants to continue, progressively add the technical plan to the same record, and create `tasks.md` only when planning proceeds. Future `tasks.md` records SHALL express adaptive logical slices of one Requirement or a small group of closely related Requirements, distinguish new from revised Requirements, name Stories to create or update, cite authoritative Scenarios, state the observable outcome without prescribing implementation mechanics, and initialize one lightweight current-state Implementation Ledger row per slice. Existing `design.md` and legacy `tasks.md` files SHALL remain compatible without being generated for future Changes.
 
 ###### Scenario R1-S1: Deferred Technical Planning
 
@@ -734,14 +734,24 @@ The packaged planning workflow SHALL create or resume one central `change.md`, c
 - WHEN technical planning makes the affected behavioral truth implementation-ready
 - THEN `/sdd-change` creates independently understandable slices that identify new or revised Requirements, affected Stories, authoritative Scenarios, observable outcomes, and behavioral dependencies without predicting files, modules, framework techniques, or implementation order.
 
-##### Requirement R2: Persistent Verified Implementation
+##### Requirement R2: Guidance-Driven Slice Application
 
-Default/full Apply SHALL continue through safe implementation and self-remediation until the Change is ready for independent review or reaches a genuine stop condition, and SHALL commit completed verified slices when policy and isolation permit.
+Apply SHALL select one behavioral Requirement slice from a planned or in-progress central Change, defaulting to the next dependency-ready slice while accepting an explicit slice ID, SHALL keep that slice's lightweight current-state Implementation Ledger row updated, and SHALL defer implementation method and composed handoffs to applicable workspace and repository guidance.
 
-###### Scenario R2-S1: Long Multi-Slice Change
+###### Scenario R2-S1: Default Next Slice
 
-- WHEN one Requirement finishes while more accepted work remains
-- THEN Apply reconciles and commits the green slice before continuing instead of reporting the Change ready early.
+- WHEN the user invokes `/sdd-apply` without a slice ID
+- THEN Apply selects one `in progress` or `ready` dependency-satisfied slice using `Resume Here` before task order, keeps its one current Implementation Ledger row updated, and does not continue into another slice in the same invocation.
+
+###### Scenario R2-S2: Explicit Slice
+
+- WHEN the user invokes `/sdd-apply` with a valid actionable slice ID
+- THEN Apply selects that exact slice instead of silently substituting another.
+
+###### Scenario R2-S3: Branch Policy Mismatch
+
+- WHEN the selected repository's current branch does not satisfy its applicable `AGENTS.md` branch policy
+- THEN Apply warns with the repository, current branch, required branch or branch class, and guidance path, and does not automatically switch or create a branch.
 
 ##### Requirement R3: Comprehensive Independent Review
 
@@ -759,7 +769,7 @@ Review SHALL complete every applicable discovery and verification gate before on
 
 ##### Requirement R4: Rendered UI Verification
 
-UI-bearing planning SHALL define a proportional Visual Verification Matrix, and Apply/Review SHALL render current source, exercise changed interactions, inspect representative desktop/mobile states and console/network results, and keep owner manual confirmation separate.
+UI-bearing planning SHALL define proportional rendered expectations, repository guidance SHALL determine implementation-time visual verification, and Review SHALL independently render current source, exercise changed interactions, inspect representative desktop/mobile states and console/network results, and keep owner manual confirmation separate.
 
 ###### Scenario R4-S1: Source-Only UI Confidence
 
@@ -768,7 +778,7 @@ UI-bearing planning SHALL define a proportional Visual Verification Matrix, and 
 
 ##### Requirement R5: Risk-Shaped Evidence Closure
 
-Apply and Review SHALL trigger pattern-parity, boundary-contract, stateful-transition, capability-authority, provenance/budget, filesystem-confinement, aggregate-candidate, and evidence-falsification checks when those boundaries intersect the Change.
+Repository guidance and Review SHALL trigger pattern-parity, boundary-contract, stateful-transition, capability-authority, provenance/budget, filesystem-confinement, aggregate-candidate, and evidence-falsification checks when those boundaries intersect the Change.
 
 ###### Scenario R5-S1: Aggregate Green With Weak Scenario Proof
 
@@ -814,24 +824,21 @@ Explore, ADR, and Change SHALL invoke one read-only same-session context workflo
 | S6/R1-S3 | `skills/sdd-change/SKILL.md#Plan verification and requirement slices` | primary | Defines adaptive behavioral slice boundaries, Requirement disposition, Story actions, Scenario references, and the prohibition on implementation recipes. |
 | S6/R1-S3 | `docs/templates/tasks.md#Requirement Slices` | primary | Provides the concise generated requirements-oriented delivery queue and advisory ordering contract. |
 | S6/R1-S3 | `src/commands/validate.js#CHANGE_FILES` | support | Requires the new Requirement Slices section while continuing to accept legacy task checklist shapes. |
-| S6/R2 | `skills/sdd-apply/SKILL.md#Persistence invariant` | primary | Defines full Apply as an outcome request that continues until review readiness or a genuine stop. |
-| S6/R2-S1 | `skills/sdd-apply/SKILL.md#Commit cadence invariant` | primary | Makes a verified artifact-reconciled phase commit part of each completed slice. |
-| S6/R2 | `skills/sdd-apply/references/risk-closure.md#Phase Commit` | support | Defines coherent green phase boundaries and immutable handoff behavior. |
+| S6/R2-S1, S6/R2-S2 | `skills/sdd-apply/SKILL.md#Select The Slice` | primary | Selects one next-ready or explicitly requested actionable Requirement slice without consuming later work. |
+| S6/R2-S1, S6/R2-S2 | `skills/sdd-apply/SKILL.md#Build The Implementation Brief` | primary | Presents the selected behavioral outcome, Requirements, Story changes, Scenarios, dependencies, constraints, repository, guidance, and branch result without an implementation recipe. |
+| S6/R2-S1, S6/R2-S2 | `skills/sdd-apply/SKILL.md#Apply The Selected Slice` | support | Maintains exactly one current Implementation Ledger row per slice without command, verification, commit, or review history. |
+| S6/R2-S3 | `skills/sdd-apply/SKILL.md#Check Branch Policy` | primary | Checks repository guidance and current Git state, warns on mismatch, and forbids automatic branch mutation. |
+| S6/R2 | `skills/sdd-apply/SKILL.md#Load Governing Guidance` | primary | Makes workspace and repository guidance authoritative for implementation process and composed specialist handoffs. |
 | S6/R3 | `skills/sdd-review/SKILL.md#Full-review invariant` | primary | Requires complete applicable discovery despite early findings. |
 | S6/R3-S2 | `skills/sdd-review/SKILL.md#Execution-continuity invariant` | primary | Requires yielded and long-running commands to be resumed through completion. |
 | S6/R4 | `skills/sdd-design/SKILL.md#Define The Visual Verification Matrix` | primary | Defines proportional rendered states, interactions, viewports, and evidence before implementation. |
-| S6/R4 | `skills/sdd-apply/SKILL.md#Apply Loop` | primary | Requires direct rendered inspection of current UI source during implementation. |
+| S6/R4 | `skills/sdd-apply/SKILL.md#Load Governing Guidance` | support | Defers implementation-time rendered-verification method to the selected repository's guidance. |
 | S6/R4 | `skills/sdd-review/SKILL.md#Review Gates` | primary | Keeps deterministic rendered verification distinct from owner manual confirmation. |
-| S6/R5 | `skills/sdd-apply/SKILL.md#Verification And Implementation Self-Check` | primary | Runs risk-shaped implementation closure and evidence reconciliation. |
-| S6/R5 | `skills/sdd-apply/references/risk-closure.md#Pattern Parity` | support | Requires sibling implementations to preserve shared policy and lifecycle shape. |
-| S6/R5 | `skills/sdd-apply/references/risk-closure.md#Boundary Contracts` | support | Requires exact boundary, adapter, failure, and retry mapping. |
-| S6/R5 | `skills/sdd-apply/references/risk-closure.md#Stateful Transitions` | support | Requires concurrent and durable state interleavings to be proved. |
-| S6/R5 | `skills/sdd-apply/references/risk-closure.md#Authority, Budget, And Mutation Safety` | support | Requires authority, provenance, budget, and filesystem mutation invariants. |
-| S6/R5 | `skills/sdd-apply/references/risk-closure.md#Evidence Claim Integrity` | support | Requires exact claimed-boundary evidence to survive falsification. |
+| S6/R5 | `skills/sdd-apply/SKILL.md#Load Governing Guidance` | support | Defers implementation-time risk and evidence procedure to applicable project-owned guidance and composed skills. |
 | S6/R5 | `skills/sdd-review/SKILL.md#Systematic Review Search` | primary | Independently falsifies claimed behavior and evidence across the candidate. |
 | S6/R6 | `skills/sdd-interactive/SKILL.md#Workflow` | primary | Implements a trimmed shared-artifact session with immediate Apply-style execution and routing for broader scope. |
 | S6/R7 | `skills/sdd-change/SKILL.md#Select Or Create The Change` | primary | Creates or resumes one central Change and settles stable target repository IDs before planning completes. |
-| S6/R7 | `skills/sdd-apply/SKILL.md#Authority And Project Profile` | primary | Orchestrates implementation and the single workspace-wide transition across the complete target set. |
+| S6/R7 | `skills/sdd-apply/SKILL.md#Resolve The Change` | primary | Resolves the one central Change and stable target repository IDs without creating repository-local copies. |
 | S6/R7 | `skills/sdd-review/SKILL.md#Authority And Project Profile` | primary | Reviews all target repositories and records one consolidated verdict and closeout state. |
 | S6/R7 | `skills/sdd-pr/SKILL.md#Authority And Project Profile` | primary | Stewards the coordinated repository PR set without duplicating lifecycle ownership. |
 | S6/R7 | `skills/sdd-space-status/SKILL.md#Workflow` | support | Presents top-level unique Changes and repository-filtered projections without double-counting. |
@@ -845,7 +852,7 @@ Explore, ADR, and Change SHALL invoke one read-only same-session context workflo
 #### Implementation Gaps
 
 - S6/R7: remaining delivery skills need final semantic review after mechanical artifact-reference updates.
-- S6/R1-S3: `/sdd-apply` still needs a separate focused reconciliation so it consumes adaptive Requirement slices without recreating a universal engineering ledger.
+- S6/R2: explicit autonomous all-slices execution remains deferred until the one-slice Apply contract is proven.
 
 #### Verified By
 
@@ -853,12 +860,12 @@ Explore, ADR, and Change SHALL invoke one read-only same-session context workflo
 |---|---|---|---|
 | S6/R1-S1, S6/R1-S2 | Automated tests `test/change-contract.test.js#change create captures proposed intent in one central change.md` and `test/change-contract.test.js#planning completes the same Change before lifecycle work continues` | Proposed intent needs only `change.md`; progressive technical sections, `tasks.md`, and repository ownership gate `planned`; no new `design.md` is created, while compatible existing records remain valid. | Passing 2026-08-11 |
 | S6/R1-S3 | Automated tests `test/workflow-contracts.test.js#packaged change workflow progresses one central intent record into planning`, `test/workflow-contracts.test.js#requirement slices remain repository-qualified while review handoffs key repeated blocks by repository ID`, and `test/cli.test.js#packaged tasks template defines adaptive requirement slices instead of an up-front engineering plan` | The generated tasks contract is requirements-oriented, repository-qualified, explicit about new/revised Requirements and Story changes, Scenario-linked, implementation-agnostic, adaptive, and free of universal engineering matrices and ledgers. | Passing 2026-08-11 |
-| S6/R2-S1 | Semantic source inspection of `skills/sdd-apply/SKILL.md#Persistence invariant` and `skills/sdd-apply/SKILL.md#Commit cadence invariant` | Apply continues beyond a green slice and commits an isolated reconciled phase before later work. | Passing 2026-07-23 |
+| S6/R2-S1, S6/R2-S2, S6/R2-S3 | Automated test `test/workflow-contracts.test.js#packaged Apply selects one behavioral slice and defers implementation method to repository guidance` | Apply defaults to one next-ready slice, accepts an explicit slice, produces a WHAT-oriented brief, reads applicable `AGENTS.md`, warns on branch mismatch, and excludes universal implementation, commit, review, and ledger methodology. | Passing 2026-08-12 |
 | S6/R3-S1, S6/R3-S2 | Semantic source inspection of `skills/sdd-review/SKILL.md#Full-review invariant` and `skills/sdd-review/SKILL.md#Execution-continuity invariant` | Review retains early findings while completing discovery and resumes yielded commands. | Passing 2026-07-23 |
-| S6/R4-S1 | Semantic source inspection of `skills/sdd-design/SKILL.md#Define The Visual Verification Matrix`, `skills/sdd-apply/SKILL.md#Apply Loop`, and `skills/sdd-review/SKILL.md#Review Gates` | Design, Apply, and Review jointly reject source-only UI confidence. | Passing 2026-07-23 |
-| S6/R5-S1 | Semantic source inspection of `skills/sdd-apply/references/risk-closure.md#Evidence Claim Integrity` and `skills/sdd-review/SKILL.md#Review Gates` | Aggregate success cannot substitute for exact high-risk Scenario proof. | Passing 2026-07-23 |
+| S6/R4-S1 | Semantic source inspection of `skills/sdd-design/SKILL.md#Define The Visual Verification Matrix`, repository-guidance delegation in `skills/sdd-apply/SKILL.md#Load Governing Guidance`, and `skills/sdd-review/SKILL.md#Review Gates` | Design records expected rendered behavior, repository guidance owns implementation-time method, and Review independently rejects source-only UI confidence. | Passing 2026-08-12 |
+| S6/R5-S1 | Semantic source inspection of repository-guidance delegation in `skills/sdd-apply/SKILL.md#Load Governing Guidance` and `skills/sdd-review/SKILL.md#Review Gates` | Implementation risk procedure is project-owned while Review still rejects aggregate success as a substitute for exact high-risk Scenario proof. | Passing 2026-08-12 |
 | S6/R6-S1 | Semantic source inspection of `skills/sdd-interactive/SKILL.md#Workflow` and `skills/sdd-interactive/SKILL.md#Artifact Shape` | Interactive uses trimmed shared artifacts, immediate execution, durable Epic reconciliation, and broader-scope routing. | Passing 2026-07-23 |
-| S6/R2-S1 | Automated test `test/workflow-contracts.test.js#packaged Apply continues after a verified slice and commits the phase before later work` | Full Apply persists beyond one slice and commits each isolated verified artifact-reconciled phase. | Passing 2026-07-23 |
+| S6/R2-S1, S6/R2-S2, S6/R2-S3 | Automated test `test/cli.test.js#packaged tasks template defines adaptive requirement slices instead of an up-front engineering plan` | The package contract keeps task slices behavioral and verifies the simplified Apply skill no longer restores universal engineering matrices or ledgers. | Passing 2026-08-12 |
 | S6/R3-S1 | Automated test `test/workflow-contracts.test.js#packaged Review completes every applicable gate after an early blocking finding` | Review retains early findings while completing all applicable discovery and scorecard gates. | Passing 2026-07-23 |
 | S6/R3-S2 | Automated test `test/workflow-contracts.test.js#packaged Review resumes yielded commands and preserves the full until-ready report contract` | Yielded work resumes, the default cap remains five, and every mode returns the same complete report. | Passing 2026-07-23 |
 | S6/R4-S1 | Automated test `test/workflow-contracts.test.js#packaged UI workflows reject source-only confidence without rendered current-source evidence` | Design, Apply, Review, templates, and doctrine consistently require current-source rendered evidence. | Passing 2026-07-23 |

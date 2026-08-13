@@ -64,6 +64,7 @@ const CHANGE_FILES = Object.freeze({
   "tasks.md": [
     ["Resume Here"],
     ["Requirement Slices", "Task Checklist", "Checklist"],
+    ["Implementation Ledger"],
     ["Blockers / Open Questions", "Open Questions"],
     ["Closeout"],
   ],
