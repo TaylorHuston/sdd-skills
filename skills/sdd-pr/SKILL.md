@@ -137,7 +137,7 @@ For each actionable comment:
 1. Locate the referenced code and confirm the issue against current source.
 2. Classify the expected SDD impact using the reconciliation checkpoint below.
 3. Route accepted implementation changes to a separately invoked `/sdd-apply` against the reviewed finding and current candidate; do not implement them inside PR stewardship.
-4. Route repository-owned Epic/Story reconciliation to a separately invoked `/sdd-epic-update` after the fix is reviewed; route supporting docs and release communication to their owning workflows.
+4. Route repository-owned Epic/Story reconciliation to a separately invoked `/sdd-epic-update` after the fix is reviewed; route one candidate-specific user/operator release entry to `/sdd-changelog` after Epic Update, and release-wide aggregation/versioning to `/sdd-release`.
 5. Resume PR stewardship only after those capabilities return their exact candidate and result.
 6. Run or require focused verification and a fresh `/sdd-review` as dictated by the changed risk.
 7. Recompute the changed-file inventory and confirm every new or modified path remains inside the accepted remediation and SDD reconciliation scope.
@@ -182,7 +182,7 @@ Each loop iteration should:
 1. Refresh comments, review threads, checks, branch status, and every remote reviewer/check watermark for every target PR.
 2. Resolve each current PR head and compare it with that repository's reviewed source commit and latest reconciled PR head.
 3. Reclassify comments against current code and classify the SDD impact of accepted changes.
-4. Route accepted implementation comments to Apply and repository-local truth to Epic Update; resume only after their separately returned results.
+4. Route accepted implementation comments to Apply, repository-local truth to Epic Update, and affected candidate-specific release communication to Changelog; resume only after their separately returned results.
 5. Push changes and reply/resolve threads.
 6. Update affected PR bodies or durable summary comments and central `tasks.md` with current reconciliation and remote-review watermarks whenever state materially changes.
 

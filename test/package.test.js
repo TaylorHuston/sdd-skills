@@ -15,7 +15,7 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 const packageRoot = new URL("../", import.meta.url);
 
-test("package dry run includes the Epic Update capability", async () => {
+test("package dry run includes candidate-bound Epic Update and Changelog capabilities", async () => {
   const { stdout } = await execFileAsync("npm", ["pack", "--dry-run", "--json"], {
     cwd: new URL("../", import.meta.url),
   });
@@ -23,6 +23,9 @@ test("package dry run includes the Epic Update capability", async () => {
   const paths = packed.files.map((file) => file.path);
   assert.ok(paths.includes("skills/sdd-epic-update/SKILL.md"));
   assert.ok(paths.includes("skills/sdd-epic-update/agents/openai.yaml"));
+  assert.ok(paths.includes("skills/sdd-changelog/SKILL.md"));
+  assert.ok(paths.includes("skills/sdd-changelog/agents/openai.yaml"));
+  assert.ok(paths.includes("src/commands/candidate-resolve.js"));
   assert.ok(paths.includes("src/commands/epic-update-input.js"));
 });
 

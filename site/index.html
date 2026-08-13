@@ -749,7 +749,7 @@ skil
                 <li>Install workspace-managed skills and map private topology</li>
                 <li>Initialize portable repository contracts</li>
                 <li>Scaffold canonical Changes and repository-owned Epics</li>
-                <li>Resolve immutable baseline and committed or working-tree envelopes with <code>sdd epic update-input</code></li>
+                <li>Resolve immutable committed or working-tree envelopes with <code>sdd candidate resolve</code>; add Epic-specific validation input with <code>sdd epic update-input</code></li>
                 <li>Validate artifacts, structured Requirement slices, ledger/checkpoint coherence, ownership metadata,
                   audit-report coherence, and optional Git-relative freshness</li>
                 <li>Report central Change status across mapped repositories</li>
@@ -768,6 +768,7 @@ skil
                 <li>Implement one slice against an exact baseline with fresh candidate-bound evidence</li>
                 <li>Review complete diffs through systematic search and validated findings</li>
                 <li>Reconcile durable Epic truth against one exact candidate</li>
+                <li>Write one reviewed candidate's native user/operator release entry when warranted</li>
                 <li>Audit broader codebase health</li>
               </ul>
             </section>
@@ -799,7 +800,8 @@ skil
               <div><code>/sdd-review</code><code>/sdd-epic-verify</code></div>
             </li>
             <li><span>08</span><strong>Reconcile durable Epic truth</strong><code>/sdd-epic-update</code></li>
-            <li class="workflowMapMulti"><span>09</span><strong>Deliver</strong>
+            <li><span>09</span><strong>Write candidate release communication when warranted</strong><code>/sdd-changelog</code></li>
+            <li class="workflowMapMulti"><span>10</span><strong>Deliver</strong>
               <div><code>/sdd-pr</code><code>/sdd-release</code></div>
             </li>
           </ol>
@@ -808,7 +810,7 @@ skil
             Apply begins. Apply uses the same public statuses after exactly one slice: it records the pre-slice
             baseline for each affected repository, may implement inline or through one fresh-context worker in an
             authorized dedicated isolated workspace, inspects the complete candidate itself, and requires fresh Requirement/Scenario verification before recommending a separate
-            Review. Epic Update then works from an exact committed or working-tree candidate, updates implementation and verification maps only from inspected durable evidence, and stops before code review, code fixes, Change lifecycle mutation, changelog work, and commits. The map shows recommended handoffs, not an automatic cascade.</p>
+            Review. Epic Update then works from an exact committed or working-tree candidate, updates implementation and verification maps only from inspected durable evidence, and stops before code review, code fixes, Change lifecycle mutation, changelog work, and commits. Changelog uses the same candidate envelope after current Review and Epic Update, follows the repository's native release-record policy, returns <code>no-op</code> for internal-only or already accurate work, and stops before versioning, staging, commits, PRs, release, or deployment. Release owns aggregation and version intent. The map shows recommended handoffs, not an automatic cascade.</p>
         </section>
 
         <section class="referenceLifecycle" aria-labelledby="reference-lifecycle-title">

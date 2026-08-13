@@ -3514,7 +3514,16 @@ test("explicit Epic validation rejects a broken duplicate claim for the selected
   }
 });
 
-test("CLI exposes the Epic Update envelope helper and package includes its skill", async () => {
+test("CLI exposes shared candidate and Epic Update envelope helpers plus their skills", async () => {
+  const { stdout: candidateHelp } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "candidate",
+    "--help",
+  ]);
+  assert.match(candidateHelp, /sdd candidate resolve/);
+  assert.match(candidateHelp, /--baseline <ref>/);
+  assert.match(candidateHelp, /working-tree \(default\)/);
+
   const { stdout: epicHelp } = await execFileAsync(process.execPath, [
     join(PACKAGE_ROOT, "bin", "sdd.js"),
     "epic",
@@ -3526,11 +3535,13 @@ test("CLI exposes the Epic Update envelope helper and package includes its skill
 
   const bundledSkills = await readdir(join(PACKAGE_ROOT, "skills"));
   assert.ok(bundledSkills.includes("sdd-epic-update"));
-  const skill = await readFile(
-    join(PACKAGE_ROOT, "skills", "sdd-epic-update", "SKILL.md"),
-    "utf8",
-  );
-  assert.match(skill, /^name: sdd-epic-update$/m);
+  assert.ok(bundledSkills.includes("sdd-changelog"));
+  const [epicUpdate, changelog] = await Promise.all([
+    readFile(join(PACKAGE_ROOT, "skills", "sdd-epic-update", "SKILL.md"), "utf8"),
+    readFile(join(PACKAGE_ROOT, "skills", "sdd-changelog", "SKILL.md"), "utf8"),
+  ]);
+  assert.match(epicUpdate, /^name: sdd-epic-update$/m);
+  assert.match(changelog, /^name: sdd-changelog$/m);
 });
 
 test("packaged Epic templates stay synchronized", async () => {

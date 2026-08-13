@@ -344,6 +344,33 @@ test("packaged Epic Update reconciles only repository-owned truth for an exact c
   assert.match(doctrine, /`\/sdd-epic-update`/);
 });
 
+test("packaged Changelog writes only one reviewed candidate's native release entry", async () => {
+  const [changelog, changelogAgent, doctrine, release, review] = await Promise.all([
+    readPackageFile("skills", "sdd-changelog", "SKILL.md"),
+    readPackageFile("skills", "sdd-changelog", "agents", "openai.yaml"),
+    readPackageFile("docs", "story-driven-development.md"),
+    readPackageFile("skills", "sdd-release", "SKILL.md"),
+    readPackageFile("skills", "sdd-review", "SKILL.md"),
+  ]);
+
+  assert.match(changelog, /Apply session[\s\S]*is optional[\s\S]*never fabricate Apply history/);
+  assert.match(changelog, /sdd candidate resolve <repository-path>/);
+  assert.match(changelog, /Require current review evidence/);
+  assert.match(changelog, /require a current `\/sdd-epic-update` result/);
+  assert.match(changelog, /`user-visible`[\s\S]*`operator-relevant`[\s\S]*`internal-only`[\s\S]*`speculative-or-unverified`/);
+  assert.match(changelog, /Return `no-op` when/);
+  assert.match(changelog, /For Keep a Changelog, edit only the appropriate `Unreleased` category/);
+  assert.match(changelog, /implementation-input projection remains unchanged/);
+  assert.match(changelog, /second invocation should normally produce no release-record changes and return `no-op`/);
+  assert.match(changelog, /Do not:[\s\S]*modify application code[\s\S]*choose or write a release version[\s\S]*stage, commit, push/);
+  assert.match(changelog, /`complete`[\s\S]*`no-op`[\s\S]*`needs-user`[\s\S]*`blocked`[\s\S]*`routed`/);
+  assert.match(changelogAgent, /one reviewed candidate's release entry/);
+  assert.match(doctrine, /## Candidate-Bound Changelog Entries/);
+  assert.match(doctrine, /`\/sdd-changelog`/);
+  assert.match(release, /Route missing or stale per-change entries to `\/sdd-changelog`/);
+  assert.match(review, /missing not-yet-authored entry alone does not make otherwise clean implementation `changes-requested`/);
+});
+
 test("packaged Apply delivers one candidate-bound slice with optional isolated delegation", async () => {
   const [applySkill, applyAgent, doctrine, readme] = await Promise.all([
     readPackageFile("skills", "sdd-apply", "SKILL.md"),

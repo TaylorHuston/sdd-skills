@@ -97,6 +97,18 @@ test("public guide presents candidate-bound Epic reconciliation as its own capab
   assert.match(html, /<code>sdd epic update-input<\/code>/);
 });
 
+test("public guide presents candidate-bound Changelog as separate from Release", async () => {
+  const { html } = await readSite();
+
+  assert.match(html, /<code>\/sdd-changelog<\/code>/);
+  assert.match(html, /same candidate envelope after current Review and Epic Update/);
+  assert.match(html, /repository's native release-record policy/);
+  assert.match(html, /returns <code>no-op<\/code> for internal-only or already accurate work/);
+  assert.match(html, /stops before versioning, staging, commits, PRs, release, or deployment/);
+  assert.match(html, /Release owns aggregation and version intent/);
+  assert.match(html, /<code>sdd candidate resolve<\/code>/);
+});
+
 test("public guide distinguishes structured Change validation from planning judgment", async () => {
   const { html } = await readSite();
 

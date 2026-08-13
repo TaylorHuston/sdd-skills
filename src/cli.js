@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
+import { resolveCandidateEnvelope } from "./commands/candidate-resolve.js";
 import { configureWorkspace } from "./commands/configure.js";
 import { getWorkspaceContext } from "./commands/context.js";
 import { closeChange } from "./commands/change-close.js";
@@ -44,6 +45,7 @@ Usage:
   sdd context [path] [options]          Resolve planning/repository context in one workspace
   sdd status [space-id] [options]       List Space status or show one Space in detail
   sdd validate [space-id] [options]     Validate SDD artifact structure and references
+  sdd candidate resolve [options]       Resolve one exact repository diff envelope
   sdd epic create [options]             Scaffold a canonical Epic in one repository
   sdd epic update-input [options]       Resolve one exact Epic-update diff envelope
   sdd change create [options]           Scaffold a workspace-central Change for a Space
@@ -95,6 +97,15 @@ Validate options:
   --change <change-id>            Validate one active or closed Change
   --epic <epic-id>                Validate one Epic
   --changed-from <commit-ish>     Check Epic modified metadata against a Git baseline
+  --json                          Emit machine-readable JSON
+
+Candidate resolve usage:
+  sdd candidate resolve [repository-path] --baseline <commit-ish> [options]
+
+Candidate resolve options:
+  --workspace <path>              Select the owning workspace explicitly
+  --baseline <commit-ish>         Resolve the immutable beginning of the candidate range
+  --candidate <value>             working-tree (default) or an explicit commit/ref
   --json                          Emit machine-readable JSON
 
 Epic create usage:
@@ -193,6 +204,21 @@ Commands:
 Shared options:
   --workspace <path>  Select the owning workspace explicitly
   --dry-run           Report without writing files
+  --json              Emit machine-readable JSON
+`;
+
+const CANDIDATE_HELP = `SDD Candidate commands
+
+Usage:
+  sdd candidate resolve [repository-path] --baseline <commit-ish> [options]
+
+Commands:
+  resolve  Resolve a safe read-only diff envelope for candidate-bound capabilities
+
+Resolve options:
+  --workspace <path>  Select the owning workspace explicitly
+  --baseline <ref>    Resolve the immutable beginning of the candidate range
+  --candidate <value> working-tree (default) or an explicit commit/ref
   --json              Emit machine-readable JSON
 `;
 
@@ -758,6 +784,17 @@ function printHuman(result) {
     console.log(`Findings: ${result.summary.errors} error(s), ${result.summary.warnings} warning(s)`);
     return;
   }
+  if (result.command === "candidate-resolve") {
+    console.log(`Candidate: ${result.repository.id}`);
+    console.log(`Repository: ${result.repository.root}`);
+    console.log(`Baseline: ${result.baseline}`);
+    console.log(`Candidate watermark: ${result.candidate.watermark}`);
+    console.log(`Changed paths: ${result.changedPaths.length}`);
+    for (const entry of result.changedPaths) {
+      console.log(`  ${entry.status} ${entry.from ? `${terminalSafe(entry.from)} -> ` : ""}${terminalSafe(entry.path)}`);
+    }
+    return;
+  }
   if (result.command === "epic-create") {
     console.log(`${result.dryRun ? "Would create" : "Created"} Epic: ${result.epicId}`);
     console.log(`Space: ${result.spaceId}`);
@@ -1032,6 +1069,46 @@ async function executeCommand(command, args) {
           epicId: values.epic ?? null,
           changedFrom: values["changed-from"] ?? null,
           workspaceRoot: requestedWorkspaceRoot,
+        },
+      ),
+      json: values.json ?? false,
+    };
+  }
+
+  if (command === "candidate") {
+    const subcommand = args[0];
+    if (["--help", "-h", "help"].includes(subcommand)) {
+      return { help: true, helpText: CANDIDATE_HELP };
+    }
+    if (subcommand !== "resolve") {
+      throw new SddError(
+        subcommand ? `Unknown candidate command: ${subcommand}` : "candidate requires a subcommand.",
+        { code: "USAGE", details: ["Available command: candidate resolve"] },
+      );
+    }
+    const { values, positionals } = parseCommandArgs(
+      args.slice(1),
+      commandOptions({
+        workspace: { type: "string" },
+        baseline: { type: "string" },
+        candidate: { type: "string" },
+      }),
+    );
+    if (values.help) return { help: true, helpText: CANDIDATE_HELP };
+    if (positionals.length > 1) {
+      throw new SddError("candidate resolve accepts at most one repository path.", { code: "USAGE" });
+    }
+    if (!values.baseline) {
+      throw new SddError("candidate resolve requires --baseline <commit-ish>.", { code: "USAGE" });
+    }
+    const requestedWorkspaceRoot = resolvePathOption(values, "workspace");
+    return {
+      result: await resolveCandidateEnvelope(
+        requireCommandPath(positionals, "candidate resolve"),
+        {
+          workspaceRoot: requestedWorkspaceRoot,
+          baseline: values.baseline,
+          candidate: values.candidate ?? "working-tree",
         },
       ),
       json: values.json ?? false,

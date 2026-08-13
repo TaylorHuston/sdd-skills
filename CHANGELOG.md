@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Added `/sdd-changelog`, an independently callable candidate-bound capability that follows each repository's native changelog, changeset, generated-note, or no-record policy; creates or updates one reviewed user/operator entry when warranted; returns `no-op` for internal-only, duplicate, generated, or speculative work; proves its release-record-only edit preserves the reviewed implementation projection; and stops before versioning, staging, commits, PRs, release, or deployment.
+- Added read-only `sdd candidate resolve` as the shared immutable committed/working-tree envelope primitive for candidate-bound skills. It inventories staged, unstaged, and relevant untracked state with content-sensitive watermarks while disabling external diff, text conversion, and configured clean/process filters. `sdd epic update-input` now preserves its existing contract as an Epic-specific wrapper.
 - Added `/sdd-epic-update`, an independently callable candidate-bound capability that reconciles repository-owned Epic, Story, Requirement, Scenario, implementation-map, gap, and verification-map truth after reviewed or manual work. It works without fabricated Apply history, returns `complete`, `no-op`, `needs-user`, `blocked`, or `routed`, proves same-candidate idempotence, and stops before code review, code fixes, Change lifecycle changes, changelog work, and commits.
 - Added read-only `sdd epic update-input` to resolve immutable baselines and committed or working-tree candidates, reject non-ancestor committed ranges, inventory changed paths plus staged/unstaged/untracked state, and return configured Epic roots and scoped validation commands without making semantic decisions or mutating artifacts.
 - Added `/sdd-gather-context`, a lightweight same-session shared skill that reads and reconciles the action-specific minimum planning, decision, behavior, implementation, test, and Git evidence before Explore, ADR, or Change proceeds.
@@ -34,6 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Planning, Apply, Review, PR, Release, Interactive, Epic verification, audits, and Space status now share one workspace-central Change record and treat repository entries only as stable targets or filtered projections.
 - Status and validation keep Space-owned Changes visible when repository mappings go stale, reject unresolved repository ownership, and report active/closed ID collisions within the selected workspace even through scoped projections.
 - `/sdd-release` now records repository-keyed candidates, checks, authorization, and handoffs for the complete target set, with one aggregate coordination and closeout gate.
+- `/sdd-review` now classifies candidate release impact and rejects misleading existing claims without treating a separately pending Changelog entry as an implementation defect. `/sdd-release` now requires current candidate-specific Changelog entries or evidence-based `no-op` results where policy calls for them, then owns release-wide aggregation and version intent instead of silently drafting missing per-change entries.
 
 ### Removed
 

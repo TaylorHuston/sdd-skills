@@ -56,7 +56,8 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
    - Record the full repository handoff set before running checks; a passing target never makes the aggregate release ready by itself.
 2. Run release preflight.
    - Confirm every target worktree is clean or only contains release-artifact edits that this skill will make.
-   - Confirm each release candidate has a current `/sdd-epic-update` result for affected repository-owned behavior and traceability, or a recorded evidence-based `no-op`; any candidate change after that watermark makes reconciliation stale.
+   - Confirm each release candidate has a current `/sdd-epic-update` result for affected repository-owned behavior and traceability, or a recorded evidence-based `no-op`; any implementation-candidate change after that watermark makes reconciliation stale.
+   - Confirm every completed user-visible or operator-relevant Change has a current candidate-specific `/sdd-changelog` result or evidence-based `no-op` under that repository's native policy. Route missing or stale per-change entries to `/sdd-changelog` instead of drafting them inside Release. A changelog-only candidate may preserve Review and Epic Update freshness when its non-changelog implementation projection is proved unchanged.
    - Confirm each source branch is up to date with its own target or record why not.
    - Check every source/target pair for merge conflicts without performing a merge.
    - Confirm no active SDD change required for this release is missing `/sdd-review` readiness or accepted override.
@@ -79,14 +80,15 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
    - If no project-local release guidance exists and no meaningful local release gate can be identified, stop or explicitly record why release confidence cannot be established.
    - If project-local release guidance exists and says e2e or browser/provider checks are optional or not yet part of the required gate, do not stop solely because no e2e command exists; report the skipped optional gate and its documented reason.
    - If any required release check fails, stop before release-artifact edits unless the failure is caused by stale release metadata and project policy permits fixing it first.
-4. Review the changelog and confirm version intent.
-   - Read the complete unreleased section and the latest released entry in `CHANGELOG.md` when present. Compare them with the source-vs-target diff, release-relevant SDD Changes, and the project's configured release record so omissions, duplicate claims, stale entries, internal bookkeeping, and unverified claims are visible before release metadata changes.
+4. Review and aggregate existing changelog entries, then confirm version intent.
+   - Read the complete unreleased section and the latest released entry in `CHANGELOG.md` when present. Compare them with the source-vs-target diff, release-relevant SDD Changes, current `/sdd-changelog` results, and the project's configured release record so omissions, duplicate claims, stale entries, internal bookkeeping, and unverified claims are visible before release metadata changes.
+   - Aggregate and edit release-wide framing only after candidate-specific entries are current. Do not absorb `/sdd-changelog` ownership by silently creating a missing per-change entry here.
    - Resolve the current version and the project's versioning policy from manifests, version files, documented tooling, release records, and tags as project policy permits. Do not infer a scheme the project has not adopted.
    - Suggest the next version under the configured policy. For Semantic Versioning, normally suggest `major` for breaking public behavior or compatibility requirements, `minor` for backward-compatible user-facing capabilities, and `patch` for backward-compatible fixes, security hardening, or public operational/documentation corrections. Account for explicit pre-1.0 or project-specific rules. If the changelog contains no version-worthy public change, recommend no bump instead of manufacturing one.
    - Present the current version, suggested next version and increment class, concise changelog summary, rationale, and any ambiguity. Then explicitly ask whether the user wants this release to be a version update before changing a version, converting an unreleased section into a released version, planning a tag/package release, or describing the handoff as versioned.
    - Offer the suggested version, a different version, or no version update when project policy permits. An explicit version supplied by the user, or an explicit instruction to release as that version, already satisfies this confirmation; a general request to run `/sdd-release` does not.
    - In `--check`, do not pause for confirmation or mutate artifacts. Report the recommendation, whether a version update appears appropriate, and the confirmation that a later non-check run would require.
-   - If no changelog exists, record that fact and follow the configured release-record policy. Do not create a changelog or invent versioning merely to satisfy this workflow.
+   - If no changelog exists, record that fact and follow the configured release-record policy. A missing candidate-specific record routes to `/sdd-changelog`; do not create a changelog or invent versioning merely to satisfy this workflow.
 5. Prepare release communication and version metadata.
    - Follow the project's configured release-record and the user's confirmed version decision. Do not impose a changelog format or version scheme when none is configured.
    - Use the confirmed user-provided or user-approved version, then apply project-owned version tooling or documented rules. Stop when the chosen version is incompatible with project policy or required version metadata remains ambiguous.
@@ -146,7 +148,7 @@ Scale independently to each target. A small static app may only have build. A lo
 - Treat the project-defined release record as public communication unless local guidance says it is private.
 - Do not reuse an already released version or release identifier for new content.
 - Do not infer a versioning scheme that the project has not adopted.
-- Review unreleased changelog content against the actual release scope before recommending a version.
+- Require current candidate-specific `/sdd-changelog` results where policy calls for them, then review and aggregate unreleased content against the actual release scope before recommending a version.
 - Do not convert unreleased content into a numbered release or modify version metadata until the user confirms the version-update decision.
 - Include only the content required by project policy, and keep every behavior claim aligned with current Epic truth and evidence.
 - If there are no public-facing changes, say so in the configured handoff instead of fabricating release notes.
@@ -163,6 +165,7 @@ Stop and report when:
 - required release checks fail.
 - `/sdd-review` readiness is missing for release-blocking SDD changes.
 - candidate-bound `/sdd-epic-update` reconciliation is missing or stale for affected repository-owned behavior or traceability.
+- a required candidate-specific `/sdd-changelog` entry is missing, stale, duplicate, or inconsistent with the reviewed candidate and current Epic truth.
 - a triggered cumulative release-candidate review is missing, stale, or has unresolved findings for an initial, multi-Change, materially post-review, or high-risk cumulative release diff.
 - required manual confirmation remains `pending user` and project policy requires acceptance before the configured release handoff or requested release action.
 - release-relevant SDD closeout state is contradictory, duplicate Story labels/references make Epic traceability unreliable, or conflicting legacy app-wide Story IDs are unresolved.

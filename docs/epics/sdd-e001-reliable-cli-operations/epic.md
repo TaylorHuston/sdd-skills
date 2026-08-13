@@ -63,7 +63,7 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 | S3 | implemented | verified | Route one workspace-unique central Change across portable repository targets. | 2026-08-10 | Creation, lifecycle, physical confinement, and deterministic discovery use current workspace and repository contracts; legacy alpha formats are unsupported. |
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
 | S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-23 | Reports are versioned; PR/release paths are classified and rechecked; Git baselines are immutable and bounded. |
-| S6 | partial | partial | Carry one progressive central Change through planning and an evidence-backed multi-repository handoff. | 2026-08-13 | Candidate-bound Epic reconciliation is implemented; broader delivery-skill and package-wide verification gaps remain. |
+| S6 | partial | partial | Carry one progressive central Change through planning and an evidence-backed multi-repository handoff. | 2026-08-13 | Candidate-bound Epic reconciliation and per-candidate release communication are implemented; broader delivery-skill and package-wide verification gaps remain. |
 | S7 | implemented | partial | Explain the portable method and package through accessible responsive documentation. | 2026-08-10 | The public guide describes progressive Changes and current-only setup; responsive rendering and owner confirmation remain pending. |
 
 ## Stories
@@ -831,6 +831,25 @@ Epic Update SHALL accept one exact committed or working-tree diff envelope with 
 - WHEN Epic Update runs again after repository-owned truth already matches the same candidate
 - THEN it returns `no-op` without rewriting the Epic.
 
+##### Requirement R10: Candidate-Bound Release Communication
+
+Changelog SHALL accept one exact reviewed committed or working-tree candidate with current Epic reconciliation when behavior or traceability changed, SHALL follow the repository's native release-record policy, SHALL create or update one user-visible or operator-relevant entry only when warranted, and SHALL preserve the reviewed implementation projection while stopping before versioning or Git/release handoff mutations.
+
+###### Scenario R10-S1: Reviewed Candidate Needs One Entry
+
+- WHEN a reviewed candidate has a current Epic Update result and changes user-visible or operator-relevant behavior
+- THEN `/sdd-changelog` creates or corrects exactly one native unreleased or per-change entry aligned with the reviewed outcome and accepted gaps.
+
+###### Scenario R10-S2: Internal Or Existing Entry
+
+- WHEN policy does not record the internal-only result or an accurate entry already exists for the same candidate
+- THEN Changelog returns `no-op` without manufacturing public release communication.
+
+###### Scenario R10-S3: Shared Read-Only Candidate Envelope
+
+- WHEN Epic Update or Changelog targets committed or dirty work
+- THEN `sdd candidate resolve` returns one immutable, content-sensitive, read-only diff envelope while `sdd epic update-input` preserves its Epic-specific validation contract.
+
 
 #### Implemented By
 
@@ -869,8 +888,12 @@ Epic Update SHALL accept one exact committed or working-tree diff envelope with 
 | S6/R8-S1 | `skills/sdd-adr/SKILL.md#Gather Context` | support | Invokes the shared context workflow before technical recommendation or decision capture. |
 | S6/R8-S1 | `skills/sdd-change/SKILL.md#Gather Context` | support | Invokes the shared context workflow before intent finalization or technical planning. |
 | S6/R9, S6/R9-S1, S6/R9-S3 | `skills/sdd-epic-update/SKILL.md#Determine Affected Behavior` | primary | Defines candidate-bound behavior derivation, repository-owned reconciliation, routing, terminal boundaries, and idempotent results. |
-| S6/R9-S2 | `src/commands/epic-update-input.js#resolveEpicUpdateInput` | primary | Resolves immutable refs and content-sensitive committed or working-tree candidate envelopes without artifact mutation. |
-| S6/R9 | `docs/story-driven-development.md#Candidate-Bound Epic Reconciliation` | support | Defines the portable capability boundary and CLI-versus-skill ownership split. |
+| S6/R9-S2, S6/R10-S3 | `src/commands/candidate-resolve.js#resolveCandidateEnvelope` | primary | Resolves immutable refs and content-sensitive committed or working-tree candidate envelopes without artifact mutation. |
+| S6/R9-S2, S6/R10-S3 | `src/commands/epic-update-input.js#resolveEpicUpdateInput` | support | Extends the generic envelope with configured Epic artifacts and scoped validation argv. |
+| S6/R9 | `docs/story-driven-development.md#Candidate-Bound Epic Reconciliation` | support | Defines the portable Epic capability boundary and CLI-versus-skill ownership split. |
+| S6/R10, S6/R10-S1, S6/R10-S2 | `skills/sdd-changelog/SKILL.md#Decide Whether An Entry Is Warranted` | primary | Classifies reviewed outcomes, follows native policy, writes one candidate-specific entry when warranted, and returns evidence-based no-op results. |
+| S6/R10-S3 | `skills/sdd-changelog/SKILL.md#Validate Candidate Preservation And Idempotence` | primary | Proves only owned release-record state changed while preserving Review and Epic Update projections. |
+| S6/R10 | `docs/story-driven-development.md#Candidate-Bound Changelog Entries` | support | Defines candidate-specific communication, terminal boundaries, and Release aggregation ownership. |
 #### Implementation Gaps
 
 - S6/R7: remaining delivery skills need final semantic review after mechanical artifact-reference updates.
@@ -896,7 +919,8 @@ Epic Update SHALL accept one exact committed or working-tree diff envelope with 
 | S6/R7-S1 | Automated test `test/workflow-contracts.test.js#packaged workflows coordinate one central Change across every target repository` | All delivery workflows share the central layout, full target-set invariant, repository-free Change-wide lifecycle, and projection semantics without legacy Change paths. | Passing 2026-08-07 |
 | S6/R8-S1 | Automated test `test/workflow-contracts.test.js#packaged planning workflows share one same-session minimum context contract` | The shared skill owns all action profiles, reuses current reads, stays artifact-free and same-session, and is invoked by Explore, ADR, and Change. | Passing 2026-08-11 |
 | S6/R9-S1, S6/R9-S3 | Automated test `test/workflow-contracts.test.js#packaged Epic Update reconciles only repository-owned truth for an exact candidate` | The skill supports active-Change and manual candidates, limits mutation to Epic truth, routes invalid intent/evidence, returns composable statuses, and requires same-candidate no-op behavior. | Passing 2026-08-13 |
-| S6/R9-S2 | Automated tests `test/epic-update-input.test.js#epic update input resolves an immutable committed candidate and changed paths`, `test/epic-update-input.test.js#epic update input inventories staged, unstaged, and untracked working-tree state`, `test/epic-update-input.test.js#epic update input watermark changes when tracked or untracked content changes`, `test/epic-update-input.test.js#epic update input disables repository-configured content filters`, `test/epic-update-input.test.js#epic update input is read-only`, and `test/epic-update-input.test.js#epic update input rejects a baseline that is not an ancestor of a committed candidate` | The helper resolves safe committed and dirty-tree envelopes, includes changed content in its watermark, and rejects invalid committed ranges. | Passing 2026-08-13 |
+| S6/R9-S2, S6/R10-S3 | Automated tests `test/candidate-resolve.test.js#candidate resolve resolves an immutable committed candidate and changed paths`, `test/candidate-resolve.test.js#candidate resolve inventories staged, unstaged, and untracked working-tree state`, `test/candidate-resolve.test.js#candidate resolve watermark changes when tracked or untracked content changes`, `test/candidate-resolve.test.js#candidate resolve disables repository-configured content filters`, `test/candidate-resolve.test.js#candidate resolve is read-only`, and `test/candidate-resolve.test.js#candidate resolve rejects a baseline that is not an ancestor of a committed candidate`; automated test `test/epic-update-input.test.js#epic update input resolves an immutable committed candidate and changed paths` | The shared helper resolves safe committed and dirty-tree envelopes while the Epic wrapper preserves its existing contract. | Passing 2026-08-13 |
+| S6/R10-S1, S6/R10-S2 | Automated test `test/workflow-contracts.test.js#packaged Changelog writes only one reviewed candidate's native release entry` | The skill requires reviewed and reconciled input, follows native policy, handles warranted and no-op outcomes, preserves the implementation projection, and stops before versioning or handoff mutation. | Passing 2026-08-13 |
 
 #### Verification Gaps
 

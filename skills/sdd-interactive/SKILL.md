@@ -82,7 +82,8 @@ Use existing central artifacts when the session continues an active Change. Keep
    - Stop after the one selected slice reaches the public `/sdd-apply` result contract; do not consume another slice.
    - Recommend a separately invoked `/sdd-review` for independent candidate review.
    - After a clean review, recommend `/sdd-epic-update` with the exact candidate envelope. Epic Update owns repository-local implementation maps, gaps, durable verification maps, and same-candidate idempotence.
-   - Keep manual acceptance, changelog, commit, PR, release, and closeout as separate owning steps. Do not hide them inside this wrapper.
+   - When the reviewed result may be user-visible or operator-relevant, recommend `/sdd-changelog` after Epic Update. Changelog owns one candidate-specific native release entry or an evidence-based `no-op`.
+   - Keep manual acceptance, commit, PR, release, and closeout as separate owning steps. Do not hide them inside this wrapper.
    - If the slice cannot finish in one session, preserve honest Change, slice, ledger, and Resume state rather than broadening the wrapper.
 9. Close the working session.
    - Run `sdd validate <space-id> --change <change-id> --repo <repository-id> [--repo <repository-id> ...] --workspace <workspace-root> --json`, filtering the one central record through every target repository needed for the session; resolve deterministic errors introduced by the session and classify warnings. A repository filter selects contextual Epic and repository surfaces, not a Change copy. The lightweight artifact shape may omit full `/sdd-change` detail, but it must still satisfy the validator's shared core contract.
