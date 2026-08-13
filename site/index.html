@@ -703,8 +703,10 @@ skil
   epics/&lt;epic&gt;/epic.md
   adrs/&lt;date&gt;-&lt;decision&gt;.md
   audits/</code></pre>
-              <p class="recordNote">Epics hold durable behavior and evidence maps. ADRs keep lasting decisions. Audits
-                remain point-in-time advisory records.</p>
+              <p class="recordNote">Epics hold durable behavior and evidence maps. ADRs preserve consequential
+                technical choices only when real alternatives and their tradeoffs would otherwise be hard to
+                reconstruct. ADR returns the confirmed direction to its caller without implementing it. Audits remain
+                point-in-time advisory records.</p>
             </article>
 
             <article class="recordType recordChange implementationRecord">
@@ -755,7 +757,7 @@ skil
               <ul>
                 <li>Gather the minimum relevant context</li>
                 <li>Refine outcomes and requirements</li>
-                <li>Compare technical paths</li>
+                <li>Compare viable technical paths and confirm consequential decisions</li>
                 <li>Route specialist guidance</li>
                 <li>Implement with evidence</li>
                 <li>Review complete diffs through systematic search and validated findings</li>
@@ -778,7 +780,9 @@ skil
             <li><span>00</span><strong>Gather action-specific context</strong><code>/sdd-gather-context</code></li>
             <li><span>01</span><strong>Explore</strong><code>/sdd-explore</code></li>
             <li><span>02</span><strong>Capture intent</strong><code>/sdd-change</code></li>
-            <li><span>03</span><strong>Continue planning when ready</strong><code>/sdd-change</code></li>
+            <li class="workflowMapMulti"><span>03</span><strong>Continue planning and settle branching decisions</strong>
+              <div><code>/sdd-change</code><code>/sdd-adr</code></div>
+            </li>
             <li><span>04</span><strong>Converge the experience</strong><code>/sdd-design --plan</code></li>
             <li><span>05</span><strong>Commit to a work
                 scope</strong><code>sdd validate &lt;space-id&gt; --change &lt;change-id&gt; --workspace &lt;path&gt;</code>

@@ -13,7 +13,7 @@ Resolve the workspace, Space ID, repository, and stable repository ID with `sdd 
 
 Use this skill from `/sdd-explore` when a discussion reaches a durable architecture decision. `/sdd-change` must invoke it whenever technical planning reveals two or more meaningfully different viable technical approaches; this skill owns their comparison, recommendation, user decision, and ADR-threshold assessment before returning the result to Change planning. Do not create an ADR during intent capture before technical decisions are understood.
 
-ADRs complement SDD artifacts. They do not replace Product Briefs/PRDs, Epics, Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, change/design/tasks files, review reports, changelogs, or release records.
+ADRs complement SDD artifacts. They do not replace Product Briefs/PRDs, Epics, Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, progressive `change.md`, the behavioral queue in `tasks.md`, review reports, changelogs, or release records.
 
 ## Gather Context
 
@@ -23,7 +23,14 @@ Do not recommend or record a decision while the result is insufficient for the f
 
 ## ADR Threshold
 
-Create or update an ADR when the decision is durable enough that future implementation or review should respect it.
+Create or update an ADR only when all of these are true:
+
+- at least two meaningfully different approaches are viable;
+- the decision is consequential enough that future implementation or review must respect it;
+- the selected direction is surprising or difficult to reconstruct without the tradeoff context;
+- the comparison is grounded in current project evidence rather than invented alternatives.
+
+When only one approach is viable, state the constraining reason and return `no-op` without creating a ceremonial ADR.
 
 Good ADR candidates:
 
@@ -43,7 +50,7 @@ Do not create an ADR for:
 - decisions already governed clearly by project-local guidance
 - ideas the user has not decided or asked to preserve
 
-When unsure, offer an ADR candidate instead of writing a committed decision.
+When unsure, return `needs-user` with the threshold uncertainty instead of writing a committed decision. An explicitly requested draft may use status `Proposed`, but it must remain clearly undecided.
 
 ## Location
 
@@ -61,25 +68,28 @@ If the project has no `docs/adrs/`, create it only when the user has asked to dr
 
 1. Resolve project root and decision context.
    - Start from the `/sdd-gather-context` result.
-   - If invoked from another skill, preserve the stable Change ID, central design notes, decision question, relevant constraints, and approaches already discovered in context.
-2. Resolve the decision.
-   - When invoked by `/sdd-change`, compare the meaningfully different viable approaches using project evidence, recommend one, and ask the user to settle the choice. Do not silently choose for the user.
-   - If the decision remains unresolved, return that state to `/sdd-change`; the Change must remain `proposed`.
-3. Decide whether an ADR is warranted.
-   - If not warranted, report why and return a concise decision summary for the central Change's technical-planning sections in `change.md` or its `tasks.md`, or for an exploration summary.
-   - If warranted but undecided, draft an ADR candidate with status `Proposed`.
-4. Create or update the ADR.
+   - If invoked from another skill, preserve the stable Change ID, progressive planning context, focused decision question, relevant constraints, and approaches already discovered.
+2. Establish the real choice.
+   - Confirm that at least two meaningfully different approaches remain viable under current evidence. Do not invent alternatives merely to justify an ADR.
+   - Compare viable options and their tradeoffs, recommend one, and ask the user to settle the choice. A clear selection or acceptance already given by the user in the current discussion counts as confirmation; otherwise do not silently choose.
+   - If context is insufficient, return `blocked`. If the choice or ADR threshold remains unresolved, return `needs-user`. When invoked by `/sdd-change`, the Change remains `proposed` until the choice is settled.
+3. Apply the ADR threshold.
+   - If the decision does not warrant an ADR, return `no-op` with the selected direction, constraining reason or tradeoff summary, and caller follow-up for the technical-planning sections of `change.md` or the exploration record.
+   - If an ADR is warranted but the user requested only a draft, write a clearly undecided candidate with status `Proposed` and return `needs-user`.
+4. Create or update the ADR after confirmation.
    - Use `assets/adr-template.md`.
    - Preserve existing ADR status unless the user or project workflow explicitly changes it.
    - Use status values that match the project when present; otherwise use `Proposed`, `Accepted`, `Superseded`, or `Rejected`.
-5. Link the ADR.
+5. Link repository-owned truth.
    - Link related Changes by stable Change ID, and link repository-local Epics, Stories, Requirements, Scenarios, PRs, or implementation evidence when known. Never put a private absolute central Change path in a repository-local ADR.
-   - If invoked during `/sdd-change`, ensure the central `change.md` and `tasks.md` identify the repository-relative ADR path and its repository ID.
-   - If invoked during `/sdd-explore`, offer to link the ADR from an exploration summary or later `/sdd-change`.
+   - Return the repository ID, repository-relative ADR path, selected direction, and binding consequences to the caller. The caller owns any corresponding update to `change.md`, an exploration record, or a Requirement slice; do not mutate those artifacts from this skill.
 6. Verify the ADR.
    - Re-read the ADR.
    - Confirm it states context, decision, options considered, consequences, validation, and reconsideration signals.
    - Confirm it does not include secrets, private credentials, raw environment values, speculative roadmap promises, or unrelated private notes.
+7. Stop at the decision boundary.
+   - Do not plan a Change, edit `tasks.md`, update Epic behavior, implement code, review, commit, release, or invoke the next workflow automatically.
+   - Return control to the caller. Any recommended next workflow is a terminal handoff for this invocation.
 
 ## Content Rules
 
@@ -92,13 +102,25 @@ If the project has no `docs/adrs/`, create it only when the user has asked to dr
 - Refer to related Changes by stable Change ID, not by an installation-specific absolute `<workspace>/.sdd/changes/...` path.
 - Keep Epic/Story truth authoritative for behavior. ADRs explain technical decisions and constraints, not user behavior truth.
 
-## Final Response
+## Result Contract
+
+Return exactly one status:
+
+- `complete` — the decision was confirmed and the warranted ADR was created or updated;
+- `no-op` — the assessment completed but no ADR mutation was warranted or the existing ADR already expresses the confirmed decision;
+- `needs-user` — the choice, threshold judgment, or requested draft remains undecided;
+- `blocked` — setup or evidence is insufficient to assess the decision safely;
+- `routed` — the discovered issue belongs to another workflow, such as behavioral scope returning to `/sdd-change`.
 
 Summarize:
 
-- ADR path
-- status
-- decision
-- options considered
+- result status and why
+- repository ID and ADR path, when one exists
+- ADR status
+- selected or unresolved decision
+- viable options considered and decisive tradeoffs
 - links to related stable Change IDs and repository-local SDD artifacts
-- follow-up needed in the central `change.md` or `tasks.md`, repository-local Epic truth, or review
+- caller-owned follow-up for `change.md`, an exploration record, Requirement-slice constraints, Epic truth, or review
+- recommended next workflow, if any
+
+An ADR result is terminal for this invocation. Return the selected direction and reference without implementing it or crossing into the caller's artifact boundary.

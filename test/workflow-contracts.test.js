@@ -147,6 +147,31 @@ test("packaged planning workflows share one same-session minimum context contrac
   );
 });
 
+test("packaged ADR preserves the decision boundary and returns composable results", async () => {
+  const [adrSkill, readme, doctrine] = await Promise.all([
+    readPackageFile("skills", "sdd-adr", "SKILL.md"),
+    readPackageFile("README.md"),
+    readPackageFile("docs", "story-driven-development.md"),
+  ]);
+
+  assert.match(adrSkill, /at least two meaningfully different approaches are viable/);
+  assert.match(adrSkill, /surprising or difficult to reconstruct without the tradeoff context/);
+  assert.match(adrSkill, /Do not invent alternatives merely to justify an ADR/);
+  assert.match(adrSkill, /recommend one, and ask the user to settle the choice/);
+  assert.match(adrSkill, /return `no-op` without creating a ceremonial ADR/);
+  assert.match(adrSkill, /The caller owns any corresponding update to `change\.md`/);
+  assert.match(adrSkill, /do not mutate those artifacts from this skill/);
+  assert.match(adrSkill, /`complete`[\s\S]*`no-op`[\s\S]*`needs-user`[\s\S]*`blocked`[\s\S]*`routed`/);
+  assert.match(adrSkill, /An ADR result is terminal for this invocation/);
+  assert.match(adrSkill, /without implementing it or crossing into the caller's artifact boundary/);
+  assert.doesNotMatch(adrSkill, /central design notes/);
+  assert.doesNotMatch(adrSkill, /change\/design\/tasks files/);
+  assert.doesNotMatch(adrSkill, /ensure the central `change\.md` and `tasks\.md` identify/);
+  assert.match(readme, /Explicit `complete`, `no-op`, `needs-user`, `blocked`, or `routed` result/);
+  assert.match(readme, /without editing caller-owned artifacts or implementing it/);
+  assert.match(doctrine, /Return an explicit result and stop before caller-owned planning or implementation/);
+});
+
 test("packaged Explore preserves generalized durable discussions and routes mature outcomes", async () => {
   const [exploreSkill, exploreAgent, readme, doctrine] = await Promise.all([
     readPackageFile("skills", "sdd-explore", "SKILL.md"),

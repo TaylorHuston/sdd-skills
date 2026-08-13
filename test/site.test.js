@@ -55,6 +55,15 @@ test("public guide documents progressive workspace-owned Changes and current-onl
   assert.doesNotMatch(html, /docs\/changes/);
 });
 
+test("public guide presents ADR as a confirmed terminal decision handoff", async () => {
+  const { html } = await readSite();
+
+  assert.match(html, /ADRs preserve consequential\s+technical choices only when real alternatives/);
+  assert.match(html, /ADR returns the confirmed direction to its caller without implementing it/);
+  assert.match(html, /Compare viable technical paths and confirm consequential decisions/);
+  assert.match(html, /<code>\/sdd-change<\/code><code>\/sdd-adr<\/code>/);
+});
+
 test("public guide has unique fragment targets and sequential navigable sections", async () => {
   const { html } = await readSite();
   const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
