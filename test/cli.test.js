@@ -3525,7 +3525,7 @@ test("packaged Epic templates stay synchronized", async () => {
   }
 });
 
-test("packaged workflow templates preserve boundary, transition, and evidence-integrity contracts", async () => {
+test("packaged tasks template defines adaptive requirement slices instead of an up-front engineering plan", async () => {
   const tasksTemplate = await readFile(
     join(PACKAGE_ROOT, "docs", "templates", "tasks.md"),
     "utf8",
@@ -3538,12 +3538,21 @@ test("packaged workflow templates preserve boundary, transition, and evidence-in
     tasksTemplate,
     "sdd-change tasks template must match the canonical package template",
   );
-  assert.match(tasksTemplate, /^## Pattern Parity Matrix$/m);
-  assert.match(tasksTemplate, /^## Boundary Contract Matrix$/m);
-  assert.match(tasksTemplate, /^## Stateful Transition Matrix$/m);
-  assert.match(tasksTemplate, /concurrent start \/ cancel then late completion \/ replacement \/ retry \/ remount \/ restart/);
-  assert.match(tasksTemplate, /^## Verification Scope Decision$/m);
-  assert.match(tasksTemplate, /exact test title or stable named test anchor/);
+  assert.match(tasksTemplate, /^## Requirement Slices$/m);
+  assert.match(tasksTemplate, /one distinct Requirement or a small group of closely related Requirements/);
+  assert.match(tasksTemplate, /what behavioral work remains, not how to implement it/);
+  assert.match(tasksTemplate, /Order is advisory/);
+  assert.match(tasksTemplate, /^  - New: `EPIC-ID\/S3 R1`/m);
+  assert.match(tasksTemplate, /^  - Revised: `EPIC-ID\/S1 R2`/m);
+  assert.match(tasksTemplate, /^  - Create: `EPIC-ID\/S3`/m);
+  assert.match(tasksTemplate, /^  - Update: `EPIC-ID\/S1`/m);
+  assert.match(tasksTemplate, /^- Scenarios: `EPIC-ID\/S3 R1-S1`, `EPIC-ID\/S1 R2-S1`$/m);
+  assert.doesNotMatch(tasksTemplate, /^## Implementation Ledger$/m);
+  assert.doesNotMatch(tasksTemplate, /^## Verification Ledger$/m);
+  assert.doesNotMatch(tasksTemplate, /^## Pattern Parity Matrix$/m);
+  assert.doesNotMatch(tasksTemplate, /^## Boundary Contract Matrix$/m);
+  assert.doesNotMatch(tasksTemplate, /^## Stateful Transition Matrix$/m);
+  assert.doesNotMatch(tasksTemplate, /^## Verification Scope Decision$/m);
 
   const reviewTemplate = await readFile(
     join(PACKAGE_ROOT, "docs", "templates", "review.md"),

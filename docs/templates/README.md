@@ -13,7 +13,7 @@ These examples mirror the canonical template assets shipped inside the packaged 
 | Orphan audit report | [orphan-audit-report.md](orphan-audit-report.md) | `skills/sdd-orphan-audit/assets/orphan-audit-report-template.md` | `/sdd-orphan-audit` |
 | Code audit report | [code-audit-report.md](code-audit-report.md) | `skills/sdd-code-audit/assets/code-audit-report-template.md` | `/sdd-code-audit` |
 | Product Brief / PRD | [prd.md](prd.md) | `skills/sdd-prd/assets/canonical-prd-template.md` | `/sdd-prd` |
-| Tasks ledger | [tasks.md](tasks.md) | `skills/sdd-change/assets/tasks-template.md` | `/sdd-change`, `/sdd-design --revise`, `/sdd-apply`, `/sdd-interactive` subset |
+| Requirement-slice delivery queue | [tasks.md](tasks.md) | `skills/sdd-change/assets/tasks-template.md` | `/sdd-change`, `/sdd-apply`; conditional sections may be added by `/sdd-design --revise` or delivery/review workflows |
 | Review report | [review.md](review.md) | `skills/sdd-review/assets/review-template.md` | `/sdd-review` |
 | Release PR | [release-pr.md](release-pr.md) | `skills/sdd-release/assets/release-pr-template.md` | `/sdd-release` |
 

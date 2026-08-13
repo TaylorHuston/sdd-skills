@@ -16,7 +16,7 @@ Every Change starts in the central workspace store:
 ```text
 <workspace>/.sdd/changes/<change-id>/
   change.md    # intent, lifecycle, and progressively added technical plan
-  tasks.md     # added during technical planning
+  tasks.md     # adaptive requirements-oriented delivery slices added during planning
 ```
 
 `change.md` is the durable intent, lifecycle, and technical-planning record. Its frontmatter contains `status`, `space`, and `repositories`. Existing Changes may also contain a legacy `design.md`; read and reconcile it when present, but do not create one for new or newly planned Changes.
@@ -75,6 +75,8 @@ Confirm the target repositories before finalizing the plan.
 
 Describe the affected Stories, Requirements, and concrete Scenarios. Cover important success and failure paths without enumerating every imaginable edge case.
 
+For each affected behavior, decide whether it creates a new Requirement or revises existing Requirement truth. Preserve stable Story, Requirement, and Scenario IDs for genuine revisions; allocate new IDs only for genuinely new behavior. Name every Story that must be created or updated and ensure the owning Epic contains the cited Requirements and Scenarios before planning is called complete.
+
 Keep technical constraints in the technical-planning sections of `change.md` unless users or external clients can observe them. Do not invent implementation locations or verification evidence for work that does not exist yet.
 
 ### 3. Resolve technical approach decisions
@@ -89,13 +91,27 @@ When only one technical approach is viable, state the constraining reason in `ch
 
 Do not finalize while a material product or technical choice remains unresolved.
 
-### 4. Plan verification and work
+### 4. Plan verification and requirement slices
 
 Identify the public seams where behavior will be tested and any manual confirmation still needed. Prefer focused behavioral evidence over implementation-coupled tests or generic checklists.
 
-Progressively append or update the sections from `assets/planning-sections.md` in `change.md`: current context, behavioral changes, technical decision handoffs, selected approach, applicable experience design, alternatives, constraints, verification strategy, and risks. Create `tasks.md` as a short capability-level implementation ledger, blockers, verification obligations, and resume point using its template.
+Progressively append or update the sections from `assets/planning-sections.md` in `change.md`: current context, behavioral changes, technical decision handoffs, selected approach, applicable experience design, alternatives, constraints, verification strategy, and risks.
 
-Do not create `design.md` for future Changes. If the selected Change already has one, treat it as compatible source context: update it only when continuing that existing record would otherwise leave two contradictory current plans. Keep tasks adaptive and outcome-oriented, not a file-by-file script.
+Create `tasks.md` from its template as a requirements-oriented delivery queue:
+
+- each slice covers one distinct Requirement or a small group of closely related Requirements;
+- identify each Requirement as new or revised and cite its full Epic/Story/Requirement reference;
+- name every Story to create or update;
+- include one short stand-alone outcome summary and cite authoritative Scenario IDs instead of duplicating their full acceptance text;
+- state only behavioral or decision dependencies needed to know whether the slice is ready;
+- make each slice independently understandable so a future isolated subagent can gather fresh implementation context and deliver it;
+- describe what must be implemented, never how to implement it.
+
+Do not prescribe files, modules, functions, components, schemas, framework techniques, implementation order inside a slice, test architecture, subagent specialization, or speculative enabling work. Do not add generic engineering checklists, universal risk matrices, or empty evidence ledgers. Add conditional coordination or evidence sections only when this particular Change already requires them.
+
+Slice order is advisory, not a frozen implementation sequence. `/sdd-apply` may select any ready slice and may resequence, split, or merge slices when implementation discoveries warrant it, while preserving Requirement and Scenario truth. A discovery that changes accepted behavior or scope returns to `/sdd-change`.
+
+Do not create `design.md` for future Changes. If the selected Change already has one, treat it as compatible source context: update it only when continuing that existing record would otherwise leave two contradictory current plans.
 
 ### 5. Validate and hand off
 
@@ -114,9 +130,9 @@ When implementation, review, or feedback changes scope, observable behavior, rep
 
 1. Confirm that the discovery belongs to the current Change.
 2. Return the Change to `proposed` with `sdd change transition` when needed.
-3. Update the intent and technical-planning sections of `change.md`, `tasks.md`, and relevant ADRs. Reconcile an existing `design.md` only when the Change already has one.
+3. Update the intent and technical-planning sections of `change.md`, affected Epic Story/Requirement/Scenario truth, requirement slices in `tasks.md`, and relevant ADRs. Reconcile an existing `design.md` only when the Change already has one.
 4. Preserve stable Story, Requirement, and Scenario IDs when their meaning has not changed.
-5. Record what changed and the `/sdd-apply` restart point.
+5. Reconcile slice boundaries and record the `/sdd-apply` restart point without adding a technical implementation recipe.
 6. Transition back to `planned` only when the revised plan is coherent.
 
 Create another Change for adjacent future work. Route changed product direction through `/sdd-prd`.
@@ -127,6 +143,7 @@ Create another Change for adjacent future work. Route changed product direction 
 - Do not silently broaden or narrow confirmed intent.
 - Keep unresolved uncertainty explicit.
 - Do not claim planned behavior is implemented or verified.
+- Do not turn `tasks.md` into a second technical plan or a chronological engineering diary.
 - Do not edit application code from this skill.
 - Let project guidance own branch, release, documentation, and technology policy.
 

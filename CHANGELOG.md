@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - **Breaking:** `/sdd-change` is now one adaptive workflow: it creates or resumes a proposed Change, captures intent, and asks before continuing into technical planning. Proposed Changes require only `change.md`; planning progressively expands that record and adds `tasks.md`. Future workflows do not create `design.md`; existing records remain compatible.
+- Future `tasks.md` records are concise adaptive Requirement-slice queues: each slice identifies new or revised Requirements, Stories to create or update, authoritative Scenario references, and the observable outcome without prescribing implementation mechanics.
 - `/sdd-change` now composes with `/sdd-adr` whenever planning reveals two or more meaningfully different viable technical approaches; `/sdd-adr` owns option comparison, recommendation, user decision, and ADR-threshold assessment before Change planning resumes.
 - `/sdd-explore` now serves any substantial discussion the user wants preserved beyond chat, chooses the record location by authority and local guidance, defaults unsettled idea-owned discussions to `<idea>/explorations/`, and may hand mature outcomes to `/sdd-prd`, `/sdd-change`, `/sdd-adr`, or another owning workflow.
 - **Breaking:** `sdd change create` now creates only the proposed `change.md` record and allows repository ownership to remain empty until planning settles the target set.

@@ -62,6 +62,7 @@ test("packaged change workflow progresses one central intent record into plannin
     "assets",
     "planning-sections.md",
   );
+  const tasksTemplate = await readPackageFile("docs", "templates", "tasks.md");
 
   assert.equal(packagedChangeTemplate, changeTemplate);
   assert.equal(packagedPlanningSections, planningSections);
@@ -84,10 +85,17 @@ test("packaged change workflow progresses one central intent record into plannin
   assert.match(changeSkill, /`proposed`: intent exists, but ownership or technical planning may be incomplete/);
   assert.match(changeSkill, /Progressively append or update the sections from `assets\/planning-sections\.md` in `change\.md`/);
   assert.match(changeSkill, /Do not create `design\.md` for future Changes/);
+  assert.match(changeSkill, /one distinct Requirement or a small group of closely related Requirements/);
+  assert.match(changeSkill, /identify each Requirement as new or revised/);
+  assert.match(changeSkill, /name every Story to create or update/);
+  assert.match(changeSkill, /cite authoritative Scenario IDs/);
+  assert.match(changeSkill, /what must be implemented, never how to implement it/);
+  assert.match(changeSkill, /resequence, split, or merge slices/);
   assert.doesNotMatch(changeSkill, /--brief|--plan|--replan|proposal\.md|change-briefs/);
   assert.match(changeTemplate, /status: proposed/);
   assert.match(changeTemplate, /space: <space-id>/);
   assert.match(changeTemplate, /repositories: \[\]/);
+  assert.match(tasksTemplate, /^## Requirement Slices$/m);
   assert.match(planningSections, /## Technical Decision Handoffs/);
   assert.match(
     planningSections,
@@ -228,17 +236,22 @@ test("packaged workflows coordinate one central Change across every target repos
   );
 });
 
-test("multi-repository handoff templates key integration proof and repeated blocks by repository ID", async () => {
+test("requirement slices remain repository-qualified while review handoffs key repeated blocks by repository ID", async () => {
   const [tasks, review] = await Promise.all([
     readPackageFile("docs", "templates", "tasks.md"),
     readPackageFile("docs", "templates", "review.md"),
   ]);
 
-  const verificationScope = markdownSection(tasks, "Verification Scope Decision");
-  assert.match(
-    verificationScope,
-    /Repository-key every integration handoff\.[\s\S]*\| Repository ID \| Tested Integration Tree \/ Ref \| Actual Integrated Tree \/ Ref \| Match \| Required Aggregate Rerun \/ Evidence \| Result \|/,
-  );
+  const slices = markdownSection(tasks, "Requirement Slices");
+  assert.match(slices, /^### S1: <Behavioral outcome>$/m);
+  assert.match(slices, /^- Repository: `<repository-id>`$/m);
+  assert.match(slices, /^- Requirements:$/m);
+  assert.match(slices, /^  - New: `EPIC-ID\/S3 R1` — <requirement summary>$/m);
+  assert.match(slices, /^  - Revised: `EPIC-ID\/S1 R2` — <required behavioral revision>$/m);
+  assert.match(slices, /^- Story changes:$/m);
+  assert.match(slices, /^  - Create: `EPIC-ID\/S3` — <Story title>$/m);
+  assert.match(slices, /^  - Update: `EPIC-ID\/S1` — <reason>$/m);
+  assert.match(slices, /^- Scenarios: `EPIC-ID\/S3 R1-S1`, `EPIC-ID\/S1 R2-S1`$/m);
   assert.match(
     markdownSection(review, "Review Bundle: <repository-id>"),
     /^- Repository ID: <repository-id>$/m,
@@ -534,14 +547,12 @@ test("packaged UI workflows reject source-only confidence without rendered curre
     "assets",
     "tasks-template.md",
   );
-  assert.equal(packagedTasks, canonicalTasks, "the UI evidence ledger must use the canonical tasks template");
-  const matrix = markdownSection(canonicalTasks, "Visual Verification Matrix");
-  assertContractClauses("Visual Verification Matrix", matrix, [
-    [
-      "remain pending until directly inspected evidence and console or network results are recorded",
-      /\| Surface \/ Route or Fixture \| Viewport \| State \/ Interaction \| Expected Rendered Behavior \| Tool \/ Setup \| Inspected Evidence \| Console \/ Network \| Result \| .* \| TBD \| desktop \/ mobile \| .* \| screenshot, trace, or direct observation \| clean \/ findings \/ not applicable \| pending \|/,
-    ],
-  ]);
+  assert.equal(packagedTasks, canonicalTasks, "the Change workflow must use the canonical tasks template");
+  assert.doesNotMatch(canonicalTasks, /^## Visual Verification Matrix$/m);
+  assert.match(
+    canonicalTasks,
+    /Add only the conditional coordination or evidence sections that this Change actually needs during delivery or review\./,
+  );
 });
 
 test("packaged evidence closure keeps high-risk Scenarios unverified when only an aggregate gate passes", async () => {
@@ -622,13 +633,11 @@ test("packaged evidence closure keeps high-risk Scenarios unverified when only a
   ]);
 
   const canonicalTasks = await readPackageFile("docs", "templates", "tasks.md");
-  const verificationScope = markdownSection(canonicalTasks, "Verification Scope Decision");
-  assertContractClauses("Verification Scope Decision", verificationScope, [
-    [
-      "record focused proof separately from by-repository aggregate and integration results",
-      /Keep focused behavior proof distinct from aggregate and integration-candidate proof\. .* Project-defined aggregate commands or authoritative constituent sources by repository: .* Aggregate gates required before `in_review`: yes \/ no \/ pending, by repository .* Exact committed source candidates by repository: .* Freshness and cache treatment: .* Aggregate results and meaningful execution\/count evidence: .* Prospective integration gates required: yes \/ no \/ pending, by repository/,
-    ],
-  ]);
+  assert.doesNotMatch(canonicalTasks, /^## Verification Scope Decision$/m);
+  assert.match(
+    canonicalTasks,
+    /Durable implementation and verification evidence belongs primarily in the affected Stories' `Implemented By` and `Verified By` maps and in `review\.md` when review findings exist\./,
+  );
 });
 
 test("packaged Interactive workflow tracks one lightweight progressive Change", async () => {

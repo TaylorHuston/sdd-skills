@@ -687,9 +687,9 @@ The published package SHALL include the orphan-audit source and universal bundle
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
 | S5/R1-S1, S5/R1-S2 | Automated test `test/cli.test.js#packaged audit and handoff skills preserve current-state and file-scope gates` | The packaged Epic verification skill retains immutable/current-state and successor requirements. | Passing 2026-07-22 |
-| S5/R1-S1 | Automated test `test/cli.test.js#packaged workflow templates preserve boundary, transition, and evidence-integrity contracts` | The canonical report template is versioned, defaults blocked, exposes current findings, and matches the skill asset. | Passing 2026-07-22 |
+| S5/R1-S1 | Automated test `test/cli.test.js#packaged tasks template defines adaptive requirement slices instead of an up-front engineering plan` | The canonical report template is versioned, defaults blocked, exposes current findings, and matches the skill asset. | Passing 2026-08-11 |
 | S5/R2-S1, S5/R2-S2 | Automated test `test/cli.test.js#packaged audit and handoff skills preserve current-state and file-scope gates` | Both handoff skills retain exact diff inventory gates and the PR skill has no separate `--fix` mode. | Passing 2026-07-22 |
-| S5/R2-S2 | Automated test `test/cli.test.js#packaged workflow templates preserve boundary, transition, and evidence-integrity contracts` | The release template mirrors its skill asset and includes file-scope plus SDD-integrity sections. | Passing 2026-07-22 |
+| S5/R2-S2 | Automated test `test/cli.test.js#packaged tasks template defines adaptive requirement slices instead of an up-front engineering plan` | The release template mirrors its skill asset and includes file-scope plus SDD-integrity sections. | Passing 2026-08-11 |
 | S5/R3-S1 | Automated test `test/orphan-audit.test.js#orphan audit rejects option-like changed-from input without Git side effects` | Option-like baselines are rejected before diffing and cannot create an external output file. | Passing 2026-07-23 |
 | S5/R3-S2 | Automated test `test/orphan-audit.test.js#orphan audit fails promptly with an actionable Git timeout` | A stalled Git child is bounded and returns deterministic recovery guidance. | Passing 2026-07-23 |
 | S5/R3-S3 | Automated test `test/orphan-audit.test.js#orphan audit fails closed when any changed-surface Git command fails` | Baseline, unstaged, staged, and untracked query failures cannot silently erase changed-surface evidence. | Passing 2026-07-23 |
@@ -717,7 +717,7 @@ As a developer, I want SDD planning, implementation, and review workflows to car
 
 ##### Requirement R1: Progressive Planning And Handoff Records
 
-The packaged planning workflow SHALL create or resume one central `change.md`, capture durable intent before technical planning, ask whether the user wants to continue, progressively add the technical plan to the same record, and create `tasks.md` only when planning proceeds. Existing `design.md` files SHALL remain compatible without being created for future Changes.
+The packaged planning workflow SHALL create or resume one central `change.md`, capture durable intent before technical planning, ask whether the user wants to continue, progressively add the technical plan to the same record, and create `tasks.md` only when planning proceeds. Future `tasks.md` records SHALL express adaptive logical slices of one Requirement or a small group of closely related Requirements, distinguish new from revised Requirements, name Stories to create or update, cite authoritative Scenarios, and state the observable outcome without prescribing implementation mechanics. Existing `design.md` and legacy `tasks.md` files SHALL remain compatible without being generated for future Changes.
 
 ###### Scenario R1-S1: Deferred Technical Planning
 
@@ -727,7 +727,12 @@ The packaged planning workflow SHALL create or resume one central `change.md`, c
 ###### Scenario R1-S2: Replanning After Review
 
 - WHEN review invalidates Story ownership or verification scope
-- THEN `/sdd-change` returns the same Change to a coherent planned state with a planning update and exact Apply restart point.
+- THEN `/sdd-change` returns the same Change to a coherent planned state with reconciled Requirement slices and an exact Apply restart point.
+
+###### Scenario R1-S3: Adaptive Requirement Slicing
+
+- WHEN technical planning makes the affected behavioral truth implementation-ready
+- THEN `/sdd-change` creates independently understandable slices that identify new or revised Requirements, affected Stories, authoritative Scenarios, observable outcomes, and behavioral dependencies without predicting files, modules, framework techniques, or implementation order.
 
 ##### Requirement R2: Persistent Verified Implementation
 
@@ -806,11 +811,9 @@ Explore, ADR, and Change SHALL invoke one read-only same-session context workflo
 | S6/R1-S1, S6/R1-S2 | `skills/sdd-change/SKILL.md#Revising An Existing Plan` | primary | Governs progressive in-place plan revision and exact Apply restart without a separate mode or new `design.md`. |
 | S6/R1-S1 | `src/commands/change-create.js#createChange` | primary | Creates one proposed `change.md` and allows repository ownership to remain empty. |
 | S6/R1-S1 | `src/commands/change-transition.js#assertPlanningComplete` | primary | Requires repository ownership, technical-planning sections in `change.md`, and `tasks.md` before `planned`, while accepting an existing compatible `design.md`. |
-| S6/R1 | `docs/templates/tasks.md#Decision Fan-Out Ledger` | support | Carries planning decisions and their affected surfaces into delivery. |
-| S6/R1 | `docs/templates/tasks.md#Verification Environment` | support | Records required setups and safety boundaries before evidence is claimed. |
-| S6/R1 | `docs/templates/tasks.md#Verification Scope Decision` | support | Records aggregate and prospective-integration candidate obligations. |
-| S6/R1 | `docs/templates/tasks.md#Visual Verification Matrix` | support | Records proportional rendered states and interactions for UI-bearing work. |
-| S6/R1 | `docs/templates/tasks.md#Review Handoff Candidate` | support | Carries immutable candidate identity and remaining obligations into review. |
+| S6/R1-S3 | `skills/sdd-change/SKILL.md#Plan verification and requirement slices` | primary | Defines adaptive behavioral slice boundaries, Requirement disposition, Story actions, Scenario references, and the prohibition on implementation recipes. |
+| S6/R1-S3 | `docs/templates/tasks.md#Requirement Slices` | primary | Provides the concise generated requirements-oriented delivery queue and advisory ordering contract. |
+| S6/R1-S3 | `src/commands/validate.js#CHANGE_FILES` | support | Requires the new Requirement Slices section while continuing to accept legacy task checklist shapes. |
 | S6/R2 | `skills/sdd-apply/SKILL.md#Persistence invariant` | primary | Defines full Apply as an outcome request that continues until review readiness or a genuine stop. |
 | S6/R2-S1 | `skills/sdd-apply/SKILL.md#Commit cadence invariant` | primary | Makes a verified artifact-reconciled phase commit part of each completed slice. |
 | S6/R2 | `skills/sdd-apply/references/risk-closure.md#Phase Commit` | support | Defines coherent green phase boundaries and immutable handoff behavior. |
@@ -841,14 +844,15 @@ Explore, ADR, and Change SHALL invoke one read-only same-session context workflo
 | S6/R8-S1 | `skills/sdd-change/SKILL.md#Gather Context` | support | Invokes the shared context workflow before intent finalization or technical planning. |
 #### Implementation Gaps
 
-- S6/R1-S1 and S6/R1-S2: existing workspace Change data and remaining package contract tests still need conversion to the progressive `change.md` shape.
 - S6/R7: remaining delivery skills need final semantic review after mechanical artifact-reference updates.
+- S6/R1-S3: `/sdd-apply` still needs a separate focused reconciliation so it consumes adaptive Requirement slices without recreating a universal engineering ledger.
 
 #### Verified By
 
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
 | S6/R1-S1, S6/R1-S2 | Automated tests `test/change-contract.test.js#change create captures proposed intent in one central change.md` and `test/change-contract.test.js#planning completes the same Change before lifecycle work continues` | Proposed intent needs only `change.md`; progressive technical sections, `tasks.md`, and repository ownership gate `planned`; no new `design.md` is created, while compatible existing records remain valid. | Passing 2026-08-11 |
+| S6/R1-S3 | Automated tests `test/workflow-contracts.test.js#packaged change workflow progresses one central intent record into planning`, `test/workflow-contracts.test.js#requirement slices remain repository-qualified while review handoffs key repeated blocks by repository ID`, and `test/cli.test.js#packaged tasks template defines adaptive requirement slices instead of an up-front engineering plan` | The generated tasks contract is requirements-oriented, repository-qualified, explicit about new/revised Requirements and Story changes, Scenario-linked, implementation-agnostic, adaptive, and free of universal engineering matrices and ledgers. | Passing 2026-08-11 |
 | S6/R2-S1 | Semantic source inspection of `skills/sdd-apply/SKILL.md#Persistence invariant` and `skills/sdd-apply/SKILL.md#Commit cadence invariant` | Apply continues beyond a green slice and commits an isolated reconciled phase before later work. | Passing 2026-07-23 |
 | S6/R3-S1, S6/R3-S2 | Semantic source inspection of `skills/sdd-review/SKILL.md#Full-review invariant` and `skills/sdd-review/SKILL.md#Execution-continuity invariant` | Review retains early findings while completing discovery and resumes yielded commands. | Passing 2026-07-23 |
 | S6/R4-S1 | Semantic source inspection of `skills/sdd-design/SKILL.md#Define The Visual Verification Matrix`, `skills/sdd-apply/SKILL.md#Apply Loop`, and `skills/sdd-review/SKILL.md#Review Gates` | Design, Apply, and Review jointly reject source-only UI confidence. | Passing 2026-07-23 |
