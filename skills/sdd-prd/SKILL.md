@@ -212,3 +212,6 @@ Summarize:
 - open questions
 - SDD drift findings, if any
 - recommended next workflow, usually `/sdd-change` when a bounded outcome is worth retaining or planning
+
+## Self Improvement
+After completing this skill ask yourself "what improvements to this skill could be made that would improve our overall SDD workflow?" Report any suggestions to the user.

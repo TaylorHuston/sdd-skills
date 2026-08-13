@@ -1,4 +1,4 @@
 interface:
   display_name: "SDD Review"
-  short_description: "Review one central Change across repositories"
-  default_prompt: "Use $sdd-review to run one deep local PR-style review of the workspace-central active Change across every targeted repository, consolidate repository-specific SDD truth, security, manual UI confirmation, and integration readiness in the central ledger, and gate the one Change-wide closeout on all targets."
+  short_description: "Independently review a slice or full Change"
+  default_prompt: "Use $sdd-review through its public candidate-bound contract, directly with or without a Change. For --slice-checkpoint, independently review the named slice's Requirements/Scenarios plus the exact candidate's relevant quality, security, data, rendered-UI, and regression surface; in implementation phase, report expected stale affected Epic mappings as epic-update-required, and in post-epic phase require them current; remain read-only and report ready, changes-requested, or blocked without lifecycle or closeout work. Otherwise run the complete Change-wide local PR-style review across every targeted repository and gate integration readiness on all targets."

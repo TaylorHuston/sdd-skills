@@ -173,3 +173,6 @@ Report the checkpoint covered, Change path and lifecycle status, Space, reposito
 ## Final Response
 
 Return the result contract above concisely.
+
+## Self Improvement
+After completing this skill ask yourself "what improvements to this skill could be made that would improve our overall SDD workflow?" Report any suggestions to the user.

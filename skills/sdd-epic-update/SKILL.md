@@ -5,7 +5,7 @@ description: Reconcile repository-owned SDD Epic, Story, Requirement, Scenario, 
 
 # SDD Epic Update
 
-Update the durable behavior-to-code map for one exact candidate. This is a mutation capability, not a code review, implementation workflow, or full-Epic audit.
+Update the durable behavior-to-code map for one exact candidate. This public mutation capability may be invoked directly or composed by Apply after a clean slice Review; composition does not create a private mode or make Apply history mandatory. It is not a code review, implementation workflow, or full-Epic audit.
 
 ## Inputs
 
@@ -25,7 +25,7 @@ The conceptual input is one shared diff envelope per repository:
 - candidate SHA when committed, or HEAD plus staged, unstaged, and relevant untracked state for a working tree;
 - optional Change ID, slice ID, Requirement references, Scenario references, review result, and durable verification evidence.
 
-An active Change, selected slice, Apply session, or Implementation Ledger row is optional. Manual changes and traceability-only repairs are legitimate inputs; never fabricate Apply history merely to authorize Epic reconciliation.
+An active Change, selected slice, Apply session, or Implementation Ledger row is optional. Manual changes and traceability-only repairs are legitimate inputs; never fabricate Apply history merely to authorize Epic reconciliation. When Apply composes this capability, it supplies the selected slice, exact reviewed implementation envelope, Review result, and durable verification evidence through this same public contract.
 
 When the baseline or candidate is ambiguous, return `needs-user`. Never infer that the target branch, merge base, previous commit, or current HEAD is the intended baseline without evidence from the caller, Change checkpoint, review envelope, or repository policy.
 
@@ -121,7 +121,7 @@ Stop after Epic/index reconciliation and validation. Do not:
 - write changelog or release-note content;
 - commit, stage, push, open or merge a PR, release, deploy, or close a Change.
 
-Recommend those as separately invoked workflows when applicable. When an active structured Change exists, report the fresh Epic-update candidate watermark so the owning workflow can replace the `Epic-update candidate` checkpoint; do not edit that workspace-local checkpoint from this capability.
+Recommend those as separately invoked workflows when applicable. When an active structured Change exists, report the fresh Epic-update candidate watermark so a direct caller or composing workflow can replace the `Epic-update candidate` checkpoint; do not edit that workspace-local checkpoint from this capability. A composing Apply invocation owns that checkpoint update after handling this result.
 
 ## Result Contract
 
@@ -144,3 +144,6 @@ Also report:
 - idempotence result;
 - post-reconciliation candidate watermark and any gates made stale;
 - unresolved gaps, routes, blockers, and recommended next workflow.
+
+## Self Improvement
+After completing this skill ask yourself "what improvements to this skill could be made that would improve our overall SDD workflow?" Report any suggestions to the user.

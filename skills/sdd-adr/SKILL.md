@@ -124,3 +124,6 @@ Summarize:
 - recommended next workflow, if any
 
 An ADR result is terminal for this invocation. Return the selected direction and reference without implementing it or crossing into the caller's artifact boundary.
+
+## Self Improvement
+After completing this skill ask yourself "what improvements to this skill could be made that would improve our overall SDD workflow?" Report any suggestions to the user.

@@ -1,11 +1,11 @@
 ---
 name: sdd-apply
-description: Select and implement exactly one next-ready or explicitly requested Requirement slice from a planned or in-progress central SDD Change. Resolve its repository, load governing guidance, check branch policy and dirty state, establish the exact pre-slice baseline, choose inline or optional isolated delegated execution, implement and freshly verify only that slice, inspect the resulting candidate, and update lightweight resume state. Return before independent review, Epic reconciliation, changelog, commits, PR, release, or closeout.
+description: Deliver exactly one next-ready or explicitly requested Requirement slice from a planned or in-progress central SDD Change. Resolve its repository, load governing guidance, establish the exact candidate, implement and freshly verify the slice inline or through one optional isolated worker, then compose candidate-bound SDD Review and Epic Update before marking the slice done. Review and Epic Update remain independently callable; Apply stops before another slice, final Change-wide review, changelog, commits, PRs, release, deployment, or closeout.
 ---
 
 # SDD Apply
 
-Select and implement one independently green behavioral Requirement slice. `/sdd-apply` owns the bounded slice-delivery contract; repository guidance and applicable specialist skills own implementation technique.
+Deliver one independently green behavioral Requirement slice through implementation, fresh verification, independent slice Review, and Epic reconciliation. `/sdd-apply` owns this bounded composition; repository guidance and applicable specialist skills own implementation technique, while `/sdd-review` and `/sdd-epic-update` keep their normal public contracts and remain directly callable.
 
 ## Inputs
 
@@ -39,7 +39,7 @@ Prefer the `## Requirement Slices` shape. For compatible legacy task files witho
 When a slice ID is explicit:
 
 - require that exact slice to exist;
-- return `no-op` when it is already done;
+- for a slice labeled `done`, first validate that required implementation verification, slice Review, Epic Update, and any required post-Epic Review are present and current for the recorded final candidate; return `no-op` only when all gates are current, otherwise restore it to `in progress` and resume at the first stale or missing gate without reimplementing already valid work;
 - return `blocked` for an explicit blocked slice;
 - return `needs-user` for an explicit deferred slice when the user must confirm reactivation or sequencing;
 - select it only when its dependencies are complete or the user explicitly resolves the dependency conflict.
@@ -51,9 +51,9 @@ Otherwise choose in this order:
 3. the first `ready` slice whose dependencies are complete;
 4. return `needs-user` when several candidates require a product or sequencing choice that the artifacts do not settle.
 
-Do not choose `done`, `blocked`, or `deferred` work. Ordering in `tasks.md` is advisory, but dependency and status truth is not.
+Do not choose a fully current `done`, `blocked`, or `deferred` slice. A nominally `done` slice with missing or stale composed gates is incomplete state, not a no-op; resume it at the first stale gate and repair its status/checkpoint. Ordering in `tasks.md` is advisory, but dependency and status truth is not.
 
-If no actionable slice remains, return `no-op`. Do not transition to `in_review`, start review, close the Change, or invent more work.
+If no actionable or stale-gate slice remains, return `no-op`. Do not transition to `in_review`, start review, close the Change, or invent more work.
 
 ## Build The Behavioral Brief
 
@@ -128,7 +128,7 @@ Stop with `blocked` when overlapping dirty work makes safe implementation or att
 
 Update the fixed-label current checkpoint under `Resume Here` with the selected Change and slice, one row in its repository-envelope table per affected repository, current phase, latest verification, review, Epic-update, changelog, and acceptance candidates, and open finding or blocker. For a working-tree candidate, its watermark identifies HEAD plus the staged, unstaged, and relevant untracked snapshot; for a committed candidate, record the resolved candidate SHA. This is replaceable resumption state, not a chronological command or evidence log.
 
-On resume, reload canonical artifacts and repository state. Validate the stored Change ID, slice ID, each repository envelope and baseline, current candidates, phase, latest verification, review, Epic-update, changelog, and acceptance candidates, and open finding or blocker against Git and current artifacts. Never trust remembered or stale state. Resume at the first stale, blocked, or incomplete gate. If an exact pre-slice baseline for already-started work cannot be recovered unambiguously, return `needs-user` or `blocked` instead of guessing.
+On resume, reload canonical artifacts and repository state. Validate the stored Change ID, slice ID, each repository envelope and baseline, current candidates, phase, latest verification, Review, Epic-update, changelog, and acceptance candidates, and open finding or blocker against Git and current artifacts. Never trust remembered or stale state. A `done` label is not proof: when its verification, implementation Review, Epic Update, or required post-Epic Review is missing or stale, restore the slice and ledger row to `in progress`, preserve valid implementation, and resume at the first stale, blocked, or incomplete gate. If an exact pre-slice baseline for already-started work cannot be recovered unambiguously, return `needs-user` or `blocked` instead of guessing.
 
 ## Choose Execution Strategy
 
@@ -173,34 +173,70 @@ After preflight:
 5. Inspect the complete resulting candidate against the pre-slice baseline, including staged, unstaged, and relevant untracked changes. Confirm every changed surface is attributable to the slice or identified as pre-existing.
 6. Run fresh, proportional verification for the current candidate. Cover the slice's referenced Requirements and Scenarios, its verification intent, affected interface contracts, and repository-required checks. Record the command or observation, result, exact candidate watermark, coverage, and whether evidence is automated or manual in the result or owning evidence artifact—not in the Implementation Ledger.
 7. Any candidate change makes affected verification stale. Rerun proportionate proof before claiming completion. Manual acceptance remains separate and returns `needs-user` when required now; never present automated verification as human acceptance.
-8. Mark the slice `done` only when its current candidate has passing required automated verification and no unresolved implementation blocker. If verification fails or implementation cannot safely proceed, leave it `in progress` or mark it `blocked` with one concise reason.
+8. Keep the slice `in progress` after implementation verification. Do not mark it `done` until the composed Review and Epic Update gates below succeed.
 9. Keep the selected slice's lightweight Implementation Ledger row current:
    - `in progress`: summarize only the actual implementation surface discovered so far;
    - `done`: summarize the observable result and important changed surface in one concise entry;
    - `blocked`: state the implementation state reached and one concise blocker.
    Replace stale text and update the date. Keep exactly one row per slice. Do not record commands, detailed verification evidence, commit hashes, review state, or predicted implementation steps.
-10. Refresh `Resume Here`, `Remaining slices`, and blockers. Record the latest candidate, verification, and review watermarks plus any open finding or blocker in the replaceable current checkpoint. Choose no additional slice during this invocation.
+10. Refresh `Resume Here`, `Remaining slices`, and blockers after each candidate mutation or composed capability result. Record the latest candidate, verification, Review, Epic-update, changelog, and acceptance watermarks plus any open finding or blocker in the replaceable current checkpoint. Choose no additional slice during this invocation.
+
+## Compose Slice Review
+
+After fresh implementation verification passes, invoke `/sdd-review` through its public candidate-bound contract in **implementation-phase slice-checkpoint mode**. Supply the exact repository envelope, Change and slice IDs, Requirement/Scenario references, implementation verification, manual-acceptance state, and any prior Review finding IDs. Do not use the implementer as the only reviewer; use a fresh-context reviewer when available and independently validate its concrete findings.
+
+Slice-checkpoint Review is narrower than the later final Change-wide integration review:
+
+- Spec Adherence covers the selected slice's Requirements, Scenarios, binding constraints, and interface contracts.
+- Implementation Quality inspects the complete candidate and relevant regression surface, including security, data safety, rendered UI, and repository policy where applicable.
+- It does not transition the Change to `in_review`, assess whole-Change closeout, create a PR, merge, commit, release, deploy, or close the Change.
+- Direct `/sdd-review` invocation remains valid with or without Apply and uses the same public inputs and result vocabulary.
+
+Handle the Review result explicitly:
+
+- `ready`: refresh the implementation Review candidate and continue to Epic Update. `epic-update-required` is an expected companion result when implementation and evidence are sound but affected Epic mappings are still stale; it is not permission to skip Epic Update.
+- `changes-requested`: keep the slice `in progress`. By default, perform at most one bounded same-slice remediation batch for valid findings that do not require product, behavior, design, architecture, destructive, credential, production, or user-authority decisions. Rerun affected implementation verification, re-resolve the candidate, and invoke scoped re-review with prior finding IDs plus old/new candidate watermarks.
+- `blocked`: keep the slice `in progress` or `blocked` according to the concrete condition and return `blocked` after recording it.
+- findings that change accepted behavior route to `/sdd-change`; unresolved experience direction routes to `/sdd-design --revise`; consequential technical alternatives route to `/sdd-adr`; user decisions or authority return `needs-user`.
+
+If the bounded remediation and scoped re-review do not produce `ready`, stop this Apply invocation. Do not loop indefinitely or proceed to Epic Update with unresolved `BLOCKING` or `REQUIRED` findings.
+
+## Compose Epic Update
+
+After slice-checkpoint Review is `ready` for the exact implementation candidate, invoke `/sdd-epic-update` through its public candidate-bound contract. Supply the same implementation baseline/candidate envelope, Change and slice IDs, Requirements/Scenarios, current Review result, and durable verification evidence.
+
+Epic Update remains independently callable with or without Apply. Within Apply:
+
+- scope reconciliation to behavior affected by the selected slice while allowing necessary correction of directly contradictory neighboring Epic truth;
+- accept `complete` or evidence-based `no-op` as a passing gate;
+- handle `needs-user`, `blocked`, or `routed` exactly as the capability reports and do not mark the slice done;
+- after Epic mutations, re-resolve the repository candidate and record both the reviewed implementation-input watermark and post-Epic-update repository watermark;
+- when Epic Update returns `complete`, invoke `/sdd-review --slice-checkpoint --phase post-epic` against the post-reconciliation candidate. Scope this rereview to affected Epic truth, anchors, durable evidence, candidate attribution, and regressions introduced by the Epic-only change; the final Review watermark must cover the actual post-Epic candidate;
+- when Epic Update returns `no-op`, the implementation-phase Review remains current because the repository candidate did not change;
+- do not invoke Changelog, commit the Epic edits, or perform lifecycle/closeout work.
+
+Mark the slice `done` only when required implementation verification is fresh, implementation-phase slice Review is `ready`, Epic Update returned `complete` or evidence-based `no-op`, and any required post-Epic slice Review is `ready` for the final repository candidate. Manual acceptance remains separate and may remain `pending user`; record it without claiming acceptance.
 
 If implementation shows that a slice should be split or merged without changing accepted behavior, update the boundaries and references concisely. Route changed acceptance or scope back to `/sdd-change`.
 
 ## Terminal Handoffs
 
-`/sdd-apply` stops after one slice. It does not own or automatically cross into:
+`/sdd-apply` stops after one complete slice pipeline. It composes slice-checkpoint Review and Epic Update, but it does not automatically cross into:
 
-- independent review or remediation review loops;
-- Epic or Story truth reconciliation;
+- another Requirement slice;
+- final Change-wide integration Review or transition to `in_review`;
 - changelog or release communication;
 - commits, pushes, PRs, merges, or branch mutation;
 - release or deployment;
-- Change transition to `in_review` or closeout.
+- closeout.
 
-A request to implement another slice is a new `/sdd-apply` invocation. Implemented work normally recommends separately invoked `/sdd-review`. When Apply addresses prior review findings, carry the prior finding IDs, previously reviewed candidate watermark, current fix candidate watermark, and focused fix verification into a separately invoked scoped re-review; do not silently substitute that scoped pass for a separately requested full review. Changed behavior routes to Change, and durable technical tradeoffs route to ADR. Report exact pending handoffs without executing them implicitly.
+A request to implement another slice is a new `/sdd-apply` invocation. When no actionable slice remains, recommend a directly invoked final `/sdd-review` across the complete Change; that review is not replaced by the per-slice Review result. Changed behavior routes to Change, unresolved experience direction to Design, and durable technical tradeoffs to ADR. Report exact pending handoffs without executing them implicitly.
 
 ## Result Contract
 
 Return exactly one composable status:
 
-- `complete` — the selected slice is `done`, the current candidate was independently inspected, and required automated verification is fresh; report pending manual acceptance and recommended Review separately;
+- `complete` — the selected slice is `done`, required implementation verification is fresh, implementation-phase slice Review is `ready`, Epic Update is `complete` or evidence-based `no-op`, and any required post-Epic slice Review is `ready` for the final candidate; report pending manual acceptance and whether another Apply slice or final Change-wide Review comes next;
 - `no-op` — the explicit slice was already done or no actionable slice remains, and no mutation was needed;
 - `needs-user` — slice choice, deferred-slice reactivation, branch or isolation resolution, overlapping-state disposition, required context, authorization, or manual acceptance requires the user;
 - `blocked` — safe implementation or required verification cannot complete with current state or evidence;
@@ -216,8 +252,13 @@ Also report:
 - slice state: `done`, `blocked`, `deferred`, or `in progress`;
 - concise changed-surface summary matching the current Implementation Ledger row;
 - verification observations with Requirement/Scenario coverage and candidate watermark;
+- composed Review mode, verdict, finding IDs/counts, reviewed implementation watermark, remediation/re-review result, and remaining findings;
+- composed Epic Update result, affected Epic references, implementation-input and post-reconciliation watermarks, validation/idempotence result, and stale downstream gates;
 - manual acceptance state;
 - remaining slices and next ready slice, if determinable;
 - blockers, concerns, scope discoveries, and recommended next workflow.
 
 Do not claim the whole Change is implementation-complete merely because one slice is done. Verification and worker evidence are candidate-bound; identify stale evidence rather than carrying it forward.
+
+## Self Improvement
+After completing this skill ask yourself "what improvements to this skill could be made that would improve our overall SDD workflow?" Report any suggestions to the user.

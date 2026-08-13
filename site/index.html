@@ -791,15 +791,17 @@ skil
             <li class="workflowMapMulti"><span>03</span><strong>Plan independently green slices and settle branching decisions</strong>
               <div><code>/sdd-change</code><code>/sdd-adr</code></div>
             </li>
-            <li><span>04</span><strong>Converge the experience</strong><code>/sdd-design --plan</code></li>
-            <li><span>05</span><strong>Commit to a work
-                scope</strong><code>sdd validate &lt;space-id&gt; --change &lt;change-id&gt; --workspace &lt;path&gt;</code>
+            <li class="workflowMapMulti"><span>04</span><strong>Validate, then commit to the planned scope</strong>
+              <div><code>sdd validate &lt;space-id&gt; --change &lt;change-id&gt; --workspace &lt;path&gt;</code><code>/sdd-change</code></div>
             </li>
-            <li><span>06</span><strong>Implement one candidate-bound slice</strong><code>/sdd-apply</code></li>
-            <li class="workflowMapMulti"><span>07</span><strong>Review independently</strong>
-              <div><code>/sdd-review</code><code>/sdd-epic-verify</code></div>
+            <li><span>05</span><strong>Optionally converge the planned experience</strong><code>/sdd-design --plan</code></li>
+            <li class="workflowMapMulti"><span>06</span><strong>Deliver one verified slice</strong>
+              <div><code>/sdd-apply</code><code>/sdd-review --slice-checkpoint</code><code>/sdd-epic-update</code></div>
             </li>
-            <li><span>08</span><strong>Reconcile durable Epic truth</strong><code>/sdd-epic-update</code></li>
+            <li class="workflowMapMulti"><span>07</span><strong>Repeat per slice, then review the complete Change on current Epic truth</strong>
+              <div><code>/sdd-apply</code><code>/sdd-review</code><code>/sdd-epic-verify</code></div>
+            </li>
+            <li><span>08</span><strong>Confirm the final Review and Epic truth share one candidate</strong><code>/sdd-review</code></li>
             <li><span>09</span><strong>Write candidate release communication when warranted</strong><code>/sdd-changelog</code></li>
             <li class="workflowMapMulti"><span>10</span><strong>Deliver</strong>
               <div><code>/sdd-pr</code><code>/sdd-release</code></div>
@@ -807,10 +809,9 @@ skil
           </ol>
           <p class="referenceNote"><code>/sdd-change</code> returns <code>complete</code>, <code>no-op</code>,
             <code>needs-user</code>, <code>blocked</code>, or <code>routed</code>, then returns control before Design or
-            Apply begins. Apply uses the same public statuses after exactly one slice: it records the pre-slice
+            Apply begins. Design uses the same statuses, preserves a <code>planned</code> Change during initial convergence, binds revisions to exact repository candidates, keeps prototypes optional, and returns before separately invoked Apply or Review. Apply uses the same public statuses after exactly one slice: it records the pre-slice
             baseline for each affected repository, may implement inline or through one fresh-context worker in an
-            authorized dedicated isolated workspace, inspects the complete candidate itself, and requires fresh Requirement/Scenario verification before recommending a separate
-            Review. Epic Update then works from an exact committed or working-tree candidate, updates implementation and verification maps only from inspected durable evidence, and stops before code review, code fixes, Change lifecycle mutation, changelog work, and commits. Changelog uses the same candidate envelope after current Review and Epic Update, follows the repository's native release-record policy, returns <code>no-op</code> for internal-only or already accurate work, and stops before versioning, staging, commits, PRs, release, or deployment. Release owns aggregation and version intent. The map shows recommended handoffs, not an automatic cascade.</p>
+            authorized dedicated isolated workspace, inspects and freshly verifies the candidate, then invokes the public read-only Review contract in implementation-phase slice-checkpoint mode. After any bounded remediation and scoped re-review succeeds, Apply invokes the public Epic Update contract; when Epic files change, it invokes post-Epic slice Review on the final candidate before marking the slice done. Review and Epic Update remain directly callable; a separate final Review on current Epic truth still owns complete-Change integration readiness. Changelog consumes the same candidate envelope after current final Review and current Epic truth, follows the repository's native release-record policy, returns <code>no-op</code> for internal-only or already accurate work, and stops before versioning, staging, commits, PRs, release, or deployment. Release owns aggregation and version intent. Changelog remains outside the per-slice pipeline; commits, PRs, release, deployment, and closeout are never implied by Apply's composition.</p>
         </section>
 
         <section class="referenceLifecycle" aria-labelledby="reference-lifecycle-title">

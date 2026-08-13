@@ -72,28 +72,36 @@ test("public guide presents Change as composable vertical-slice planning", async
   assert.match(html, /Plan independently green slices and settle branching decisions/);
   assert.match(html, /<code>complete<\/code>, <code>no-op<\/code>,\s+<code>needs-user<\/code>, <code>blocked<\/code>, or <code>routed<\/code>/);
   assert.match(html, /returns control before Design or\s+Apply begins/);
-  assert.match(html, /recommended handoffs, not an automatic cascade/);
+  assert.match(html, /commits, PRs, release, deployment, and closeout are never implied by Apply's composition/);
 });
 
-test("public guide presents Apply as one candidate-bound terminal workflow", async () => {
+test("public guide presents Design as optional planned convergence and candidate-bound revision", async () => {
   const { html } = await readSite();
 
-  assert.match(html, /Implement one candidate-bound slice/);
+  assert.match(html, /Validate, then commit to the planned scope[\s\S]*Optionally converge the planned experience/);
+  assert.match(html, /Design uses the same statuses, preserves a <code>planned<\/code> Change during initial convergence, binds revisions to exact repository candidates, keeps prototypes optional, and returns before separately invoked Apply or Review/);
+});
+
+test("public guide presents Apply as one reviewed and reconciled slice pipeline", async () => {
+  const { html } = await readSite();
+
+  assert.match(html, /Deliver one verified slice/);
   assert.match(html, /exact baseline with fresh candidate-bound evidence/);
   assert.match(html, /Apply uses the same public statuses after exactly one slice/);
   assert.match(html, /implement inline or through one fresh-context worker in an\s+authorized dedicated isolated workspace/);
-  assert.match(html, /inspects the complete\s+candidate itself/);
-  assert.match(html, /fresh Requirement\/Scenario verification before recommending a separate\s+Review/);
+  assert.match(html, /invokes the public read-only Review contract in implementation-phase slice-checkpoint mode/);
+  assert.match(html, /invokes the public Epic Update contract; when Epic files change, it invokes post-Epic slice Review on the final candidate before marking the slice done/);
+  assert.match(html, /Review and Epic Update remain directly callable/);
 });
 
 test("public guide presents candidate-bound Epic reconciliation as its own capability", async () => {
   const { html } = await readSite();
 
-  assert.match(html, /Reconcile durable Epic truth/);
+  assert.match(html, /Confirm the final Review and Epic truth share one candidate/);
   assert.match(html, /<code>\/sdd-epic-update<\/code>/);
-  assert.match(html, /exact committed or working-tree candidate/);
-  assert.match(html, /updates implementation and verification maps only from inspected durable evidence/);
-  assert.match(html, /stops before code review, code fixes, Change lifecycle mutation, changelog work, and commits/);
+  assert.match(html, /public Epic Update contract/);
+  assert.match(html, /Review and Epic Update remain directly callable/);
+  assert.match(html, /Epic truth share one candidate/);
   assert.match(html, /<code>sdd epic update-input<\/code>/);
 });
 
@@ -101,7 +109,7 @@ test("public guide presents candidate-bound Changelog as separate from Release",
   const { html } = await readSite();
 
   assert.match(html, /<code>\/sdd-changelog<\/code>/);
-  assert.match(html, /same candidate envelope after current Review and Epic Update/);
+  assert.match(html, /same candidate envelope after current final Review and current Epic truth/);
   assert.match(html, /repository's native release-record policy/);
   assert.match(html, /returns <code>no-op<\/code> for internal-only or already accurate work/);
   assert.match(html, /stops before versioning, staging, commits, PRs, release, or deployment/);

@@ -1,6 +1,6 @@
 ---
 name: sdd-interactive
-description: Create and apply a lightweight SDD change in one tracked interactive working session. Use when the user invokes /sdd-interactive or asks for small UI tweaks, minor behavior refinements, polish, narrow bug fixes, or other concrete changes that deserve a durable change record but do not need a full upfront /sdd-change pass. Combines minimal progressive Change capture with exactly one public /sdd-apply-style Requirement slice, then recommends separately callable Review, Epic Update, acceptance, and commit steps.
+description: Create and apply a lightweight SDD change in one tracked interactive working session. Use for small UI tweaks, minor behavior refinements, polish, narrow bug fixes, or other concrete changes that deserve a durable record without a full upfront /sdd-change pass. Combines minimal Change capture with exactly one public /sdd-apply Requirement slice, including its composed slice Review and Epic Update gates, then recommends final Review, acceptance, and authorized handoff steps.
 ---
 
 # SDD Interactive
@@ -56,7 +56,7 @@ Use existing central artifacts when the session continues an active Change. Keep
    - Take one user request, manual-testing note, or tweak at a time.
    - Record it in the central `tasks.md` before or immediately after acting, including the responsible repository ID.
    - Classify it as `cosmetic`, `defect`, `verification gap`, `artifact drift`, `requirement refinement`, `small in-scope behavior`, `scope expansion`, or `product drift`.
-   - For `cosmetic` changes, make the smallest safe edit, verify the affected surface, and record why no Epic truth changed.
+   - For `cosmetic` changes, record one narrow presentation Requirement slice and execute the public `/sdd-apply` contract. Use rendered/manual proof where appropriate and let composed Epic Update return `no-op` when no durable Epic truth changed; do not bypass the mandatory slice Review gate.
    - For `defect` changes, route through the public `/sdd-apply` trigger contract, including diagnosis and failing-first proof when applicable.
    - For `verification gap`, use the same one-slice Apply contract to produce the missing proof before claiming completion.
    - For `artifact drift`, route repository-owned Epic truth to `/sdd-epic-update`; route Change, supporting-doc, or release-communication drift to its owning workflow.
@@ -79,9 +79,9 @@ Use existing central artifacts when the session continues an active Change. Keep
    - Record only concrete consequences that changed implementation, verification, artifacts, or stop conditions; do not maintain a skills-considered inventory.
    - Validate important subagent claims before updating durable truth or committing.
 8. Return at the capability boundaries.
-   - Stop after the one selected slice reaches the public `/sdd-apply` result contract; do not consume another slice.
-   - Recommend a separately invoked `/sdd-review` for independent candidate review.
-   - After a clean review, recommend `/sdd-epic-update` with the exact candidate envelope. Epic Update owns repository-local implementation maps, gaps, durable verification maps, and same-candidate idempotence.
+   - Stop after the one selected slice reaches the public `/sdd-apply` result contract, including its composed slice-checkpoint Review and Epic Update gates; do not consume another slice.
+   - Preserve the composed Review verdict, finding IDs, reviewed implementation watermark, and Epic Update result rather than duplicating either capability.
+   - Recommend a separately invoked final `/sdd-review` only when the lightweight Change is otherwise implementation-complete and needs Change-wide integration readiness.
    - When the reviewed result may be user-visible or operator-relevant, recommend `/sdd-changelog` after Epic Update. Changelog owns one candidate-specific native release entry or an evidence-based `no-op`.
    - Keep manual acceptance, commit, PR, release, and closeout as separate owning steps. Do not hide them inside this wrapper.
    - If the slice cannot finish in one session, preserve honest Change, slice, ledger, and Resume state rather than broadening the wrapper.
@@ -91,9 +91,9 @@ Use existing central artifacts when the session continues an active Change. Keep
    - For browser-visible or otherwise user-facing app changes, walk the user through what to manually confirm in the UI: app URL, setup state, routes, clicks/inputs, expected results, failure signs, and what feedback would change Requirements, Scenarios, or implementation.
    - Record that walkthrough in `tasks.md` under `Manual UI Confirmation`. If no manual UI confirmation applies, record why.
    - Record manual confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
-   - Refresh only the honest one-slice resume state and public Apply result. Do not claim Review, Epic Update, acceptance, changelog, commit, PR, release, or closeout completed unless those public capabilities were separately invoked.
-   - Keep the central status `in_progress`; `/sdd-review` owns any later transition to `in_review`.
-   - Recommend `/sdd-review`, then `/sdd-epic-update` for affected durable truth.
+   - Refresh only the honest one-slice resume state and public Apply result. Record the Review and Epic Update results composed through Apply, but do not claim final Change-wide Review, acceptance, changelog, commit, PR, release, or closeout completed unless those public capabilities were separately invoked.
+   - Keep the central status `in_progress`; final directly invoked `/sdd-review` owns any later transition to `in_review`.
+   - Recommend final `/sdd-review` when the lightweight Change is implementation-complete; Epic truth is already reconciled by the Apply slice pipeline.
    - Do not commit, close, merge, release, or deploy from this wrapper.
 
 ## Artifact Shape
@@ -215,7 +215,7 @@ Summarize:
 
 - canonical central Change folder path
 - requests handled
-- Change/slice artifacts updated and the separately pending Epic Update handoff
+- Change/slice artifacts updated, composed slice Review and Epic Update results, and any separately pending final Review handoff
 - tests or checks run
 - manual UI confirmations the user should perform, or why none apply
 - remaining gaps, review needs, and whether `/sdd-review` is recommended

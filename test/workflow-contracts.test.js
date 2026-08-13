@@ -330,6 +330,8 @@ test("packaged Epic Update reconciles only repository-owned truth for an exact c
   ]);
 
   assert.match(epicUpdate, /with or without an active Change[\s\S]*Apply history/);
+  assert.match(epicUpdate, /public mutation capability may be invoked directly or composed by Apply/);
+  assert.match(epicUpdate, /When Apply composes this capability, it supplies the selected slice, exact reviewed implementation envelope, Review result, and durable verification evidence through this same public contract/);
   assert.match(epicUpdate, /shared diff envelope per repository/);
   assert.match(epicUpdate, /sdd epic update-input <repository-path>/);
   assert.match(epicUpdate, /Derive affected behavior from actual implementation, not filenames alone/);
@@ -339,7 +341,7 @@ test("packaged Epic Update reconciles only repository-owned truth for an exact c
   assert.match(epicUpdate, /second invocation should normally produce no Epic\/index changes and return `no-op`/);
   assert.match(epicUpdate, /Do not:[\s\S]*review implementation quality[\s\S]*modify application code[\s\S]*Change lifecycle state[\s\S]*write changelog[\s\S]*commit/);
   assert.match(epicUpdate, /`complete`[\s\S]*`no-op`[\s\S]*`needs-user`[\s\S]*`blocked`[\s\S]*`routed`/);
-  assert.match(epicUpdateAgent, /Reconcile Epic truth to one exact candidate/);
+  assert.match(epicUpdateAgent, /public directly callable or Apply-composed contract/);
   assert.match(doctrine, /## Candidate-Bound Epic Reconciliation/);
   assert.match(doctrine, /`\/sdd-epic-update`/);
 });
@@ -381,6 +383,8 @@ test("packaged Apply delivers one candidate-bound slice with optional isolated d
 
   assert.match(applySkill, /Default mode applies exactly one slice\./);
   assert.match(applySkill, /A bare `S#` argument is a slice ID/);
+  assert.match(applySkill, /for a slice labeled `done`, first validate that required implementation verification, slice Review, Epic Update, and any required post-Epic Review are present and current/);
+  assert.match(applySkill, /A nominally `done` slice with missing or stale composed gates is incomplete state, not a no-op/);
   assert.match(applySkill, /When no slice is supplied, choose the next ready slice/);
   assert.match(applySkill, /an `in progress` slice named by `Resume Here`[\s\S]*the first `ready` slice whose dependencies are complete/);
   assert.match(applySkill, /## Build The Behavioral Brief/);
@@ -416,22 +420,56 @@ test("packaged Apply delivers one candidate-bound slice with optional isolated d
   assert.match(applySkill, /Manual acceptance remains separate/);
   assert.match(applySkill, /Keep exactly one row per slice/);
   assert.match(applySkill, /Choose no additional slice during this invocation/);
+  assert.match(applySkill, /## Compose Slice Review/);
+  assert.match(applySkill, /invoke `\/sdd-review` through its public candidate-bound contract in \*\*implementation-phase slice-checkpoint mode\*\*/);
+  assert.match(applySkill, /Direct `\/sdd-review` invocation remains valid with or without Apply/);
+  assert.match(applySkill, /perform at most one bounded same-slice remediation batch/);
+  assert.match(applySkill, /invoke scoped re-review with prior finding IDs plus old\/new candidate watermarks/);
+  assert.match(applySkill, /## Compose Epic Update/);
+  assert.match(applySkill, /invoke `\/sdd-epic-update` through its public candidate-bound contract/);
+  assert.match(applySkill, /Epic Update remains independently callable with or without Apply/);
+  assert.match(applySkill, /when Epic Update returns `complete`, invoke `\/sdd-review --slice-checkpoint --phase post-epic`/);
+  assert.match(applySkill, /Mark the slice `done` only when required implementation verification is fresh, implementation-phase slice Review is `ready`, Epic Update returned `complete` or evidence-based `no-op`, and any required post-Epic slice Review is `ready`/);
   assert.match(applySkill, /## Terminal Handoffs/);
-  assert.match(applySkill, /stops after one slice/);
-  assert.match(applySkill, /carry the prior finding IDs, previously reviewed candidate watermark, current fix candidate watermark/);
+  assert.match(applySkill, /stops after one complete slice pipeline/);
+  assert.match(applySkill, /final Change-wide integration Review/);
   assert.match(applySkill, /## Result Contract/);
   assert.match(applySkill, /Return exactly one composable status/);
   assert.match(applySkill, /`complete`[\s\S]*`no-op`[\s\S]*`needs-user`[\s\S]*`blocked`[\s\S]*`routed`/);
   assert.match(applySkill, /artifacts read and written/);
   assert.match(applySkill, /one diff envelope per affected repository/);
   assert.match(applyAgent, /exactly one next-ready or explicitly named Requirement slice/);
+  assert.match(applyAgent, /compose the public candidate-bound \$sdd-review contract in implementation-phase slice-checkpoint mode/);
+  assert.match(applyAgent, /compose \$sdd-epic-update, and run post-Epic slice Review when Epic files changed before marking the slice done/);
   assert.match(doctrine, /one fresh-context implementer/);
   assert.match(doctrine, /requires fresh candidate-bound verification/);
   assert.match(doctrine, /structured Requirement-slice IDs, fields, references, dependency graphs, ledger alignment, and Resume checkpoint shape/);
-  assert.match(readme, /one optional fresh-context implementer in an authorized dedicated isolated workspace/);
-  assert.match(readme, /deterministic slice, reference, dependency, ledger, and Resume-checkpoint validation|checks structured Requirement-slice IDs and required fields/);
+  assert.match(readme, /implements inline or with one optional isolated worker/);
 
   assert.doesNotMatch(applySkill, /Persistence invariant|Commit cadence invariant|Pattern Parity Matrix|Boundary Contract Matrix|Stateful Transition Matrix|Verification Ledger|--review-only|--no-delegate|--no-commit|transition <space-id> <change-id> --from in_progress --to in_review|sdd change close/);
+});
+
+test("packaged Review stays directly callable and supports read-only slice composition", async () => {
+  const [reviewSkill, reviewAgent] = await Promise.all([
+    readPackageFile("skills", "sdd-review", "SKILL.md"),
+    readPackageFile("skills", "sdd-review", "agents", "openai.yaml"),
+  ]);
+  const modes = markdownSection(reviewSkill, "Inputs And Modes");
+
+  assert.match(reviewSkill, /same public capability supports a slice checkpoint composed by `\/sdd-apply` and a directly invoked final Change-wide local-PR gate/);
+  assert.match(reviewSkill, /A Change is optional for direct candidate review; never fabricate Change, slice, or Apply history/);
+  assert.match(modes, /`--candidate-review <repository-path> --baseline <commit-ish>/);
+  assert.match(modes, /Without accepted behavior inputs, mark Spec Adherence `cannot-verify` rather than inventing a Change/);
+  assert.match(modes, /`--slice-checkpoint --slice S# --baseline <commit-ish>[\s\S]*--phase implementation\|post-epic/);
+  assert.match(modes, /Scope Spec Adherence to that slice's Requirements, Scenarios, constraints, and interfaces/);
+  assert.match(modes, /report stale or missing Epic mappings as `epic-update-required` rather than `changes-requested`/);
+  assert.match(modes, /In `post-epic` phase, require affected Epic truth and anchors to match the candidate/);
+  assert.match(modes, /remain read-only: do not write `review\.md` or other artifacts, remediate, commit, transition lifecycle state/);
+  assert.match(modes, /This mode may be composed by Apply or invoked directly by a user through the same contract/);
+  assert.match(reviewSkill, /Never transition lifecycle state in `--slice-checkpoint` mode/);
+  assert.match(reviewSkill, /In implementation-phase `--slice-checkpoint` only, stale affected Epic mappings[\s\S]*produce `ready` plus `epic-update-required`/);
+  assert.match(reviewAgent, /directly with or without a Change/);
+  assert.match(reviewAgent, /For --slice-checkpoint, independently review the named slice/);
 });
 
 test("packaged Review completes every applicable gate after an early blocking finding", async () => {
@@ -573,6 +611,65 @@ test("packaged Review resumes yielded commands and preserves the full until-read
       /complete gate scorecard covering every applicable Review Gate[\s\S]*final post-remediation reviewed source commit per repository as the review watermarks/,
     ],
   ]);
+  assert.match(finalResponse, /Implementation Quality: pass\|findings\|cannot-verify/);
+  assert.match(finalResponse, /Spec Adherence: pass\|findings\|cannot-verify/);
+});
+
+test("packaged Design composes through planned and candidate-bound terminal handoffs", async () => {
+  const designSkill = await readPackageFile("skills", "sdd-design", "SKILL.md");
+
+  assertContractClauses("Design composition", designSkill, [
+    [
+      "require and preserve planned status for initial design",
+      /`--plan` requires and preserves central `planned` status/,
+    ],
+    [
+      "transition review only immediately before confirmed edits",
+      /After feedback is confirmed as an experience revision within accepted behavior and the user confirms the revised direction,[\s\S]*immediately before editing central Change artifacts/,
+    ],
+    [
+      "route proposed work back to Change",
+      /A `proposed` Change returns `routed` to `\/sdd-change`/,
+    ],
+    [
+      "resolve exact revision candidates",
+      /sdd candidate resolve <repository-path> --baseline <commit-ish> --candidate <working-tree-or-commit-ish> --workspace <workspace-root> --json/,
+    ],
+    [
+      "never guess a revision baseline",
+      /Take the baseline from explicit input, the Apply checkpoint, or the Review result; never guess it/,
+    ],
+    [
+      "keep prototypes optional",
+      /If no design tooling is installed, produce a clear text, ASCII, or Markdown experience contract and continue\. Missing optional tools are not blockers/,
+    ],
+    [
+      "preserve the fixed checkpoint and downstream freshness",
+      /fixed `Resume Here` phase, current slice, repository envelopes, downstream candidate freshness, acceptance state, and open finding or blocker/,
+    ],
+    [
+      "reopen every affected slice while preserving dependency selection",
+      /When repository implementation must change, reopen every affected `done` slice coherently:[\s\S]*Do not leave affected downstream slices `done`, because Apply would skip required revision work/,
+    ],
+    [
+      "refresh envelopes after repository-local design-doc mutation",
+      /After any authorized repository-local design-document mutation in `--revise`, rerun `sdd candidate resolve`[\s\S]*recalculate downstream freshness from the new watermark/,
+    ],
+    [
+      "define terminal wait and route behavior for every result",
+      /Choose the terminal handoff or wait condition from the result:[\s\S]*`needs-user`: invoke no downstream workflow[\s\S]*`blocked`: invoke no downstream workflow[\s\S]*`routed`: name the one owning workflow/,
+    ],
+    [
+      "return the shared composable result vocabulary",
+      /Return exactly one composable status:[\s\S]*`complete`[\s\S]*`no-op`[\s\S]*`needs-user`[\s\S]*`blocked`[\s\S]*`routed`/,
+    ],
+    [
+      "stop before downstream workflow mutations",
+      /A result is terminal for this invocation\. Do not automatically invoke Apply, Review, Epic Update, Changelog, implementation, commits, PRs, release, deployment, or closeout/,
+    ],
+  ]);
+
+  assert.doesNotMatch(designSkill, /--replan/);
 });
 
 test("packaged UI workflows reject source-only confidence without rendered current-source evidence", async () => {
@@ -680,7 +777,9 @@ test("packaged Interactive workflow tracks one lightweight progressive Change", 
   assert.doesNotMatch(interactiveSkill, /<yyyy-mm-dd-change-name>\/design\.md/);
   assert.match(interactiveSkill, /sdd change transition <space-id> <change-id> --from proposed --to planned/);
   assert.match(interactiveSkill, /compose exactly one bounded Apply-style slice/);
-  assert.match(interactiveSkill, /Recommend `\/sdd-review`, then `\/sdd-epic-update`/);
+  assert.match(interactiveSkill, /including its composed slice Review and Epic Update gates/);
+  assert.match(interactiveSkill, /For `cosmetic` changes, record one narrow presentation Requirement slice and execute the public `\/sdd-apply` contract/);
+  assert.match(interactiveSkill, /Recommend final `\/sdd-review` when the lightweight Change is implementation-complete/);
   assert.match(interactiveSkill, /Do not commit, close, merge, release, or deploy from this wrapper/);
   assert.doesNotMatch(interactiveSkill, /proposal\.md|--brief|\/sdd-change --plan|--replan/);
 });

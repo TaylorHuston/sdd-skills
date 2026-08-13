@@ -176,3 +176,6 @@ At a useful pause:
 5. Report the record path, material artifacts read or written, remaining questions or gaps, and the recommended next workflow when applicable.
 
 A route is a terminal handoff for this invocation. Do not cross directly into application implementation, Change lifecycle mutation, ADR creation, PRD revision, or another owning workflow.
+
+## Self Improvement
+After completing this skill ask yourself "what improvements to this skill could be made that would improve our overall SDD workflow?" Report any suggestions to the user.

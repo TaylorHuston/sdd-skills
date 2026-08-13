@@ -1,4 +1,4 @@
 interface:
   display_name: "SDD Epic Update"
   short_description: "Reconcile Epic truth to one exact candidate"
-  default_prompt: "Use $sdd-epic-update to reconcile repository-owned Epic, Story, Requirement, Scenario, implementation-map, gap, and verification-map truth against the supplied exact candidate, validate the result, prove same-candidate idempotence, and stop before code review, code fixes, Change lifecycle mutation, changelog work, or commits."
+  default_prompt: "Use $sdd-epic-update through its public directly callable or Apply-composed contract to reconcile repository-owned Epic, Story, Requirement, Scenario, implementation-map, gap, and verification-map truth against the supplied exact candidate, validate the result, prove same-candidate idempotence, and stop before code review, code fixes, Change lifecycle mutation, changelog work, or commits."
