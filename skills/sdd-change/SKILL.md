@@ -104,7 +104,9 @@ Progressively append or update the sections from `assets/planning-sections.md` i
 
 Create `tasks.md` from its template as a requirements-oriented delivery queue:
 
-- each slice covers one distinct Requirement or a small group of closely related Requirements as the smallest practical vertical unit that can become independently green;
+- each slice covers exactly one Requirement by default as the smallest practical vertical unit that can become independently green;
+- combine Requirements only when completing either in isolation would be incoherent, and then require a concise `Coupling justification`;
+- require each slice to be completable atomically in one fresh Apply session from committed dependencies through implementation, verification, final Review, Epic reconciliation, and its local commit;
 - require an observable outcome, a focused Scenario-based test cycle, and a meaningful independent review verdict so one slice may be rejected without necessarily rejecting adjacent slices;
 - identify each Requirement as new or revised and cite its full Epic/Story/Requirement reference;
 - name every Story to create or update;
@@ -112,13 +114,15 @@ Create `tasks.md` from its template as a requirements-oriented delivery queue:
 - state only behavioral or decision dependencies and binding constraints needed to know whether the slice is ready;
 - add concise `Consumes` and `Produces` contracts only when another slice or repository relies on that interface;
 - state focused verification intent and whether manual acceptance is required, while leaving implementation-time evidence to the owning workflows;
+- declare `Closure receipt: required` for each newly planned slice, then declare `Visual requirements` as either one reasoned `Not applicable` row or unique `V#` obligations, each tied to declared slice Scenarios and naming one independently accountable viewport/state/interaction observation; derive these from the accepted Experience Design matrix rather than relying on Review to rediscover omitted states; existing completed slices without the marker remain grandfathered unless they reopen;
 - make each slice independently understandable so a future isolated subagent can gather fresh implementation context and deliver it;
 - fold setup, configuration, migrations, and documentation into the behavioral slice that requires them; batch only same-shape work that shares one acceptance and review surface;
 - describe what must be implemented, never how to implement it;
-- initialize one lightweight Implementation Ledger row per slice with repository, `not started` status, `None yet.` summary, and the current date;
+- initialize one lightweight Implementation Ledger row per slice with repository, `not started` status, `None yet.` summary, Commit `pending`, and the current date;
+- initialize one compact Slice Gate Ledger row per slice with pending candidate-bound gates, no required or accepted gaps, Final Commit `pending`, and the current date;
 - initialize the fixed-label `Resume Here` checkpoint with this Change ID, current slice and phase, pending downstream candidate watermarks, one repository envelope per selected slice repository, and no fabricated baseline or evidence.
 
-The checkpoint and Implementation Ledger are current-state resume aids that `/sdd-apply` maintains. Do not predict files or steps in it. Do not prescribe files, modules, functions, components, schemas, framework techniques, implementation order inside a slice, test architecture, subagent specialization, or speculative enabling work. Do not add generic engineering checklists, universal risk matrices, or verification ledgers. Add conditional coordination or evidence sections only when this particular Change already requires them.
+The checkpoint, Implementation Ledger, and Slice Gate Ledger are current-state resume aids that `/sdd-apply` maintains. The Implementation Ledger records the full final commit SHA only after a reviewed slice is sealed. The gate ledger durably records exact-candidate verdicts, closure, required-versus-explicitly-accepted gaps, and the same final commit without duplicating test details or review transcripts. Do not predict files or steps in either ledger. Do not prescribe files, modules, functions, components, schemas, framework techniques, implementation order inside a slice, test architecture, subagent specialization, or speculative enabling work. Do not add generic engineering checklists, universal risk matrices, or verification ledgers. Add conditional coordination or evidence sections only when this particular Change already requires them.
 
 Slice order is advisory, not a frozen implementation sequence. `/sdd-apply` may select any ready slice and may resequence, split, or merge slices when implementation discoveries warrant it, while preserving Requirement and Scenario truth. A discovery that changes accepted behavior or scope returns to `/sdd-change`.
 

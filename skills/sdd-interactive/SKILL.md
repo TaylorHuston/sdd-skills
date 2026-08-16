@@ -91,7 +91,7 @@ Use existing central artifacts when the session continues an active Change. Keep
    - For browser-visible or otherwise user-facing app changes, walk the user through what to manually confirm in the UI: app URL, setup state, routes, clicks/inputs, expected results, failure signs, and what feedback would change Requirements, Scenarios, or implementation.
    - Record that walkthrough in `tasks.md` under `Manual UI Confirmation`. If no manual UI confirmation applies, record why.
    - Record manual confirmation status as `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
-   - Refresh only the honest one-slice resume state and public Apply result. Record the Review and Epic Update results composed through Apply, but do not claim final Change-wide Review, acceptance, changelog, commit, PR, release, or closeout completed unless those public capabilities were separately invoked.
+   - Refresh only the honest one-slice resume state and public Apply result. Record the Review and Epic Update results composed through Apply plus the final slice commit created by Apply, but do not claim final Change-wide Review, acceptance, changelog, push, PR, release, or closeout completed unless those public capabilities were separately invoked.
    - Keep the central status `in_progress`; final directly invoked `/sdd-review` owns any later transition to `in_review`.
    - Recommend final `/sdd-review` when the lightweight Change is implementation-complete; Epic truth is already reconciled by the Apply slice pipeline.
    - Do not commit, close, merge, release, or deploy from this wrapper.

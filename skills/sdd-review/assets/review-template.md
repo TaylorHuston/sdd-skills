@@ -1,166 +1,113 @@
-# Review: CHANGE TITLE
+# Final Change Review: CHANGE TITLE
 
 ## Review Scope
 
 - Central Change: `<workspace>/.sdd/changes/yyyy-mm-dd-change-name/`
 - Space: `<space-id>`
 - Target repository IDs: `<repository-id, ...>`
-- Repositories reviewed: `<repository-id, ...>`
+- Source/target and exact candidate per repository: `<record below>`
 
-This record is the one review record for the central Change. The verdict and Gate Scorecard aggregate every target repository; `ready` requires every applicable repository-scoped gate to pass. Prefix findings with the repository ID and repeat repository-scoped bundles where targets have different refs, commands, evidence, PR state, or release obligations.
+This file is the final Change-wide integration Review. Candidate-bound Requirement-slice Reviews live separately under `slice-reviews/`.
 
 ## Verdict
 
-changes-requested | blocked | ready
+blocked | changes-requested | ready
 
-## Gate Scorecard
+- Implementation Quality: findings | cannot-verify | pass
+- Spec Adherence: findings | cannot-verify | pass
+- Manual acceptance: pending user | accepted gap | user confirmed | not applicable
 
-| Gate | Result | Notes |
-|---|---|---|
-| Change artifacts | TBD | TBD |
-| Change status | TBD | `proposed` / `planned` / `in_progress` / `in_review`; central location under `<workspace>/.sdd/changes/closed/` means closed. |
-| Epic truth | TBD | TBD |
-| Canonical map authority | TBD | One current implementation map and one current verification map per Story. |
-| Requirements and Scenarios | TBD | TBD |
-| Story reference traceability | TBD | TBD |
-| Reverse traceability | TBD | Diff-scoped source/test candidate inventory and classification. |
-| Tests and verification | TBD | TBD |
-| Verification scope and aggregate candidate | TBD | Focused proof remains distinct; required aggregate proof is fresh on the exact reviewed commit. |
-| Semantic anchor ownership | TBD | Primary anchors identify governing definitions/registrations rather than incidental occurrences. |
-| Evidence falsification | TBD | Exact named test/anchor, assertion/observation, discovery path, and boundary match for new or high-risk claims; generic framework anchors rejected. |
-| Pattern conformance | TBD | New sibling surfaces compared with the closest established behavior contract and focused tests. |
-| Boundary contracts | TBD | Typed domain results preserve status, permission, retryability, recovery, and client-visible meaning across layers. |
-| Stateful transitions | TBD | Applicable concurrency, cancellation, stale completion, retry, remount, restart, identity, navigation, recovery, refresh, and timeout edges inspected. |
-| Rendered UI verification | TBD | Directly inspected current rendering, representative viewports/states/interactions, and console/network result. |
-| Manual UI confirmation | TBD | TBD |
-| Code review | TBD | TBD |
-| Visual / UX consistency | TBD | TBD |
-| Security review | TBD | TBD |
-| Documentation | TBD | TBD |
-| Space / repository current-state truth | TBD | TBD |
-| Release communication | TBD | TBD |
-| Branch and merge readiness | TBD | TBD |
-| Prospective integration candidate | TBD | Exact tree/ref and required aggregate result, or why source-candidate proof is reusable. |
-| PRD alignment | TBD | TBD |
+## Gate Execution Manifest
+
+| Gate | Result | Method / command | Candidate | Durable proof reference |
+|---|---|---|---|---|
+| artifact-truth | findings | TBD | TBD | TBD |
+| canonical-map-authority | findings | TBD | TBD | TBD |
+| source-vs-target | findings | TBD | TBD | TBD |
+| pattern-conformance | not-applicable | TBD | TBD | TBD |
+| boundary-contracts | not-applicable | TBD | TBD | TBD |
+| reverse-traceability | findings | TBD | TBD | TBD |
+| verification | findings | TBD | TBD | TBD |
+| evidence-falsification | findings | TBD | TBD | TBD |
+| risk-shaped-evidence | findings | TBD | TBD | TBD |
+| security-data-safety | findings | TBD | TBD | TBD |
+| rendered-ui | not-applicable | TBD | TBD | TBD |
+| manual-acceptance | pass | TBD | TBD | TBD |
+| supporting-truth | findings | TBD | TBD | TBD |
+| integration-readiness | findings | TBD | TBD | TBD |
 
 ## Findings
 
 ### BLOCKING
 
-- [ ] FILE:LINE - Finding and impact. Recommendation: concrete fix.
+- None.
 
 ### REQUIRED
 
-- [ ] FILE:LINE - Finding and impact. Recommendation: concrete fix.
+- None.
 
 ### SUGGESTION
 
-- [ ] FILE:LINE - Finding and impact. Recommendation: concrete fix.
+- None.
 
-## Verification Evidence
+For every BLOCKING or REQUIRED finding, record its admission ground: explicit accepted-contract violation, material safety, project policy, false closure, or deterministic-gate failure. Classify remediation as `product-defect` or `closure-repair`.
 
-| Repository | Command / Scenario | Evidence Type | Requirement / Scenario | Result | What It Proves |
-|---|---|---|---|---|---|
-| repository-id | TBD | focused automated test / aggregate candidate gate / integration-candidate gate / broad supporting gate / deterministic E2E / live-provider playtest / manual UI confirmation / debug-log inspection | EPIC-ID/S1 R1/R1-S1 or candidate scope | TBD | TBD |
+## Scenario Evidence Closure
 
-## Verification Scope And Candidate Gates
+| Repository | Scenario | Claimed boundary | Cited proof | Proven boundary | Evidence type | Durability / reproduction reference | Result | Gap |
+|---|---|---|---|---|---|---|---|---|
+| repository-id | EPIC-ID/S1 R1-S1 | TBD | TBD | TBD | automated / rendered / mixed / ... | TBD | pass / accepted-gap / findings / blocked | none / required / manual-acceptance / optional-confidence:<reference> / user-accepted:yyyy-mm-dd |
 
-- Project-defined aggregate commands or authoritative constituent sources by repository:
-- Aggregate gates required by repository: yes / no
-- Trigger or project-policy reason:
-- Cache/freshness policy:
-- Post-gate evidence-record-only changes and affected checks rerun:
+## Visual Verification
 
-| Repository | Stage | Exact Commit / Tree | Command | Meaningful Execution / Counts | Result |
-|---|---|---|---|---|---|
-| repository-id | Reviewed source candidate | TBD | TBD | TBD | pass / findings / blocked / not applicable |
-| repository-id | Prospective integration candidate | TBD | TBD | TBD | pass / findings / blocked / reusable source proof |
-| repository-id | Actual integrated result | TBD | TBD | matches tested tree / rerun evidence / pending | pass / findings / blocked / not applicable |
+| Repository | Requirement / Surface | Viewport | State / Interaction | Observed | Proof | Console / Network | Result | Gap |
+|---|---|---|---|---|---|---|---|---|
+| repository-id | TBD | desktop / mobile | TBD | TBD | TBD | clean / findings / not applicable | pass / accepted-gap / findings / blocked | none / required / user-accepted:yyyy-mm-dd |
 
-## Boundary And Conservation Review
+## Repository Review Bundle: <repository-id>
 
-- Boundary Contract Matrix status and exact proof:
-- Capability identifier issuer, scope, lifetime, and invalid-reuse proof:
-- Content-budget and provider-visible provenance conservation:
-- Filesystem ancestor/confinement validation before mutation and fail-closed no-write proof:
+Repeat for every target repository.
 
-## Rendered UI Verification
-
-| Surface / Route or Fixture | Viewport | State / Interaction | Tool / Setup | Directly Inspected Evidence | Console / Network | Result |
-|---|---|---|---|---|---|---|
-| TBD | desktop / mobile | TBD | project browser/screenshot tooling / runtime browser / rendered preview or fixture / manual browser capture | TBD | clean / findings / not applicable | pass / findings / blocked / not applicable |
-
-## Review Bundle: <repository-id>
-
-Repeat this bundle for every target repository and identify the stable repository ID.
-
-- Repository ID: <repository-id>
-- Source branch/ref:
-- Reviewed source commit:
-- Target branch/ref:
-- Merge base:
-- Source-only commits:
-- Target-only commits:
-- Changed files:
-- Diff stat:
-- Conflict check:
-- Prospective integration tree:
-- Source and target refs used for candidate proof:
+- Repository ID:
+- Source branch/ref and exact commit:
+- Target branch/ref and merge base:
+- Source-only and target-only commits:
+- Changed files and diff stat:
 - Dirty state:
 - Branch policy:
-- Reverse-traceability command/result:
-
-## Reverse Traceability
-
-- Candidate scope:
-- Epic ownership reconciled:
-- Support/generated/framework classifications:
-- Stranded refactor surfaces checked:
-- Explicit gaps or tracked cleanup:
-
-## Discovery Wave
-
-| Pass | Reviewer | Result | Notes |
-|---|---|---|---|
-| Artifact truth | TBD | TBD | TBD |
-| Reverse traceability | TBD | TBD | TBD |
-| Code diff | TBD | TBD | TBD |
-| Verification coverage | TBD | TBD | TBD |
-| Evidence falsification | TBD | TBD | TBD |
-| Pattern conformance | TBD | TBD | TBD |
-| Boundary contracts | TBD | TBD | TBD |
-| Stateful transitions | TBD | TBD | TBD |
-| Security / authority / budget / mutation safety | TBD | TBD | TBD |
-| UI / visual identity | TBD | TBD | TBD |
-| Docs / Idea truth / release communication / PRD | TBD | TBD | TBD |
-| Integration readiness | TBD | TBD | TBD |
+- Conflict check and prospective integration tree:
+- Project aggregate gate and exact result:
+- Reverse-traceability command, counts, and classifications:
+- Security/data-safety result:
+- Documentation and release-communication result:
+- PR/merge state:
 
 ## Consolidated Remediation
 
-- Root causes addressed:
-- Safe-fix batch:
-- Deferred or unsafe findings:
-- Affected verification union:
-- Regression-focused rereview:
-- New regressions introduced by remediation: none / list
+- Discovery Review candidate and findings:
+- Admitted safe remediation batch:
+- Verification rerun:
+- Fresh final Review candidate and result:
+- Regression introduced by remediation: none / exact correction
+- Remaining findings requiring user decision:
 
-## PR / Merge Readiness: <repository-id>
+Do not begin another broad remediation cycle after the final Review. A new pre-existing issue returns `needs-user`; only a regression introduced by the remediation batch receives one narrow correction.
 
-Record this readiness block for every target repository. A ready aggregate verdict does not collapse distinct branches, commits, PRs, or integration targets.
+## Manual Acceptance
 
-- Repository ID: <repository-id>
-- Source branch:
-- Reviewed source commit:
-- Target branch:
-- Tested integration tree/ref:
-- Source/target refs rechecked immediately before integration:
-- Actual integrated tree matches tested tree:
-- Required aggregate rerun after drift:
-- Conflict check:
-- Commit state:
-- PR status:
-- Merge status:
+- Status:
+- Suggested walkthrough:
+- Acceptance-dependent handoff still blocked:
+
+## Closeout And Handoff
+
+- Change status:
+- Repository-specific integration readiness:
+- Changelog/release communication:
+- PR/merge/close action taken, offered, or blocked:
+- Remaining risks:
+- Recommended next workflow:
 
 ## Review Log
 
-- YYYY-MM-DD: Review created or updated.
+- yyyy-mm-dd: Final Change-wide Review created or updated.

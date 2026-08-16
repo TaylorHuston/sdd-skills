@@ -22,6 +22,7 @@ import test, { after } from "node:test";
 import { promisify } from "node:util";
 import { parse } from "yaml";
 
+import { SLICE_REVIEW_GATE_IDS } from "../src/slice-review.js";
 import { getWorkspaceContext } from "../src/commands/context.js";
 import {
   configureWorkspace,
@@ -376,6 +377,114 @@ async function writeCanonicalChange(
     ].join("\n"),
     "utf8",
   );
+}
+
+async function writeDoneStructuredTasksWithoutClosure(
+  root,
+  changeId,
+  commit = "0123456789abcdef0123456789abcdef01234567",
+) {
+  const candidate = `commit:${commit}`;
+  const changePath = join(root, ".sdd", "changes", changeId);
+  await writeFile(join(changePath, "tasks.md"), [
+    `# Tasks: ${changeId}`,
+    "",
+    "## Resume Here",
+    "",
+    `- Change: \`${changeId}\``,
+    "- Current slice: S1",
+    "- Phase: complete",
+    `- Verification candidate: ${candidate}`,
+    `- Review candidate: ready @ ${candidate}`,
+    `- Epic-update candidate: no-op @ ${candidate}`,
+    "- Changelog candidate: pending",
+    "- Acceptance candidate: not required",
+    "- Open finding / blocker: none",
+    "",
+    "| Repository | Root | Baseline | Candidate kind | Candidate watermark |",
+    "|---|---|---|---|---|",
+    `| \`sample-web\` | \`code/sample-web\` | baseline | commit | ${candidate} |`,
+    "",
+    "## Requirement Slices",
+    "",
+    "### S1: Expose the behavior",
+    "",
+    "- Status: done",
+    "- Repository: `sample-web`",
+    "- Requirements:",
+    "  - New: `SAMPLE-E001/S1 R1` — Expose the behavior.",
+    "- Story changes:",
+    "  - Update: `SAMPLE-E001/S1` — Expose the behavior.",
+    "- Outcome: The behavior is visible.",
+    "- Scenarios: `SAMPLE-E001/S1 R1-S1`",
+    "- Dependencies: none",
+    "- Binding constraints: Preserve the public boundary.",
+    "- Verification intent: Exercise the public behavior.",
+    "- Manual acceptance: not required",
+    "- Completion certificate: required",
+    "- Visual requirements:",
+    "  - Not applicable — This slice has no rendered UI surface.",
+    "",
+    "## Implementation Ledger",
+    "",
+    "| Slice | Repository | Status | Implementation Summary / Changed Surface | Commit | Updated |",
+    "|---|---|---|---|---|---|",
+    `| S1 | \`sample-web\` | done | Behavior implemented. | ${commit} | 2026-08-14 |`,
+    "",
+    "## Slice Gate Ledger",
+    "",
+    "| Slice | Verification Candidate | Implementation Review | Epic Update | Semantic Closure | Evidence Closure | Post-Epic Review | Required Gaps | Accepted Gaps | Final Commit | Updated |",
+    "|---|---|---|---|---|---|---|---|---|---|---|",
+    `| S1 | ${candidate} | ready @ ${candidate} | no-op @ ${candidate} | pass | pass | not required | none | none | ${commit} | 2026-08-14 |`,
+    "",
+    "## Blockers / Open Questions",
+    "",
+    "- None.",
+    "",
+    "## Closeout",
+    "",
+    "- Remaining slices: none",
+    "",
+  ].join("\n"), "utf8");
+}
+
+async function writeValidSliceClosure(root, changeId, {
+  commit,
+  tree,
+  proof = "`test/core.test.js#core journey completes successfully`",
+  reviewProof = "`change:review.md#Final slice review`",
+} = {}) {
+  const candidate = `commit:${commit}`;
+  const changePath = join(root, ".sdd", "changes", changeId);
+  await mkdir(join(changePath, "slice-closures"), { recursive: true });
+  await writeFile(join(changePath, "slice-closures", "S1.yaml"), [
+    "schema: sdd-slice-closure-v1",
+    `change: ${changeId}`,
+    "slice: S1",
+    "repository: sample-web",
+    "updated: 2026-08-14",
+    `finalReviewCandidate: ${candidate}`,
+    "finalReviewVerdict: ready",
+    `finalReviewProof: ${JSON.stringify(reviewProof)}`,
+    `finalCommit: ${commit}`,
+    `finalCommitTree: ${tree}`,
+    "scenarios:",
+    "  - scenario: SAMPLE-E001/S1 R1-S1",
+    "    claimedBoundary: public behavior",
+    "    provenBoundary: public behavior",
+    "    evidenceType: automated",
+    `    proof: ${JSON.stringify(proof)}`,
+    "    result: pass",
+    "    gap: none",
+    "visual:",
+    "  applicability: not-applicable",
+    "  reason: This slice has no rendered UI surface.",
+    "  requirements: []",
+    "seal:",
+    `  reviewedTree: ${tree}`,
+    `  finalCommitTree: ${tree}`,
+    "",
+  ].join("\n"), "utf8");
 }
 
 async function setPlannedChangeStatus(root, created, status = "planned") {
@@ -3577,10 +3686,13 @@ test("packaged tasks template defines adaptive requirement slices instead of an 
   assert.match(tasksTemplate, /^  - Create: `EPIC-ID\/S3`/m);
   assert.match(tasksTemplate, /^  - Update: `EPIC-ID\/S1`/m);
   assert.match(tasksTemplate, /^- Scenarios: `EPIC-ID\/S3 R1-S1`, `EPIC-ID\/S1 R2-S1`$/m);
+  assert.match(tasksTemplate, /^- Completion certificate: required$/m);
+  assert.match(tasksTemplate, /Existing completed slices without that marker are grandfathered/);
   assert.match(tasksTemplate, /^## Implementation Ledger$/m);
-  assert.match(tasksTemplate, /^\| Slice \| Repository \| Status \| Implementation Summary \/ Changed Surface \| Updated \|$/m);
+  assert.match(tasksTemplate, /^\| Slice \| Repository \| Status \| Implementation Summary \/ Changed Surface \| Commit \| Updated \|$/m);
   assert.match(tasksTemplate, /Keep one current-state row per slice/);
-  assert.match(tasksTemplate, /do not record predicted implementation steps, command history, verification evidence, commit hashes, or review state here/);
+  assert.match(tasksTemplate, /do not record predicted implementation steps, command history, detailed verification evidence, or review transcripts here/);
+  assert.match(tasksTemplate, /full 40-character SHA/);
   assert.doesNotMatch(tasksTemplate, /^## Verification Ledger$/m);
   assert.doesNotMatch(tasksTemplate, /^## Pattern Parity Matrix$/m);
   assert.doesNotMatch(tasksTemplate, /^## Boundary Contract Matrix$/m);
@@ -4244,7 +4356,7 @@ test("CLI exposes focused validate and update help", async () => {
     "--help",
   ]);
   assert.match(validate.stdout, /^SDD Validate$/m);
-  assert.match(validate.stdout, /structured Requirement slices and checkpoints/);
+  assert.match(validate.stdout, /structured Requirement slices, closure certificates and checkpoints/);
   assert.match(validate.stdout, /--changed-from <commit-ish>/);
   assert.doesNotMatch(validate.stdout, /Setup options:/);
 
@@ -4277,6 +4389,234 @@ test("validate accepts a canonical active Change", async (t) => {
   assert.equal(result.summary.changes, 1);
   assert.equal(result.summary.errors, 0);
   assert.deepEqual(result.findings, []);
+});
+
+test("validate rejects a current done slice without its closure certificate", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-08-14-missing-slice-closure";
+  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
+  await writeDoneStructuredTasksWithoutClosure(root, changeId);
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    changeId,
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.findings.some((entry) =>
+    entry.code === "MISSING_SLICE_CLOSURE" && entry.sliceId === "S1"));
+
+  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
+  await writeFile(
+    tasksPath,
+    (await readFile(tasksPath, "utf8")).replace("- Completion certificate: required\n", ""),
+    "utf8",
+  );
+  const grandfathered = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    changeId,
+  });
+  assert.equal(grandfathered.valid, true, JSON.stringify(grandfathered.findings, null, 2));
+});
+
+test("validate reconciles a done slice closure with its Epic proof and Git seal", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-08-14-sealed-slice";
+  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
+  await writeCanonicalEpic(root, "sample-web");
+  const changePath = join(root, ".sdd", "changes", changeId);
+  const changeSource = await readFile(join(changePath, "change.md"), "utf8");
+  await writeFile(join(changePath, "change.md"), [
+    changeSource.trimEnd(),
+    "",
+    "## Epic Actions",
+    "",
+    "- Revise `SAMPLE-E001`.",
+    "",
+  ].join("\n"), "utf8");
+
+  const repositoryPath = join(root, "code", "sample-web");
+  await execFileAsync("git", ["init", "-q"], { cwd: repositoryPath });
+  await execFileAsync("git", ["config", "user.name", "SDD Test"], { cwd: repositoryPath });
+  await execFileAsync("git", ["config", "user.email", "sdd@example.invalid"], { cwd: repositoryPath });
+  await execFileAsync("git", ["add", "."], { cwd: repositoryPath });
+  await execFileAsync("git", ["commit", "-qm", "initial"], { cwd: repositoryPath });
+  await writeFile(
+    join(repositoryPath, "src", "core.js"),
+    "export function runCoreJourney() { return 'sealed'; }\n",
+    "utf8",
+  );
+  await execFileAsync("git", ["add", "src/core.js"], { cwd: repositoryPath });
+  await execFileAsync("git", ["commit", "-qm", "seal slice"], { cwd: repositoryPath });
+  const [{ stdout: commitSource }, { stdout: treeSource }] = await Promise.all([
+    execFileAsync("git", ["rev-parse", "HEAD"], { cwd: repositoryPath }),
+    execFileAsync("git", ["rev-parse", "HEAD^{tree}"], { cwd: repositoryPath }),
+  ]);
+  const commit = commitSource.trim();
+  const tree = treeSource.trim();
+  await writeDoneStructuredTasksWithoutClosure(root, changeId, commit);
+  await writeFile(
+    join(changePath, "review.md"),
+    "# Review\n\n## Final slice review\n\nReady for the sealed candidate.\n",
+    "utf8",
+  );
+  await writeValidSliceClosure(root, changeId, { commit, tree });
+
+  const valid = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    changeId,
+  });
+  assert.equal(valid.valid, true, JSON.stringify(valid.findings, null, 2));
+
+  const closurePath = join(changePath, "slice-closures", "S1.yaml");
+  const closureSource = await readFile(closurePath, "utf8");
+  await writeFile(
+    closurePath,
+    closureSource.replaceAll(
+      "test/core.test.js#core journey completes successfully",
+      "test/core.test.js#missing proof anchor",
+    ),
+    "utf8",
+  );
+  const invalid = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    changeId,
+  });
+  assert.ok(invalid.findings.some((entry) => entry.code === "NON_DURABLE_SLICE_EVIDENCE"));
+  assert.ok(invalid.findings.some((entry) => entry.code === "SLICE_CLOSURE_EVIDENCE_MISMATCH"));
+});
+
+test("validate binds a minimal v2 receipt to a durable slice Review digest and Git seal", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-08-14-v2-sealed-slice";
+  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
+  await writeCanonicalEpic(root, "sample-web");
+  const changePath = join(root, ".sdd", "changes", changeId);
+  const changeSource = await readFile(join(changePath, "change.md"), "utf8");
+  await writeFile(join(changePath, "change.md"), [changeSource.trimEnd(), "", "## Epic Actions", "", "- Revise `SAMPLE-E001`.", ""].join("\n"), "utf8");
+
+  const repositoryPath = join(root, "code", "sample-web");
+  await execFileAsync("git", ["init", "-q"], { cwd: repositoryPath });
+  await execFileAsync("git", ["config", "user.name", "SDD Test"], { cwd: repositoryPath });
+  await execFileAsync("git", ["config", "user.email", "sdd@example.invalid"], { cwd: repositoryPath });
+  await execFileAsync("git", ["add", "."], { cwd: repositoryPath });
+  await execFileAsync("git", ["commit", "-qm", "initial"], { cwd: repositoryPath });
+  await writeFile(join(repositoryPath, "src", "core.js"), "export function runCoreJourney() { return 'v2-sealed'; }\n", "utf8");
+  await execFileAsync("git", ["add", "src/core.js"], { cwd: repositoryPath });
+  await execFileAsync("git", ["commit", "-qm", "seal v2 slice"], { cwd: repositoryPath });
+  const [{ stdout: commitSource }, { stdout: treeSource }] = await Promise.all([
+    execFileAsync("git", ["rev-parse", "HEAD"], { cwd: repositoryPath }),
+    execFileAsync("git", ["rev-parse", "HEAD^{tree}"], { cwd: repositoryPath }),
+  ]);
+  const commit = commitSource.trim();
+  const tree = treeSource.trim();
+  const candidate = `commit:${commit}`;
+  await writeDoneStructuredTasksWithoutClosure(root, changeId, commit);
+  const tasksPath = join(changePath, "tasks.md");
+  await writeFile(tasksPath, (await readFile(tasksPath, "utf8")).replace(
+    "- Completion certificate: required",
+    "- Closure receipt: required",
+  ), "utf8");
+
+  const reviewSource = [
+    "---",
+    "schema: sdd-slice-review-v1",
+    `change: ${changeId}`,
+    "slice: S1",
+    "repository: sample-web",
+    `candidate: ${candidate}`,
+    `reviewedTree: ${tree}`,
+    "verdict: ready",
+    "reviewed: 2026-08-14",
+    "---",
+    "# Slice Review: S1",
+    "",
+    "## Gate Execution Manifest",
+    "",
+    "| Anchor | Gate | Result | Method / command | Candidate | Durable proof reference |",
+    "|---|---|---|---|---|---|",
+    ...SLICE_REVIEW_GATE_IDS.map((gateId) => `| <a id=\"gate-${gateId}\"></a> | ${gateId} | pass | focused check | ${candidate} | \`test/core.test.js#core journey completes successfully\` |`),
+    "",
+    "## Scenario Evidence Closure",
+    "",
+    "| Anchor | Scenario | Claimed boundary | Cited proof | Proven boundary | Evidence type | Durability / reproduction reference | Result | Gap |",
+    "|---|---|---|---|---|---|---|---|---|",
+    "| <a id=\"scenario-sample-e001-s1-r1-s1\"></a> | SAMPLE-E001/S1 R1-S1 | public behavior | `test/core.test.js#core journey completes successfully` | public behavior | automated | `test/core.test.js#core journey completes successfully` | pass | none |",
+    "",
+    "## Visual Verification",
+    "",
+    "| Anchor | Requirement | Scenarios | Obligation | Observed | Proof | Result | Gap |",
+    "|---|---|---|---|---|---|---|---|",
+    "| <a id=\"visual-not-applicable\"></a> | not-applicable | none | This slice has no rendered UI surface. | not-applicable | `change:tasks.md#Requirement Slices` | pass | none |",
+    "",
+  ].join("\n");
+  await mkdir(join(changePath, "slice-reviews"), { recursive: true });
+  const reviewPath = join(changePath, "slice-reviews", "S1.md");
+  await writeFile(reviewPath, reviewSource, "utf8");
+  const reviewSha256 = createHash("sha256").update(reviewSource).digest("hex");
+  await mkdir(join(changePath, "slice-closures"), { recursive: true });
+  const closurePath = join(changePath, "slice-closures", "S1.yaml");
+  await writeFile(closurePath, [
+    "schema: sdd-slice-closure-v2",
+    `change: ${changeId}`,
+    "slice: S1",
+    "repository: sample-web",
+    "updated: 2026-08-14",
+    "review:",
+    "  path: slice-reviews/S1.md",
+    `  candidate: ${candidate}`,
+    "  verdict: ready",
+    `  sha256: ${reviewSha256}`,
+    "scenarios:",
+    "  - scenario: SAMPLE-E001/S1 R1-S1",
+    "    result: pass",
+    "    gap: none",
+    "    reviewAnchor: scenario-sample-e001-s1-r1-s1",
+    "visual:",
+    "  applicability: not-applicable",
+    "  reason: This slice has no rendered UI surface.",
+    "  requirements: []",
+    "seal:",
+    `  finalCommit: ${commit}`,
+    `  reviewedTree: ${tree}`,
+    `  finalCommitTree: ${tree}`,
+    "",
+  ].join("\n"), "utf8");
+
+  const valid = await validateArtifacts(root, { spaceId: "sample", repositories: ["sample-web"], changeId });
+  assert.equal(valid.valid, true, JSON.stringify(valid.findings, null, 2));
+
+  await writeFile(reviewPath, `${reviewSource}\n`, "utf8");
+  const stale = await validateArtifacts(root, { spaceId: "sample", repositories: ["sample-web"], changeId });
+  assert.ok(stale.findings.some((entry) => entry.code === "SLICE_CLOSURE_REVIEW_MISMATCH"));
+
+  const missingProofReview = reviewSource.replaceAll(
+    "test/core.test.js#core journey completes successfully",
+    "test/core.test.js#missing durable anchor",
+  );
+  await writeFile(reviewPath, missingProofReview, "utf8");
+  const missingProofSha = createHash("sha256").update(missingProofReview).digest("hex");
+  await writeFile(closurePath, (await readFile(closurePath, "utf8")).replace(reviewSha256, missingProofSha), "utf8");
+  const missingProof = await validateArtifacts(root, { spaceId: "sample", repositories: ["sample-web"], changeId });
+  assert.ok(missingProof.findings.some((entry) => entry.code === "NON_DURABLE_SLICE_EVIDENCE"));
+  assert.ok(missingProof.findings.some((entry) => entry.code === "SLICE_CLOSURE_EVIDENCE_MISMATCH"));
+
+  const missingGateReview = reviewSource.replace(/^.*gate-artifact-truth.*\n/m, "");
+  await writeFile(reviewPath, missingGateReview, "utf8");
+  const missingGateSha = createHash("sha256").update(missingGateReview).digest("hex");
+  await writeFile(closurePath, (await readFile(closurePath, "utf8")).replace(missingProofSha, missingGateSha), "utf8");
+  const missingGate = await validateArtifacts(root, { spaceId: "sample", repositories: ["sample-web"], changeId });
+  assert.ok(missingGate.findings.some((entry) => entry.code === "SLICE_REVIEW_GATE_SET_MISMATCH"));
 });
 
 test("explicit Change validation resolves only repositories declared by its central metadata", async (t) => {

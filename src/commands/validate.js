@@ -1,5 +1,8 @@
+import { execFile as execFileCallback } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { promisify } from "node:util";
 import { parseDocument } from "yaml";
 
 import {
@@ -38,7 +41,7 @@ import {
   synthesizeRepositoryOnlySpaceFromChangeMetadata,
 } from "../workspace.js";
 import { SddError } from "../errors.js";
-import { isDirectory, isPathPhysicallyInside, pathExists } from "../fs.js";
+import { isDirectory, isPathPhysicallyInside, pathExists, readBoundRegularFile } from "../fs.js";
 import {
   behaviorReferences,
   implementationLocationPaths,
@@ -48,6 +51,13 @@ import {
 } from "../epic-evidence.js";
 import { resolveChangedFrom, validateEpicHistory } from "../epic-history.js";
 import { validateEpicVerifyReports } from "../epic-verify-report.js";
+import {
+  LEGACY_SLICE_CLOSURE_SCHEMA,
+  SLICE_CLOSURE_SCHEMA,
+  durableProofReferences,
+  validateSliceClosureSource,
+} from "../slice-closure.js";
+import { validateSliceReviewSource } from "../slice-review.js";
 
 const CHANGE_FILES = Object.freeze({
   "change.md": [
@@ -132,6 +142,8 @@ const IMPLEMENTATION_KINDS = Object.freeze([
   "migration",
   "support",
 ]);
+const execFile = promisify(execFileCallback);
+
 const TEMPLATE_PLACEHOLDERS = Object.freeze([
   "CHANGE TITLE",
   "EPIC TITLE",
@@ -199,6 +211,100 @@ function declaredEpicDirectories(source, epicsDirectory) {
 
 function finding(level, code, path, message, context = {}) {
   return { level, code, path: normalizePath(path), message, ...context };
+}
+
+async function gitOutput(repositoryRoot, args) {
+  try {
+    const result = await execFile("git", args, {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    return { ok: true, stdout: result.stdout.trim(), raw: result.stdout };
+  } catch (error) {
+    return { ok: false, stdout: "", raw: "", error };
+  }
+}
+
+function parseFullScenarioReference(reference) {
+  const match = /^([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*)\/(S[1-9]\d*) (R[1-9]\d*-S[1-9]\d*)$/.exec(reference);
+  return match ? { epicId: match[1], story: match[2], scenario: match[3] } : null;
+}
+
+function epicVerificationGapClassification(epicSource, storyLabel, scenarioId) {
+  const stories = splitStoryBlocks(epicSource.split(/\r?\n/));
+  const story = stories.find((entry) => entry.label === storyLabel);
+  if (!story) return null;
+  const lines = sectionLines(story.lines, "Verification Gaps");
+  const escaped = `${storyLabel}/${scenarioId}`.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const matchingLines = lines.filter((entry) => new RegExp(`^\\s*- \\x60${escaped}\\x60:`).test(entry));
+  if (matchingLines.length === 0) return null;
+  if (matchingLines.length > 1) return { classification: "duplicate", date: null, line: matchingLines.join("\n") };
+  const [line] = matchingLines;
+  const accepted = /\[user accepted (\d{4}-\d{2}-\d{2})\]/.exec(line);
+  if (accepted) return { classification: "user-accepted", date: accepted[1], line };
+  if (/\[required\]/.test(line)) return { classification: "required", date: null, line };
+  if (/\[manual acceptance\]/.test(line)) return { classification: "manual-acceptance", date: null, line };
+  const optional = /\[optional confidence(?::\s*([^\]]+))?\]/.exec(line);
+  if (optional) return { classification: "optional-confidence", date: null, policy: optional[1]?.trim() ?? "", line };
+  return { classification: "unclassified", date: null, line };
+}
+
+function closureGapClassification(value) {
+  if (value === "none" || value === "required" || value === "manual-acceptance") {
+    return { classification: value, date: null, policy: "" };
+  }
+  if (value.startsWith("user-accepted:")) {
+    return { classification: "user-accepted", date: value.slice("user-accepted:".length), policy: "" };
+  }
+  if (value.startsWith("optional-confidence:")) {
+    return { classification: "optional-confidence", date: null, policy: value.slice("optional-confidence:".length).trim() };
+  }
+  return { classification: "unclassified", date: null, policy: "" };
+}
+
+function resolveClosureScenario(epicRecords, reference) {
+  const full = parseFullScenarioReference(reference);
+  if (full) {
+    const matches = epicRecords.filter((epic) => (
+      epic.epicId === full.epicId
+      && epic.scenarios.some((entry) => entry.story === full.story && entry.scenario === full.scenario)
+    ));
+    return matches.length === 1
+      ? { epic: matches[0], story: full.story, scenario: full.scenario }
+      : null;
+  }
+  const legacy = /^([A-Z][A-Z0-9]*-\d+) (R[1-9]\d*-S[1-9]\d*)$/.exec(reference);
+  if (!legacy) return null;
+  const matches = epicRecords.filter((epic) =>
+    epic.scenarios.some((entry) => entry.story === legacy[1] && entry.scenario === legacy[2]));
+  return matches.length === 1
+    ? { epic: matches[0], story: legacy[1], scenario: legacy[2] }
+    : null;
+}
+
+async function proofReferenceExists({ reference, record, repositoryPath, commit }) {
+  const changeOwned = reference.startsWith("change:");
+  const normalized = changeOwned ? reference.slice("change:".length) : reference;
+  const anchorIndex = normalized.indexOf("#");
+  const path = normalized.slice(0, anchorIndex).replace(/^\.\//, "");
+  const anchor = normalized.slice(anchorIndex + 1);
+  if (changeOwned) {
+    let artifact;
+    try {
+      artifact = await readBoundRegularFile(join(record.path, path), {
+        ownerRoot: record.path,
+        allowMissing: true,
+        label: "Slice closure proof",
+        unsafeCode: "UNSAFE_ARTIFACT_PATH",
+      });
+    } catch {
+      return false;
+    }
+    return artifact !== null && artifact.source.includes(anchor);
+  }
+  const result = await gitOutput(repositoryPath, ["show", `${commit}:${path}`]);
+  return result.ok && result.raw.includes(anchor);
 }
 
 function headingsAtLevel(source, level) {
@@ -335,6 +441,8 @@ function epicContext(repository, epicId) {
 async function validateEpic(repository, epicPath, repositoryRoot, artifactRoots, displayPath) {
   const source = await readFile(epicPath, "utf8");
   const findings = [];
+  const scenarioInventory = [];
+  const evidenceByScenario = new Map();
   const { data: frontmatter, error } = parseFrontmatter(source);
   const epicId = frontmatter?.id ?? basename(dirname(epicPath));
   const context = epicContext(repository, epicId);
@@ -460,6 +568,9 @@ async function validateEpic(repository, epicPath, repositoryRoot, artifactRoots,
       const match = line.match(/^###### Scenario (R\d+-S\d+):\s+.+$/);
       return match ? [match[1]] : [];
     });
+    for (const scenarioId of scenarioIds) {
+      scenarioInventory.push({ story: story.label, scenario: scenarioId });
+    }
     if (isV2 && requirementIds.length === 0) {
       findings.push(finding(
         "error",
@@ -732,7 +843,15 @@ async function validateEpic(repository, epicPath, repositoryRoot, artifactRoots,
       });
       findings.push(...result.findings);
       for (const behavior of result.verifiedBehaviors) verifiedReferences.add(behavior);
-      for (const behavior of result.passingBehaviors) passingEvidenceReferences.add(behavior);
+      for (const behavior of result.passingBehaviors) {
+        passingEvidenceReferences.add(behavior);
+        if (/-S\d+$/.test(behavior)) {
+          const key = `${story.label}/${behavior}`;
+          const evidence = evidenceByScenario.get(key) ?? new Set();
+          evidence.add(row[1] ?? "");
+          evidenceByScenario.set(key, evidence);
+        }
+      }
     }
     if (isV2) {
       const verificationGapReferences = new Set();
@@ -835,7 +954,10 @@ async function validateEpic(repository, epicPath, repositoryRoot, artifactRoots,
     epicId,
     declaredEpicId: frontmatter?.id,
     storyLabels: actualStories,
+    scenarios: scenarioInventory,
+    evidenceByScenario,
     displayPath,
+    source,
     findings,
   };
 }
@@ -1048,6 +1170,8 @@ async function validateChange({
   const findings = [];
   let metadata = null;
   const requiredFiles = {};
+  let structuredTasks = null;
+  const sliceClosures = new Map();
   const context = {
     artifactType: "change",
     artifactId: changeId,
@@ -1156,6 +1280,7 @@ async function validateChange({
         changeId,
         repositoryIds: metadata?.repositories ?? [],
       });
+      structuredTasks = taskResult;
       for (const taskIssue of taskResult.issues) {
         findings.push(finding(
           shapeLevel,
@@ -1219,7 +1344,119 @@ async function validateChange({
       }
     }
   }
-  return { findings, metadata, requiredFiles };
+
+  if (structuredTasks?.structured && structuredTasks.ledgerFormat === "current-six-column") {
+    for (const slice of structuredTasks.slices.filter((entry) => entry.status === "done" && entry.closureRequired)) {
+      const displayPath = normalizePath(join(displayRoot, "slice-closures", `${slice.id}.yaml`));
+      const closurePath = join(changePath, "slice-closures", `${slice.id}.yaml`);
+      let closure;
+      try {
+        closure = await readBoundRegularFile(closurePath, {
+          ownerRoot: changePath,
+          allowMissing: true,
+          label: "Slice closure",
+          unsafeCode: "UNSAFE_ARTIFACT_PATH",
+        });
+      } catch (error) {
+        if (error instanceof SddError && ["UNSAFE_ARTIFACT_PATH", "CONCURRENT_CHANGE"].includes(error.code)) {
+          findings.push(finding(
+            historical ? "warning" : "error",
+            error.code,
+            displayPath,
+            `Slice closure ${slice.id} must be an owner-confined stable regular file.`,
+            { ...context, sliceId: slice.id },
+          ));
+          continue;
+        }
+        throw error;
+      }
+      if (closure === null) {
+        findings.push(finding(
+          historical ? "warning" : "error",
+          "MISSING_SLICE_CLOSURE",
+          displayPath,
+          `Done slice ${slice.id} requires slice-closures/${slice.id}.yaml.`,
+          { ...context, sliceId: slice.id },
+        ));
+        continue;
+      }
+      const gate = structuredTasks.gates.find((entry) => entry.sliceId === slice.id);
+      const result = validateSliceClosureSource(closure.source, {
+        changeId,
+        slice,
+        gate,
+      });
+      if (slice.closureSchema && result.record?.schema !== slice.closureSchema) {
+        result.issues.push({
+          code: "SLICE_CLOSURE_SCHEMA_MISMATCH",
+          message: `Slice ${slice.id} declares ${slice.closureSchema} but its closure uses ${result.record?.schema ?? "no schema"}.`,
+        });
+      }
+
+      let review = null;
+      let reviewDisplayPath = null;
+      if (result.record?.schema === SLICE_CLOSURE_SCHEMA) {
+        reviewDisplayPath = normalizePath(join(displayRoot, result.record.review?.path ?? `slice-reviews/${slice.id}.md`));
+        const reviewPath = join(changePath, result.record.review?.path ?? `slice-reviews/${slice.id}.md`);
+        let reviewFile;
+        try {
+          reviewFile = await readBoundRegularFile(reviewPath, {
+            ownerRoot: changePath,
+            allowMissing: true,
+            label: "Slice review",
+            unsafeCode: "UNSAFE_ARTIFACT_PATH",
+          });
+        } catch (error) {
+          if (error instanceof SddError && ["UNSAFE_ARTIFACT_PATH", "CONCURRENT_CHANGE"].includes(error.code)) {
+            findings.push(finding(
+              historical ? "warning" : "error",
+              error.code,
+              reviewDisplayPath,
+              `Slice review ${slice.id} must be an owner-confined stable regular file.`,
+              { ...context, sliceId: slice.id },
+            ));
+            reviewFile = null;
+          } else {
+            throw error;
+          }
+        }
+        if (reviewFile === null) {
+          findings.push(finding(
+            historical ? "warning" : "error",
+            "MISSING_SLICE_REVIEW",
+            reviewDisplayPath,
+            `Done slice ${slice.id} requires ${result.record.review?.path ?? `slice-reviews/${slice.id}.md`}.`,
+            { ...context, sliceId: slice.id },
+          ));
+        } else {
+          const reviewResult = validateSliceReviewSource(reviewFile.source, { changeId, slice });
+          const sha256 = createHash("sha256").update(reviewFile.source).digest("hex");
+          review = { ...reviewResult, source: reviewFile.source, sha256, displayPath: reviewDisplayPath };
+          for (const reviewIssue of reviewResult.issues) {
+            findings.push(finding(
+              historical ? "warning" : "error",
+              reviewIssue.code,
+              reviewDisplayPath,
+              reviewIssue.message,
+              { ...context, sliceId: slice.id },
+            ));
+          }
+        }
+      }
+
+      sliceClosures.set(slice.id, { ...result, displayPath, review, reviewDisplayPath });
+      for (const closureIssue of result.issues) {
+        findings.push(finding(
+          historical ? "warning" : "error",
+          closureIssue.code,
+          displayPath,
+          closureIssue.message,
+          { ...context, sliceId: slice.id },
+        ));
+      }
+    }
+  }
+  return { findings, metadata, requiredFiles, structuredTasks, sliceClosures };
 }
 
 async function resolveAffectedEpicAssignments(
@@ -1312,6 +1549,291 @@ async function resolveAffectedEpicAssignments(
     assignments.get(repositoryProjectionKey(repository)).add(directory);
   }
   return { assignments, findings };
+}
+
+async function validateV2ClosureRepositoryState({
+  repository,
+  repositoryPath,
+  record,
+  slice,
+  closure,
+  epicRecords,
+}) {
+  const findings = [];
+  const closureRecord = closure?.record;
+  const review = closure?.review;
+  if (!closureRecord || closure.issues.length > 0 || !review || review.issues.length > 0) return findings;
+  const level = record.closed ? "warning" : "error";
+  const context = {
+    spaceId: repository.spaceId,
+    repository: repository.resolvedPath,
+    artifactType: "change",
+    artifactId: record.changeId,
+    sliceId: slice.id,
+  };
+  const displayPath = closure.displayPath;
+  const reviewRecord = review.record;
+
+  if (
+    closureRecord.review.path !== `slice-reviews/${slice.id}.md`
+    || closureRecord.review.sha256 !== review.sha256
+    || closureRecord.review.candidate !== reviewRecord.candidate
+    || closureRecord.review.verdict !== reviewRecord.verdict
+    || closureRecord.seal.reviewedTree !== reviewRecord.reviewedTree
+  ) {
+    findings.push(finding(
+      level,
+      "SLICE_CLOSURE_REVIEW_MISMATCH",
+      displayPath,
+      `Slice closure ${slice.id} must match the exact durable slice review identity, candidate, verdict, digest, and reviewed tree.`,
+      context,
+    ));
+  }
+
+  const reviewScenarios = new Map(review.scenarios.map((entry) => [entry.scenario, entry]));
+  for (const entry of closureRecord.scenarios) {
+    const reviewEntry = reviewScenarios.get(entry.scenario);
+    if (!reviewEntry || reviewEntry.anchor !== entry.reviewAnchor || reviewEntry.result !== entry.result || reviewEntry.gap !== entry.gap) {
+      findings.push(finding(
+        level,
+        "SLICE_CLOSURE_REVIEW_MISMATCH",
+        displayPath,
+        `Slice closure ${slice.id} Scenario ${entry.scenario} must match its anchored final Review row.`,
+        context,
+      ));
+    }
+  }
+  const reviewVisual = new Map(review.visual.map((entry) => [entry.requirement, entry]));
+  for (const entry of closureRecord.visual.requirements) {
+    const reviewEntry = reviewVisual.get(entry.requirement);
+    if (!reviewEntry || reviewEntry.anchor !== entry.reviewAnchor || reviewEntry.result !== entry.result || reviewEntry.gap !== entry.gap) {
+      findings.push(finding(
+        level,
+        "SLICE_CLOSURE_REVIEW_MISMATCH",
+        displayPath,
+        `Slice closure ${slice.id} visual requirement ${entry.requirement} must match its anchored final Review row.`,
+        context,
+      ));
+    }
+  }
+
+  const commit = closureRecord.seal.finalCommit;
+  const resolvedCommit = await gitOutput(repositoryPath, ["rev-parse", "--verify", `${commit}^{commit}`]);
+  const tree = await gitOutput(repositoryPath, ["rev-parse", "--verify", `${commit}^{tree}`]);
+  const reachable = await gitOutput(repositoryPath, ["merge-base", "--is-ancestor", commit, "HEAD"]);
+  if (
+    !resolvedCommit.ok
+    || resolvedCommit.stdout !== commit
+    || !tree.ok
+    || tree.stdout !== closureRecord.seal.reviewedTree
+    || tree.stdout !== closureRecord.seal.finalCommitTree
+    || !reachable.ok
+  ) {
+    findings.push(finding(
+      level,
+      "INVALID_SLICE_CLOSURE_SEAL",
+      displayPath,
+      `Slice closure ${slice.id} reviewed tree must equal its reachable final commit tree.`,
+      context,
+    ));
+  }
+  const parents = await gitOutput(repositoryPath, ["rev-list", "--parents", "-n", "1", commit]);
+  const parentParts = parents.stdout.split(/\s+/).filter(Boolean);
+  const workingTree = /^working-tree:([0-9a-f]{40}):sha256:/.exec(closureRecord.review.candidate);
+  const committedCandidate = /^(?:commit:)?([0-9a-f]{40})$/.exec(closureRecord.review.candidate);
+  if (
+    !parents.ok
+    || parentParts.length !== 2
+    || (workingTree && parentParts[1] !== workingTree[1])
+    || (committedCandidate && committedCandidate[1] !== commit)
+  ) {
+    findings.push(finding(
+      level,
+      "INVALID_SLICE_CLOSURE_SEAL",
+      displayPath,
+      `Slice closure ${slice.id} final commit must have one parent and preserve its reviewed candidate relationship.`,
+      context,
+    ));
+  }
+
+  for (const reference of new Set((review.proofValues ?? []).flatMap(durableProofReferences))) {
+    if (await proofReferenceExists({ reference, record, repositoryPath, commit })) continue;
+    findings.push(finding(
+      level,
+      "NON_DURABLE_SLICE_EVIDENCE",
+      review.displayPath,
+      `Slice review ${slice.id} proof reference is not present with its anchor in the sealed candidate: ${reference}.`,
+      context,
+    ));
+  }
+
+  const reviewScenariosById = new Map(review.scenarios.map((entry) => [entry.scenario, entry]));
+  for (const scenarioRow of closureRecord.scenarios) {
+    const resolvedScenario = resolveClosureScenario(epicRecords, scenarioRow.scenario);
+    if (!resolvedScenario) {
+      findings.push(finding(
+        level,
+        "SLICE_CLOSURE_SCENARIO_NOT_FOUND",
+        displayPath,
+        `Slice closure ${slice.id} Scenario ${scenarioRow.scenario} does not resolve exactly once in the validated affected Epics.`,
+        context,
+      ));
+      continue;
+    }
+    const { epic, story, scenario } = resolvedScenario;
+    const epicGap = epicVerificationGapClassification(epic.source, story, scenario);
+    const closureGap = closureGapClassification(scenarioRow.gap);
+    const gapMatches = closureGap.classification === "none"
+      ? epicGap === null
+      : epicGap?.classification === closureGap.classification
+        && (closureGap.classification !== "user-accepted" || epicGap.date === closureGap.date)
+        && (closureGap.classification !== "optional-confidence" || epicGap.policy === closureGap.policy);
+    if (!gapMatches) {
+      findings.push(finding(
+        level,
+        "SLICE_CLOSURE_EPIC_GAP_MISMATCH",
+        epic.displayPath,
+        `Scenario ${scenarioRow.scenario} closure gap ${scenarioRow.gap} must exactly match its Epic Verification Gap classification.`,
+        context,
+      ));
+    }
+    if (scenarioRow.result === "pass") {
+      const reviewScenario = reviewScenariosById.get(scenarioRow.scenario);
+      const canonicalEvidence = epic.evidenceByScenario.get(`${story}/${scenario}`) ?? new Set();
+      const canonicalReferences = new Set([...canonicalEvidence].flatMap(durableProofReferences));
+      const reviewReferences = durableProofReferences(reviewScenario?.citedProof);
+      if (!reviewReferences.some((reference) => canonicalReferences.has(reference))) {
+        findings.push(finding(
+          level,
+          "SLICE_CLOSURE_EVIDENCE_MISMATCH",
+          epic.displayPath,
+          `Passing Scenario ${scenarioRow.scenario} must cite durable Review proof recorded as passing in its Epic Verified By map.`,
+          context,
+        ));
+      }
+    }
+  }
+  return findings;
+}
+
+async function validateClosureRepositoryState({
+  repository,
+  repositoryPath,
+  record,
+  slice,
+  closure,
+  epicRecords,
+}) {
+  if (closure?.record?.schema === SLICE_CLOSURE_SCHEMA) {
+    return validateV2ClosureRepositoryState({ repository, repositoryPath, record, slice, closure, epicRecords });
+  }
+  const findings = [];
+  const closureRecord = closure?.record;
+  if (!closureRecord || closure.issues.length > 0) return findings;
+  const level = record.closed ? "warning" : "error";
+  const context = {
+    spaceId: repository.spaceId,
+    repository: repository.resolvedPath,
+    artifactType: "change",
+    artifactId: record.changeId,
+    sliceId: slice.id,
+  };
+  const displayPath = closure.displayPath;
+  const commit = closureRecord.finalCommit;
+  const resolvedCommit = await gitOutput(repositoryPath, ["rev-parse", "--verify", `${commit}^{commit}`]);
+  const tree = await gitOutput(repositoryPath, ["rev-parse", "--verify", `${commit}^{tree}`]);
+  const reachable = await gitOutput(repositoryPath, ["merge-base", "--is-ancestor", commit, "HEAD"]);
+  if (
+    !resolvedCommit.ok
+    || resolvedCommit.stdout !== commit
+    || !tree.ok
+    || tree.stdout !== closureRecord.finalCommitTree
+    || tree.stdout !== closureRecord.seal.reviewedTree
+    || tree.stdout !== closureRecord.seal.finalCommitTree
+    || !reachable.ok
+  ) {
+    findings.push(finding(
+      level,
+      "INVALID_SLICE_CLOSURE_SEAL",
+      displayPath,
+      `Slice closure ${slice.id} reviewed tree must equal its reachable final commit tree.`,
+      context,
+    ));
+  }
+  const parents = await gitOutput(repositoryPath, ["rev-list", "--parents", "-n", "1", commit]);
+  const parentParts = parents.stdout.split(/\s+/).filter(Boolean);
+  const workingTree = /^working-tree:([0-9a-f]{40}):sha256:/.exec(closureRecord.finalReviewCandidate);
+  if (!parents.ok || parentParts.length !== 2 || (workingTree && parentParts[1] !== workingTree[1])) {
+    findings.push(finding(
+      level,
+      "INVALID_SLICE_CLOSURE_SEAL",
+      displayPath,
+      `Slice closure ${slice.id} final commit must have one parent, and a working-tree review candidate must name that parent as HEAD.`,
+      context,
+    ));
+  }
+
+  const proofValues = [
+    closureRecord.finalReviewProof,
+    ...closureRecord.scenarios.map((entry) => entry.proof),
+    ...closureRecord.visual.requirements.map((entry) => entry.proof),
+  ];
+  for (const reference of new Set(proofValues.flatMap(durableProofReferences))) {
+    if (await proofReferenceExists({ reference, record, repositoryPath, commit })) continue;
+    findings.push(finding(
+      level,
+      "NON_DURABLE_SLICE_EVIDENCE",
+      displayPath,
+      `Slice closure ${slice.id} proof reference is not present with its anchor in the sealed candidate: ${reference}.`,
+      context,
+    ));
+  }
+
+  for (const scenarioRow of closureRecord.scenarios) {
+    const resolvedScenario = resolveClosureScenario(epicRecords, scenarioRow.scenario);
+    if (!resolvedScenario) {
+      findings.push(finding(
+        level,
+        "SLICE_CLOSURE_SCENARIO_NOT_FOUND",
+        displayPath,
+        `Slice closure ${slice.id} Scenario ${scenarioRow.scenario} does not resolve exactly once in the validated affected Epics.`,
+        context,
+      ));
+      continue;
+    }
+    const { epic, story, scenario } = resolvedScenario;
+    const epicGap = epicVerificationGapClassification(epic.source, story, scenario);
+    const closureGap = closureGapClassification(scenarioRow.gap);
+    const gapMatches = closureGap.classification === "none"
+      ? epicGap === null
+      : epicGap?.classification === closureGap.classification
+        && (closureGap.classification !== "user-accepted" || epicGap.date === closureGap.date)
+        && (closureGap.classification !== "optional-confidence" || epicGap.policy === closureGap.policy);
+    if (!gapMatches) {
+      findings.push(finding(
+        level,
+        "SLICE_CLOSURE_EPIC_GAP_MISMATCH",
+        epic.displayPath,
+        `Scenario ${scenarioRow.scenario} closure gap ${scenarioRow.gap} must exactly match its Epic Verification Gap classification.`,
+        context,
+      ));
+    }
+    if (scenarioRow.result === "pass") {
+      const canonicalEvidence = epic.evidenceByScenario.get(`${story}/${scenario}`) ?? new Set();
+      const canonicalReferences = new Set([...canonicalEvidence].flatMap(durableProofReferences));
+      const closureReferences = durableProofReferences(scenarioRow.proof);
+      if (!closureReferences.some((reference) => canonicalReferences.has(reference))) {
+        findings.push(finding(
+          level,
+          "SLICE_CLOSURE_EVIDENCE_MISMATCH",
+          epic.displayPath,
+          `Passing Scenario ${scenarioRow.scenario} must cite proof recorded as passing in its Epic Verified By map.`,
+          context,
+        ));
+      }
+    }
+  }
+  return findings;
 }
 
 async function validateRepository(
@@ -1502,6 +2024,24 @@ async function validateRepository(
       }
     }
   }
+  for (const record of targetedChanges) {
+    const tasks = record.structuredTasks;
+    if (!tasks?.structured || tasks.ledgerFormat !== "current-six-column") continue;
+    for (const slice of tasks.slices.filter((entry) =>
+      entry.status === "done" && entry.closureRequired && entry.repository === repository.id)) {
+      const closure = record.sliceClosures?.get(slice.id);
+      if (!closure) continue;
+      findings.push(...await validateClosureRepositoryState({
+        repository,
+        repositoryPath,
+        record,
+        slice,
+        closure,
+        epicRecords,
+      }));
+    }
+  }
+
   const seenEpicIds = new Map();
   const seenLegacyStoryIds = new Map();
   for (const epic of epicRecords) {
@@ -1625,6 +2165,8 @@ async function validateCentralRecords(
       ...record,
       metadata: result.metadata,
       requiredFiles: result.requiredFiles,
+      structuredTasks: result.structuredTasks,
+      sliceClosures: result.sliceClosures,
     });
     if (
       validateRepositoryOwnership

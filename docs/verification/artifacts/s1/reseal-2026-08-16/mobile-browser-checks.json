@@ -1,0 +1,19 @@
+{
+  "body": {
+    "background": "rgb(9, 9, 11)",
+    "color": "rgb(244, 244, 245)"
+  },
+  "controls": {
+    "copy": 44,
+    "nav": [
+      44,
+      44
+    ]
+  },
+  "overflow": 0,
+  "reducedMotion": true,
+  "viewport": [
+    320,
+    844
+  ]
+}

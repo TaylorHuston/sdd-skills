@@ -177,7 +177,7 @@ const VALIDATE_HELP = `SDD Validate
 Usage:
   sdd validate [space-id] [options]
 
-Validate central Changes, structured Requirement slices and checkpoints, repository Epics, verification reports, ownership, references, and optional Git-relative freshness.
+Validate central Changes, structured Requirement slices, closure certificates and checkpoints, repository Epics, verification reports, ownership, references, and optional Git-relative freshness.
 
 Options:
   --workspace <path>          Select the owning workspace explicitly

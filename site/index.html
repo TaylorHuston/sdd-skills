@@ -80,7 +80,7 @@ skil
 
         <figure class="behaviorMap" aria-labelledby="map-caption">
           <figcaption id="map-caption">How the pieces connect</figcaption>
-          <div class="mapFlow" aria-label="Idea to verified evidence">
+          <div class="mapFlow" role="group" aria-label="Idea to verified evidence">
             <div class="mapNode mapNodePrimary">
               <span>01</span>
               <strong>Intent</strong>
@@ -161,7 +161,7 @@ skil
           </aside>
         </div>
 
-        <div class="rediscoveryBand" aria-label="Cost of missing context">
+        <div class="rediscoveryBand" role="group" aria-label="Cost of missing context">
           <div>
             <span>For a developer</span>
             <p>The first hour disappears into routes, services, stale layers, and tests that may prove the wrong thing.
@@ -245,7 +245,7 @@ skil
             Change becomes history; the updated Story remains.</p>
         </div>
 
-        <div class="modelEquation"
+        <div class="modelEquation" role="group"
           aria-label="Accepted behavior plus code ownership plus proof produces current application truth">
           <span>Accepted behavior</span>
           <b aria-hidden="true">+</b>
@@ -261,7 +261,7 @@ skil
             <p class="columnLabel">Three records, three jobs</p>
             <div>
               <h3 id="records-title">These documents age differently, so I keep them separate.</h3>
-              <p>A PRD can guide the product for years. A Change becomes history as soon as the work is done. An Epic
+              <p>A PRD is a starting direction to revisit deliberately, not a document to synchronize after every slice. A Change becomes history as soon as the work is done. An Epic
                 has to keep changing with the application. Asking one document to do all three jobs is how the docs stop
                 being useful.</p>
             </div>
@@ -273,7 +273,7 @@ skil
               <h4>What are we trying to build?</h4>
               <p>Planning holds product direction, exploration, open questions, and possible work. It describes the
                 intent and constraints before the team has committed to a delivery path.</p>
-              <p class="recordNote">It can change or be abandoned without claiming that the product itself changed.</p>
+              <p class="recordNote">It can be broader, older, or phased differently without blocking an accepted Change; revisit it when product learning warrants.</p>
             </article>
 
             <article class="recordType recordProject">
@@ -387,7 +387,7 @@ skil
         </header>
 
         <div class="traceLayout">
-          <div class="traceStack" aria-label="Traceability hierarchy">
+          <div class="traceStack" role="group" aria-label="Traceability hierarchy">
             <div class="traceRow">
               <span class="traceType">Epic</span>
               <strong>What durable capability exists?</strong>
@@ -685,7 +685,7 @@ skil
             <article class="recordType recordPlanning implementationRecord">
               <p class="recordIndex">01 / Planning</p>
               <h4>Space-owned context</h4>
-              <pre aria-label="Default planning document layout"><code>&lt;planning-path&gt;/
+              <pre role="region" tabindex="0" aria-label="Default planning document layout"><code>&lt;planning-path&gt;/
   prd.md
   explorations/
 
@@ -699,7 +699,7 @@ skil
             <article class="recordType recordProject implementationRecord">
               <p class="recordIndex">02 / Project</p>
               <h4>Repository-owned truth</h4>
-              <pre aria-label="Default project document layout"><code>&lt;repository&gt;/docs/
+              <pre role="region" tabindex="0" aria-label="Default project document layout"><code>&lt;repository&gt;/docs/
   epics/&lt;epic&gt;/epic.md
   adrs/&lt;date&gt;-&lt;decision&gt;.md
   audits/</code></pre>
@@ -712,10 +712,14 @@ skil
             <article class="recordType recordChange implementationRecord">
               <p class="recordIndex">03 / Changes</p>
               <h4>Workspace-owned work</h4>
-              <pre aria-label="Default Change document layout"><code>&lt;workspace&gt;/.sdd/changes/
+              <pre role="region" tabindex="0" aria-label="Default Change document layout"><code>&lt;workspace&gt;/.sdd/changes/
   &lt;date&gt;-&lt;change&gt;/
     change.md  # intent plus progressive plan
     tasks.md   # added during planning
+    slice-reviews/
+      S1.md    # durable detailed candidate-bound slice Review
+    slice-closures/
+      S1.yaml  # generated minimal Review index and Git seal
   closed/
     &lt;date&gt;-&lt;change&gt;/</code></pre>
               <p class="recordNote"><code>sdd change create</code> writes one proposed <code>change.md</code> whose
@@ -723,8 +727,8 @@ skil
                 <code>tasks.md</code> with independently green vertical Requirement slices. Each slice has an
                 observable outcome, Scenario-based proof intent, and enough boundary context for a meaningful review
                 without predicting files or implementation steps. The CLI validates slice fields, references,
-                dependencies, one current ledger row per slice, and a replaceable Resume checkpoint with repository
-                candidate envelopes; it does not judge whether the slices are good. Existing records may retain a compatible <code>design.md</code>.
+                dependencies, unique Scenario references, explicit visual obligations, one current Implementation Ledger row and one candidate-bound Slice Gate Ledger row per slice, a durable slice Review plus minimal versioned closure receipt for each new or reopened completed slice, and a replaceable Resume checkpoint with repository
+                candidate envelopes. Gate rows use exact commit or content-sensitive working-tree watermarks and keep verification, implementation Review, Epic Update, post-Epic Review, gap disposition, and final commit candidate-consistent. A slice marked <code>Closure receipt: required</code> cannot remain <code>done</code> without complete gate state, an owner-confined detailed slice Review, a matching minimal receipt, exact Scenario and planned visual contract accounting, durable Review proof references that resolve in the seal, reconciled gaps, a Review-byte digest, and a reachable single-parent commit whose reviewed and final trees agree. Legacy v1 receipts and existing completed slices without the marker remain compatible. The CLI validates provenance and consistency, not whether the proof is semantically sufficient. Existing records may retain a compatible <code>design.md</code>.
                 The ID is unique within this workspace, and closeout moves the folder once under
                 <code>&lt;workspace&gt;/.sdd/changes/closed/</code> after project truth has been reconciled.
               </p>
@@ -750,8 +754,7 @@ skil
                 <li>Initialize portable repository contracts</li>
                 <li>Scaffold canonical Changes and repository-owned Epics</li>
                 <li>Resolve immutable committed or working-tree envelopes with <code>sdd candidate resolve</code>; add Epic-specific validation input with <code>sdd epic update-input</code></li>
-                <li>Validate artifacts, structured Requirement slices, ledger/checkpoint coherence, ownership metadata,
-                  audit-report coherence, and optional Git-relative freshness</li>
+                <li>Validate artifacts, atomic Requirement slices, explicit multi-Requirement coupling, candidate-consistent gate ledgers, durable slice Reviews, minimal closure receipts, exact gate/Scenario/visual sets, Review digests, accepted-gap reconciliation, reviewed-tree/final-tree seals, ledger/checkpoint coherence, ownership metadata, audit-report coherence, and optional Git-relative freshness</li>
                 <li>Report central Change status across mapped repositories</li>
                 <li>Reconcile checksum-managed doctrine and skills during update</li>
                 <li>Guard one-record lifecycle transitions</li>
@@ -795,7 +798,7 @@ skil
               <div><code>sdd validate &lt;space-id&gt; --change &lt;change-id&gt; --workspace &lt;path&gt;</code><code>/sdd-change</code></div>
             </li>
             <li><span>05</span><strong>Optionally converge the planned experience</strong><code>/sdd-design --plan</code></li>
-            <li class="workflowMapMulti"><span>06</span><strong>Deliver one verified slice</strong>
+            <li class="workflowMapMulti"><span>06</span><strong>Deliver, review, reconcile, and commit one slice</strong>
               <div><code>/sdd-apply</code><code>/sdd-review --slice-checkpoint</code><code>/sdd-epic-update</code></div>
             </li>
             <li class="workflowMapMulti"><span>07</span><strong>Repeat per slice, then review the complete Change on current Epic truth</strong>
@@ -809,9 +812,9 @@ skil
           </ol>
           <p class="referenceNote"><code>/sdd-change</code> returns <code>complete</code>, <code>no-op</code>,
             <code>needs-user</code>, <code>blocked</code>, or <code>routed</code>, then returns control before Design or
-            Apply begins. Design uses the same statuses, preserves a <code>planned</code> Change during initial convergence, binds revisions to exact repository candidates, keeps prototypes optional, and returns before separately invoked Apply or Review. Apply uses the same public statuses after exactly one slice: it records the pre-slice
-            baseline for each affected repository, may implement inline or through one fresh-context worker in an
-            authorized dedicated isolated workspace, inspects and freshly verifies the candidate, then invokes the public read-only Review contract in implementation-phase slice-checkpoint mode. After any bounded remediation and scoped re-review succeeds, Apply invokes the public Epic Update contract; when Epic files change, it invokes post-Epic slice Review on the final candidate before marking the slice done. Review and Epic Update remain directly callable; a separate final Review on current Epic truth still owns complete-Change integration readiness. Changelog consumes the same candidate envelope after current final Review and current Epic truth, follows the repository's native release-record policy, returns <code>no-op</code> for internal-only or already accurate work, and stops before versioning, staging, commits, PRs, release, or deployment. Release owns aggregation and version intent. Changelog remains outside the per-slice pipeline; commits, PRs, release, deployment, and closeout are never implied by Apply's composition.</p>
+            Apply begins. Design uses the same statuses, preserves a <code>planned</code> Change during initial convergence, binds revisions to exact repository candidates, keeps prototypes optional, and returns before separately invoked Apply or Review. Apply uses the same public statuses after exactly one atomic Requirement slice: it records the pre-slice
+            baseline for each affected repository, states a transient Scenario proof sketch without adding another durable matrix, may implement inline or through one fresh-context worker in an
+            authorized dedicated isolated workspace, inspects and freshly verifies the candidate, then invokes the public Review contract in implementation-phase slice-checkpoint mode. Apply admits grounded required findings, performs one consolidated same-slice remediation batch, then requires one fresh final Review across every affected Scenario before invoking the public Epic Update contract; another pre-existing finding returns <code>needs-user</code>, while only a remediation-introduced regression receives one narrow correction. Scenario evidence closure records each claimed and proven boundary, evidence type, and durable reproduction reference; temporary-only artifacts cannot close a technical gate. Fresh reviewers treat prior verdicts as claims to falsify and return a Gate Execution Manifest that accounts for every applicable gate, a real diff-scoped reverse-traceability audit, and every triggered visual-matrix state. Required technical gaps cannot pass as manual acceptance. When Epic files change, Apply invokes a fresh comprehensive post-Epic slice Review on the final candidate. Once every gate passes, Apply stages only slice-attributable files and creates one content-identical local commit per affected repository. For each new or reopened slice, final Review writes a durable <code>slice-reviews/S#.md</code>; Apply then generates a minimal machine-validated receipt containing Review identity/candidate/verdict/raw digest, compact Scenario and visual result/gap anchors, accepted gaps, and reviewed-tree/final-tree equality. Only after scoped validation reconciles the Review, receipt, Epic, ledgers, and Git does Apply record the full SHA and mark the slice done. Review and Epic Update remain directly callable; a separate final Review on current Epic truth still owns complete-Change integration readiness. Changelog consumes the same candidate envelope after current final Review and current Epic truth, follows the repository's native release-record policy, returns <code>no-op</code> for internal-only or already accurate work, and stops before versioning, staging, commits, PRs, release, or deployment. Release owns aggregation and version intent. Changelog remains outside the per-slice pipeline; Apply's narrow local slice-commit authority never implies push, PR, merge, release, deployment, or closeout.</p>
         </section>
 
         <section class="referenceLifecycle" aria-labelledby="reference-lifecycle-title">

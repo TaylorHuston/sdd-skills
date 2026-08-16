@@ -55,6 +55,13 @@ test("public guide documents progressive workspace-owned Changes and current-onl
   assert.doesNotMatch(html, /docs\/changes/);
 });
 
+test("public guide presents PRDs as directional starting points rather than delivery gates", async () => {
+  const { html } = await readSite();
+
+  assert.match(html, /A PRD is a starting direction to revisit deliberately, not a document to synchronize after every slice/);
+  assert.match(html, /It can be broader, older, or phased differently without blocking an accepted Change/);
+});
+
 test("public guide presents ADR as a confirmed terminal decision handoff", async () => {
   const { html } = await readSite();
 
@@ -72,7 +79,7 @@ test("public guide presents Change as composable vertical-slice planning", async
   assert.match(html, /Plan independently green slices and settle branching decisions/);
   assert.match(html, /<code>complete<\/code>, <code>no-op<\/code>,\s+<code>needs-user<\/code>, <code>blocked<\/code>, or <code>routed<\/code>/);
   assert.match(html, /returns control before Design or\s+Apply begins/);
-  assert.match(html, /commits, PRs, release, deployment, and closeout are never implied by Apply's composition/);
+  assert.match(html, /Apply's narrow local slice-commit authority never implies push, PR, merge, release, deployment, or closeout/);
 });
 
 test("public guide presents Design as optional planned convergence and candidate-bound revision", async () => {
@@ -85,12 +92,25 @@ test("public guide presents Design as optional planned convergence and candidate
 test("public guide presents Apply as one reviewed and reconciled slice pipeline", async () => {
   const { html } = await readSite();
 
-  assert.match(html, /Deliver one verified slice/);
+  assert.match(html, /Deliver, review, reconcile, and commit one slice/);
   assert.match(html, /exact baseline with fresh candidate-bound evidence/);
-  assert.match(html, /Apply uses the same public statuses after exactly one slice/);
+  assert.match(html, /Apply uses the same public statuses after exactly one atomic Requirement slice/);
   assert.match(html, /implement inline or through one fresh-context worker in an\s+authorized dedicated isolated workspace/);
-  assert.match(html, /invokes the public read-only Review contract in implementation-phase slice-checkpoint mode/);
-  assert.match(html, /invokes the public Epic Update contract; when Epic files change, it invokes post-Epic slice Review on the final candidate before marking the slice done/);
+  assert.match(html, /transient Scenario proof sketch without adding another durable matrix/);
+  assert.match(html, /invokes the public Review contract in implementation-phase slice-checkpoint mode/);
+  assert.match(html, /admits grounded required findings, performs one consolidated same-slice remediation batch/);
+  assert.match(html, /another pre-existing finding returns <code>needs-user<\/code>/);
+  assert.match(html, /only a remediation-introduced regression receives one narrow correction/);
+  assert.match(html, /requires one fresh final Review across every affected Scenario before invoking the public Epic Update contract/);
+  assert.match(html, /evidence type, and durable reproduction reference/);
+  assert.match(html, /temporary-only artifacts cannot close a technical gate/);
+  assert.match(html, /prior verdicts as claims to falsify/);
+  assert.match(html, /Gate Execution Manifest that accounts for every applicable gate/);
+  assert.match(html, /real diff-scoped reverse-traceability audit/);
+  assert.match(html, /Required technical gaps cannot pass as manual acceptance/);
+  assert.match(html, /When Epic files change, Apply invokes a fresh comprehensive post-Epic slice Review on the final candidate/);
+  assert.match(html, /final Review writes a durable <code>slice-reviews\/S#\.md<\/code>/);
+  assert.match(html, /minimal machine-validated receipt containing Review identity\/candidate\/verdict\/raw digest/);
   assert.match(html, /Review and Epic Update remain directly callable/);
 });
 
@@ -120,10 +140,12 @@ test("public guide presents candidate-bound Changelog as separate from Release",
 test("public guide distinguishes structured Change validation from planning judgment", async () => {
   const { html } = await readSite();
 
-  assert.match(html, /CLI validates slice fields, references,\s+dependencies, one current ledger row per slice/);
-  assert.match(html, /replaceable Resume checkpoint with repository\s+candidate envelopes/);
-  assert.match(html, /it does not judge whether the slices are good/);
-  assert.match(html, /structured Requirement slices, ledger\/checkpoint coherence/);
+  assert.match(html, /CLI validates slice fields, references,\s+dependencies, unique Scenario references, explicit visual obligations, one current Implementation Ledger row and one candidate-bound Slice Gate Ledger row per slice, a durable slice Review plus minimal versioned closure receipt/);
+  assert.match(html, /Gate rows use exact commit or content-sensitive working-tree watermarks/);
+  assert.match(html, /slice marked <code>Closure receipt: required<\/code> cannot remain <code>done<\/code> without complete gate state, an owner-confined detailed slice Review, a matching minimal receipt, exact Scenario and planned visual contract accounting, durable Review proof references that resolve in the seal, reconciled gaps, a Review-byte digest, and a reachable single-parent commit/);
+  assert.match(html, /Legacy v1 receipts and existing completed slices without the marker remain compatible/);
+  assert.match(html, /CLI validates provenance and consistency, not whether the proof is semantically sufficient/);
+  assert.match(html, /atomic Requirement slices, explicit multi-Requirement coupling, candidate-consistent gate ledgers, durable slice Reviews, minimal closure receipts, exact gate\/Scenario\/visual sets, Review digests, accepted-gap reconciliation, reviewed-tree\/final-tree seals, ledger\/checkpoint coherence/);
 });
 
 test("public guide has unique fragment targets and sequential navigable sections", async () => {
@@ -142,6 +164,9 @@ test("public guide has unique fragment targets and sequential navigable sections
   assert.match(html, /class="skipLink" href="#main-content">Skip to content/);
   assert.match(html, /<aside class="docsSidebar" aria-label="Documentation navigation">/);
   assert.match(html, /<nav class="siteNav" aria-label="On this page">/);
+  assert.match(html, /class="mapFlow" role="group" aria-label="Idea to verified evidence"/);
+  assert.match(html, /class="traceStack" role="group" aria-label="Traceability hierarchy"/);
+  assert.equal((html.match(/<pre role="region" tabindex="0" aria-label="Default [^"]+ document layout">/g) ?? []).length, 3);
 });
 
 test("public guide preserves clipboard fallback feedback and reduced-motion behavior", async () => {

@@ -1,11 +1,11 @@
 ---
 name: sdd-prd
-description: Create, draft, update, review, or reason about private project planning Product Briefs/PRDs and Feature/Capability Briefs for SDD application projects in project planning docs through a lightweight grill-me style product interview. Use when the user invokes /sdd-prd, asks whether a SDD project needs product direction before SDD changes, refines SDD product scope, audience, principles, market/monetization, non-goals, or open questions, or checks drift between PRD direction and SDD changes, Epic directories, embedded Stories, Requirements, Scenarios, implementation, or review results. PRDs are optional for early experiments and expected once a project has momentum beyond experimentation.
+description: Create, draft, periodically revisit, or reason about private project planning Product Briefs/PRDs and Feature/Capability Briefs for SDD application projects through a lightweight grill-me style product interview. Use when the user invokes /sdd-prd, wants a starting point for product direction, refines product scope, audience, principles, market/monetization, non-goals, or open questions, or deliberately revisits direction after implementation learning. PRDs guide planning but are not continuously synchronized implementation truth or an ordinary Apply/Review gate.
 ---
 
 # SDD Product Brief / PRD
 
-Treat a Product Brief/PRD as durable private product direction above the SDD change workflow. Keep it high-level enough to guide `/sdd-change`, later Change planning, Epic scope, Story shape, and scope tradeoffs without becoming a roadmap, implementation spec, status page, worklog, or SDD change artifact.
+Treat a Product Brief/PRD as a durable private starting point for product direction that should be revisited deliberately over time, not continuously synchronized with every implementation slice. Keep it high-level enough to guide `/sdd-change`, later Change planning, Epic scope, Story shape, and scope tradeoffs without becoming a roadmap, implementation spec, status page, worklog, SDD change artifact, or competing source of current behavioral truth.
 
 ## Authority And Project Profile
 
@@ -36,7 +36,7 @@ Use this boundary:
 
 An active dated Change lives once at `<workspace>/.sdd/changes/<change-id>/`; closed history lives at `<workspace>/.sdd/changes/closed/<change-id>/`. Change IDs are unique within the selected workspace, while Epics, ADRs, implementation, tests, and supporting docs remain repository-local. Legacy planned or repository-local active/closed Change paths are unsupported historical data; do not read them as live owners, and recreate worthwhile intent through `/sdd-change`.
 
-`/sdd-change` should read the PRD when available and flag drift. `/sdd-apply` should stop when implementation reveals meaningful product drift. `/sdd-review` should include a lightweight PRD alignment check when product scope changed.
+`/sdd-change` may read the PRD as directional context and surface a conflict only when planning requires a product decision. After a Change is accepted and planned, its scope plus repository Epic/Story truth govern delivery. `/sdd-apply` and `/sdd-review` may suggest a periodic PRD revisit when implementation learning is material, but ordinary PRD staleness, breadth, or different phasing is advisory and never by itself blocks a slice, Review verdict, integration, or closeout. Block only when the current Change explicitly depends on an unresolved product decision or project guidance explicitly grants the PRD stronger authority.
 
 ## Locations
 
@@ -180,15 +180,16 @@ Use only sections that make the brief useful:
 
 ## Drift
 
-Notice PRD drift during `sdd-explore`, `sdd-change`, `sdd-apply`, `sdd-review`, acceptance, and status work. Suggest a PRD revisit when implementation, testing, dogfooding, target users, scope boundaries, principles, market assumptions, monetization assumptions, or recurring decisions diverge from written product direction.
+Notice opportunities for a deliberate PRD revisit during `sdd-explore`, `sdd-change`, implementation learning, acceptance, and status work. Suggest one when dogfooding, target users, principles, market assumptions, monetization assumptions, or recurring product decisions materially change the useful starting direction. Do not turn every Change, slice, or review into a synchronization pass.
 
-Treat implementation and Epic truth as current behavioral reality. Treat the PRD as directional product intent. A valid drift-review outcome is `reviewed; no PRD change needed`.
+Treat accepted Change scope and repository Epic/Story truth as current delivery and behavioral reality. Treat the PRD as directional context that may intentionally be broader, older, aspirational, or phased differently. A valid outcome is `revisit suggested; no implementation block` or `reviewed; no PRD change needed`.
 
-When drift is found:
+When drift is noticed:
 
-- If product intent changed, recommend updating `prd.md`.
-- If a proposed SDD change conflicts with product direction, flag the conflict before `/sdd-change` or `/sdd-review` proceeds.
-- If the PRD is intentionally broader than current implementation, leave it alone and make current implementation state clear in repository-local Epic truth and the relevant central Change records.
+- If the user wants to revisit product direction, recommend or invoke `/sdd-prd` separately and follow its explicit persistence gate.
+- If a proposed Change cannot be planned without resolving a genuine product conflict, return `needs-user` before planning is accepted; do not silently override either direction.
+- If an already planned Change differs from the PRD, continue from the accepted Change unless the user reopens its scope. Report the PRD difference as advisory context, not an implementation or Review defect.
+- If the PRD is intentionally broader than current implementation, leave it alone and keep current implementation state clear in repository-local Epic truth and the relevant central Change records.
 
 ## Completion Check
 

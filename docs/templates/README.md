@@ -14,7 +14,9 @@ These examples mirror the canonical template assets shipped inside the packaged 
 | Code audit report | [code-audit-report.md](code-audit-report.md) | `skills/sdd-code-audit/assets/code-audit-report-template.md` | `/sdd-code-audit` |
 | Product Brief / PRD | [prd.md](prd.md) | `skills/sdd-prd/assets/canonical-prd-template.md` | `/sdd-prd` |
 | Requirement-slice delivery queue | [tasks.md](tasks.md) | `skills/sdd-change/assets/tasks-template.md` | `/sdd-change`, `/sdd-apply`; conditional sections may be added by `/sdd-design --revise` or delivery/review workflows |
-| Review report | [review.md](review.md) | `skills/sdd-review/assets/review-template.md` | `/sdd-review` |
+| Slice Review | [slice-review.md](slice-review.md) | `skills/sdd-review/assets/slice-review-template.md` | `/sdd-review --slice-checkpoint`; durable candidate-bound reasoning for one slice |
+| Slice closure receipt | [slice-closure.yaml](slice-closure.yaml) | `skills/sdd-apply/assets/slice-closure-template.yaml` | `/sdd-apply`; generated minimal Review index and Git seal |
+| Final Change review report | [review.md](review.md) | `skills/sdd-review/assets/review-template.md` | final Change-wide `/sdd-review` |
 | Release PR | [release-pr.md](release-pr.md) | `skills/sdd-release/assets/release-pr-template.md` | `/sdd-release` |
 
 Duplicate skill-local assets, such as the Epic template copies, should stay byte-identical unless a skill intentionally needs a different template.

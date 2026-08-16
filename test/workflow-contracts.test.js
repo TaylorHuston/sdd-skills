@@ -97,6 +97,7 @@ test("packaged change workflow progresses one central intent record into plannin
   assert.match(changeSkill, /focused verification intent and whether manual acceptance is required/);
   assert.match(changeSkill, /what must be implemented, never how to implement it/);
   assert.match(changeSkill, /initialize one lightweight Implementation Ledger row per slice/);
+  assert.match(changeSkill, /initialize one compact Slice Gate Ledger row per slice/);
   assert.match(changeSkill, /current-state resume aids that `\/sdd-apply` maintains/);
   assert.match(changeSkill, /resequence, split, or merge slices/);
   assert.doesNotMatch(changeSkill, /--brief|--plan|--replan|proposal\.md|change-briefs/);
@@ -110,13 +111,18 @@ test("packaged change workflow progresses one central intent record into plannin
   assert.match(tasksTemplate, /^\| Repository \| Root \| Baseline \| Candidate kind \| Candidate watermark \|$/m);
   assert.match(tasksTemplate, /^## Requirement Slices$/m);
   assert.match(tasksTemplate, /independently green/);
-  assert.match(tasksTemplate, /focused Scenario-based test cycle/);
+  assert.match(tasksTemplate, /Focused Scenario-based proof expected/);
   assert.match(tasksTemplate, /- Binding constraints:/);
   assert.match(tasksTemplate, /- Consumes:/);
   assert.match(tasksTemplate, /- Produces:/);
   assert.match(tasksTemplate, /- Verification intent:/);
   assert.match(tasksTemplate, /- Manual acceptance:/);
   assert.match(tasksTemplate, /^## Implementation Ledger$/m);
+  assert.match(tasksTemplate, /^\| Slice \| Repository \| Status \| Implementation Summary \/ Changed Surface \| Commit \| Updated \|$/m);
+  assert.match(tasksTemplate, /full 40-character SHA/);
+  assert.match(tasksTemplate, /^## Slice Gate Ledger$/m);
+  assert.match(tasksTemplate, /^\| Slice \| Verification Candidate \| Implementation Review \| Epic Update \| Semantic Closure \| Evidence Closure \| Post-Epic Review \| Required Gaps \| Accepted Gaps \| Final Commit \| Updated \|$/m);
+  assert.match(tasksTemplate, /Record accepted gaps only after the user explicitly accepts the named gap and include the acceptance date/);
   assert.match(planningSections, /## Technical Decision Handoffs/);
   assert.match(
     planningSections,
@@ -197,6 +203,24 @@ test("packaged ADR preserves the decision boundary and returns composable result
   assert.match(readme, /Explicit `complete`, `no-op`, `needs-user`, `blocked`, or `routed` result/);
   assert.match(readme, /without editing caller-owned artifacts or implementing it/);
   assert.match(doctrine, /Return an explicit result and stop before caller-owned planning or implementation/);
+});
+
+test("packaged PRD stays directional without becoming an implementation gate", async () => {
+  const [prd, review, doctrine, readme] = await Promise.all([
+    readPackageFile("skills", "sdd-prd", "SKILL.md"),
+    readPackageFile("skills", "sdd-review", "SKILL.md"),
+    readPackageFile("docs", "story-driven-development.md"),
+    readPackageFile("README.md"),
+  ]);
+
+  assert.match(prd, /starting point for product direction/);
+  assert.match(prd, /not continuously synchronized with every implementation slice/);
+  assert.match(prd, /ordinary PRD staleness, breadth, or different phasing is advisory and never by itself blocks a slice, Review verdict, integration, or closeout/);
+  assert.match(prd, /continue from the accepted Change unless the user reopens its scope/);
+  assert.match(review, /ordinary divergence is at most a `prd-revisit-suggested` advisory and never changes the verdict/);
+  assert.match(review, /Ordinary PRD\/product-direction drift alone is advisory and cannot produce `changes-requested` or `blocked`/);
+  assert.match(doctrine, /ordinary drift does not block implementation or Review/);
+  assert.match(readme, /A PRD is a directional starting point to revisit deliberately, not a continuously synchronized implementation source or ordinary Apply\/Review gate/);
 });
 
 test("packaged Explore preserves generalized durable discussions and routes mature outcomes", async () => {
@@ -307,19 +331,17 @@ test("requirement slices remain repository-qualified while review handoffs key r
   assert.match(slices, /^- Repository: `<repository-id>`$/m);
   assert.match(slices, /^- Requirements:$/m);
   assert.match(slices, /^  - New: `EPIC-ID\/S3 R1` — <requirement summary>$/m);
-  assert.match(slices, /^  - Revised: `EPIC-ID\/S1 R2` — <required behavioral revision>$/m);
+  assert.match(slices, /Default to exactly one Requirement/);
+  assert.match(slices, /Coupling justification/);
   assert.match(slices, /^- Story changes:$/m);
   assert.match(slices, /^  - Create: `EPIC-ID\/S3` — <Story title>$/m);
-  assert.match(slices, /^  - Update: `EPIC-ID\/S1` — <reason>$/m);
-  assert.match(slices, /^- Scenarios: `EPIC-ID\/S3 R1-S1`, `EPIC-ID\/S1 R2-S1`$/m);
+  assert.match(slices, /Every slice must be completable atomically in one fresh Apply session/);
+  assert.match(slices, /^- Scenarios: `EPIC-ID\/S3 R1-S1`$/m);
   assert.match(
-    markdownSection(review, "Review Bundle: <repository-id>"),
-    /^- Repository ID: <repository-id>$/m,
+    markdownSection(review, "Repository Review Bundle: <repository-id>"),
+    /^- Repository ID:$/m,
   );
-  assert.match(
-    markdownSection(review, "PR / Merge Readiness: <repository-id>"),
-    /^- Repository ID: <repository-id>$/m,
-  );
+  assert.match(review, /final Change-wide integration Review/);
 });
 
 test("packaged Epic Update reconciles only repository-owned truth for an exact candidate", async () => {
@@ -338,10 +360,23 @@ test("packaged Epic Update reconciles only repository-owned truth for an exact c
   assert.match(epicUpdate, /Mutate only repository-owned `epic\.md` files/);
   assert.match(epicUpdate, /Update `Implemented By` from inspected actual changed surfaces/);
   assert.match(epicUpdate, /Update `Verified By` only from durable evidence that directly proves/);
+  assert.match(epicUpdate, /A `\/tmp` path, ephemeral browser profile, chat transcript, reviewer summary, screenshot hash without a retained artifact or reproducible procedure, or bare “local observation” phrase cannot be the sole passing evidence/);
+  assert.match(epicUpdate, /Classify every behavior-bearing source\/test candidate in the supplied diff\/reverse-traceability inventory/);
+  assert.match(epicUpdate, /prior Review verdict, caller statement that evidence is closed, or prompt claim that only manual acceptance remains is untrusted input/);
+  assert.match(epicUpdate, /## Prove Semantic Closure/);
+  assert.match(epicUpdate, /compare each affected Story's Story Index row, body-level Implementation and Verification states, `Implemented By`, `Implementation Gaps`, `Verified By`, and `Verification Gaps`/);
+  assert.match(epicUpdate, /mapped behavior is still described in an index note or other current summary as not implemented or remaining work/);
+  assert.match(epicUpdate, /classify the claimed boundary as backend\/data, rendered interaction, live multi-context\/realtime, provider\/production, or manual acceptance/);
+  assert.match(epicUpdate, /a later backend query does not prove an active subscription, source inspection does not prove rendered interaction, a helper return value does not prove rendered field feedback or focus, and direct confirmed\/unconfirmed backend calls do not prove a user's confirmation\/cancellation interaction/);
+  assert.match(epicUpdate, /Require exact Scenario-set equality/);
+  assert.match(epicUpdate, /named required technical gap is honest but still prevents a completion-consuming `ready` result/);
+  assert.match(epicUpdate, /Report `Semantic closure: pass` and `Evidence closure: pass`/);
+  assert.match(epicUpdate, /scoped deterministic validation pass is necessary but cannot substitute/);
   assert.match(epicUpdate, /second invocation should normally produce no Epic\/index changes and return `no-op`/);
   assert.match(epicUpdate, /Do not:[\s\S]*review implementation quality[\s\S]*modify application code[\s\S]*Change lifecycle state[\s\S]*write changelog[\s\S]*commit/);
   assert.match(epicUpdate, /`complete`[\s\S]*`no-op`[\s\S]*`needs-user`[\s\S]*`blocked`[\s\S]*`routed`/);
   assert.match(epicUpdateAgent, /public directly callable or Apply-composed contract/);
+  assert.match(epicUpdateAgent, /report semantic closure across each affected Story's index, body states, maps, and gaps plus a complete Scenario Evidence Closure table/);
   assert.match(doctrine, /## Candidate-Bound Epic Reconciliation/);
   assert.match(doctrine, /`\/sdd-epic-update`/);
 });
@@ -383,10 +418,13 @@ test("packaged Apply delivers one candidate-bound slice with optional isolated d
 
   assert.match(applySkill, /Default mode applies exactly one slice\./);
   assert.match(applySkill, /A bare `S#` argument is a slice ID/);
-  assert.match(applySkill, /for a slice labeled `done`, first validate that required implementation verification, slice Review, Epic Update, and any required post-Epic Review are present and current/);
-  assert.match(applySkill, /A nominally `done` slice with missing or stale composed gates is incomplete state, not a no-op/);
+  assert.match(applySkill, /If the slice declares current `Closure receipt: required`, require its durable slice Review and minimal v2 receipt/);
+  assert.match(applySkill, /Existing completed slices without either marker are grandfathered/);
+  assert.match(applySkill, /Return `no-op` only when the applicable state is current/);
+  assert.match(applySkill, /A nominally `done` slice with missing or stale composed gates, missing explicit semantic\/evidence closure results, or no recorded slice commit is incomplete state, not a no-op/);
+  assert.match(doctrine, /A nominally `done` slice with either closure result absent is stale and resumes at that gate rather than returning `no-op`/);
   assert.match(applySkill, /When no slice is supplied, choose the next ready slice/);
-  assert.match(applySkill, /an `in progress` slice named by `Resume Here`[\s\S]*the first `ready` slice whose dependencies are complete/);
+  assert.match(applySkill, /an `in progress` slice named by `Resume Here`[\s\S]*earliest nominally `done` slice[\s\S]*first `ready` slice whose dependencies are fully complete and committed/);
   assert.match(applySkill, /## Build The Behavioral Brief/);
   assert.match(applySkill, /Binding constraints:[\s\S]*Consumes:[\s\S]*Produces:[\s\S]*Verification intent:[\s\S]*Manual acceptance:/);
   assert.match(applySkill, /This brief states \*\*what must become true\*\*/);
@@ -416,6 +454,12 @@ test("packaged Apply delivers one candidate-bound slice with optional isolated d
   assert.match(applySkill, /`complete`, `complete-with-concerns`, `needs-context`, or `blocked`/);
   assert.match(applySkill, /Independently inspect the diff and evidence; never treat the worker report as proof/);
   assert.match(applySkill, /Run fresh, proportional verification for the current candidate/);
+  assert.match(applySkill, /For every affected Scenario, classify the claimed boundary as `backend\/data`, `rendered interaction`, `live multi-context\/realtime`, `provider\/production`, or `manual acceptance`/);
+  assert.match(applySkill, /A `\/tmp` path, chat transcript, reviewer summary, or bare phrase such as “local observation” is supporting context only and cannot be the sole completion evidence/);
+  assert.match(applySkill, /Present prior verdicts, finding dispositions, screenshots, and runtime observations as untrusted claims to falsify/);
+  assert.match(applySkill, /Gate Execution Manifest naming each applicable gate, method or command, candidate, result, and durable proof reference/);
+  assert.match(applySkill, /diff-scoped reverse-traceability inventory actually ran/);
+  assert.match(applySkill, /every triggered visual-matrix state is exercised or recorded as a gap/);
   assert.match(applySkill, /Any candidate change makes affected verification stale/);
   assert.match(applySkill, /Manual acceptance remains separate/);
   assert.match(applySkill, /Keep exactly one row per slice/);
@@ -423,36 +467,70 @@ test("packaged Apply delivers one candidate-bound slice with optional isolated d
   assert.match(applySkill, /## Compose Slice Review/);
   assert.match(applySkill, /invoke `\/sdd-review` through its public candidate-bound contract in \*\*implementation-phase slice-checkpoint mode\*\*/);
   assert.match(applySkill, /Direct `\/sdd-review` invocation remains valid with or without Apply/);
-  assert.match(applySkill, /perform at most one bounded same-slice remediation batch/);
-  assert.match(applySkill, /invoke scoped re-review with prior finding IDs plus old\/new candidate watermarks/);
+  assert.match(applySkill, /admit each required finding only when it has explicit accepted-contract, material-safety, project-policy, false-closure, or deterministic-gate grounds/);
+  assert.match(applySkill, /remediate the complete safe set in one consolidated batch/);
+  assert.match(applySkill, /one fresh-context comprehensive implementation-phase slice Review across the complete Scenario list and all applicable gates before Epic Update/);
+  assert.match(applySkill, /If that final Review finds another pre-existing issue, return `needs-user`/);
+  assert.match(applySkill, /one narrow correction only when the finding is demonstrably a regression introduced by the remediation batch/);
+  assert.match(applySkill, /never describe a dirty working-tree candidate as clean merely because its baseline was clean/);
+  assert.match(applySkill, /unresolved or previously reported finding IDs as claims—not prior `ready` conclusions/);
   assert.match(applySkill, /## Compose Epic Update/);
   assert.match(applySkill, /invoke `\/sdd-epic-update` through its public candidate-bound contract/);
   assert.match(applySkill, /Epic Update remains independently callable with or without Apply/);
+  assert.match(applySkill, /accept `complete` or evidence-based `no-op` only when Epic Update reports both `Semantic closure: pass` and `Evidence closure: pass`/);
+  assert.match(applySkill, /one Scenario Evidence Closure row for every affected Scenario/);
+  assert.match(applySkill, /an unresolved required technical gap blocks `ready` and slice completion/);
+  assert.match(applySkill, /record both the reviewed implementation-input watermark and post-Epic-update repository watermark plus the semantic-closure result/);
   assert.match(applySkill, /when Epic Update returns `complete`, invoke `\/sdd-review --slice-checkpoint --phase post-epic`/);
-  assert.match(applySkill, /Mark the slice `done` only when required implementation verification is fresh, implementation-phase slice Review is `ready`, Epic Update returned `complete` or evidence-based `no-op`, and any required post-Epic slice Review is `ready`/);
+  assert.match(applySkill, /require the reviewer to enumerate every affected Scenario, independently apply `EPIC-CLOSURE`[\s\S]*apply `EVIDENCE-CLOSURE` row by row/);
+  assert.match(applySkill, /This is a fresh comprehensive closure review, not a scoped finding-disposition pass/);
+  assert.match(applySkill, /Require exact Scenario-set equality, matching claimed\/proven boundaries, durable reproducible evidence that survives the session/);
+  assert.match(applySkill, /## Commit The Completed Slice/);
+  assert.match(applySkill, /create one normal local commit in each repository affected by the selected slice/);
+  assert.match(applySkill, /part of the workflow authorization granted by invoking `\/sdd-apply`/);
+  assert.match(applySkill, /Stage only those attributable paths\. Never use broad staging when unrelated changes exist/);
+  assert.match(applySkill, /Record the staged tree with `git write-tree`/);
+  assert.match(applySkill, /commit's tree from `git rev-parse <sha>\^\{tree\}` must equal the staged tree/);
+  assert.match(applySkill, /final candidate-bound Review at `<change-path>\/slice-reviews\/<slice-id>\.md`/);
+  assert.match(applySkill, /generate `<change-path>\/slice-closures\/<slice-id>\.yaml`/);
+  assert.match(applySkill, /never copies test details, boundary analysis, visual observations, commands, changed paths, or Review reasoning/);
+  assert.match(applySkill, /validate Review identity and raw-file digest, the exact gate\/Scenario\/visual sets, unique Review anchors, accepted-gap reconciliation, Epic agreement, final-commit reachability, and reviewed-tree\/final-tree equality/);
+  assert.match(applySkill, /Update `Resume Here`, the selected Implementation Ledger row, and the selected Slice Gate Ledger row with that SHA/);
+  assert.match(applySkill, /Never claim `complete` from an uncommitted working-tree slice/);
   assert.match(applySkill, /## Terminal Handoffs/);
-  assert.match(applySkill, /stops after one complete slice pipeline/);
+  assert.match(applySkill, /stops after one reviewed, Epic-reconciled, committed slice pipeline/);
   assert.match(applySkill, /final Change-wide integration Review/);
   assert.match(applySkill, /## Result Contract/);
   assert.match(applySkill, /Return exactly one composable status/);
   assert.match(applySkill, /`complete`[\s\S]*`no-op`[\s\S]*`needs-user`[\s\S]*`blocked`[\s\S]*`routed`/);
   assert.match(applySkill, /artifacts read and written/);
   assert.match(applySkill, /one diff envelope per affected repository/);
-  assert.match(applyAgent, /exactly one next-ready or explicitly named Requirement slice/);
-  assert.match(applyAgent, /compose the public candidate-bound \$sdd-review contract in implementation-phase slice-checkpoint mode/);
-  assert.match(applyAgent, /compose \$sdd-epic-update, and run post-Epic slice Review when Epic files changed before marking the slice done/);
+  assert.match(applyAgent, /exactly one next-ready or explicitly named atomic Requirement slice/);
+  assert.match(applyAgent, /state a transient Scenario proof sketch/);
+  assert.match(applyAgent, /one consolidated remediation batch/);
+  assert.match(applyAgent, /one fresh final candidate-bound Review/);
+  assert.match(applyAgent, /new pre-existing issue after remediation returns needs-user/);
+  assert.match(applyAgent, /persist slice-reviews\/S#\.md/);
+  assert.match(applyAgent, /minimal sdd-slice-closure-v2 receipt with the Review digest and Git tree seal/);
   assert.match(doctrine, /one fresh-context implementer/);
   assert.match(doctrine, /requires fresh candidate-bound verification/);
   assert.match(doctrine, /structured Requirement-slice IDs, fields, references, dependency graphs, ledger alignment, and Resume checkpoint shape/);
+  assert.match(doctrine, /creates one normal local commit per affected repository/);
+  assert.match(doctrine, /records each full commit SHA in the Implementation Ledger/);
   assert.match(readme, /implements inline or with one optional isolated worker/);
+  assert.match(readme, /transient proof sketch/);
+  assert.match(readme, /one consolidated remediation batch/);
+  assert.match(readme, /final Review writes `slice-reviews\/<slice-id>\.md`/);
+  assert.match(readme, /minimal `sdd-slice-closure-v2` receipt/);
 
   assert.doesNotMatch(applySkill, /Persistence invariant|Commit cadence invariant|Pattern Parity Matrix|Boundary Contract Matrix|Stateful Transition Matrix|Verification Ledger|--review-only|--no-delegate|--no-commit|transition <space-id> <change-id> --from in_progress --to in_review|sdd change close/);
 });
 
 test("packaged Review stays directly callable and supports read-only slice composition", async () => {
-  const [reviewSkill, reviewAgent] = await Promise.all([
+  const [reviewSkill, reviewAgent, reviewSubagentPrompt] = await Promise.all([
     readPackageFile("skills", "sdd-review", "SKILL.md"),
     readPackageFile("skills", "sdd-review", "agents", "openai.yaml"),
+    readPackageFile("skills", "sdd-review", "assets", "subagent-pr-review-prompt.md"),
   ]);
   const modes = markdownSection(reviewSkill, "Inputs And Modes");
 
@@ -463,13 +541,31 @@ test("packaged Review stays directly callable and supports read-only slice compo
   assert.match(modes, /`--slice-checkpoint --slice S# --baseline <commit-ish>[\s\S]*--phase implementation\|post-epic/);
   assert.match(modes, /Scope Spec Adherence to that slice's Requirements, Scenarios, constraints, and interfaces/);
   assert.match(modes, /report stale or missing Epic mappings as `epic-update-required` rather than `changes-requested`/);
-  assert.match(modes, /In `post-epic` phase, require affected Epic truth and anchors to match the candidate/);
-  assert.match(modes, /remain read-only: do not write `review\.md` or other artifacts, remediate, commit, transition lifecycle state/);
-  assert.match(modes, /This mode may be composed by Apply or invoked directly by a user through the same contract/);
+  assert.match(modes, /In `post-epic` phase, independently require semantic and evidence closure for every affected Story and Scenario/);
+  assert.match(modes, /Write or replace the candidate-bound result at `slice-reviews\/<slice-id>\.md`/);
+  assert.match(modes, /only central artifact mutation authorized by slice-checkpoint mode/);
+  assert.match(reviewSkill, /explicitly apply the `EPIC-CLOSURE` comparison across each affected Story's index, body states, maps, and gaps/);
+  assert.match(reviewSkill, /a deterministic validation pass alone cannot satisfy this gate/);
+  assert.match(reviewSkill, /otherwise return `EVIDENCE-CLOSURE` and retain a verification gap/);
+  assert.match(reviewSkill, /complete Scenario Evidence Closure table with exact Scenario-set equality/);
+  assert.match(reviewSkill, /an unresolved required technical gap blocks `ready`/);
   assert.match(reviewSkill, /Never transition lifecycle state in `--slice-checkpoint` mode/);
   assert.match(reviewSkill, /In implementation-phase `--slice-checkpoint` only, stale affected Epic mappings[\s\S]*produce `ready` plus `epic-update-required`/);
-  assert.match(reviewAgent, /directly with or without a Change/);
-  assert.match(reviewAgent, /For --slice-checkpoint, independently review the named slice/);
+  assert.match(reviewAgent, /public candidate-bound contract/);
+  assert.match(reviewAgent, /active --slice-checkpoint, independently derive the Requirement\/Scenario expectations/);
+  assert.match(reviewAgent, /Persist final ready slice Reviews at slice-reviews\/S#\.md/);
+  assert.match(reviewAgent, /minimal sdd-slice-closure-v2 receipt/);
+  assert.match(reviewSubagentPrompt, /treat every affected Scenario—not only new, high-risk, recently repaired, or previously disputed completion claims/);
+  assert.match(reviewSubagentPrompt, /Prior verdicts, finding dispositions, and evidence claims to treat as untrusted/);
+  assert.match(reviewSubagentPrompt, /Falsify the supplied claims from current source and proof/);
+  assert.match(reviewSubagentPrompt, /Gate Execution Manifest with exactly one row per canonical gate/);
+  assert.match(reviewSubagentPrompt, /complete Scenario Evidence Closure table with Scenario, claimed boundary, cited proof, proven boundary, evidence type, durability or reproduction reference, result/);
+  assert.match(reviewSkill, /Technical proof must remain independently inspectable or reproducible after the current session/);
+  assert.match(reviewSkill, /run the packaged diff-scoped orphan audit with `--changed-from`/);
+  assert.match(reviewSkill, /explicit accounting table with one row per triggered viewport\/state\/interaction/);
+  assert.match(reviewSkill, /Exact Scenario-set equality is required/);
+  assert.match(reviewSkill, /Implementation Quality and Spec Adherence are both `pass`/);
+  assert.match(reviewSkill, /Do not classify required rendered interaction, live multi-context\/realtime/);
 });
 
 test("packaged Review completes every applicable gate after an early blocking finding", async () => {
@@ -514,7 +610,7 @@ test("packaged Review completes every applicable gate after an early blocking fi
   assertContractClauses("Review gates", gates, [
     [
       "record an explicit result for every applicable gate",
-      /Run every gate that applies and record `pass`, `findings`, `blocked`, or `not applicable`\./,
+      /Run every gate that applies and record `pass`, `findings`, `blocked`, or `not-applicable`\./,
     ],
     [
       "forbid short-circuiting after an earlier finding",
@@ -522,7 +618,7 @@ test("packaged Review completes every applicable gate after an early blocking fi
     ],
     [
       "require a complete scorecard before finalization",
-      /Before finalizing, confirm that every gate has an explicit result and that no delegated or main-thread review pass remains uncollected\./,
+      /Before finalizing, confirm that every gate has an explicit manifest row and that no delegated or main-thread review pass remains uncollected\./,
     ],
   ]);
 
@@ -534,27 +630,28 @@ test("packaged Review completes every applicable gate after an early blocking fi
     "review-template.md",
   );
   assert.equal(packagedReview, canonicalReview, "the packaged review record must mirror the canonical template");
-  const scorecard = markdownSection(canonicalReview, "Gate Scorecard");
+  const manifest = markdownSection(canonicalReview, "Gate Execution Manifest");
   for (const requiredGate of [
-    "Change artifacts",
-    "Epic truth",
-    "Reverse traceability",
-    "Tests and verification",
-    "Evidence falsification",
-    "Pattern conformance",
-    "Boundary contracts",
-    "Stateful transitions",
-    "Rendered UI verification",
-    "Security review",
-    "Documentation",
-    "Branch and merge readiness",
-    "Prospective integration candidate",
+    "artifact-truth",
+    "canonical-map-authority",
+    "source-vs-target",
+    "pattern-conformance",
+    "boundary-contracts",
+    "reverse-traceability",
+    "verification",
+    "evidence-falsification",
+    "risk-shaped-evidence",
+    "security-data-safety",
+    "rendered-ui",
+    "manual-acceptance",
+    "supporting-truth",
+    "integration-readiness",
   ]) {
-    assert.match(scorecard, new RegExp(`^\\| ${requiredGate} \\|`, "m"));
+    assert.match(manifest, new RegExp(`^\\| ${requiredGate} \\|`, "m"));
   }
 });
 
-test("packaged Review resumes yielded commands and preserves the full until-ready report contract", async () => {
+test("packaged Review resumes yielded commands and enforces one bounded remediation batch", async () => {
   const reviewSkill = await readPackageFile("skills", "sdd-review", "SKILL.md");
 
   assertContractClauses("Review execution continuity", reviewSkill, [
@@ -576,39 +673,40 @@ test("packaged Review resumes yielded commands and preserves the full until-read
     ],
   ]);
 
-  const modes = markdownSection(reviewSkill, "Inputs And Modes");
-  assertContractClauses("Review until-ready mode", modes, [
+  const remediation = markdownSection(reviewSkill, "Remediation");
+  assertContractClauses("Review bounded remediation", remediation, [
     [
-      "change only the number of bounded remediation cycles",
-      /`--until-ready`: after the default full discovery, batch remediation, and regression rereview, allow additional bounded remediation cycles until all gates pass or a stop condition occurs\. This changes only the number of remediation cycles/,
+      "perform one consolidated remediation batch",
+      /one consolidated safe-remediation batch after the complete discovery wave, followed by one fresh final Review/,
     ],
     [
-      "require the same complete final report as one review loop",
-      /it must end with the same complete Final Response as a single review loop\. Per-cycle updates are progress messages, not substitute verdicts\./,
+      "stop on another pre-existing issue",
+      /If that final Review finds a new pre-existing issue, return `needs-user`/,
     ],
     [
-      "default the remediation cap to five iterations",
-      /`--max-iterations N`: cap `--until-ready`; default to `5`\./,
+      "allow only a remediation-introduced regression correction",
+      /one narrow correction and focused rerun only when the final finding is demonstrably a regression introduced by the remediation batch/,
     ],
   ]);
+  assert.doesNotMatch(reviewSkill, /--until-ready|--max-iterations/);
 
   const finalResponse = markdownSection(reviewSkill, "Final Response");
   assertContractClauses("Review final response", finalResponse, [
     [
-      "apply one complete report shape to all full-review modes and the iteration cap",
-      /Final-report invariant: default, `--deep`, `--no-fix`, `--until-ready`, and a run that reaches `--max-iterations` all use the same complete report structure below\./,
+      "apply one complete report shape to all review modes",
+      /Final-report invariant: default, `--deep`, `--no-fix`, slice checkpoint, seal audit, and explicit deep re-review all use the applicable complete report structure below\./,
     ],
     [
       "forbid a short narrative from replacing the full result",
       /Never replace it with a short narrative such as “review is ready,” a list of resolved themes, test totals, or key commits\./,
     ],
     [
-      "require the capped run to report every residual finding",
-      /If the iteration cap is reached, issue the full report with the resulting `changes-requested` or `blocked` verdict and every residual finding\./,
+      "require the final response to report every residual finding",
+      /last response must independently contain the complete review result and every residual finding/,
     ],
     [
       "include every gate and the final reviewed watermark",
-      /complete gate scorecard covering every applicable Review Gate[\s\S]*final post-remediation reviewed source commit per repository as the review watermarks/,
+      /complete Gate Execution Manifest covering exactly the 14 canonical gate IDs[\s\S]*final post-remediation reviewed source commit per repository as the review watermarks/,
     ],
   ]);
   assert.match(finalResponse, /Implementation Quality: pass\|findings\|cannot-verify/);
@@ -703,11 +801,11 @@ test("packaged UI workflows reject source-only confidence without rendered curre
     ],
     [
       "reject non-rendered and apply-only evidence",
-      /A green build, passing non-visual tests, apply-side screenshots alone, or generated-but-uninspected images cannot pass this gate\./,
+      /A green build, passing non-visual tests, apply-side screenshots alone, happy-path fixtures that omit a triggered state, temporary-only images, or generated-but-uninspected images cannot pass this gate\./,
     ],
     [
       "block an unavailable required surface unless the gap is accepted",
-      /If no available path can render a required surface, mark the gate `blocked` unless the user explicitly accepts the gap\./,
+      /If no available path can render or durably describe a required surface, mark the gate `blocked` unless the user explicitly accepts the gap\./,
     ],
     [
       "keep owner acceptance distinct from reviewer rendering",
@@ -723,6 +821,11 @@ test("packaged UI workflows reject source-only confidence without rendered curre
     "tasks-template.md",
   );
   assert.equal(packagedTasks, canonicalTasks, "the Change workflow must use the canonical tasks template");
+  const canonicalClosure = await readPackageFile("docs", "templates", "slice-closure.yaml");
+  const packagedClosure = await readPackageFile("skills", "sdd-apply", "assets", "slice-closure-template.yaml");
+  assert.equal(packagedClosure, canonicalClosure, "Apply must use the canonical slice closure template");
+  assert.match(canonicalTasks, /- Visual requirements:/);
+  assert.match(canonicalTasks, /slice-closures\/<slice-id>\.yaml/);
   assert.doesNotMatch(canonicalTasks, /^## Visual Verification Matrix$/m);
   assert.match(
     canonicalTasks,
@@ -752,11 +855,11 @@ test("packaged evidence closure keeps high-risk Scenarios unverified when only a
   assertContractClauses("Review evidence falsification", reviewGates, [
     [
       "require scenario-mapped evidence in addition to aggregate candidate checks",
-      /\*\*Verification\*\*: scenario-mapped focused evidence exists, broad gates are not substituted for behavior proof, production\/mock boundaries are honest, the Verification Scope Decision is explicit, and required aggregate candidate checks pass freshly on the exact reviewed commit or have explicit blocking gaps\./,
+      /\*\*Verification\*\*: scenario-mapped focused evidence exists for every affected Scenario, broad gates are not substituted for behavior proof, production\/mock boundaries are honest, the Verification Scope Decision is explicit, and required aggregate candidate checks pass freshly on the exact reviewed commit or have explicit blocking gaps\./,
     ],
     [
       "open high-risk proof and reject unsupported aggregation or boundary substitution",
-      /\*\*Evidence falsification\*\*: for every new or high-risk completion, `Verified By`, E2E, security, recovery, or production-path claim, open the cited proof and confirm its exact test title or stable named anchor, important assertion\/observation, and discovery by the command that passed\. Reject generic framework anchors such as `#it\(`, unsupported Scenario aggregation, missing\/skipped\/undiscovered evidence, and server-side proof used to imply untested client retry, redirect, timeout, draft, navigation, or recovery behavior\./,
+      /\*\*Evidence falsification\*\*: for every affected Scenario—not only new, high-risk, recently repaired, or previously disputed claims—and every `Verified By`, E2E\/security\/recovery\/production-path claim, open the cited proof and confirm its exact test title or stable named anchor, important assertion\/observation, discovery by the command that passed, production call-site use when a helper or formatter is cited, and durable reproduction reference for interactive\/runtime evidence\.[\s\S]*Evidence must exercise the same boundary the Scenario claims and survive the current session;/,
     ],
   ]);
 
@@ -764,7 +867,7 @@ test("packaged evidence closure keeps high-risk Scenarios unverified when only a
   assert.doesNotMatch(canonicalTasks, /^## Verification Scope Decision$/m);
   assert.match(
     canonicalTasks,
-    /Durable implementation and verification evidence belongs primarily in the affected Stories' `Implemented By` and `Verified By` maps and in `review\.md` when review findings exist\./,
+    /Durable implementation and verification evidence belongs in the affected Stories' `Implemented By` and `Verified By` maps; candidate-bound slice reasoning belongs in `slice-reviews\/<slice-id>\.md`; final Change-wide integration Review remains `review\.md`\./,
   );
 });
 
