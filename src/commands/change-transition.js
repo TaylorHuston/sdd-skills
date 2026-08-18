@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 
 import { assertValidChangeId } from "../change-id.js";
 import { formatStructuredTaskIssues, parseStructuredChangeTasks } from "../change-tasks.js";
+import { formatV2TaskIssues, parseV2ChangeTasks } from "../change-tasks-v2.js";
 import {
   assertChangeStoreConfinement,
   assertRequiredChangeFileSnapshotCurrent,
@@ -18,6 +19,7 @@ import {
   resolveRepositoriesForMetadata,
 } from "../change-repositories.js";
 import {
+  CHANGE_SCHEMA_V2,
   CHANGE_STATUSES,
   canTransitionChangeStatus,
   parseChangeMetadata,
@@ -61,18 +63,27 @@ async function assertPlanningComplete(changePath, workspaceRoot, metadata, chang
   const missingSections = existingDesign === null
     ? missingPlannedChangeSections(changeSource)
     : missingCompatibleDesignSections(existingDesign.source);
-  const taskIssues = tasks === null
-    ? []
-    : parseStructuredChangeTasks(tasks.source, {
-        changeId,
-        repositoryIds: metadata.repositories,
-      }).issues;
+  const taskResult = tasks === null
+    ? null
+    : metadata.schema === CHANGE_SCHEMA_V2
+      ? parseV2ChangeTasks(tasks.source, {
+          changeId,
+          repositoryIds: metadata.repositories,
+        })
+      : parseStructuredChangeTasks(tasks.source, {
+          changeId,
+          repositoryIds: metadata.repositories,
+        });
+  const taskIssues = taskResult?.issues ?? [];
   if (missing.length > 0 || missingSections.length > 0 || taskIssues.length > 0) {
     const planningFile = existingDesign === null ? "change.md" : "design.md";
+    const formatIssues = metadata.schema === CHANGE_SCHEMA_V2
+      ? formatV2TaskIssues
+      : formatStructuredTaskIssues;
     const details = [
       ...missing,
       ...missingSections.map((section) => `${planningFile}: ${section}`),
-      ...formatStructuredTaskIssues(taskIssues).map((detail) => `tasks.md: ${detail}`),
+      ...formatIssues(taskIssues).map((detail) => `tasks.md: ${detail}`),
     ];
     throw new SddError(
       `Planning is incomplete: ${details.join("; ")}.`,

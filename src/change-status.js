@@ -7,6 +7,8 @@ import {
   relativeChangeStorePath,
 } from "./change-store.js";
 
+export const CHANGE_SCHEMA_V2 = "sdd-change-v2";
+
 export const CHANGE_STATUSES = Object.freeze([
   "proposed",
   "planned",
@@ -90,10 +92,21 @@ function validateOwnership(space, repositories) {
 export function parseChangeMetadata(source) {
   const parsed = frontmatterDocument(source);
   if (parsed.error) {
-    return { status: null, space: null, repositories: null, error: parsed.error };
+    return { schema: null, status: null, space: null, repositories: null, error: parsed.error };
+  }
+  const schema = parsed.value.schema ?? null;
+  if (schema !== null && schema !== CHANGE_SCHEMA_V2) {
+    return {
+      schema,
+      status: parsed.value.status ?? null,
+      space: parsed.value.space ?? null,
+      repositories: parsed.value.repositories ?? null,
+      error: `unsupported Change schema ${JSON.stringify(schema)}`,
+    };
   }
   if (typeof parsed.value.status !== "string" || parsed.value.status.length === 0) {
     return {
+      schema,
       status: parsed.value.status ?? null,
       space: parsed.value.space ?? null,
       repositories: parsed.value.repositories ?? null,
@@ -102,6 +115,7 @@ export function parseChangeMetadata(source) {
   }
   const ownershipError = validateOwnership(parsed.value.space, parsed.value.repositories);
   return {
+    schema,
     status: parsed.value.status,
     space: parsed.value.space ?? null,
     repositories: parsed.value.repositories ?? null,
@@ -189,6 +203,30 @@ export async function inspectChangeStatuses(
             level: "error",
             message: `Invalid Change status ${JSON.stringify(metadata.status)} in ${displayPath}. Expected one of: ${CHANGE_STATUSES.join(", ")}.`,
           });
+        }
+        if (metadata.status !== "proposed") {
+          const tasksPath = join(record.path, "tasks.md");
+          const tasksSnapshot = await readRequiredChangeFileSnapshot(
+            record.path,
+            "tasks.md",
+            workspaceRoot,
+            {
+              afterRead: afterChangeFileRead
+                ? (observation) => afterChangeFileRead({
+                    changeId: record.changeId,
+                    closed: record.closed,
+                    fileName: "tasks.md",
+                    ...observation,
+                  })
+                : null,
+            },
+          );
+          if (tasksSnapshot === null) {
+            findings.push({
+              level: "error",
+              message: `Change is missing tasks.md: ${relativeChangeStorePath(tasksPath, workspaceRoot)}.`,
+            });
+          }
         }
         const configuredSpace = configuredSpaceIds.has(metadata.space);
         const repositoryOnlyContext = configuredSpace

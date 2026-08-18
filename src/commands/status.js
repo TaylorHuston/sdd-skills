@@ -177,6 +177,29 @@ async function readCentralChanges(
         }
         const statusValid = CHANGE_STATUSES.includes(metadata.status)
           || (record.closed && LEGACY_CHANGE_STATUSES.includes(metadata.status));
+        if (metadata.status !== "proposed") {
+          const tasksSnapshot = await readRequiredChangeFileSnapshot(
+            record.path,
+            "tasks.md",
+            workspaceRoot,
+            {
+              afterRead: afterChangeFileRead
+                ? (observation) => afterChangeFileRead({
+                    changeId: record.changeId,
+                    closed: record.closed,
+                    fileName: "tasks.md",
+                    ...observation,
+                  })
+                : null,
+            },
+          );
+          if (tasksSnapshot === null) {
+            throw new SddError(
+              `Change is missing tasks.md: ${relativeChangeStorePath(record.path, workspaceRoot)}`,
+              { code: "INCOMPLETE_CHANGE" },
+            );
+          }
+        }
         changes.push({
           changeId: record.changeId,
           date: changeDate(record.changeId),
