@@ -5,7 +5,7 @@ description: Create, draft, periodically revisit, or reason about private projec
 
 # SDD Product Brief / PRD
 
-Treat a Product Brief/PRD as a durable private starting point for product direction that should be revisited deliberately over time, not continuously synchronized with every implementation slice. Keep it high-level enough to guide `/sdd-change`, later Change planning, Epic scope, Story shape, and scope tradeoffs without becoming a roadmap, implementation spec, status page, worklog, SDD change artifact, or competing source of current behavioral truth.
+Treat a Product Brief/PRD as a durable private starting point for product direction that should be revisited deliberately over time, not continuously synchronized with every implementation outcome. Keep it high-level enough to guide `/sdd-change`, later Change planning, Epic scope, Story shape, and scope tradeoffs without becoming a roadmap, implementation spec, status page, worklog, SDD change artifact, or competing source of current behavioral truth.
 
 ## Authority And Project Profile
 
@@ -30,13 +30,14 @@ Use this boundary:
 | `<planning-root>/prd.md` | product purpose, audience, scope, principles, product-level capability areas, market/monetization, open product questions |
 | `<workspace>/.sdd/changes/<change-id>/change.md` | intent, status, Space, repository ownership, scope, and Epic impact from proposal onward |
 | `<workspace>/.sdd/changes/<change-id>/change.md` technical-planning sections | high-level technical approach plus proposed Epic/Story/Requirement/Scenario changes |
-| `<workspace>/.sdd/changes/<change-id>/tasks.md` | implementation ledger, resume state, verification ledger, and closeout state |
+| `<workspace>/.sdd/changes/<change-id>/tasks.md` | compact delivery outcomes, dependencies, Resume checkpoint, and closeout state |
+| `<workspace>/.sdd/changes/<change-id>/review.md` | candidate-bound gates, findings, gaps, acceptance, remediation, and final commit/tree |
 | `docs/epics/<key>-<###>-<epic-name>/epic.md` | durable capability/Epic truth, embedded Stories, Requirements, Scenarios, code map, verification map, gaps |
 | `<workspace>/.sdd/changes/<change-id>/review.md` | Change-local review findings when `sdd-review` is not clean |
 
 An active dated Change lives once at `<workspace>/.sdd/changes/<change-id>/`; closed history lives at `<workspace>/.sdd/changes/closed/<change-id>/`. Change IDs are unique within the selected workspace, while Epics, ADRs, implementation, tests, and supporting docs remain repository-local. Legacy planned or repository-local active/closed Change paths are unsupported historical data; do not read them as live owners, and recreate worthwhile intent through `/sdd-change`.
 
-`/sdd-change` may read the PRD as directional context and surface a conflict only when planning requires a product decision. After a Change is accepted and planned, its scope plus repository Epic/Story truth govern delivery. `/sdd-apply` and `/sdd-review` may suggest a periodic PRD revisit when implementation learning is material, but ordinary PRD staleness, breadth, or different phasing is advisory and never by itself blocks a slice, Review verdict, integration, or closeout. Block only when the current Change explicitly depends on an unresolved product decision or project guidance explicitly grants the PRD stronger authority.
+`/sdd-change` may read the PRD as directional context and surface a conflict only when planning requires a product decision. After a Change is accepted and planned, its scope plus repository Epic/Story truth govern delivery. `/sdd-apply` and `/sdd-review` may suggest a periodic PRD revisit when implementation learning is material, but ordinary PRD staleness, breadth, or different phasing is advisory and never by itself blocks an outcome, Review verdict, integration, or closeout. Block only when the current Change explicitly depends on an unresolved product decision or project guidance explicitly grants the PRD stronger authority.
 
 ## Locations
 
@@ -180,7 +181,7 @@ Use only sections that make the brief useful:
 
 ## Drift
 
-Notice opportunities for a deliberate PRD revisit during `sdd-explore`, `sdd-change`, implementation learning, acceptance, and status work. Suggest one when dogfooding, target users, principles, market assumptions, monetization assumptions, or recurring product decisions materially change the useful starting direction. Do not turn every Change, slice, or review into a synchronization pass.
+Notice opportunities for a deliberate PRD revisit during `sdd-explore`, `sdd-change`, implementation learning, acceptance, and status work. Suggest one when dogfooding, target users, principles, market assumptions, monetization assumptions, or recurring product decisions materially change the useful starting direction. Do not turn every Change, outcome, or review into a synchronization pass.
 
 Treat accepted Change scope and repository Epic/Story truth as current delivery and behavioral reality. Treat the PRD as directional context that may intentionally be broader, older, aspirational, or phased differently. A valid outcome is `revisit suggested; no implementation block` or `reviewed; no PRD change needed`.
 

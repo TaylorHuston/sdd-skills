@@ -22,9 +22,9 @@ The conceptual input is one shared diff envelope per repository:
 - immutable baseline commit SHA;
 - candidate kind: current working tree or explicit commit/ref;
 - candidate SHA when committed, or HEAD plus staged, unstaged, and relevant untracked state for a working tree;
-- optional Change ID, slice ID, Requirement/Scenario references, current Review result, Epic Update result, accepted gaps, and manual-acceptance state.
+- optional Change ID, outcome ID, Requirement/Scenario references, current Review result, Epic Update result, accepted gaps, and manual-acceptance state.
 
-An active Change, Apply session, or Implementation Ledger row is optional. Manual changes use the same public contract; never fabricate Apply history or a retroactive Change solely to authorize release communication.
+An active Change or Apply session is optional. Manual changes use the same public contract; never fabricate Apply history or a retroactive Change solely to authorize release communication.
 
 When the baseline, candidate, repository, or owned release record is ambiguous, return `needs-user`. Do not infer a target branch, merge base, prior release, or public record without caller, Change, review, or project-policy evidence.
 
@@ -132,7 +132,7 @@ Return exactly one composable status:
 Also report:
 
 - one diff envelope per repository: repository ID/root, immutable baseline, reviewed candidate kind and watermark, and staged/unstaged/relevant-untracked state where applicable;
-- optional Change, slice, Requirement, Scenario, Review, Epic Update, acceptance, and accepted-gap inputs used;
+- optional Change, outcome, Requirement, Scenario, Review, Epic Update, acceptance, and accepted-gap inputs used;
 - release-record policy source and resolved native owner;
 - classification and evidence-based notability decision;
 - entry path/section or generated source, action (`created`, `updated`, `no-op`), and concise final text;

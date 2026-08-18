@@ -52,6 +52,30 @@ export function implementationLocationPaths(value) {
   });
 }
 
+export function durableProofReferences(value) {
+  if (typeof value !== "string") return [];
+  return [...value.matchAll(/`([^`]+)`/g)]
+    .map((match) => match[1])
+    .filter((reference) => {
+      const normalized = reference.startsWith("change:")
+        ? reference.slice("change:".length)
+        : reference;
+      const anchorIndex = normalized.indexOf("#");
+      const path = (anchorIndex >= 0 ? normalized.slice(0, anchorIndex) : normalized).replace(/^\.\//, "");
+      const anchor = anchorIndex >= 0 ? normalized.slice(anchorIndex + 1) : "";
+      return path.length > 0
+        && anchor.length > 0
+        && !path.startsWith("/")
+        && !path.startsWith("-")
+        && !path.startsWith(":")
+        && !path.startsWith("../")
+        && !path.includes("/../")
+        && !path.includes("\\")
+        && !path.startsWith("slice-closures/")
+        && !/\s/.test(path);
+    });
+}
+
 export function automatedEvidenceTestLocations(evidence) {
   const explicitlyAutomated = /\b(?:automated|e2e|end-to-end|integration|japa|jest|playwright|pytest|specs?|unit|vitest)\b/i.test(evidence);
   const genericTestEvidence = /\btests?\b/i.test(evidence) && !/\bmanual\b/i.test(evidence);

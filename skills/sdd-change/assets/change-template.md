@@ -1,4 +1,5 @@
 ---
+schema: sdd-change-v2
 status: proposed
 space: <space-id>
 repositories: []

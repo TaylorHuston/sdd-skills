@@ -1,4 +1,4 @@
 interface:
   display_name: "SDD Change"
-  short_description: "Capture or plan an SDD Change"
-  default_prompt: "Use $sdd-change to create or resume one central Change, capture its intent, and continue into technical planning when I choose."
+  short_description: "Capture or plan one v2 SDD Change"
+  default_prompt: "Use $sdd-change to create or resume one workspace-central v2 Change. Capture intent proportionally, plan coherent observable outcomes in compact tasks.md, initialize one central review.md, declare only material expected risk triggers, and describe what must become true without prescribing implementation method or compatibility work."

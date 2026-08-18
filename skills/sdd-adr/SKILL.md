@@ -82,7 +82,7 @@ If the project has no `docs/adrs/`, create it only when the user has asked to dr
    - Use status values that match the project when present; otherwise use `Proposed`, `Accepted`, `Superseded`, or `Rejected`.
 5. Link repository-owned truth.
    - Link related Changes by stable Change ID, and link repository-local Epics, Stories, Requirements, Scenarios, PRs, or implementation evidence when known. Never put a private absolute central Change path in a repository-local ADR.
-   - Return the repository ID, repository-relative ADR path, selected direction, and binding consequences to the caller. The caller owns any corresponding update to `change.md`, an exploration record, or a Requirement slice; do not mutate those artifacts from this skill.
+   - Return the repository ID, repository-relative ADR path, selected direction, and binding consequences to the caller. The caller owns any corresponding update to `change.md`, an exploration record, or a delivery outcome; do not mutate those artifacts from this skill.
 6. Verify the ADR.
    - Re-read the ADR.
    - Confirm it states context, decision, options considered, consequences, validation, and reconsideration signals.
@@ -120,7 +120,7 @@ Summarize:
 - selected or unresolved decision
 - viable options considered and decisive tradeoffs
 - links to related stable Change IDs and repository-local SDD artifacts
-- caller-owned follow-up for `change.md`, an exploration record, Requirement-slice constraints, Epic truth, or review
+- caller-owned follow-up for `change.md`, an exploration record, Requirement/outcome constraints, Epic truth, or review
 - recommended next workflow, if any
 
 An ADR result is terminal for this invocation. Return the selected direction and reference without implementing it or crossing into the caller's artifact boundary.

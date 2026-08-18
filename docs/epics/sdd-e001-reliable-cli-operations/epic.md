@@ -63,8 +63,8 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 | S3 | implemented | verified | Route one workspace-unique central Change across portable repository targets. | 2026-08-10 | Creation, lifecycle, physical confinement, and deterministic discovery use current workspace and repository contracts; legacy alpha formats are unsupported. |
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
 | S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-23 | Reports are versioned; PR/release paths are classified and rechecked; Git baselines are immutable and bounded. |
-| S6 | partial | partial | Carry one progressive central Change through planning and an evidence-backed multi-repository handoff. | 2026-08-16 | The legacy fixed-manifest and receipt protocol remains implemented; the accepted risk-triggered three-artifact replacement is planned under `2026-08-17-replace-default-sdd-workflow`. |
-| S7 | partial | partial | Explain the portable method and package through accessible responsive documentation. | 2026-08-16 | Existing responsive and accessibility behavior remains verified; methodology copy for the accepted risk-triggered default is planned and not yet current-source verified. |
+| S6 | implemented | partial | Carry one progressive central Change through focused planning, risk-triggered Review, conditional Epic reconciliation, and a content-identical local outcome commit. | 2026-08-17 | The one supported current workflow is v2; the unrelated accepted aggregate NUL-path gap remains explicit. |
+| S7 | partial | partial | Explain the portable method and package through accessible responsive documentation. | 2026-08-17 | README, doctrine, and templates now explain one v2 workflow; S3 still owns public-guide copy, rendering, and owner acceptance. |
 
 ## Stories
 
@@ -687,9 +687,9 @@ The published package SHALL include the orphan-audit source and universal bundle
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
 | S5/R1-S1, S5/R1-S2 | Automated test `test/cli.test.js#packaged audit and handoff skills preserve current-state and file-scope gates` | The packaged Epic verification skill retains immutable/current-state and successor requirements. | Passing 2026-07-22 |
-| S5/R1-S1 | Automated test `test/cli.test.js#packaged tasks template defines adaptive requirement slices instead of an up-front engineering plan` | The canonical report template is versioned, defaults blocked, exposes current findings, and matches the skill asset. | Passing 2026-08-11 |
+| S5/R1-S1 | Automated test `test/cli.test.js#packaged audit and handoff skills preserve current-state and file-scope gates` | The canonical report template is versioned and matches the skill asset. | Passing 2026-08-17 |
 | S5/R2-S1, S5/R2-S2 | Automated test `test/cli.test.js#packaged audit and handoff skills preserve current-state and file-scope gates` | Both handoff skills retain exact diff inventory gates and the PR skill has no separate `--fix` mode. | Passing 2026-07-22 |
-| S5/R2-S2 | Automated test `test/cli.test.js#packaged tasks template defines adaptive requirement slices instead of an up-front engineering plan` | The release template mirrors its skill asset and includes file-scope plus SDD-integrity sections. | Passing 2026-08-11 |
+| S5/R2-S2 | Automated test `test/cli.test.js#packaged audit and handoff skills preserve current-state and file-scope gates` | The release template mirrors its skill asset and includes file-scope plus SDD-integrity sections. | Passing 2026-08-17 |
 | S5/R3-S1 | Automated test `test/orphan-audit.test.js#orphan audit rejects option-like changed-from input without Git side effects` | Option-like baselines are rejected before diffing and cannot create an external output file. | Passing 2026-07-23 |
 | S5/R3-S2 | Automated test `test/orphan-audit.test.js#orphan audit fails promptly with an actionable Git timeout` | A stalled Git child is bounded and returns deterministic recovery guidance. | Passing 2026-07-23 |
 | S5/R3-S3 | Automated test `test/orphan-audit.test.js#orphan audit fails closed when any changed-surface Git command fails` | Baseline, unstaged, staged, and untracked query failures cannot silently erase changed-surface evidence. | Passing 2026-07-23 |
@@ -705,11 +705,11 @@ The published package SHALL include the orphan-audit source and universal bundle
 
 ### Story S6: Reliable Workflow Execution
 
-Implementation: partial
+Implementation: implemented
 Verification: partial
 Created: 2026-07-23
 Modified: 2026-08-17
-Last verified: 2026-08-16
+Last verified: 2026-08-17
 
 As a developer, I want SDD planning, implementation, and review workflows to carry work through a complete evidence-backed handoff, so that an agent does not stop at a partial task, a green command, or the first finding.
 
@@ -894,10 +894,10 @@ Apply and Review SHALL keep one canonical current closure record in central `rev
 - WHEN Apply creates the authorized local outcome commit
 - THEN unrelated paths are excluded, the final commit is single-parent and reachable, and its tree equals the tree independently reviewed before commit without requiring a self-referential repository seal.
 
-###### Scenario R11-S5: Historical Closure Remains Readable
+###### Scenario R11-S5: Historical Closure Is Not Current
 
-- WHEN validation encounters a schema-less historical Change with `sdd-slice-review-v1` or `sdd-slice-closure-v1/v2` artifacts
-- THEN it continues to validate that historical contract while v2 creation and delivery never generate those artifacts.
+- WHEN current validation or lifecycle mutation encounters a schema-less or receipt-based Change
+- THEN it reports the record as unsupported history and does not migrate it, generate replacement closure artifacts, or treat it as a second current workflow.
 
 ##### Requirement R12: Durable Exploration Placement And Handoff
 
@@ -922,129 +922,85 @@ PRDs SHALL remain directional product-planning inputs rather than continuously s
 - WHEN an accepted Change and current Epic truth intentionally phase behavior differently from an older or broader PRD
 - THEN delivery continues from the accepted Change, Review may suggest a deliberate PRD revisit, and ordinary drift does not produce a blocking verdict.
 
-##### Requirement R14: Versioned Current And Historical Change Contracts
+##### Requirement R14: One Current Change Contract
 
-The CLI SHALL select Change artifact rules from an explicit `schema: sdd-change-v2` marker for new work, treat schema-less existing Changes as legacy records, keep legacy v1/v2 Review and receipt readers bounded to records that use them, and avoid generating legacy closure artifacts for v2 Changes.
+The CLI SHALL create new work with explicit `schema: sdd-change-v2`, SHALL use the compact v2 task and central Review contract for current lifecycle and validation, and SHALL treat schema-less or receipt-based Changes as unsupported history without a migration or backward-compatibility promise.
 
-###### Scenario R14-S1: V2 Artifact Validation
+###### Scenario R14-S1: V2 Is The Default
 
-- WHEN a v2 Change contains only its current progressive, queue, and Review records
-- THEN lifecycle and validation accept the three-artifact contract and enforce its universal gates, declared triggers, candidate relationships, gaps, and final tree equality without requiring legacy closure files.
+- WHEN the CLI creates and plans a current Change
+- THEN it emits and validates the three-artifact v2 contract with universal gates, declared triggers, candidate relationships, gaps, and final tree equality without legacy closure files.
 
-###### Scenario R14-S2: Historical Reader Boundary
+###### Scenario R14-S2: Unsupported Historical Record
 
-- WHEN a schema-less historical Change contains a supported v1/v2 slice Review or receipt
-- THEN validation applies the frozen legacy rules to that record without converting it, making it the new default, or allowing those readers to weaken v2 validation.
+- WHEN current lifecycle mutation or validation encounters a schema-less historical Change
+- THEN it reports `UNSUPPORTED_CHANGE_SCHEMA` and does not convert the record or invoke its task, Review, or receipt contract.
 
 #### Implemented By
 
 | Requirement / Scenario | Location / Anchor | Kind | Responsibility |
 |---|---|---|---|
-| S6/R1-S1, S6/R1-S2 | `skills/sdd-change/SKILL.md#Select Or Create The Change` | primary | Governs one adaptive create/resume flow and proposed intent capture. |
-| S6/R1-S1, S6/R1-S2 | `skills/sdd-change/SKILL.md#Revising An Existing Plan` | primary | Governs progressive in-place plan revision and exact Apply restart without a separate mode or new `design.md`. |
-| S6/R1-S1 | `src/commands/change-create.js#createChange` | primary | Creates one proposed `change.md` and allows repository ownership to remain empty. |
-| S6/R1-S1 | `src/commands/change-transition.js#assertPlanningComplete` | primary | Requires repository ownership, technical-planning sections in `change.md`, and `tasks.md` before `planned`, while accepting an existing compatible `design.md`. |
-| S6/R1-S3 | `skills/sdd-change/SKILL.md#Plan verification and requirement slices` | primary | Defines adaptive behavioral slice boundaries, Requirement disposition, Story actions, Scenario references, and the prohibition on implementation recipes. |
-| S6/R1-S3 | `docs/templates/tasks.md#Requirement Slices` | primary | Provides the concise generated requirements-oriented delivery queue and advisory ordering contract. |
-| S6/R1-S3 | `src/commands/validate.js#CHANGE_FILES` | support | Requires the new Requirement Slices section while continuing to accept legacy task checklist shapes. |
-| S6/R2-S1, S6/R2-S2 | `skills/sdd-apply/SKILL.md#Select The Slice` | primary | Selects one next-ready or explicitly requested actionable Requirement slice without consuming later work. |
-| S6/R2-S1, S6/R2-S2 | `skills/sdd-apply/SKILL.md#Build The Behavioral Brief` | primary | Presents the selected behavioral outcome, Requirements, Story changes, Scenarios, dependencies, constraints, repository, guidance, and branch result without an implementation recipe. |
-| S6/R2-S1, S6/R2-S2 | `skills/sdd-apply/SKILL.md#Apply And Verify The Selected Slice` | support | Maintains exactly one current Implementation Ledger row per slice without command, verification, commit, or review history. |
-| S6/R2-S3 | `skills/sdd-apply/SKILL.md#Preflight Branch, Dirty State, And Baseline` | primary | Checks repository guidance and current Git state, warns on mismatch, and forbids automatic branch mutation. |
-| S6/R2 | `skills/sdd-apply/SKILL.md#Load Governing Guidance` | primary | Makes workspace and repository guidance authoritative for implementation process and composed specialist handoffs. |
-| S6/R3 | `skills/sdd-review/SKILL.md#Full-review invariant` | primary | Requires complete applicable discovery despite early findings and one grounded consolidated verdict. |
-| S6/R3 | `skills/sdd-review/SKILL.md#Remediation` | primary | Admits required findings under explicit grounds and bounds work to one remediation batch plus one final Review. |
-| S6/R3-S2 | `skills/sdd-review/SKILL.md#Execution-continuity invariant` | primary | Requires yielded and long-running commands to be resumed through completion. |
-| S6/R4 | `skills/sdd-design/SKILL.md#Define The Visual Verification Matrix` | primary | Defines proportional rendered states, interactions, viewports, and evidence before implementation. |
-| S6/R4 | `skills/sdd-apply/SKILL.md#Load Governing Guidance` | support | Defers implementation-time rendered-verification method to the selected repository's guidance. |
-| S6/R4 | `skills/sdd-review/SKILL.md#Review Gates` | primary | Keeps deterministic rendered verification distinct from owner manual confirmation. |
-| S6/R5 | `skills/sdd-apply/SKILL.md#Load Governing Guidance` | support | Defers implementation-time risk and evidence procedure to applicable project-owned guidance and composed skills. |
-| S6/R5 | `skills/sdd-review/SKILL.md#Systematic Review Search` | primary | Independently falsifies claimed behavior and evidence across the candidate. |
-| S6/R6 | `skills/sdd-interactive/SKILL.md#Workflow` | primary | Implements a trimmed shared-artifact session with immediate Apply-style execution and routing for broader scope. |
-| S6/R7 | `skills/sdd-change/SKILL.md#Select Or Create The Change` | primary | Creates or resumes one central Change and settles stable target repository IDs before planning completes. |
-| S6/R7 | `skills/sdd-apply/SKILL.md#Resolve The Change` | primary | Resolves the one central Change and stable target repository IDs without creating repository-local copies. |
-| S6/R7 | `skills/sdd-review/SKILL.md#Authority And Project Profile` | primary | Reviews all target repositories and records one consolidated verdict and closeout state. |
-| S6/R7 | `skills/sdd-pr/SKILL.md#Authority And Project Profile` | primary | Stewards the coordinated repository PR set without duplicating lifecycle ownership. |
-| S6/R7 | `skills/sdd-space-status/SKILL.md#Workflow` | support | Presents top-level unique Changes and repository-filtered projections without double-counting. |
-| S6/R7 | `skills/sdd-release/SKILL.md#Operating Sequence` | primary | Resolves release readiness from canonical central records and repository-specific gates. |
-| S6/R8, S6/R8-S1 | `skills/sdd-gather-context/SKILL.md#Common Minimum` | primary | Defines shared topology, guidance, planning, status, and repository context that every action must read or explicitly mark missing. |
-| S6/R8, S6/R8-S1 | `skills/sdd-gather-context/SKILL.md#Action Minimums` | primary | Defines the exploration-, ADR-, and Change-specific minimum evidence. |
-| S6/R8-S1 | `skills/sdd-gather-context/SKILL.md#Completion Criterion` | primary | Requires an evidence-linked same-session sufficiency result and preserves parent-workflow ownership. |
-| S6/R8-S1 | `skills/sdd-explore/SKILL.md#Gather Context` | support | Invokes the shared context workflow for durable exploration. |
-| S6/R8-S1 | `skills/sdd-adr/SKILL.md#Gather Context` | support | Invokes the shared context workflow before technical recommendation or decision capture. |
-| S6/R8-S1 | `skills/sdd-change/SKILL.md#Gather Context` | support | Invokes the shared context workflow before intent finalization or technical planning. |
-| S6/R9, S6/R9-S1, S6/R9-S3 | `skills/sdd-epic-update/SKILL.md#Determine Affected Behavior` | primary | Defines candidate-bound behavior derivation, repository-owned reconciliation, routing, terminal boundaries, and idempotent results. |
-| S6/R9-S2, S6/R10-S3 | `src/commands/candidate-resolve.js#resolveCandidateEnvelope` | primary | Resolves immutable refs and content-sensitive committed or working-tree candidate envelopes without artifact mutation. |
-| S6/R9-S2, S6/R10-S3 | `src/commands/epic-update-input.js#resolveEpicUpdateInput` | support | Extends the generic envelope with configured Epic artifacts and scoped validation argv. |
-| S6/R9 | `docs/story-driven-development.md#Candidate-Bound Epic Reconciliation` | support | Defines the portable Epic capability boundary and CLI-versus-skill ownership split. |
-| S6/R10, S6/R10-S1, S6/R10-S2 | `skills/sdd-changelog/SKILL.md#Decide Whether An Entry Is Warranted` | primary | Classifies reviewed outcomes, follows native policy, writes one candidate-specific entry when warranted, and returns evidence-based no-op results. |
-| S6/R10-S3 | `skills/sdd-changelog/SKILL.md#Validate Candidate Preservation And Idempotence` | primary | Proves only owned release-record state changed while preserving Review and Epic Update projections. |
-| S6/R10 | `docs/story-driven-development.md#Candidate-Bound Changelog Entries` | support | Defines candidate-specific communication, terminal boundaries, and Release aggregation ownership. |
-| S6/R11-S1, S6/R11-S2 | `skills/sdd-review/SKILL.md#Resolve Verification Scope` | primary | Requires exact affected-Scenario enumeration, same-boundary proof, comprehensive final review, and blocking classification for required technical gaps. |
-| S6/R11-S1, S6/R11-S2 | `skills/sdd-apply/SKILL.md#Compose Slice Review` | primary | Composes scoped remediation plus one fresh comprehensive implementation review before Epic reconciliation. |
-| S6/R11-S1, S6/R11-S2 | `skills/sdd-apply/SKILL.md#Compose Epic Update` | primary | Requires row-by-row closure and one comprehensive post-Epic review on the final candidate. |
-| S6/R11-S2 | `skills/sdd-epic-update/SKILL.md#Prove Semantic Closure` | primary | Classifies claimed and proven Scenario boundaries and preserves missing required proof as a gap. |
-| S6/R11-S3 | `src/change-tasks.js#parseStructuredChangeTasks` | primary | Validates current/legacy closure markers, canonical gate rows, candidate relationships, gap acceptance, and exact final commit agreement while preserving compatibility. |
-| S6/R11-S3 | `docs/templates/tasks.md#Slice Gate Ledger` | support | Defines the compact durable current-state gate record initialized for new Requirement slices. |
-| S6/R11-S4 | `src/slice-review.js#validateSliceReviewSource` | primary | Enforces durable Review identity, canonical gates, exact Scenario and planned visual contracts, anchored proof provenance, gaps, and ready-verdict consistency. |
-| S6/R11-S4 | `src/slice-closure.js#validateSliceClosureSource` | primary | Enforces the minimal v2 Review index, compact result/gap anchors, accepted-gap consistency, and reviewed-tree/final-tree structure while retaining frozen v1 validation. |
-| S6/R11-S4 | `src/commands/validate.js#validateV2ClosureRepositoryState` | primary | Reconciles Review bytes and proof references, receipt rows, Epic evidence/gaps, and reachable single-parent final Git commit trees. |
-| S6/R11-S4 | `docs/templates/slice-review.md#sdd-slice-review-v1` | support | Defines the detailed durable candidate-bound slice Review. |
-| S6/R11-S4 | `docs/templates/slice-closure.yaml#sdd-slice-closure-v2` | support | Defines the generated minimal Review index and Git seal. |
-| S6/R12, S6/R12-S1 | `skills/sdd-explore/SKILL.md#Choose The Record Destination` | primary | Selects the durable destination by explicit user choice, artifact authority, idea ownership, or the nearest safe private owner before writing. |
-| S6/R12-S1 | `skills/sdd-explore/SKILL.md#Maintain The Record` | primary | Creates or resumes one synthesized living record rather than a transcript or duplicate ledger. |
-| S6/R12-S2 | `skills/sdd-explore/SKILL.md#Route Mature Outcomes` | primary | Routes mature conclusions to PRD, Change, ADR, or another owner with authorization while retaining only source-context links. |
-| S6/R13, S6/R13-S1 | `skills/sdd-prd/SKILL.md#SDD Relationship` | primary | Keeps Product Briefs directional unless current delivery explicitly grants stronger authority. |
-| S6/R13-S1 | `skills/sdd-review/SKILL.md#Stop Conditions` | support | Treats ordinary PRD drift as advisory while preserving explicit unresolved product decisions as review gates. |
-| S6/R14 | `src/change-status.js#CHANGE_SCHEMA_V2` | primary | Defines the explicit current Change schema and keeps schema-less metadata on the historical path. |
-| S6/R14-S2 | `src/commands/status.js#readCentralChanges`, `src/change-status.js#inspectChangeStatuses` | support | Keeps `tasks.md` optional for proposed Changes but requires it consistently across status, inspection, validation, and Doctor consumers after planning. |
-| S6/R14-S1 | `src/change-tasks-v2.js#parseV2ChangeTasks` | primary | Validates the compact queue, Resume checkpoint, vertical outcomes, dependencies, and planned triggers while rejecting legacy ledgers and closure markers. |
-| S6/R14-S1 | `src/change-review.js#validateV2ChangeReviewSource` | primary | Validates central exact-candidate Review identity, five universal gates, planned/discovered triggers, Scenario/gap coherence, manual acceptance, and completion fields. |
-| S6/R14-S1 | `src/commands/change-transition.js#assertPlanningComplete` | support | Selects the compact v2 planning parser for guarded proposed-to-planned transitions. |
-| S6/R14-S1, S6/R14-S2 | `src/commands/validate.js#validateChange` | primary | Dispatches v2 Change/task/Review validation explicitly while leaving schema-less legacy Review and receipt readers unchanged. |
-| S6/R14-S1 | `src/commands/validate.js#validateV2ReviewRepositoryState` | support | Requires a reachable single-parent final commit whose tree equals the centrally recorded reviewed and final trees. |
+| S6/R1 | `skills/sdd-change/SKILL.md#Plan Delivery` | primary | Defines proportional intent capture, coherent outcomes, expected triggers, and implementation-agnostic planning. |
+| S6/R1-S1 | `src/commands/change-create.js#createChange` | primary | Creates one workspace-central proposed Change from the current v2 template. |
+| S6/R1-S2 | `skills/sdd-change/SKILL.md#Revising Remaining Work` | primary | Preserves completed facts while revising incoherent remaining work. |
+| S6/R1-S3, S6/R1-S4 | `docs/templates/tasks.md#Delivery Outcomes` | primary | Defines compact v2 outcomes and excludes duplicate closure state. |
+| S6/R2 | `skills/sdd-apply/SKILL.md#Inputs And Selection` | primary | Selects exactly one explicit or dependency-ready outcome. |
+| S6/R2 | `skills/sdd-apply/SKILL.md#Behavioral Brief` | primary | States what must become true without predicting implementation method. |
+| S6/R2-S3 | `skills/sdd-apply/SKILL.md#Preflight` | primary | Enforces branch/dirty-state attribution without automatic branch mutation. |
+| S6/R3 | `skills/sdd-review/SKILL.md#Review Work` | primary | Performs independent complete-candidate inspection and continues safe checks after findings or command yields. |
+| S6/R3-S3 | `skills/sdd-review/SKILL.md#Five Universal Gates` | primary | Defines the five-gate current Review contract. |
+| S6/R4 | `skills/sdd-review/SKILL.md#Triggered Checks` | primary | Requires current-source rendered and accessibility checks when UI risk triggers them. |
+| S6/R4 | `skills/sdd-design/SKILL.md#Define The Visual Verification Matrix` | support | Records proportional expected rendered behavior when design planning is needed. |
+| S6/R5 | `skills/sdd-change/SKILL.md#Risk And Verification Policy` | primary | Declares behavior-derived triggers and focused verification as the planning default. |
+| S6/R5 | `skills/sdd-review/SKILL.md#Triggered Checks` | primary | Executes every planned trigger and adds material discovered risks with concrete proof. |
+| S6/R6 | `skills/sdd-interactive/SKILL.md#Create The Minimal Current Records` | primary | Reuses the same v2 records and one Apply outcome without a second template family. |
+| S6/R7 | `skills/sdd-review/SKILL.md#Resolve The Candidate` | primary | Resolves every target repository from one central Change and keeps separate candidate envelopes. |
+| S6/R7 | `skills/sdd-pr/SKILL.md#Authority And Project Profile` | support | Stewards repository handoffs without duplicating Change lifecycle ownership. |
+| S6/R7 | `skills/sdd-release/SKILL.md#Operating Sequence` | support | Aggregates production handoff readiness from the central Change target set. |
+| S6/R8 | `skills/sdd-gather-context/SKILL.md#Common Minimum` | primary | Defines the shared read-only same-session planning context contract. |
+| S6/R8-S1 | `skills/sdd-gather-context/SKILL.md#Completion Criterion` | primary | Returns evidence-linked sufficiency without creating an artifact. |
+| S6/R9 | `skills/sdd-epic-update/SKILL.md#When To Run` | primary | Makes reconciliation immediate only when durable behavior or consumed contracts/gaps changed. |
+| S6/R9-S1, S6/R9-S3 | `skills/sdd-epic-update/SKILL.md#Determine Affected Truth` | primary | Derives affected behavior from the exact candidate and returns idempotent results. |
+| S6/R9-S2, S6/R10-S3 | `src/commands/candidate-resolve.js#resolveCandidateEnvelope` | primary | Resolves immutable content-sensitive committed or working-tree envelopes. |
+| S6/R10 | `skills/sdd-changelog/SKILL.md#Decide Whether An Entry Is Warranted` | primary | Owns one candidate-specific native release entry or evidence-based no-op. |
+| S6/R11 | `skills/sdd-apply/SKILL.md#Independent Review` | primary | Composes independent central Review and one bounded remediation batch. |
+| S6/R11-S2 | `skills/sdd-review/SKILL.md#Findings And Verdict` | primary | Keeps required technical gaps non-passing and product acceptance separate. |
+| S6/R11-S3 | `src/change-review.js#validateV2ChangeReviewSource` | primary | Validates exact candidate, five gates, triggers, Scenarios, gaps, acceptance, and completion fields. |
+| S6/R11-S3 | `skills/sdd-pr/SKILL.md#Initial Setup`, `skills/sdd-release/SKILL.md#Operating Sequence`, `skills/sdd-space-status/SKILL.md#Workflow` | support | Keep candidate/acceptance truth in `review.md`, queue/Resume truth in `tasks.md`, and remote handoff telemetry in provider-native records. |
+| S6/R11-S4 | `skills/sdd-apply/SKILL.md#Commit And Record` | primary | Selectively seals the reviewed tree in one local commit and records it centrally. |
+| S6/R11-S4 | `src/commands/validate.js#validateV2ReviewRepositoryState` | support | Enforces reachable single-parent commit and reviewed/final tree equality. |
+| S6/R11-S5, S6/R14-S2 | `src/commands/validate.js#validateChange` | primary | Reports schema-less Changes as unsupported and never selects their task/Review/receipt contract. |
+| S6/R12 | `skills/sdd-explore/SKILL.md#Choose The Record Destination` | primary | Places durable exploration by authority and ownership. |
+| S6/R12-S2 | `skills/sdd-explore/SKILL.md#Route Mature Outcomes` | primary | Routes mature conclusions without duplicating canonical truth. |
+| S6/R13 | `skills/sdd-prd/SKILL.md#SDD Relationship` | primary | Keeps PRDs directional unless explicit authority says otherwise. |
+| S6/R14-S1 | `skills/sdd-change/assets/change-template.md#sdd-change-v2` | primary | Makes v2 the default creation contract. |
+| S6/R14-S1 | `src/change-tasks-v2.js#parseV2ChangeTasks` | primary | Validates compact outcomes, dependencies, Resume, and planned triggers. |
+| S6/R14-S1 | `src/commands/change-transition.js#assertPlanningComplete` | support | Uses only the current v2 task parser for planning transitions. |
+| S6/R14-S2 | `src/commands/change-close.js#closeChange` | support | Rejects schema-less closeout as unsupported history. |
 #### Implementation Gaps
 
-- `S6/R1`, `S6/R2`, `S6/R3`, `S6/R4`, `S6/R5`, `S6/R6`, `S6/R9`, and `S6/R11`: the package still implements the fixed-ledger, fixed-manifest, per-slice Review, digest, and receipt default rather than the accepted risk-triggered three-artifact contract.
+- None.
 
 #### Verified By
 
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
-| S6/R1-S1, S6/R1-S2 | Automated tests `test/change-contract.test.js#change create captures proposed intent in one central change.md` and `test/change-contract.test.js#planning completes the same Change before lifecycle work continues` | Proposed intent needs only `change.md`; progressive technical sections, `tasks.md`, and repository ownership gate `planned`; no new `design.md` is created, while compatible existing records remain valid. | Passing 2026-08-16 |
-| S6/R1-S3 | Automated tests `test/change-tasks.test.js#multiple Requirements require an atomic coupling justification`, `test/workflow-contracts.test.js#packaged change workflow progresses one central intent record into planning`, and `test/workflow-contracts.test.js#requirement slices remain repository-qualified while review handoffs key repeated blocks by repository ID` | The generated tasks contract defaults to one Requirement, requires explicit coupling for inseparable exceptions, is repository-qualified and Scenario-linked, and remains implementation-agnostic. | Passing 2026-08-16 |
-| S6/R2-S1, S6/R2-S2, S6/R2-S3 | Automated test `test/workflow-contracts.test.js#packaged Apply delivers one candidate-bound slice with optional isolated delegation` | Apply defaults to one next-ready atomic slice, accepts an explicit slice, reads applicable guidance, warns without changing branches, states only a transient proof sketch, composes candidate-bound Review and Epic reconciliation, and stops after one reviewed local commit. | Passing 2026-08-16 |
-| S6/R3-S1, S6/R3-S2 | Semantic source inspection of `skills/sdd-review/SKILL.md#Full-review invariant` and `skills/sdd-review/SKILL.md#Execution-continuity invariant` | Review retains early findings while completing discovery and resumes yielded commands. | Passing 2026-07-23 |
-| S6/R4-S1 | Semantic source inspection of `skills/sdd-design/SKILL.md#Define The Visual Verification Matrix`, repository-guidance delegation in `skills/sdd-apply/SKILL.md#Load Governing Guidance`, and `skills/sdd-review/SKILL.md#Review Gates` | Design records expected rendered behavior, repository guidance owns implementation-time method, and Review independently rejects source-only UI confidence. | Passing 2026-08-12 |
-| S6/R5-S1 | Semantic source inspection of repository-guidance delegation in `skills/sdd-apply/SKILL.md#Load Governing Guidance` and `skills/sdd-review/SKILL.md#Review Gates` | Implementation risk procedure is project-owned while Review still rejects aggregate success as a substitute for exact high-risk Scenario proof. | Passing 2026-08-12 |
-| S6/R6-S1 | Semantic source inspection of `skills/sdd-interactive/SKILL.md#Workflow` and `skills/sdd-interactive/SKILL.md#Artifact Shape` | Interactive uses trimmed shared artifacts, immediate execution, durable Epic reconciliation, and broader-scope routing. | Passing 2026-07-23 |
-| S6/R2-S1, S6/R2-S2, S6/R2-S3 | Automated test `test/cli.test.js#packaged tasks template defines adaptive requirement slices instead of an up-front engineering plan` | The package contract keeps task slices behavioral and verifies the simplified Apply skill no longer restores universal engineering matrices or ledgers. | Passing 2026-08-12 |
-| S6/R3-S1 | Automated test `test/workflow-contracts.test.js#packaged Review completes every applicable gate after an early blocking finding` | Review retains early findings while completing all applicable discovery and scorecard gates. | Passing 2026-07-23 |
-| S6/R3-S2 | Automated test `test/workflow-contracts.test.js#packaged Review resumes yielded commands and enforces one bounded remediation batch` | Yielded work resumes, Review permits one consolidated remediation batch and one final Review, and repeated broad cycles are absent. | Passing 2026-08-16 |
-| S6/R4-S1 | Automated test `test/workflow-contracts.test.js#packaged UI workflows reject source-only confidence without rendered current-source evidence` | Design, Apply, Review, templates, and doctrine consistently require current-source rendered evidence. | Passing 2026-07-23 |
-| S6/R5-S1 | Automated test `test/workflow-contracts.test.js#packaged evidence closure keeps high-risk Scenarios unverified when only an aggregate gate passes` | Risk closure and review require exact claimed-boundary proof beyond an aggregate green result. | Passing 2026-07-23 |
-| S6/R6-S1 | Automated test `test/workflow-contracts.test.js#packaged Interactive workflow tracks one lightweight progressive Change` | Interactive keeps trimmed shared artifacts, immediate tracked execution, validation, and honest handoff semantics. | Passing 2026-07-23 |
-| S6/R7-S1 | Automated test `test/workflow-contracts.test.js#packaged workflows coordinate one central Change across every target repository` | All delivery workflows share the central layout, full target-set invariant, repository-free Change-wide lifecycle, and projection semantics without legacy Change paths. | Passing 2026-08-07 |
-| S6/R8-S1 | Automated test `test/workflow-contracts.test.js#packaged planning workflows share one same-session minimum context contract` | The shared skill owns all action profiles, reuses current reads, stays artifact-free and same-session, and is invoked by Explore, ADR, and Change. | Passing 2026-08-11 |
-| S6/R9-S1, S6/R9-S3 | Automated test `test/workflow-contracts.test.js#packaged Epic Update reconciles only repository-owned truth for an exact candidate` | The skill supports active-Change and manual candidates, limits mutation to Epic truth, routes invalid intent/evidence, returns composable statuses, and requires same-candidate no-op behavior. | Passing 2026-08-13 |
-| S6/R9-S2, S6/R10-S3 | Automated tests `test/candidate-resolve.test.js#candidate resolve resolves an immutable committed candidate and changed paths`, `test/candidate-resolve.test.js#candidate resolve inventories staged, unstaged, and untracked working-tree state`, `test/candidate-resolve.test.js#candidate resolve watermark changes when tracked or untracked content changes`, `test/candidate-resolve.test.js#candidate resolve disables repository-configured content filters`, `test/candidate-resolve.test.js#candidate resolve is read-only`, and `test/candidate-resolve.test.js#candidate resolve rejects a baseline that is not an ancestor of a committed candidate`; automated test `test/epic-update-input.test.js#epic update input resolves an immutable committed candidate and changed paths` | The shared helper resolves safe committed and dirty-tree envelopes while the Epic wrapper preserves its existing contract. | Passing 2026-08-13 |
-| S6/R10-S1, S6/R10-S2 | Automated test `test/workflow-contracts.test.js#packaged Changelog writes only one reviewed candidate's native release entry` | The skill requires reviewed and reconciled input, follows native policy, handles warranted and no-op outcomes, preserves the implementation projection, and stops before versioning or handoff mutation. | Passing 2026-08-13 |
-| S6/R11-S1, S6/R11-S2 | Automated tests `test/workflow-contracts.test.js#packaged Apply delivers one candidate-bound slice with optional isolated delegation`, `test/workflow-contracts.test.js#packaged Review stays directly callable and supports read-only slice composition`, and `test/workflow-contracts.test.js#packaged evidence closure keeps high-risk Scenarios unverified when only an aggregate gate passes` | Scoped remediation is followed by comprehensive Scenario closure, ready requires both axes and no unaccepted technical gap, and reviewers must open same-boundary proof for every affected Scenario. | Passing 2026-08-14 |
-| S6/R11-S3 | Automated tests `test/change-tasks.test.js#all current non-done slices require the certificate marker`, `test/change-tasks.test.js#existing completed slices without the certificate marker remain grandfathered`, `test/change-tasks.test.js#completed legacy multi-Requirement slices remain grandfathered while current receipts keep coupling`, `test/change-tasks.test.js#marked slices cannot downgrade to a five-column Implementation Ledger`, `test/change-tasks.test.js#marked current six-column done slices require a Slice Gate Ledger`, `test/change-tasks.test.js#Slice Gate Ledger candidates must be valid and candidate-consistent`, `test/change-tasks.test.js#done slices require complete gate closure when a Slice Gate Ledger is present`, and `test/change-tasks.test.js#accepted gaps require explicit dated user acceptance` | New and reopened done slices cannot omit gate state or current multi-Requirement coupling; completed unmarked legacy slices remain grandfathered; candidates are related; required gaps block done; accepted gaps name a Scenario and date; final commits agree across ledgers. | Passing 2026-08-16 |
-| S6/R11-S4 | Automated tests `test/slice-review.test.js#validates a durable final slice Review with exact gate, Scenario, and visual sets`, `test/slice-review.test.js#requires durable proof provenance and the exact planned visual contract`, `test/slice-closure.test.js#validates a minimal v2 closure receipt while retaining legacy v1`, `test/slice-closure.test.js#v2 receipt requires canonical Review binding, exact sets, and unique anchors`, and `test/cli.test.js#validate binds a minimal v2 receipt to a durable slice Review digest and Git seal` | A current ready claim requires a byte-bound detailed Review, durable proof that resolves in the seal and agrees with Epic evidence, exact planned visual contracts, compact matching receipt rows, and an equal reachable final tree; legacy v1 remains compatible. | Passing 2026-08-16 |
-| S6/R12-S1, S6/R12-S2 | Automated test `test/workflow-contracts.test.js#packaged Explore preserves generalized durable discussions and routes mature outcomes` | Explore triggers on requested durable retention, chooses authority-first placement with plural idea-owned fallback, maintains one synthesized record, and routes mature conclusions without duplicating canonical truth. | Passing 2026-08-16 |
-| S6/R13-S1 | Automated test `test/workflow-contracts.test.js#packaged PRD stays directional without becoming an implementation gate` | PRD, Review, doctrine, and README consistently treat ordinary directional drift as advisory while retaining explicit stronger-authority exceptions. | Passing 2026-08-16 |
-| S6/R14-S1 | Automated test `test/change-contract.test.js#v2 planning transitions with compact tasks while creation remains schema-less` | Explicit v2 planning uses the compact parser through the public transition and validation seams while default creation remains schema-less. | Passing 2026-08-17 |
-| S6/R14-S1 | Automated tests `test/change-tasks-v2.test.js#v2 tasks parse a compact delivery queue without legacy ledgers`, `test/change-tasks-v2.test.js#v2 tasks reject legacy ledgers and closure markers`, and `test/change-tasks-v2.test.js#v2 tasks reject unknown dependencies and missing planned triggers` | Compact v2 tasks preserve the queue, references, dependencies, Resume checkpoint, and trigger declarations without accepting legacy closure state. | Passing 2026-08-17 |
-| S6/R14-S1 | Automated tests `test/change-review.test.js#v2 review validates one ready exact-candidate outcome without a receipt`, `test/change-review.test.js#v2 review requires all universal gates and every planned trigger`, `test/change-review.test.js#v2 ready verdict rejects trigger gaps without dated acceptance`, `test/change-review.test.js#v2 ready verdict rejects required or invalid accepted gaps`, and `test/change-review.test.js#v2 review keeps planned manual acceptance separate` | Central Review enforces the five-gate set, planned triggers, independent verdicts, dated technical-gap honesty, same-boundary Scenario rows, and separate product acceptance without a receipt. | Passing 2026-08-17 |
-| S6/R14-S1 | Automated tests `test/change-review.test.js#done v2 outcomes require final commit and tree equality` and `test/change-contract.test.js#done v2 outcomes require a reachable content-identical review seal` | Live pre-commit validation rejects a tampered working-tree digest and fabricated Scenario/evidence authority; done state requires a committed candidate plus a reachable single-parent commit whose tree equals the reviewed tree. | Passing 2026-08-17 |
-| S6/R14-S2 | Automated tests `test/change-contract.test.js#change create captures proposed intent in one central change.md`, `test/change-tasks.test.js#structured Change tasks parse valid slices, checkpoint, and ledger`, `test/slice-review.test.js#validates a durable final slice Review with exact gate, Scenario, and visual sets`, and `test/slice-closure.test.js#validates a minimal v2 closure receipt while retaining legacy v1` | Schema-less creation and frozen legacy task, detailed Review, and v1/v2 receipt readers retain their existing behavior independently from v2 validation. | Passing 2026-08-17 |
-| S6/R14-S2 | Automated tests `test/cli.test.js#Change consumers still report a stable missing required file` and `test/cli.test.js#Change consumers retry when a stable inventory location closes before file reads` | Non-proposed Changes consistently report a genuinely missing `tasks.md` while retrying a concurrent active-to-closed move instead of producing a false missing-file result. | Passing 2026-08-17 |
-
+| S6/R1-S1, S6/R1-S2 | Automated tests `test/change-contract.test.js#change create captures proposed intent in one central change.md` and `test/change-contract.test.js#planning completes the same Change before lifecycle work continues` | Current creation is workspace-central v2; planning remains guarded and resumable. | Passing 2026-08-17 |
+| S6/R1-S3, S6/R1-S4 | Automated tests `test/change-tasks-v2.test.js#v2 tasks parse a compact delivery queue without legacy ledgers`, `test/change-tasks-v2.test.js#v2 tasks reject legacy ledgers and closure markers`, and `test/workflow-contracts.test.js#current Change templates use one v2 three-artifact contract` | Compact outcomes retain references, dependencies, Resume, triggers, and implementation-agnostic wording without closure state. | Passing 2026-08-17 |
+| S6/R2-S1, S6/R2-S2, S6/R2-S3 | Automated test `test/workflow-contracts.test.js#Apply delivers one reviewed outcome without legacy closure machinery` | Apply selects one outcome, follows guidance, verifies proportionally, independently reviews, selectively commits, and stops. | Passing 2026-08-17 |
+| S6/R3-S1, S6/R3-S2, S6/R3-S3, S6/R4-S1, S6/R5-S1, S6/R5-S2 | Automated test `test/workflow-contracts.test.js#Review uses five universal gates and concrete planned or discovered triggers` | Review completes safe relevant inspection after findings/yields, uses five gates, executes concrete triggers including UI risk, and separates Spec/Quality judgments. | Passing 2026-08-17 |
+| S6/R6-S1 | Automated test `test/workflow-contracts.test.js#Interactive reuses normal v2 records and Apply` | Interactive has no second log, ledger, template family, or closure mechanism. | Passing 2026-08-17 |
+| S6/R7-S1, S6/R8-S1, S6/R10-S1, S6/R10-S2 | Automated test `test/workflow-contracts.test.js#supporting workflows preserve central ownership and independent capability boundaries` | Context, Changelog, PR, Release, and Status retain central ownership and independent mutation boundaries. | Passing 2026-08-17 |
+| S6/R9-S1, S6/R9-S3 | Automated test `test/workflow-contracts.test.js#Epic Update is conditional and records current truth rather than implementation method` | Epic Update reconciles only when durable truth changed and otherwise returns evidence-based no-op. | Passing 2026-08-17 |
+| S6/R9-S2, S6/R10-S3 | Automated tests `test/candidate-resolve.test.js#candidate resolve resolves an immutable committed candidate and changed paths`, `test/candidate-resolve.test.js#candidate resolve inventories staged, unstaged, and untracked working-tree state`, and `test/epic-update-input.test.js#epic update input resolves an immutable committed candidate and changed paths` | Candidate helpers remain immutable, content-sensitive, and read-only. | Passing 2026-08-13 |
+| S6/R9-S4 | Semantic source inspection of `skills/sdd-epic-update/SKILL.md#When To Run` and `skills/sdd-apply/SKILL.md#Epic Reconciliation` | Apply defers reconciliation when no accepted behavior, Story completion, consumed contract/gap, or stale map requires it. | Passing 2026-08-17 |
+| S6/R11-S1, S6/R11-S2 | Automated tests `test/workflow-contracts.test.js#Apply delivers one reviewed outcome without legacy closure machinery` and `test/workflow-contracts.test.js#Review uses five universal gates and concrete planned or discovered triggers` | Apply permits one remediation batch and Review blocks unaccepted required gaps while keeping manual acceptance separate. | Passing 2026-08-17 |
+| S6/R11-S3, S6/R11-S4, S6/R14-S1 | Automated tests `test/change-review.test.js#done v2 outcomes require final commit and tree equality`, `test/change-contract.test.js#done v2 outcomes require a reachable content-identical review seal`, and `test/workflow-contracts.test.js#supporting workflows preserve central ownership and independent capability boundaries` | Done outcomes require a committed candidate, reachable single-parent commit, reviewed/final tree equality, and downstream consumers preserve central Review authority. | Passing 2026-08-17 |
+| S6/R11-S5, S6/R14-S2 | Automated test `test/change-contract.test.js#schema-less Changes are unsupported history` | Current validation and lifecycle mutation reject schema-less records without conversion or compatibility parsing. | Passing 2026-08-17 |
+| S6/R12-S1, S6/R12-S2, S6/R13-S1 | Automated test `test/workflow-contracts.test.js#supporting workflows preserve central ownership and independent capability boundaries` | Explore routes durable records by authority and PRDs remain directional rather than delivery gates. | Passing 2026-08-17 |
+| S6/R14-S1 | Automated tests `test/change-contract.test.js#v2 creation and planning use compact current records`, `test/change-tasks-v2.test.js#v2 tasks parse a compact delivery queue without legacy ledgers`, `test/change-review.test.js#v2 review validates one ready exact-candidate outcome without a receipt`, and `test/package.test.js#package dry run includes the current workflow without legacy closure templates` | New Changes default to v2, lifecycle/Review enforce the three-artifact contract, and the package omits retired receipt-era source and assets. | Passing 2026-08-17 |
 #### Verification Gaps
 
-- `S6/R1-S3`, `S6/R1-S4`, `S6/R3-S3`, `S6/R5-S2`, `S6/R9-S4`, `S6/R11-S3`, `S6/R11-S4`, and `S6/R11-S5` require fresh implementation and exact-candidate verification under `2026-08-17-replace-default-sdd-workflow`.
-- Existing passing rows remain evidence for unchanged and legacy behavior only; they do not verify the still-unimplemented default-switch portion of the accepted v2 replacement.
 - `S6/R14` [user accepted 2026-08-17]: the full package run passes the original stable-missing-file regression but exposes the unrelated pre-existing `runtime config validation rejects NUL path values without filesystem errors` failure and exceeds 1,800 seconds. Focused R14 proof is passing; this accepted aggregate gap does not claim the NUL-path behavior is correct.
 
 #### Story Notes
@@ -1059,7 +1015,7 @@ Implementation: partial
 Verification: partial
 Created: 2026-07-23
 Modified: 2026-08-17
-Last verified: 2026-08-16
+Last verified: 2026-08-17
 
 As a developer or coding agent, I want one readable public guide to explain the SDD problem, durable behavior model, general workflow, and package implementation, so that I can understand the method and find the correct entry point without reverse-engineering the repository.
 
@@ -1103,7 +1059,7 @@ The guide SHALL use the shared Steel semantic identity as restrained documentati
 
 ##### Requirement R5: Canonical Change Lifecycle Documentation
 
-The public package documentation SHALL distinguish one progressive workspace-level central Change record from repository-local Epic/code/test truth, explain repository projections and workspace-wide lifecycle commands, document current setup and deterministic workspace discovery, and state that pre-1.0 installation and Change formats require manual recreation or conversion rather than a supported migration command. It SHALL explain the v2 three-artifact default, five universal gates, behavior-derived triggered checks, exact-candidate independent Review, bounded remediation, technical-gap and manual-acceptance separation, selective local commit authority, and historical read-only compatibility without presenting the former receipt protocol as a second current profile.
+The public package documentation SHALL distinguish one progressive workspace-level central Change record from repository-local Epic/code/test truth, explain repository projections and workspace-wide lifecycle commands, document current setup and deterministic workspace discovery, and state that pre-1.0 installation and Change formats are unsupported history without a migration or backward-compatibility promise. It SHALL explain the v2 three-artifact default, five universal gates, behavior-derived triggered checks, exact-candidate independent Review, bounded remediation, technical-gap and manual-acceptance separation, and selective local commit authority without presenting the former receipt protocol as a second current profile.
 
 ###### Scenario R5-S1: Unsupported Alpha Format
 
@@ -1129,12 +1085,14 @@ The public package documentation SHALL distinguish one progressive workspace-lev
 | S7/R3 | `site/styles.css#:focus-visible` | support | Provides visible focus and touch-sized interactive treatment. |
 | S7/R4 | `site/styles.css#UI Foundations: Steel identity profile` | primary | Implements the Steel semantic palette and restrained documentation composition. |
 | S7/R4-S1 | `site/styles.css#@media (prefers-reduced-motion: reduce)` | primary | Reduces smooth scrolling and transition duration while preserving state. |
-| S7/R5 | `README.md#Installation` | primary | Defines current workspace setup, canonical workspace ownership, contained managed skills, external-repository selection, and the unsupported alpha-format policy. |
-| S7/R5 | `site/index.html#Planning, project truth, and Changes have distinct owners.` | primary | Presents progressive central Changes, current-only setup, and managed-only Update in the public guide. |
+| S7/R5-S1 | `README.md#Quick Start` | primary | Explains the current three-artifact outcome workflow, focused verification, independent Review, and selective local commit boundary. |
+| S7/R5-S1 | `docs/story-driven-development.md#Change Workflow` | primary | Defines one current v2 contract, five universal gates, behavior-derived triggers, unsupported history, and authority limits. |
+| S7/R5-S1 | `docs/templates/README.md#Canonical Template Examples` | support | Exposes only current Change, outcome queue, and central Review templates. |
+| S7/R5-S2 | `site/index.html#Planning, project truth, and Changes have distinct owners.` | primary | Presents the public methodology guide; its copy remains pending S3 revision. |
 
 #### Implementation Gaps
 
-- `S7/R5-S2`: README, doctrine, templates, and the public methodology guide still describe the fixed-manifest and receipt-based default.
+- `S7/R5-S2`: the public methodology guide still needs the S3 copy revision from the fixed-manifest and receipt-based default.
 
 #### Verified By
 
@@ -1149,11 +1107,11 @@ The public package documentation SHALL distinguish one progressive workspace-lev
 | S7/R2-S1 | Historical deterministic rendered inspection of committed candidate `666de8f` at 1440×900, 768×1024, 375×812, 320×812, and 812×375 | The prior candidate kept navigation reachable, mobile controls at 44px, long content contained, and document scroll/client width equal at every viewport. | Historical passing evidence 2026-07-23; not current-source proof |
 | S7/R3-S1 | Deterministic browser interaction on `site/site.js` clipboard-fallback remediation with clipboard denial, missing command text, and keyboard skip-link interaction | Clipboard denial selects the full command and announces `Selected` when selection is available; missing command text announces `Copy failed` without a runtime error; the visible skip link moves focus to `main-content`. | Passing 2026-07-23 |
 | S7/R4-S1 | Historical deterministic rendered inspection of committed candidate `666de8f` with reduced-motion emulation and direct screenshot review | The prior candidate used `auto` scrolling, reduced transitions to `0.00001s`, retained active navigation, and kept the Steel composition readable. | Historical passing evidence 2026-07-23; not current-source proof |
-| S7/R5-S1 | Automated test `test/site.test.js#public guide documents progressive workspace-owned Changes and current-only setup` | The source contract requires `change.md`, deferred planning artifacts, unsupported alpha-format guidance, managed-only Update, and no `--from-user` path. | Passing 2026-08-10 |
+| S7/R5-S1 | Automated tests `test/workflow-contracts.test.js#public doctrine describes one supported current workflow`, `test/cli.test.js#packaged templates define compact v2 outcomes and one central Review`, and `test/package.test.js#package dry run includes the current workflow without legacy closure templates` | README, doctrine, templates, skills, and package inventory expose one v2 three-artifact workflow without current legacy closure assets. | Passing 2026-08-17 |
 | S7/R5-S1 | Prior current-source browser inspection at 1280px with full-page screenshot and WCAG 2 A/AA axe scan | The earlier rendered guide had no layout breakage and axe reported zero violations, but its lifecycle copy is now superseded. | Historical; superseded by current evidence |
-| S7/R2-S1, S7/R5-S1 | Rendered verification `docs/verification/s1-progressive-workflow.md#Rendered Guide Evidence` | Current progressive-workflow and setup copy remains readable and reachable at 1440×900 and 320×844 with zero page overflow or console errors; screenshots and retained browser results are checksum-bound. | Passing 2026-08-16 |
-| S7/R3-S1 | Rendered verification `docs/verification/s1-progressive-workflow.md#Rendered Guide Evidence` | The skip link reaches `main-content`, mobile controls are 44px high, scrollable named code regions are keyboard reachable, and unavailable Clipboard API selects the command text while announcing `Selected`. | Passing 2026-08-16 |
-| S7/R4-S1 | Rendered verification `docs/verification/s1-progressive-workflow.md#Rendered Guide Evidence` | Fresh isolated sessions retain correct dark computed colors, zero WCAG 2 A/AA axe violations, reduced motion, 44px controls, and no page overflow at both primary viewports. | Passing 2026-08-16 |
+| S7/R2-S1 | Historical rendered verification `docs/verification/s1-progressive-workflow.md#Rendered Guide Evidence` | The 2026-08-16 Steel candidate retained reachable responsive navigation and zero page overflow; this is a visual baseline, not current workflow-copy proof. | Historical passing evidence 2026-08-16; not current-source proof |
+| S7/R3-S1 | Historical rendered verification `docs/verification/s1-progressive-workflow.md#Rendered Guide Evidence` | The 2026-08-16 candidate retained a working skip link, 44px mobile controls, keyboard-reachable code regions, and selectable clipboard fallback. | Historical passing evidence 2026-08-16; not current-source proof |
+| S7/R4-S1 | Historical rendered verification `docs/verification/s1-progressive-workflow.md#Rendered Guide Evidence` | The 2026-08-16 candidate retained Steel colors, zero axe violations, reduced motion, and no page overflow at both primary viewports. | Historical passing evidence 2026-08-16; not current-source proof |
 
 #### Verification Gaps
 
@@ -1163,7 +1121,7 @@ The public package documentation SHALL distinguish one progressive workspace-lev
 
 - README and changelog entries communicate S7; they do not own or prove the public-guide behavior.
 - Owner manual confirmation of the current guide remains `pending user` and is tracked separately from technical verification.
-- Current-source responsive-render evidence for the progressive Change and current-only setup copy is retained under `docs/verification/artifacts/s1/reseal-2026-08-16/`; prior committed-candidate renders remain historical only.
+- Historical responsive, accessibility, and Steel-presentation evidence is retained under `docs/verification/artifacts/s1/reseal-2026-08-16/`; its workflow copy is superseded and S3 owns fresh current-source rendering.
 
 ## Cross-Story Concerns
 

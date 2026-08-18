@@ -161,20 +161,11 @@ Create or update one `## Experience Design` section in the central Change's `cha
 
 Reference Requirements and Scenarios where the design contract clarifies how accepted behavior appears. Qualify repository-local artifacts and evidence with their stable target repository ID. Do not restate every Requirement or turn visual details into Stories.
 
-Update `tasks.md` only as needed to preserve current cold-resume state:
+Update `tasks.md` only when the accepted experience changes an outcome's observable result, constraints, expected UI/accessibility trigger, verification intent, manual acceptance, status, or Resume checkpoint. Keep detailed experience direction and any proportional visual matrix in `change.md`; do not create a second design ledger in `tasks.md`.
 
-- selected direction and stable reference IDs, qualified by target repository ID where the artifact is repository-local
-- material component strategies, initial repository-local ownership, and required preview states
-- user-confirmation result
-- unresolved design blockers or accepted gaps
-- expected `/sdd-apply` starting point and responsible target repository ID for each repository-specific slice
-- repository-local Storybook states, screenshots, prototypes, or manual UI checks the implementation should create
-- the Visual Verification Matrix covering affected repositories, surfaces, viewports, states, interactions, expected observations, and preferred tooling or fallback
-- the fixed `Resume Here` phase, current slice, repository envelopes, downstream candidate freshness, acceptance state, and open finding or blocker
+Initial `--plan` does not change outcome status. For `--revise`, update `Experience Design` and one concise current revision note naming the feedback, exact candidate, preserve/change/non-goal delta, confirmation, and restart point.
 
-Initial `--plan` does not change slice or Implementation Ledger status. For `--revise`, update `Experience Design` to the newly confirmed current contract and keep one replaceable `Design Revision Context` block in `tasks.md`: originating feedback/finding IDs, repository and exact candidate envelope, reference, preserve/change/non-goal delta, user confirmation, and exact restart point. Replace stale revision context instead of accumulating a design diary.
-
-When repository implementation must change, reopen every affected `done` slice coherently: set each to `ready`, set its matching Implementation Ledger row to `not started` with a concise `Revision pending for existing <surface>` summary, preserve the dependency graph, and name the first affected slice whose dependencies are complete in `Resume Here`. A later affected slice may remain `ready` while waiting on an earlier affected dependency; Apply's dependency check prevents premature selection and the slice becomes actionable when that dependency is done. Do not leave affected downstream slices `done`, because Apply would skip required revision work. Set `Closure receipt: required` on each reopened slice, remove any stale `slice-reviews/<slice-id>.md` Review and `slice-closures/<slice-id>.yaml` receipt, and mark prior verification, Review, Epic Update, Changelog, and acceptance candidates pending or stale as their candidate-sensitive claims require; stale closure artifacts for a reopened candidate are invalid state, not history. If the corrected contract already matches the repository candidate and only central design truth changed, do not fabricate an Apply slice; recommend fresh `/sdd-review`. If the revision cannot map cleanly to existing slices without changing behavior, ownership, or acceptance, return `routed` to `/sdd-change`.
+When repository implementation must change, reopen every affected done outcome coherently: set it to `ready`, preserve dependencies, name the first dependency-ready outcome in `Resume Here`, and make its central `review.md` candidate, verification, verdict, and final commit/tree pending or stale. Do not create per-outcome Review files or receipts. If the corrected contract already matches the candidate and only central design truth changed, recommend fresh `/sdd-review` without fabricating Apply work. If the revision cannot map cleanly to existing outcomes without changing behavior, ownership, or acceptance, route to `/sdd-change`.
 
 Keep implementation and rendered-design evidence in the repository that owns it, and link or identify that evidence from the central record instead of copying it into another Change location.
 
@@ -184,7 +175,7 @@ When a decision changes app-wide identity rather than only this Change, update o
 
 Design work often exposes missing or changed behavior. Classify it before editing SDD truth:
 
-- **clarification or revision within accepted behavior**: update the current `Experience Design` contract and replaceable task handoff; in `--revise`, also refresh the current `Design Revision Context`.
+- **clarification or revision within accepted behavior**: update the current `Experience Design` contract, including its concise current revision note, and update only the affected outcome or Resume fields in `tasks.md`.
 - **missing or changed Requirement/Scenario, scope, Epic ownership, client contract, data/auth rule, or technical constraint**: stop design finalization and route a central `proposed` Change to `/sdd-change`, or a central `planned`, `in_progress`, or `in_review` Change to `/sdd-change`.
 - **adjacent future improvement**: recommend `/sdd-change` without expanding the current design.
 - **broader product-direction change**: route to `/sdd-prd` or `/sdd-explore`.
@@ -209,18 +200,18 @@ In `--revise`, confirm the Change remains `in_progress` after any confirmed revi
 Choose the terminal handoff or wait condition from the result:
 
 - `complete` or `no-op` in `planned`: recommend separately invoked `/sdd-apply`.
-- `complete` in `in_progress` with reopened implementation work: recommend separately invoked `/sdd-apply` at the exact first dependency-ready Requirement/Scenario or presentation slice.
-- `complete` or `no-op` when the current repository candidate already satisfies the corrected contract: recommend separately invoked `/sdd-review` against that candidate; do not fabricate an Apply slice.
+- `complete` in `in_progress` with reopened implementation work: recommend separately invoked `/sdd-apply` at the first dependency-ready outcome.
+- `complete` or `no-op` when the current repository candidate already satisfies the corrected contract: recommend separately invoked `/sdd-review` against that candidate; do not fabricate an Apply outcome.
 - `needs-user`: invoke no downstream workflow; state the exact design decision, candidate ambiguity, dependency disposition, permission, or acceptance response needed before resuming Design.
 - `blocked`: invoke no downstream workflow; state the unblock condition and resume `/sdd-design` afterward.
 - `routed`: name the one owning workflow and return control without invoking it. A central Change in `proposed` routes to `/sdd-change`.
 - A central Change still in `in_review` has not recorded a confirmed revision mutation; preserve it there for `no-op`, `needs-user`, `blocked`, or `routed`, and do not recommend Apply.
 
-For a multi-repository Change, the handoff identifies repository-specific starting slices and evidence obligations in the one ledger. Lifecycle transitions remain Change-wide and repo-free. Design stops before Apply, Review, Epic Update, Changelog, commits, PRs, release, deployment, or closeout; each remains separately invoked and candidate-bound where its own contract requires it.
+For a multi-repository Change, the handoff identifies repository-specific starting outcomes in `tasks.md` and candidate-sensitive evidence obligations in `review.md`. Lifecycle transitions remain Change-wide and repo-free. Design stops before Apply, Review, Epic Update, Changelog, commits, PRs, release, deployment, or closeout; each remains separately invoked and candidate-bound where its own contract requires it.
 
 The `/sdd-apply` handoff should name:
 
-- the first Requirement/Scenario implementation slice and responsible target repository ID
+- the first dependency-ready outcome and responsible target repository ID
 - selected reference artifacts, qualified by repository ID when repository-local
 - material component strategies and their initial repository-local implementation owners
 - required responsive and interaction states
@@ -265,6 +256,6 @@ Report:
 - confirmed direction and stable reference artifacts, qualified by repository ID where applicable
 - major responsive, state, accessibility, and visual decisions
 - planned repository-local rendered surfaces, viewports, states, interactions, and verification tooling or fallback
-- central Change files updated, reopened slices or no-op determination, stale downstream candidates, and validation result
+- central Change files updated, reopened outcomes or no-op determination, stale downstream candidates, and validation result
 - requirement discoveries routed elsewhere
 - exactly one recommended next owner, or the explicit wait/unblock condition when no downstream workflow is valid

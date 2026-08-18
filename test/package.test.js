@@ -15,7 +15,7 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 const packageRoot = new URL("../", import.meta.url);
 
-test("package dry run includes candidate-bound Epic Update and Changelog capabilities", async () => {
+test("package dry run includes the current workflow without legacy closure templates", async () => {
   const { stdout } = await execFileAsync("npm", ["pack", "--dry-run", "--json"], {
     cwd: new URL("../", import.meta.url),
   });
@@ -27,6 +27,17 @@ test("package dry run includes candidate-bound Epic Update and Changelog capabil
   assert.ok(paths.includes("skills/sdd-changelog/agents/openai.yaml"));
   assert.ok(paths.includes("src/commands/candidate-resolve.js"));
   assert.ok(paths.includes("src/commands/epic-update-input.js"));
+  assert.ok(paths.includes("skills/sdd-change/assets/tasks-template.md"));
+  assert.ok(paths.includes("skills/sdd-review/assets/review-template.md"));
+  assert.ok(!paths.includes("skills/sdd-review/assets/slice-review-template.md"));
+  assert.ok(!paths.includes("skills/sdd-review/assets/subagent-pr-review-prompt.md"));
+  assert.ok(!paths.includes("skills/sdd-apply/assets/slice-closure-template.yaml"));
+  assert.ok(!paths.includes("docs/templates/slice-review.md"));
+  assert.ok(!paths.includes("docs/templates/slice-closure.yaml"));
+  assert.ok(!paths.includes("src/change-tasks.js"));
+  assert.ok(!paths.includes("src/slice-review.js"));
+  assert.ok(!paths.includes("src/slice-closure.js"));
+  assert.ok(!paths.includes("test/slice-closure.test.js"));
 });
 
 test("package manifest excludes generated Python bytecode", async (t) => {

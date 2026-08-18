@@ -2,7 +2,6 @@ import { rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { assertValidChangeId } from "../change-id.js";
-import { formatStructuredTaskIssues, parseStructuredChangeTasks } from "../change-tasks.js";
 import { formatV2TaskIssues, parseV2ChangeTasks } from "../change-tasks-v2.js";
 import {
   assertChangeStoreConfinement,
@@ -65,25 +64,17 @@ async function assertPlanningComplete(changePath, workspaceRoot, metadata, chang
     : missingCompatibleDesignSections(existingDesign.source);
   const taskResult = tasks === null
     ? null
-    : metadata.schema === CHANGE_SCHEMA_V2
-      ? parseV2ChangeTasks(tasks.source, {
-          changeId,
-          repositoryIds: metadata.repositories,
-        })
-      : parseStructuredChangeTasks(tasks.source, {
-          changeId,
-          repositoryIds: metadata.repositories,
-        });
+    : parseV2ChangeTasks(tasks.source, {
+        changeId,
+        repositoryIds: metadata.repositories,
+      });
   const taskIssues = taskResult?.issues ?? [];
   if (missing.length > 0 || missingSections.length > 0 || taskIssues.length > 0) {
     const planningFile = existingDesign === null ? "change.md" : "design.md";
-    const formatIssues = metadata.schema === CHANGE_SCHEMA_V2
-      ? formatV2TaskIssues
-      : formatStructuredTaskIssues;
     const details = [
       ...missing,
       ...missingSections.map((section) => `${planningFile}: ${section}`),
-      ...formatIssues(taskIssues).map((detail) => `tasks.md: ${detail}`),
+      ...formatV2TaskIssues(taskIssues).map((detail) => `tasks.md: ${detail}`),
     ];
     throw new SddError(
       `Planning is incomplete: ${details.join("; ")}.`,
@@ -179,6 +170,11 @@ export async function transitionChange(
       `Cannot parse Change metadata in ${changeFilePath}: ${metadata.error}`,
       { code: "INVALID_CHANGE_METADATA" },
     );
+  }
+  if (metadata.schema !== CHANGE_SCHEMA_V2) {
+    throw new SddError("Current Change transitions require schema: sdd-change-v2; schema-less Changes are unsupported history.", {
+      code: "UNSUPPORTED_CHANGE_SCHEMA",
+    });
   }
   if (metadata.space !== spaceId) {
     throw new SddError(`Change belongs to Space ${metadata.space}, not ${spaceId}.`, {

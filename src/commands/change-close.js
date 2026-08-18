@@ -14,7 +14,7 @@ import {
   assertSelectedRepositorySnapshotsCurrent,
   resolveRepositoriesForMetadata,
 } from "../change-repositories.js";
-import { parseChangeMetadata } from "../change-status.js";
+import { CHANGE_SCHEMA_V2, parseChangeMetadata } from "../change-status.js";
 import { assertValidConfig, resolveWorkspaceStatus } from "../config.js";
 import { SddError } from "../errors.js";
 import { isDirectory, pathExists } from "../fs.js";
@@ -98,6 +98,11 @@ export async function closeChange(
   if (metadata.error) {
     throw new SddError(`Cannot parse Change metadata in ${sourcePath}/change.md: ${metadata.error}`, {
       code: "INVALID_CHANGE_METADATA",
+    });
+  }
+  if (metadata.schema !== CHANGE_SCHEMA_V2) {
+    throw new SddError("Current Change closeout requires schema: sdd-change-v2; schema-less Changes are unsupported history.", {
+      code: "UNSUPPORTED_CHANGE_SCHEMA",
     });
   }
   if (metadata.space !== spaceId) {

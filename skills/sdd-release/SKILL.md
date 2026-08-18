@@ -9,7 +9,7 @@ Prepare a release handoff to the project-defined production target.
 
 ## Authority And Project Profile
 
-Resolve the workspace installation, Space, one central Change, idea-owned planning path, and every target repository named by the Change with `sdd context <relevant-path> --json` and `sdd status <space-id> --json`, then read the `workflowPath` returned by `sdd context` completely before judging SDD readiness, evidence, reconciliation, or reviewed-commit freshness. Resolve each repository's production target, source policy, release mechanism, required checks, versioning, release-note format, hosting provider, and handoff independently while keeping one central ledger at `<workspace>/.sdd/changes/`.
+Resolve the workspace installation, Space, one central Change, idea-owned planning path, and every target repository named by the Change with `sdd context <relevant-path> --json` and `sdd status <space-id> --json`, then read the `workflowPath` returned by `sdd context` completely before judging SDD readiness, evidence, reconciliation, or reviewed-commit freshness. Resolve each repository's production target, source policy, release mechanism, required checks, versioning, release-note format, hosting provider, and handoff independently while preserving the authority split among central `change.md`, `tasks.md`, `review.md`, and provider-native release records.
 
 This is the release gate after implementation and local review. It is stricter than `/sdd-review`: `/sdd-review` proves technical readiness while recording manual acceptance separately; `/sdd-release` proves that the complete coordinated candidate set satisfies every repository-specific and aggregate technical, acceptance, and handoff gate for the production targets.
 
@@ -118,7 +118,7 @@ Check git status in every repo that may change. Preserve unrelated dirty files. 
    - End new PR creation with a handoff to `/sdd-pr` for stewardship of the complete PR set after CI, bots, or humans have had time to respond.
    - Do not merge any PR unless the user explicitly asked for that release merge and the owning repository's branch policy allows it.
 9. Update SDD artifacts when appropriate.
-   - If release readiness changes closeout evidence, update the one central `tasks.md` with repository-keyed release, PR, merge, acceptance, and accepted-gap state. Do not independently change a target repository's lifecycle.
+   - If release readiness changes candidate, accepted-gap, or manual-acceptance truth, update the final section of central `review.md`. Keep only the current outcome, next action, or blocker in `tasks.md`; keep PR, check, merge, and release telemetry in provider-native records. Do not independently change a target repository's lifecycle.
    - Do not close the central Change unless the user explicitly asks or the release workflow is authorized to close it after every target repository passes.
    - When closeout is authorized and every release-owned contextual gate passes across the full target set, use `sdd change close <space-id> <change-id> --workspace <workspace-root>` once, with no `--repo`, instead of moving the folder manually. Do not treat the CLI preflight as a substitute for release or merge readiness.
 10. Report release state.

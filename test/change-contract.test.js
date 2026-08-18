@@ -54,118 +54,6 @@ function frontmatter(source) {
   return parse(match[1]);
 }
 
-async function completePlanning(changePath) {
-  const changePathname = join(changePath, "change.md");
-  const source = await readFile(changePathname, "utf8");
-  const withRepository = setChangeMetadata(source, {
-    space: "sample",
-    repositories: ["sample-web"],
-  });
-  assert.notEqual(withRepository, null);
-  await writeFile(
-    changePathname,
-    [
-      withRepository.trimEnd(),
-      "",
-      "## Current Context",
-      "",
-      "The current system has been inspected.",
-      "",
-      "## Behavioral Changes",
-      "",
-      "The public behavior changes observably.",
-      "",
-      "## Technical Decision Handoffs",
-      "",
-      "Only one path is viable because the public boundary already exists.",
-      "",
-      "## Selected Approach",
-      "",
-      "Use the existing public boundary.",
-      "",
-      "## Alternatives Considered",
-      "",
-      "None beyond the constrained path.",
-      "",
-      "## Implementation Constraints",
-      "",
-      "Preserve the public boundary.",
-      "",
-      "## Verification Strategy",
-      "",
-      "Exercise the public behavior.",
-      "",
-      "## Risks / Trade-Offs",
-      "",
-      "The change is intentionally small.",
-      "",
-    ].join("\n"),
-  );
-  await writeFile(
-    join(changePath, "tasks.md"),
-    [
-      "# Tasks: Capture Intent",
-      "",
-      "## Resume Here",
-      "",
-      "- Change: `2026-08-10-capture-intent`",
-      "- Current slice: S1",
-      "- Phase: planned",
-      "- Verification candidate: pending",
-      "- Review candidate: pending",
-      "- Epic-update candidate: pending",
-      "- Changelog candidate: pending",
-      "- Acceptance candidate: not required",
-      "- Open finding / blocker: none",
-      "",
-      "| Repository | Root | Baseline | Candidate kind | Candidate watermark |",
-      "|---|---|---|---|---|",
-      "| `sample-web` | `code/sample-web` | not captured | not started | not captured |",
-      "",
-      "## Requirement Slices",
-      "",
-      "### S1: Expose the public behavior",
-      "",
-      "- Status: ready",
-      "- Repository: `sample-web`",
-      "- Requirements:",
-      "  - New: `SAMPLE-E001/S1 R1` — The behavior is available through the public boundary.",
-      "- Story changes:",
-      "  - Update: `SAMPLE-E001/S1` — Add the new behavior.",
-      "- Outcome: Callers can observe the behavior through the public boundary.",
-      "- Scenarios: `SAMPLE-E001/S1 R1-S1`",
-      "- Dependencies: none",
-      "- Binding constraints: Preserve the public boundary.",
-      "- Verification intent: Exercise the public behavior.",
-      "- Manual acceptance: not required",
-      "- Completion certificate: required",
-      "- Visual requirements:",
-      "  - Not applicable — the fixture exposes no rendered UI surface.",
-      "",
-      "## Implementation Ledger",
-      "",
-      "| Slice | Repository | Status | Implementation Summary / Changed Surface | Commit | Updated |",
-      "|---|---|---|---|---|---|",
-      "| S1 | `sample-web` | not started | None yet. | pending | 2026-08-10 |",
-      "",
-      "## Slice Gate Ledger",
-      "",
-      "| Slice | Verification Candidate | Implementation Review | Epic Update | Semantic Closure | Evidence Closure | Post-Epic Review | Required Gaps | Accepted Gaps | Final Commit | Updated |",
-      "|---|---|---|---|---|---|---|---|---|---|---|",
-      "| S1 | pending | pending | pending | pending | pending | pending | none | none | pending | 2026-08-10 |",
-      "",
-      "## Blockers / Open Questions",
-      "",
-      "None.",
-      "",
-      "## Closeout",
-      "",
-      "Pending.",
-      "",
-    ].join("\n"),
-  );
-}
-
 test("change create captures proposed intent in one central change.md", async (t) => {
   const root = await createWorkspace(t);
   const result = await createChange(root, "sample", "capture-intent", {
@@ -178,6 +66,7 @@ test("change create captures proposed intent in one central change.md", async (t
   const changePath = getActiveChangePath(result.changeId, root);
   const source = await readFile(join(changePath, "change.md"), "utf8");
   assert.deepEqual(frontmatter(source), {
+    schema: "sdd-change-v2",
     status: "proposed",
     space: "sample",
     repositories: [],
@@ -198,6 +87,45 @@ test("change create captures proposed intent in one central change.md", async (t
   );
 });
 
+test("schema-less Changes are unsupported history", async (t) => {
+  const root = await createWorkspace(t);
+  const result = await createChange(root, "sample", "unsupported-history", {
+    date: "2026-08-10",
+  });
+  const changePath = getActiveChangePath(result.changeId, root);
+  const changeFilePath = join(changePath, "change.md");
+  await writeFile(
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace("schema: sdd-change-v2\n", ""),
+  );
+
+  const validation = await validateArtifacts(root, { changeId: result.changeId });
+  assert.ok(validation.findings.some((finding) => finding.code === "UNSUPPORTED_CHANGE_SCHEMA"));
+  await assert.rejects(
+    () => transitionChange(root, "sample", result.changeId, {
+      from: "proposed",
+      to: "planned",
+    }),
+    (error) => error instanceof SddError && error.code === "UNSUPPORTED_CHANGE_SCHEMA",
+  );
+
+  await writeFile(
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace("status: proposed", "status: planned"),
+  );
+  await writeFile(
+    join(changePath, "tasks.md"),
+    "# Retired task record\n\n## Requirement Slices\n\n## Implementation Ledger\n",
+  );
+  const plannedValidation = await validateArtifacts(root, { changeId: result.changeId });
+  assert.ok(plannedValidation.findings.some((finding) => finding.code === "UNSUPPORTED_CHANGE_SCHEMA"));
+  assert.equal(
+    plannedValidation.findings.some((finding) => finding.path.endsWith("/tasks.md")),
+    false,
+    "unsupported schema-less records must not invoke their legacy task contract",
+  );
+});
+
 async function completeV2Planning(changePath) {
   const changeFilePath = join(changePath, "change.md");
   const source = await readFile(changeFilePath, "utf8");
@@ -209,7 +137,7 @@ async function completeV2Planning(changePath) {
   await writeFile(
     changeFilePath,
     [
-      withRepository.replace("status: proposed", "status: proposed\nschema: sdd-change-v2").trimEnd(),
+      withRepository.trimEnd(),
       "",
       "## Current Context",
       "",
@@ -233,7 +161,7 @@ async function completeV2Planning(changePath) {
       "",
       "## Implementation Constraints",
       "",
-      "Preserve schema-less readers.",
+      "Keep one current v2 contract.",
       "",
       "## Verification Strategy",
       "",
@@ -241,7 +169,7 @@ async function completeV2Planning(changePath) {
       "",
       "## Risks / Trade-Offs",
       "",
-      "Dual readers have bounded maintenance cost.",
+      "Historical formats are unsupported.",
       "",
     ].join("\n"),
   );
@@ -271,9 +199,9 @@ async function completeV2Planning(changePath) {
       "- Outcome: Callers can use the v2 behavior.",
       "- Scenarios: `SAMPLE-E001/S1 R1-S1`",
       "- Dependencies: none",
-      "- Binding constraints: Preserve schema-less readers.",
+      "- Binding constraints: Keep one current v2 contract.",
       "- Expected triggers:",
-      "  - `contract-compatibility` — Exercise both schema paths.",
+      "  - `current-contract` — Exercise the v2 lifecycle.",
       "- Verification intent: Exercise the public lifecycle.",
       "- Manual acceptance: not required",
       "",
@@ -441,7 +369,7 @@ function v2Review({
     "",
     "| Trigger | Source | Reason | Check | Result | Gap | Evidence |",
     "|---|---|---|---|---|---|---|",
-    `| contract-compatibility | planned | Exercise both schema paths. | Validate both fixture families. | pass | none | ${evidence} |`,
+    `| current-contract | planned | Exercise the v2 lifecycle. | Validate the current lifecycle. | pass | none | ${evidence} |`,
     "",
     "### Scenario Coverage",
     "",
@@ -460,18 +388,18 @@ function v2Review({
   ].join("\n");
 }
 
-test("v2 planning transitions with compact tasks while creation remains schema-less", async (t) => {
+test("v2 creation and planning use compact current records", async (t) => {
   const root = await createWorkspace(t);
   const result = await createChange(root, "sample", "capture-intent", {
     date: "2026-08-10",
   });
   const changePath = getActiveChangePath(result.changeId, root);
 
-  assert.equal(frontmatter(await readFile(join(changePath, "change.md"), "utf8")).schema, undefined);
+  assert.equal(frontmatter(await readFile(join(changePath, "change.md"), "utf8")).schema, "sdd-change-v2");
   await completeV2Planning(changePath);
   const tasksPath = join(changePath, "tasks.md");
   const validTasks = await readFile(tasksPath, "utf8");
-  await writeFile(tasksPath, validTasks.replace("- Expected triggers:\n  - `contract-compatibility` — Exercise both schema paths.\n", ""));
+  await writeFile(tasksPath, validTasks.replace("- Expected triggers:\n  - `current-contract` — Exercise the v2 lifecycle.\n", ""));
   await assert.rejects(
     () => transitionChange(root, "sample", result.changeId, {
       from: "proposed",
@@ -627,11 +555,11 @@ test("planning completes the same Change before lifecycle work continues", async
   );
   await writeFile(changeFilePath, proposedSource);
 
-  await completePlanning(changePath);
+  await completeV2Planning(changePath);
   const malformedTasks = await readFile(join(changePath, "tasks.md"), "utf8");
   await writeFile(
     join(changePath, "tasks.md"),
-    malformedTasks.replace("- Verification intent: Exercise the public behavior.\n", ""),
+    malformedTasks.replace("- Verification intent: Exercise the public lifecycle.\n", ""),
   );
   await assert.rejects(
     () => transitionChange(root, "sample", result.changeId, {
@@ -640,7 +568,7 @@ test("planning completes the same Change before lifecycle work continues", async
     }),
     (error) => error instanceof SddError
       && error.code === "INCOMPLETE_CHANGE"
-      && error.details.some((detail) => detail.includes("INVALID_REQUIREMENT_SLICE")),
+      && error.details.some((detail) => detail.includes("INVALID_V2_OUTCOME")),
   );
   await writeFile(join(changePath, "tasks.md"), malformedTasks);
   assert.equal(await pathExists(join(changePath, "design.md")), false);
