@@ -1,0 +1,35 @@
+{
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "page": {
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "overflow": false
+  },
+  "title": "Story-Driven Development",
+  "doctype": "html",
+  "workflowHeading": "Implement one coherent outcome",
+  "artifactCopy": [
+    "<workspace>/.sdd/changes/\n  <date>-<change>/\n    change.md  # intent, plan, constraints, risks\n    tasks.md   # outcome queue and Resume checkpoint\n    review.md  # candidate, gates, findings, gaps, commit\n  closed/\n    <date>-<change>/",
+    "change.md",
+    "change.md",
+    "tasks.md",
+    "review.md",
+    "review.md"
+  ],
+  "activeNavigation": [
+    "Method",
+    "00Overview"
+  ],
+  "controls": {
+    "copyHeight": 44,
+    "githubHeight": 44
+  },
+  "colors": {
+    "body": "rgb(244, 244, 245)",
+    "background": "rgb(9, 9, 11)"
+  },
+  "reducedMotion": false
+}

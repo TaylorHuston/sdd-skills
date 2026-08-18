@@ -3,8 +3,8 @@ schema: sdd-epic-v2
 id: SDD-E001
 status: active
 created: 2026-07-20
-modified: 2026-08-17
-last_verified: 2026-08-16
+modified: 2026-08-18
+last_verified: 2026-08-18
 stories:
   - S1
   - S2
@@ -64,7 +64,7 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
 | S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-23 | Reports are versioned; PR/release paths are classified and rechecked; Git baselines are immutable and bounded. |
 | S6 | implemented | partial | Carry one progressive central Change through focused planning, risk-triggered Review, conditional Epic reconciliation, and a content-identical local outcome commit. | 2026-08-17 | The one supported current workflow is v2; the unrelated accepted aggregate NUL-path gap remains explicit. |
-| S7 | partial | partial | Explain the portable method and package through accessible responsive documentation. | 2026-08-17 | README, doctrine, and templates now explain one v2 workflow; S3 still owns public-guide copy, rendering, and owner acceptance. |
+| S7 | implemented | verified | Explain the portable method and package through accessible responsive documentation. | 2026-08-18 | Current guide and durable desktop/mobile evidence explain and prove the v2 workflow; owner product acceptance remains separately pending. |
 
 ## Stories
 
@@ -1011,11 +1011,11 @@ The CLI SHALL create new work with explicit `schema: sdd-change-v2`, SHALL use t
 
 ### Story S7: Accessible Public Methodology Reference
 
-Implementation: partial
-Verification: partial
+Implementation: implemented
+Verification: verified
 Created: 2026-07-23
-Modified: 2026-08-17
-Last verified: 2026-08-17
+Modified: 2026-08-18
+Last verified: 2026-08-18
 
 As a developer or coding agent, I want one readable public guide to explain the SDD problem, durable behavior model, general workflow, and package implementation, so that I can understand the method and find the correct entry point without reverse-engineering the repository.
 
@@ -1088,11 +1088,11 @@ The public package documentation SHALL distinguish one progressive workspace-lev
 | S7/R5-S1 | `README.md#Quick Start` | primary | Explains the current three-artifact outcome workflow, focused verification, independent Review, and selective local commit boundary. |
 | S7/R5-S1 | `docs/story-driven-development.md#Change Workflow` | primary | Defines one current v2 contract, five universal gates, behavior-derived triggers, unsupported history, and authority limits. |
 | S7/R5-S1 | `docs/templates/README.md#Canonical Template Examples` | support | Exposes only current Change, outcome queue, and central Review templates. |
-| S7/R5-S2 | `site/index.html#Planning, project truth, and Changes have distinct owners.` | primary | Presents the public methodology guide; its copy remains pending S3 revision. |
+| S7/R5-S2 | `site/index.html#Planning, project truth, and Changes have distinct owners.` | primary | Presents the three-artifact, five-gate, risk-triggered v2 workflow and its gap, acceptance, commit, and authority boundaries. |
 
 #### Implementation Gaps
 
-- `S7/R5-S2`: the public methodology guide still needs the S3 copy revision from the fixed-manifest and receipt-based default.
+- None.
 
 #### Verified By
 
@@ -1109,19 +1109,28 @@ The public package documentation SHALL distinguish one progressive workspace-lev
 | S7/R4-S1 | Historical deterministic rendered inspection of committed candidate `666de8f` with reduced-motion emulation and direct screenshot review | The prior candidate used `auto` scrolling, reduced transitions to `0.00001s`, retained active navigation, and kept the Steel composition readable. | Historical passing evidence 2026-07-23; not current-source proof |
 | S7/R5-S1 | Automated tests `test/workflow-contracts.test.js#public doctrine describes one supported current workflow`, `test/cli.test.js#packaged templates define compact v2 outcomes and one central Review`, and `test/package.test.js#package dry run includes the current workflow without legacy closure templates` | README, doctrine, templates, skills, and package inventory expose one v2 three-artifact workflow without current legacy closure assets. | Passing 2026-08-17 |
 | S7/R5-S1 | Prior current-source browser inspection at 1280px with full-page screenshot and WCAG 2 A/AA axe scan | The earlier rendered guide had no layout breakage and axe reported zero violations, but its lifecycle copy is now superseded. | Historical; superseded by current evidence |
+| S7/R2-S1 | Automated test `test/site.test.js#public guide has unique fragment targets and sequential navigable sections` | Current source has unique reachable navigation and skip targets. | Passing 2026-08-18 |
+| S7/R2-S1 | Rendered verification `docs/verification/s3-risk-triggered-guide.md#S3 Risk-Triggered Guide Verification` | Desktop and 320px renders retain reachable 44px mobile controls, contained long surfaces, and no page-level overflow. | Passing 2026-08-18 |
+| S7/R3-S1 | Automated test `test/site.test.js#public guide preserves clipboard fallback feedback and reduced-motion behavior` | Current source retains skip-link focus, selectable fallback, and announced feedback. | Passing 2026-08-18 |
+| S7/R3-S1 | Rendered verification `docs/verification/s3-risk-triggered-guide.md#S3 Risk-Triggered Guide Verification` | Deterministic browser interaction proves visible skip-link focus and announced full-command selection when clipboard access is unavailable. | Passing 2026-08-18 |
+| S7/R4-S1 | Automated test `test/site.test.js#public guide preserves clipboard fallback feedback and reduced-motion behavior` | Current source retains reduced-motion and focus treatment. | Passing 2026-08-18 |
+| S7/R4-S1 | Rendered verification `docs/verification/s3-risk-triggered-guide.md#S3 Risk-Triggered Guide Verification` | Current reduced-motion rendering uses auto scrolling and negligible transition duration while Steel navigation feedback remains functional and readable. | Passing 2026-08-18 |
+| S7/R5-S2 | Automated tests `test/site.test.js#public guide presents Change as coherent outcome planning`, `test/site.test.js#public guide presents Apply as one focused reviewed outcome`, and `test/site.test.js#public guide distinguishes deterministic v2 validation from independent judgment` | Current guide source explains the three artifacts, five gates, concrete triggers, bounded Review, gap and acceptance separation, conditional Epic timing, selective commit, and authority limits without current receipt closure. | Passing 2026-08-18 |
+| S7/R5-S2 | Rendered verification `docs/verification/s3-risk-triggered-guide.md#S3 Risk-Triggered Guide Verification` | The current v2 workflow copy remains readable and contained on desktop and minimum-width mobile renders. | Passing 2026-08-18 |
 | S7/R2-S1 | Historical rendered verification `docs/verification/s1-progressive-workflow.md#Rendered Guide Evidence` | The 2026-08-16 Steel candidate retained reachable responsive navigation and zero page overflow; this is a visual baseline, not current workflow-copy proof. | Historical passing evidence 2026-08-16; not current-source proof |
 | S7/R3-S1 | Historical rendered verification `docs/verification/s1-progressive-workflow.md#Rendered Guide Evidence` | The 2026-08-16 candidate retained a working skip link, 44px mobile controls, keyboard-reachable code regions, and selectable clipboard fallback. | Historical passing evidence 2026-08-16; not current-source proof |
 | S7/R4-S1 | Historical rendered verification `docs/verification/s1-progressive-workflow.md#Rendered Guide Evidence` | The 2026-08-16 candidate retained Steel colors, zero axe violations, reduced motion, and no page overflow at both primary viewports. | Historical passing evidence 2026-08-16; not current-source proof |
 
 #### Verification Gaps
 
-- `S7/R5-S2`: revised workflow copy needs fresh source-contract and rendered desktop/mobile verification after implementation.
+- None.
 
 #### Story Notes
 
 - README and changelog entries communicate S7; they do not own or prove the public-guide behavior.
 - Owner manual confirmation of the current guide remains `pending user` and is tracked separately from technical verification.
-- Historical responsive, accessibility, and Steel-presentation evidence is retained under `docs/verification/artifacts/s1/reseal-2026-08-16/`; its workflow copy is superseded and S3 owns fresh current-source rendering.
+- Current source-bound rendered evidence is retained under `docs/verification/artifacts/s3/2026-08-18/` and described by `docs/verification/s3-risk-triggered-guide.md`.
+- Historical responsive, accessibility, and Steel-presentation evidence remains under `docs/verification/artifacts/s1/reseal-2026-08-16/`; its workflow copy is superseded.
 
 ## Cross-Story Concerns
 

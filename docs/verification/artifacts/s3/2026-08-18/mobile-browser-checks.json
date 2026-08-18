@@ -1,0 +1,48 @@
+{
+  "viewport": {
+    "width": 320,
+    "height": 844
+  },
+  "page": {
+    "scrollWidth": 320,
+    "clientWidth": 320,
+    "overflow": false
+  },
+  "activeNavigation": [
+    "Implementation",
+    "06Reference implementation"
+  ],
+  "mobileNavigation": [
+    {
+      "text": "Method",
+      "height": 44,
+      "current": null
+    },
+    {
+      "text": "Implementation",
+      "height": 44,
+      "current": "location"
+    }
+  ],
+  "copyControl": {
+    "height": 44
+  },
+  "motion": {
+    "reduced": true,
+    "scrollBehavior": "auto",
+    "copyTransitionDuration": "1e-05s"
+  },
+  "changedSurface": {
+    "visible": true,
+    "rect": {
+      "x": 16,
+      "y": -8857.8125,
+      "width": 288,
+      "height": 340.640625,
+      "top": -8857.8125,
+      "right": 304,
+      "bottom": -8517.171875,
+      "left": 16
+    }
+  }
+}
