@@ -333,7 +333,6 @@ async function createOwnedSetupFile(
   source,
   ownedFiles,
   beforePublish = null,
-  beforeTemporaryCleanup = null,
 ) {
   const temporary = join(
     dirname(path),
@@ -417,12 +416,6 @@ async function createOwnedSetupFile(
           code: "CONCURRENT_CHANGE",
         });
       }
-      await beforeTemporaryCleanup?.({
-        label,
-        path,
-        temporary,
-        published,
-      });
       await removeBoundRegularFile(temporary, temporarySnapshot, {
         ownerRoot: workspaceRoot,
         label: `${label} temporary file`,
@@ -541,6 +534,25 @@ function appendCleanupFailure(failures, action, error) {
   }
 }
 
+function preservedSetupConfigError(error, configPath) {
+  const failure = new SddError(
+    "Workspace setup stopped after preserving its complete configuration.",
+    {
+      code: "MUTATION_RECOVERY_FAILED",
+      details: [
+        `Original error: ${error?.code ? `${error.code}: ` : ""}${error?.message ?? String(error)}`,
+        ...(error?.details ?? []).map((detail) => `Original detail: ${detail}`),
+        `Preserved workspace configuration: ${configPath}`,
+        "Inspect the preserved configuration, then retry the same setup command to complete managed installation.",
+      ],
+    },
+  );
+  failure.errors = [error];
+  failure.cause = error;
+  failure.retainedPaths = [configPath];
+  return failure;
+}
+
 async function rollbackSetupCreation(
   error,
   workspaceRoot,
@@ -656,7 +668,6 @@ async function setupInstallationUnlocked(
     dryRun = false,
     writeLock = null,
     beforeSetupFilePublish = null,
-    beforeSetupTemporaryCleanup = null,
     beforeSetupRollbackQuarantine = null,
     beforeSetupRollbackQuarantineRemoval = null,
     afterSetupDirectoryOwnershipCapture = null,
@@ -770,6 +781,7 @@ async function setupInstallationUnlocked(
   let skills;
   let managedInstallationStarted = false;
   let managedInstallationCommitted = false;
+  let createdWorkspaceConfig = false;
   let configDirectorySnapshot = (await lstatIfPresent(configDirectory)) === null
     ? null
     : await captureSetupDirectoryIdentity(
@@ -838,23 +850,19 @@ async function setupInstallationUnlocked(
         });
       }
       await writeWorkspaceConfig(workspaceRoot, config, {
-        writeFile: (path, source) => createOwnedSetupFile(
-          workspaceRoot,
-          path,
-          "Workspace configuration",
-          source,
-          ownedFiles,
-          beforeSetupFilePublish,
-          beforeSetupTemporaryCleanup,
-        ),
+        expected: null,
+        beforePublish: (context) => beforeSetupFilePublish?.({
+          label: "Workspace configuration",
+          path: configPath,
+          ...context,
+        }),
       });
-      const ownedConfig = ownedFiles.find((record) => record.path === configPath);
-      if (!ownedConfig) {
-        throw new SddError(`Workspace configuration ownership was not captured: ${configPath}`, {
-          code: "MUTATION_RECOVERY_FAILED",
-        });
-      }
-      workspaceConfigSnapshot = ownedConfig.snapshot;
+      workspaceConfigSnapshot = await readWorkspaceConfigSnapshot(workspaceRoot);
+      createdWorkspaceConfig = true;
+      const configDirectoryRecord = ownedDirectories.findIndex(
+        (record) => record.path === configDirectory,
+      );
+      if (configDirectoryRecord !== -1) ownedDirectories.splice(configDirectoryRecord, 1);
     }
     if (!ignoreExists) {
       if (await inspectFixedSetupFile(workspaceRoot, ignorePath, "Workspace SDD ignore file")) {
@@ -869,7 +877,6 @@ async function setupInstallationUnlocked(
         "cache/\n",
         ownedFiles,
         beforeSetupFilePublish,
-        beforeSetupTemporaryCleanup,
       );
     }
     await assertWorkspaceConfigSnapshotCurrent(workspaceRoot, workspaceConfigSnapshot);
@@ -903,7 +910,7 @@ async function setupInstallationUnlocked(
       ...(writeLock ? { writeLock } : {}),
     }));
   } catch (error) {
-    throw await rollbackSetupCreation(
+    const rolledBack = await rollbackSetupCreation(
       error,
       workspaceRoot,
       ownedFiles,
@@ -916,6 +923,9 @@ async function setupInstallationUnlocked(
         beforeSetupRollbackQuarantineRemoval,
       },
     );
+    throw createdWorkspaceConfig
+      ? preservedSetupConfigError(rolledBack, configPath)
+      : rolledBack;
   }
 
   return installationResult(workspaceRoot, config, {
@@ -928,7 +938,12 @@ async function setupInstallationUnlocked(
 
 export async function initRepository(
   targetPath,
-  { repositoryId, dryRun = false, workspaceRoot: explicitWorkspaceRoot } = {},
+  {
+    repositoryId,
+    dryRun = false,
+    workspaceRoot: explicitWorkspaceRoot,
+    beforeConfigPublish = null,
+  } = {},
 ) {
   const repositoryRoot = resolve(targetPath);
   const operation = await findOperationConfiguration(repositoryRoot, {
@@ -940,17 +955,14 @@ export async function initRepository(
     dryRun,
     workspaceRoot: operation.workspaceRoot,
     workspaceConfig: operation.config,
+    beforeConfigPublish,
   };
-  if (dryRun) return initRepositoryUnlocked(repositoryRoot, options);
-  return withWorkspaceMutationLock(
-    repositoryRoot,
-    () => initRepositoryUnlocked(repositoryRoot, options),
-  );
+  return initRepositoryUnlocked(repositoryRoot, options);
 }
 
 async function initRepositoryUnlocked(
   repositoryRoot,
-  { repositoryId, dryRun, workspaceRoot, workspaceConfig },
+  { repositoryId, dryRun, workspaceRoot, workspaceConfig, beforeConfigPublish },
 ) {
   const targetConfigPath = getRepositoryConfigPath(repositoryRoot);
   const targetConfigSnapshot = await readRepositoryConfigSnapshot(repositoryRoot);
@@ -968,7 +980,10 @@ async function initRepositoryUnlocked(
   );
   assertValidRepositoryConfig(repositoryConfig);
   if (!dryRun && !existingRepositoryConfig) {
-    await writeRepositoryConfig(repositoryRoot, repositoryConfig, { expected: null });
+    await writeRepositoryConfig(repositoryRoot, repositoryConfig, {
+      expected: null,
+      beforePublish: beforeConfigPublish,
+    });
   }
   return {
     command: "init",

@@ -1609,24 +1609,34 @@ test("repository init rejects concurrent first initialization without losing the
     repositoryRoots: ["repos"],
   });
 
-  let overlapProven = false;
-  await withWorkspaceMutationLock(repositoryRoot, async () => {
-    overlapProven = true;
-    await assert.rejects(
-      () => initRepository(repositoryRoot, {
-        repositoryId: "loser",
-        workspaceRoot,
-      }),
-      (error) => error.code === "OPERATION_IN_PROGRESS",
-    );
-    assert.equal(await pathExists(getRepositoryConfigPath(repositoryRoot)), false);
+  let releaseFirst;
+  let signalFirst;
+  const firstPaused = new Promise((resolve) => {
+    signalFirst = resolve;
   });
-  assert.equal(overlapProven, true);
+  const continueFirst = new Promise((resolve) => {
+    releaseFirst = resolve;
+  });
+  const first = initRepository(repositoryRoot, {
+    repositoryId: "loser",
+    workspaceRoot,
+    beforeConfigPublish: async () => {
+      signalFirst();
+      await continueFirst;
+    },
+  });
+  await firstPaused;
 
   const winner = await initRepository(repositoryRoot, {
     repositoryId: "winner",
     workspaceRoot,
   });
+  releaseFirst();
+  await assert.rejects(
+    first,
+    (error) => error.code === "CONCURRENT_CHANGE"
+      && error.details.some((detail) => detail.includes("retry")),
+  );
   const repositoryConfigPath = getRepositoryConfigPath(repositoryRoot);
   const expectedRepositoryRoot = join(root, "expected-repository");
   await mkdir(expectedRepositoryRoot, { recursive: true });
@@ -1641,7 +1651,10 @@ test("repository init rejects concurrent first initialization without losing the
   assert.equal(winner.repositoryConfig.id, "winner");
   assert.equal((await readRepositoryConfig(repositoryRoot)).id, "winner");
   assert.deepEqual(await readFile(repositoryConfigPath), expectedConfigBytes);
-  assert.equal(await pathExists(join(repositoryRoot, ".sdd", "mutation.lock")), false);
+  assert.deepEqual(
+    (await readdir(join(repositoryRoot, ".sdd"))).filter((name) => name.includes("sdd-config-")),
+    [],
+  );
 });
 
 test("interactive setup asks for planning and repository roots", async (t) => {

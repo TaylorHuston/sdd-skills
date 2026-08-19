@@ -14,6 +14,7 @@ import {
   WORKSPACE_SCHEMA_VERSION,
 } from "./constants.js";
 import { SddError } from "./errors.js";
+import { publishConfigFile } from "./config-publication.js";
 import {
   isDirectory,
   isPathInside,
@@ -21,7 +22,6 @@ import {
   pathExists,
   readBoundRegularFile,
   resolvePhysicalPath,
-  writeFileAtomically,
 } from "./fs.js";
 
 export const WORKSPACE_STATUSES = Object.freeze(["active", "inactive", "archived"]);
@@ -238,10 +238,10 @@ async function writeOwnerConfig(
   path,
   config,
   {
-    writeFile = writeFileAtomically,
     expected,
     beforePublish = null,
-    ...writeOptions
+    afterDisplace = null,
+    afterPublish = null,
   } = {},
 ) {
   const absoluteOwnerRoot = await requireConfigOwnerRoot(ownerRoot);
@@ -261,11 +261,11 @@ async function writeOwnerConfig(
     : expected === null
       ? { missing: true, ownerBinding: current.ownerBinding }
       : expected;
-  await writeFile(path, source, {
-    ...writeOptions,
+  await publishConfigFile(absoluteOwnerRoot, path, source, {
     expected: writeExpected,
     beforePublish,
-    ownerRoot: absoluteOwnerRoot,
+    afterDisplace,
+    afterPublish,
   });
   return source;
 }

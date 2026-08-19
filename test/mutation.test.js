@@ -22,7 +22,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-import { writeWorkspaceConfig } from "../src/config.js";
+import { readWorkspaceConfig, writeWorkspaceConfig } from "../src/config.js";
 import { setupInstallation } from "../src/commands/init-installation.js";
 import {
   hashDirectory,
@@ -1657,9 +1657,10 @@ test("symlink-bearing forced skill updates authenticate on commit and rollback",
   }
 });
 
-test("first-time setup removes its new config when managed installation fails", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-setup-rollback-"));
+test("first-time setup preserves its complete config and reports a safe retry", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-setup-preserved-config-"));
   t.after(() => rm(root, { recursive: true, force: true }));
+  const configPath = join(root, ".sdd", "config.yaml");
 
   await assert.rejects(
     () => setupInstallation(root, {
@@ -1668,12 +1669,22 @@ test("first-time setup removes its new config when managed installation fails", 
       skillsDirectory: "skills",
       writeLock: async () => { throw new Error("injected setup lock failure"); },
     }),
-    /injected setup lock failure/,
+    (error) => error.code === "MUTATION_RECOVERY_FAILED"
+      && error.details.some((detail) => detail.includes("injected setup lock failure"))
+      && error.details.includes(`Preserved workspace configuration: ${configPath}`)
+      && error.details.some((detail) => detail.includes("retry the same setup command")),
   );
 
-  assert.equal(await pathExists(join(root, ".sdd", "config.yaml")), false);
+  const preserved = await readWorkspaceConfig(root);
+  assert.equal(preserved.planning.root, "ideas");
+  assert.deepEqual(preserved.repositories.roots, { repos: "repos" });
   assert.equal(await pathExists(join(root, ".sdd", ".gitignore")), false);
   assert.equal(await pathExists(join(root, "skills", "sdd-apply")), false);
+
+  const retried = await setupInstallation(root);
+  assert.equal(retried.createdWorkspaceConfig, false);
+  assert.deepEqual(await readWorkspaceConfig(root), preserved);
+  assert.equal(await pathExists(join(root, "skills", "sdd-apply")), true);
 });
 
 test("workflow replacement preserves an edit made inside the replacement window", async (t) => {
@@ -2581,46 +2592,17 @@ test("first-time setup preserves dangling fixed files that appear during publica
             if (path === fixedPath) await symlink(externalTarget, fixedPath);
           },
         }),
-        (error) => error.code === "CONCURRENT_CHANGE",
+        (error) => [
+          "CONCURRENT_CHANGE",
+          "MUTATION_RECOVERY_FAILED",
+          "UNSAFE_CONFIG_PATH",
+        ].includes(error.code),
       );
 
       assert.equal(await pathExists(externalTarget), false);
       assert.equal((await lstat(fixedPath)).isSymbolicLink(), true);
     });
   }
-});
-
-test("setup rollback preserves a swapped authenticated quarantine", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-setup-quarantine-swap-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  let quarantine;
-  let displacedQuarantine;
-
-  await assert.rejects(
-    () => setupInstallation(root, {
-      planningRoot: "ideas",
-      repositoryRoots: ["repos"],
-      skillsDirectory: "skills",
-      writeLock: async () => {
-        throw new Error("injected setup rollback");
-      },
-      beforeSetupRollbackQuarantineRemoval: async ({
-        label,
-        quarantine: cleanupPath,
-      }) => {
-        if (label !== "Workspace configuration") return;
-        quarantine = cleanupPath;
-        displacedQuarantine = `${cleanupPath}.displaced`;
-        await rename(cleanupPath, displacedQuarantine);
-        await writeFile(cleanupPath, "opaque quarantine replacement\n");
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes(quarantine)),
-  );
-
-  assert.equal(await readFile(quarantine, "utf8"), "opaque quarantine replacement\n");
-  assert.match(await readFile(displacedQuarantine, "utf8"), /version:/);
 });
 
 test("setup directory rollback invokes removal hooks on its authenticated claim", async (t) => {
@@ -2715,46 +2697,8 @@ test("setup cleanup accepts the authenticated lock inode restored by managed rec
   );
 
   assert.equal(await readFile(lockPath, "utf8"), initialSource);
-  assert.equal(await pathExists(join(configDirectory, "config.yaml")), false);
+  assert.equal(await pathExists(join(configDirectory, "config.yaml")), true);
   assert.equal(await pathExists(join(configDirectory, ".gitignore")), false);
-});
-
-test("setup temporary cleanup preserves a same-path replacement", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-setup-temporary-swap-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  let temporary;
-  let displaced;
-
-  await assert.rejects(
-    () => setupInstallation(root, {
-      planningRoot: "ideas",
-      repositoryRoots: ["repos"],
-      skillsDirectory: "skills",
-      beforeSetupTemporaryCleanup: async ({
-        label,
-        temporary: cleanupPath,
-        published,
-      }) => {
-        if (label !== "Workspace configuration" || !published) return;
-        temporary = cleanupPath;
-        displaced = `${cleanupPath}.published`;
-        await rename(cleanupPath, displaced);
-        await mkdir(join(cleanupPath, "nested"), { recursive: true });
-        await writeFile(
-          join(cleanupPath, "nested", "opaque.txt"),
-          "opaque temporary replacement\n",
-        );
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes(temporary)),
-  );
-
-  assert.equal(
-    await readFile(join(temporary, "nested", "opaque.txt"), "utf8"),
-    "opaque temporary replacement\n",
-  );
-  assert.match(await readFile(displaced, "utf8"), /version:/);
 });
 
 test("first-time setup removes a new Change-store directory after ownership capture fails", async (t) => {
@@ -2847,30 +2791,6 @@ test("setup rejects a swapped SDD parent even when the Change-store inode is pre
   assert.equal(await pathExists(join(configDirectory, "config.yaml")), false);
 });
 
-test("first-time setup removes new durable state when installation fails", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-init-rollback-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await mkdir(join(root, "ideas"), { recursive: true });
-  await mkdir(join(root, "code"), { recursive: true });
-
-  await assert.rejects(
-    () => setupInstallation(root, {
-      planningRoot: "ideas",
-      repositoryRoots: ["code"],
-      skillsDirectory: ".agents/skills",
-      writeLock: async () => { throw new Error("injected init lock failure"); },
-    }),
-    /injected init lock failure/,
-  );
-
-  assert.equal(await pathExists(join(root, ".sdd", "config.yaml")), false);
-  assert.equal(await pathExists(join(root, ".sdd", ".gitignore")), false);
-  assert.equal(await pathExists(join(root, ".sdd", "story-driven-development.md")), false);
-  assert.equal(await pathExists(join(root, ".agents", "skills", "sdd-apply")), false);
-  assert.equal(await pathExists(join(root, ".sdd", "changes")), false);
-  assert.equal(await pathExists(join(root, ".sdd")), false);
-});
-
 test("failed first-time setup rolls back around a pre-existing installation lock", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "sdd-init-existing-lock-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -2886,11 +2806,13 @@ test("failed first-time setup rolls back around a pre-existing installation lock
       skillsDirectory: ".agents/skills",
       writeLock: async () => { throw new Error("injected init lock failure"); },
     }),
-    /injected init lock failure/,
+    (error) => error.code === "MUTATION_RECOVERY_FAILED"
+      && error.details.some((detail) => detail.includes("injected init lock failure"))
+      && error.details.some((detail) => detail.includes("retry the same setup command")),
   );
 
   assert.equal(await readFile(installLockPath, "utf8"), installLockSource);
-  assert.equal(await pathExists(join(root, ".sdd", "config.yaml")), false);
+  assert.equal(await pathExists(join(root, ".sdd", "config.yaml")), true);
   assert.equal(await pathExists(join(root, ".sdd", ".gitignore")), false);
   assert.equal(await pathExists(join(root, ".sdd", "changes")), false);
 });
@@ -2909,12 +2831,14 @@ test("failed first-time setup preserves pre-existing empty Change-store director
       skillsDirectory: ".agents/skills",
       writeLock: async () => { throw new Error("injected init lock failure"); },
     }),
-    /injected init lock failure/,
+    (error) => error.code === "MUTATION_RECOVERY_FAILED"
+      && error.details.some((detail) => detail.includes("injected init lock failure"))
+      && error.details.some((detail) => detail.includes("retry the same setup command")),
   );
 
   assert.equal((await lstat(changesRoot)).isDirectory(), true);
   assert.equal((await lstat(closedChangesRoot)).isDirectory(), true);
-  assert.equal(await pathExists(join(root, ".sdd", "config.yaml")), false);
+  assert.equal(await pathExists(join(root, ".sdd", "config.yaml")), true);
   assert.equal(await pathExists(join(root, ".sdd", ".gitignore")), false);
 });
 
@@ -2932,7 +2856,9 @@ test("failed first-time setup removes only the Change-store directory it created
       skillsDirectory: ".agents/skills",
       writeLock: async () => { throw new Error("injected init lock failure"); },
     }),
-    /injected init lock failure/,
+    (error) => error.code === "MUTATION_RECOVERY_FAILED"
+      && error.details.some((detail) => detail.includes("injected init lock failure"))
+      && error.details.some((detail) => detail.includes("retry the same setup command")),
   );
 
   assert.equal((await lstat(changesRoot)).isDirectory(), true);

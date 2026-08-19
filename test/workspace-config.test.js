@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { chmod, lstat, mkdir, mkdtemp, open, readFile, readdir, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
+import { parse } from "yaml";
 
 import {
   assertValidConfig,
@@ -777,6 +778,34 @@ test("workspace config rechecks retain their original owner-local ancestor chain
   assert.equal(String(currentConfig.ino), String(originalConfig.ino));
 });
 
+test("config publication rejects an owner-local ancestor replacement", async (t) => {
+  const root = await temporaryRoot(t, "sdd-config-publication-ancestor-swap-");
+  const workspaceRoot = join(root, "workspace");
+  const configDirectory = getWorkspaceConfigDirectory(workspaceRoot);
+  const displacedDirectory = join(workspaceRoot, ".sdd-displaced");
+  await mkdir(workspaceRoot);
+  const original = workspaceConfig();
+  const requested = workspaceConfig();
+  requested.planning.root = "requested-planning";
+  await writeWorkspaceConfig(workspaceRoot, original);
+  const configPath = getWorkspaceConfigPath(workspaceRoot);
+  const snapshot = await readWorkspaceConfigSnapshot(workspaceRoot);
+
+  await assert.rejects(
+    writeWorkspaceConfig(workspaceRoot, requested, {
+      expected: snapshot,
+      beforePublish: async () => {
+        await rename(configDirectory, displacedDirectory);
+        await mkdir(configDirectory);
+        await rename(join(displacedDirectory, "config.yaml"), configPath);
+      },
+    }),
+    (error) => error?.code === "CONCURRENT_CHANGE",
+  );
+
+  assert.equal(await readFile(configPath, "utf8"), snapshot.source);
+});
+
 test("expected-absent config publication preserves a file that appears before publish", async (t) => {
   const root = await temporaryRoot(t, "sdd-config-authority-create-race-");
   const workspaceRoot = join(root, "workspace");
@@ -801,7 +830,8 @@ test("expected-absent config publication preserves a file that appears before pu
         await writeFile(getWorkspaceConfigPath(workspaceRoot), winnerSource, "utf8");
       },
     }),
-    (error) => error?.code === "CONCURRENT_CHANGE",
+    (error) => error?.code === "CONCURRENT_CHANGE"
+      && error.details.some((detail) => detail.includes("retry")),
   );
   assert.equal(injected, true);
   assert.deepEqual(await readWorkspaceConfig(workspaceRoot), winnerConfig);
@@ -829,7 +859,8 @@ test("expected-absent repository config publication preserves a file that appear
         "utf8",
       ),
     }),
-    (error) => error?.code === "CONCURRENT_CHANGE",
+    (error) => error?.code === "CONCURRENT_CHANGE"
+      && error.details.some((detail) => detail.includes("retry")),
   );
   assert.deepEqual(await readRepositoryConfig(repositoryRoot), winnerConfig);
 });
@@ -852,7 +883,8 @@ test("expected config publication preserves a concurrent mode change", async (t)
       expected: snapshot,
       beforePublish: () => chmod(configPath, winnerMode),
     }),
-    (error) => error?.code === "CONCURRENT_CHANGE",
+    (error) => error?.code === "CONCURRENT_CHANGE"
+      && error.details.some((detail) => detail.includes("retry")),
   );
   assert.equal(await readFile(configPath, "utf8"), snapshot.source);
   assert.equal(
@@ -893,7 +925,7 @@ test("atomic config write rejects a config-directory replacement before publicat
         );
       },
     }),
-    (error) => ["CONCURRENT_CHANGE", "MUTATION_RECOVERY_FAILED"].includes(error?.code),
+    (error) => ["CONCURRENT_CHANGE", "MUTATION_RECOVERY_FAILED", "UNSAFE_CONFIG_PATH"].includes(error?.code),
   );
 
   assert.equal(await readFile(externalConfigPath, "utf8"), winnerSource);
@@ -903,208 +935,72 @@ test("atomic config write rejects a config-directory replacement before publicat
   );
 });
 
-test("atomic config write reports close failures and identity-cleans its temporary", async (t) => {
-  const root = await temporaryRoot(t, "sdd-config-close-failure-");
-  const workspaceRoot = join(root, "workspace");
-  await mkdir(workspaceRoot, { recursive: true });
+test("configuration replacement preserves winners after displacement and publication", async (t) => {
+  for (const phase of ["after-displace", "after-publish"]) {
+    await t.test(phase, async (t) => {
+      const root = await temporaryRoot(t, `sdd-config-${phase}-winner-`);
+      const workspaceRoot = join(root, "workspace");
+      const winnerRoot = join(root, "winner");
+      await Promise.all([
+        mkdir(workspaceRoot, { recursive: true }),
+        mkdir(winnerRoot, { recursive: true }),
+      ]);
+      const original = workspaceConfig();
+      const requested = workspaceConfig();
+      requested.planning.root = "requested-planning";
+      const winner = workspaceConfig();
+      winner.planning.root = "winner-planning";
+      await writeWorkspaceConfig(workspaceRoot, original);
+      await writeWorkspaceConfig(winnerRoot, winner);
+      const snapshot = await readWorkspaceConfigSnapshot(workspaceRoot);
+      const winnerSource = await readFile(getWorkspaceConfigPath(winnerRoot), "utf8");
+      const requestedPath = `${getWorkspaceConfigPath(workspaceRoot)}.requested`;
+      let failure;
 
-  const openWithCloseFailure = async (...args) => {
-    const handle = await open(...args);
-    let failed = false;
-    return {
-      stat: (...statArgs) => handle.stat(...statArgs),
-      writeFile: (...writeArgs) => handle.writeFile(...writeArgs),
-      sync: (...syncArgs) => handle.sync(...syncArgs),
-      close: async () => {
-        if (!failed) {
-          failed = true;
-          throw new Error("injected temporary close failure");
-        }
-        return handle.close();
-      },
-    };
-  };
+      await assert.rejects(
+        writeWorkspaceConfig(workspaceRoot, requested, {
+          expected: snapshot,
+          ...(phase === "after-displace"
+            ? { afterDisplace: ({ target }) => writeFile(target, winnerSource, "utf8") }
+            : {
+                afterPublish: async ({ target }) => {
+                  await rename(target, requestedPath);
+                  await writeFile(target, winnerSource, "utf8");
+                },
+              }),
+        }),
+        (error) => {
+          failure = error;
+          return error?.code === "MUTATION_RECOVERY_FAILED"
+            && error.details.some((detail) => detail.includes("retry"))
+            && error.retainedPaths.length > 0;
+        },
+      );
 
-  await assert.rejects(
-    writeWorkspaceConfig(workspaceRoot, workspaceConfig(), {
-      expected: null,
-      openFile: openWithCloseFailure,
-    }),
-    (error) => error?.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes("temporary close failure")),
-  );
-  assert.equal(await pathExists(getWorkspaceConfigPath(workspaceRoot)), false);
-  assert.deepEqual(await readdir(join(workspaceRoot, ".sdd")), []);
+      assert.deepEqual(await readWorkspaceConfig(workspaceRoot), winner);
+      assert.deepEqual(parse(await readFile(failure.retainedPaths[0], "utf8")), original);
+      if (phase === "after-publish") {
+        assert.deepEqual(parse(await readFile(requestedPath, "utf8")), requested);
+      }
+    });
+  }
 });
 
-test("atomic config write retains its owned temporary when cleanup fails", async (t) => {
-  const root = await temporaryRoot(t, "sdd-config-cleanup-failure-");
+test("configuration publication writes complete YAML and preserves file mode", async (t) => {
+  const root = await temporaryRoot(t, "sdd-config-complete-mode-");
   const workspaceRoot = join(root, "workspace");
-  const config = workspaceConfig();
   await mkdir(workspaceRoot, { recursive: true });
-  let temporary;
-
-  await assert.rejects(
-    writeWorkspaceConfig(workspaceRoot, config, {
-      expected: null,
-      afterPublish: (publication) => {
-        temporary = publication.temporary;
-      },
-      cleanupRename: async () => {
-        throw new Error("injected temporary cleanup failure");
-      },
-    }),
-    (error) => error?.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.includes(`Retained path: ${temporary}`),
-  );
-  assert.deepEqual(await readWorkspaceConfig(workspaceRoot), config);
-  assert.equal(await readFile(temporary, "utf8"), await readFile(
-    getWorkspaceConfigPath(workspaceRoot),
-    "utf8",
-  ));
-});
-
-test("atomic config write preserves an opaque temporary replacement after publication", async (t) => {
-  const root = await temporaryRoot(t, "sdd-config-temporary-swap-");
-  const workspaceRoot = join(root, "workspace");
-  const config = workspaceConfig();
-  await mkdir(workspaceRoot, { recursive: true });
-  let temporary;
-
-  await assert.rejects(
-    writeWorkspaceConfig(workspaceRoot, config, {
-      expected: null,
-      afterPublish: async (publication) => {
-        temporary = publication.temporary;
-        await rename(temporary, `${temporary}.owned`);
-        await writeFile(temporary, "opaque replacement\n", "utf8");
-      },
-    }),
-    (error) => error?.code === "MUTATION_RECOVERY_FAILED",
-  );
-  assert.deepEqual(await readWorkspaceConfig(workspaceRoot), config);
-  assert.equal(await readFile(temporary, "utf8"), "opaque replacement\n");
-});
-
-test("config replacement never overwrites an opaque backup-path collision", async (t) => {
-  const root = await temporaryRoot(t, "sdd-config-backup-collision-");
-  const workspaceRoot = join(root, "workspace");
   const original = workspaceConfig();
-  const requested = workspaceConfig();
-  requested.planning.root = "requested-planning";
-  await mkdir(workspaceRoot, { recursive: true });
   await writeWorkspaceConfig(workspaceRoot, original);
+  const configPath = getWorkspaceConfigPath(workspaceRoot);
+  await chmod(configPath, 0o640);
   const snapshot = await readWorkspaceConfigSnapshot(workspaceRoot);
-  let collidedBackup;
+  const updated = structuredClone(original);
+  updated.planning.root = "updated-planning";
 
-  await assert.rejects(
-    writeWorkspaceConfig(workspaceRoot, requested, {
-      expected: snapshot,
-      beforePublish: async ({ backup }) => {
-        collidedBackup = backup;
-        await writeFile(backup, "opaque backup winner\n", "utf8");
-      },
-    }),
-    (error) => error?.code === "CONCURRENT_CHANGE"
-      && error.details.includes(`Retained path: ${collidedBackup}`),
-  );
-  assert.deepEqual(await readWorkspaceConfig(workspaceRoot), original);
-  assert.equal(await readFile(collidedBackup, "utf8"), "opaque backup winner\n");
-});
+  await writeWorkspaceConfig(workspaceRoot, updated, { expected: snapshot });
 
-test("config replacement retains the authenticated backup when a winner appears before link", async (t) => {
-  const root = await temporaryRoot(t, "sdd-config-restore-race-");
-  const workspaceRoot = join(root, "workspace");
-  const winnerRoot = join(root, "winner");
-  const original = workspaceConfig();
-  const requested = workspaceConfig();
-  requested.planning.root = "requested-planning";
-  const winner = workspaceConfig();
-  winner.planning.root = "winner-planning";
-  await Promise.all([
-    mkdir(workspaceRoot, { recursive: true }),
-    mkdir(winnerRoot, { recursive: true }),
-  ]);
-  await writeWorkspaceConfig(workspaceRoot, original);
-  await writeWorkspaceConfig(winnerRoot, winner);
-  const snapshot = await readWorkspaceConfigSnapshot(workspaceRoot);
-  const winnerSource = await readFile(getWorkspaceConfigPath(winnerRoot), "utf8");
-  let retainedBackup;
-
-  await assert.rejects(
-    writeWorkspaceConfig(workspaceRoot, requested, {
-      expected: snapshot,
-      afterBackup: async ({ target, backup }) => {
-        retainedBackup = backup;
-        await writeFile(target, winnerSource, "utf8");
-      },
-    }),
-    (error) => error?.code === "CONCURRENT_CHANGE"
-      && error.details.includes(`Retained original: ${retainedBackup}`),
-  );
-  assert.deepEqual(await readWorkspaceConfig(workspaceRoot), winner);
-  assert.equal(await readFile(retainedBackup, "utf8"), snapshot.source);
-});
-
-test("config replacement verifies its linked target before deleting the original backup", async (t) => {
-  const root = await temporaryRoot(t, "sdd-config-post-link-race-");
-  const workspaceRoot = join(root, "workspace");
-  const winnerRoot = join(root, "winner");
-  const original = workspaceConfig();
-  const requested = workspaceConfig();
-  requested.planning.root = "requested-planning";
-  const winner = workspaceConfig();
-  winner.planning.root = "winner-planning";
-  await Promise.all([
-    mkdir(workspaceRoot, { recursive: true }),
-    mkdir(winnerRoot, { recursive: true }),
-  ]);
-  await writeWorkspaceConfig(workspaceRoot, original);
-  await writeWorkspaceConfig(winnerRoot, winner);
-  const snapshot = await readWorkspaceConfigSnapshot(workspaceRoot);
-  const winnerSource = await readFile(getWorkspaceConfigPath(winnerRoot), "utf8");
-  let retainedBackup;
-
-  await assert.rejects(
-    writeWorkspaceConfig(workspaceRoot, requested, {
-      expected: snapshot,
-      afterPublish: async ({ target, backup }) => {
-        retainedBackup = backup;
-        await rename(target, `${target}.requested`);
-        await writeFile(target, winnerSource, "utf8");
-      },
-    }),
-    (error) => error?.code === "CONCURRENT_CHANGE"
-      && error.details.includes(`Retained original: ${retainedBackup}`),
-  );
-  assert.deepEqual(await readWorkspaceConfig(workspaceRoot), winner);
-  assert.equal(await readFile(retainedBackup, "utf8"), snapshot.source);
-});
-
-test("expected-absent config publication verifies the linked target before success", async (t) => {
-  const root = await temporaryRoot(t, "sdd-config-create-post-link-race-");
-  const workspaceRoot = join(root, "workspace");
-  const winnerRoot = join(root, "winner");
-  const requested = workspaceConfig();
-  requested.planning.root = "requested-planning";
-  const winner = workspaceConfig();
-  winner.planning.root = "winner-planning";
-  await Promise.all([
-    mkdir(workspaceRoot, { recursive: true }),
-    mkdir(winnerRoot, { recursive: true }),
-  ]);
-  await writeWorkspaceConfig(winnerRoot, winner);
-  const winnerSource = await readFile(getWorkspaceConfigPath(winnerRoot), "utf8");
-
-  await assert.rejects(
-    writeWorkspaceConfig(workspaceRoot, requested, {
-      expected: null,
-      afterPublish: async ({ target }) => {
-        await rename(target, `${target}.requested`);
-        await writeFile(target, winnerSource, "utf8");
-      },
-    }),
-    (error) => error?.code === "CONCURRENT_CHANGE",
-  );
-  assert.deepEqual(await readWorkspaceConfig(workspaceRoot), winner);
+  assert.deepEqual(await readWorkspaceConfig(workspaceRoot), updated);
+  assert.equal(Number((await lstat(configPath, { bigint: true })).mode & 0o777n), 0o640);
+  assert.equal((await readFile(configPath, "utf8")).endsWith("\n"), true);
 });
