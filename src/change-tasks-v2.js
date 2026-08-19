@@ -342,8 +342,44 @@ export function parseV2ChangeTasks(source, { changeId = null, repositoryIds = []
     issues.push(issue("INVALID_V2_RESUME", `Resume Here Change must match ${changeId}.`));
   }
   const currentOutcome = parseInlineCode(resumeValues.get("Current outcome") ?? "");
-  if (currentOutcome !== "none" && !seenOutcomeIds.has(currentOutcome)) {
+  const outcomesById = new Map(outcomes.map((outcome) => [outcome.id, outcome]));
+  const unfinishedOutcomes = outcomes.filter((outcome) => !["done", "deferred"].includes(outcome.status));
+  const inProgressOutcomes = outcomes.filter((outcome) => outcome.status === "in progress");
+  if (currentOutcome === "none") {
+    if (unfinishedOutcomes.length > 0) {
+      issues.push(issue(
+        "INVALID_V2_RESUME",
+        `Resume Here Current outcome must name unfinished work while ${unfinishedOutcomes.map((outcome) => outcome.id).join(", ")} remain actionable or blocked.`,
+      ));
+    }
+  } else if (!seenOutcomeIds.has(currentOutcome)) {
     issues.push(issue("INVALID_V2_RESUME", `Resume Here Current outcome ${JSON.stringify(currentOutcome)} is not known.`));
+  } else {
+    const selected = outcomesById.get(currentOutcome);
+    if (["done", "deferred"].includes(selected.status)) {
+      issues.push(issue(
+        "INVALID_V2_RESUME",
+        `Resume Here Current outcome ${currentOutcome} has terminal status ${JSON.stringify(selected.status)}; advance to unfinished work or use \`none\` when every outcome is done or deferred.`,
+        { outcomeId: currentOutcome },
+      ));
+    }
+    if (inProgressOutcomes.length > 0 && selected.status !== "in progress") {
+      issues.push(issue(
+        "INVALID_V2_RESUME",
+        `Resume Here Current outcome ${currentOutcome} must identify an in-progress outcome while ${inProgressOutcomes.map((outcome) => outcome.id).join(", ")} are in progress.`,
+        { outcomeId: currentOutcome },
+      ));
+    }
+    if (selected.status === "ready") {
+      const unsatisfied = selected.dependencies.filter((dependency) => outcomesById.get(dependency)?.status !== "done");
+      if (unsatisfied.length > 0) {
+        issues.push(issue(
+          "INVALID_V2_RESUME",
+          `Resume Here Current outcome ${currentOutcome} is not dependency-ready; unfinished dependencies: ${unsatisfied.join(", ")}.`,
+          { outcomeId: currentOutcome },
+        ));
+      }
+    }
   }
 
   return {

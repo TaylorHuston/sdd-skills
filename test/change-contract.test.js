@@ -409,6 +409,18 @@ test("v2 creation and planning use compact current records", async (t) => {
       && error.code === "INCOMPLETE_CHANGE"
       && error.details.some((detail) => detail.includes("INVALID_V2_OUTCOME")),
   );
+  await writeFile(tasksPath, validTasks.replace("- Status: ready", "- Status: done"));
+  const staleResumeValidation = await validateArtifacts(root, { changeId: result.changeId });
+  assert.ok(staleResumeValidation.findings.some((finding) => finding.code === "INVALID_V2_RESUME"));
+  await assert.rejects(
+    () => transitionChange(root, "sample", result.changeId, {
+      from: "proposed",
+      to: "planned",
+    }),
+    (error) => error instanceof SddError
+      && error.code === "INCOMPLETE_CHANGE"
+      && error.details.some((detail) => detail.includes("INVALID_V2_RESUME")),
+  );
   await writeFile(tasksPath, validTasks);
   await transitionChange(root, "sample", result.changeId, {
     from: "proposed",
@@ -499,7 +511,12 @@ test("done v2 outcomes require a reachable content-identical review seal", async
   const { stdout: treeOutput } = await execFileAsync("git", ["-C", repository, "rev-parse", "HEAD^{tree}"]);
   const commit = commitOutput.trim();
   const tree = treeOutput.trim();
-  await writeFile(tasksPath, (await readFile(tasksPath, "utf8")).replace("- Status: ready", "- Status: done"));
+  await writeFile(
+    tasksPath,
+    (await readFile(tasksPath, "utf8"))
+      .replace("- Status: ready", "- Status: done")
+      .replace("- Current outcome: S1", "- Current outcome: none"),
+  );
   await writeFile(join(changePath, "review.md"), v2Review({
     candidate: commit,
     reviewedTree: tree,
