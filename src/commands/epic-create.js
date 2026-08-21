@@ -1,4 +1,10 @@
-import { lstat, readFile } from "node:fs/promises";
+import {
+  lstat,
+  mkdir,
+  open,
+  readFile,
+  readdir,
+} from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
 import {
@@ -15,12 +21,6 @@ import {
   assertSelectedRepositorySnapshotsCurrent,
   selectRepositoryTargetsForCreate,
 } from "../change-repositories.js";
-import {
-  assertPublishedFlatDirectory,
-  publishFlatDirectoryWithoutReplace,
-  recoverFlatDirectoryPublication,
-  stageFlatDirectory,
-} from "../directory-publication.js";
 import { PACKAGE_ROOT } from "../constants.js";
 import { SddError } from "../errors.js";
 import { isPathInside, pathExists, resolvePhysicalPath } from "../fs.js";
@@ -124,30 +124,155 @@ async function epicEntryPresent(anchor, path) {
   }
 }
 
-function cleanupFailure(primaryError, cleanupError, epicDirectory) {
-  const failure = new SddError("Epic creation failed and owned-directory cleanup was incomplete.", {
-    code: "MUTATION_RECOVERY_FAILED",
+function concurrentEpicTarget(epicDirectory, error = null) {
+  return new SddError(`Epic destination changed before exclusive creation: ${epicDirectory}`, {
+    code: "CONCURRENT_CHANGE",
     details: [
-      `Original error: ${primaryError?.code ? `${primaryError.code}: ` : ""}${primaryError.message}`,
-      `Cleanup error: ${cleanupError.message}`,
-      `Retained path requiring inspection: ${epicDirectory}`,
+      "The existing destination was preserved.",
+      "Inspect the destination; preserve newer work or remove the collision manually, then retry.",
+      ...(error?.message ? [`Filesystem error: ${error.message}`] : []),
     ],
   });
-  failure.errors = [primaryError, cleanupError];
-  failure.cause = new AggregateError(failure.errors, failure.message);
+}
+
+function retainedEpicStateFailure(primaryError, retainedPath, extraErrors = []) {
+  const details = [
+    `Original error: ${primaryError?.code ? `${primaryError.code}: ` : ""}${primaryError.message}`,
+    `Retained path requiring inspection: ${retainedPath}`,
+    "Inspect the retained Epic state; preserve newer work or remove the residue manually, then retry.",
+  ];
+  const failure = new SddError("Epic creation stopped with preserved state.", {
+    code: "MUTATION_RECOVERY_FAILED",
+    details,
+  });
+  failure.retainedPaths = [retainedPath];
+  failure.errors = [primaryError, ...extraErrors];
+  failure.cause = failure.errors.length === 1
+    ? primaryError
+    : new AggregateError(failure.errors, failure.message);
   return failure;
 }
 
-function preservedPublicationError(primaryError, cleanup) {
-  const failure = new SddError("Epic creation detected a concurrent destination replacement and preserved it.", {
-    code: "CONCURRENT_CHANGE",
-    details: [
-      `Original error: ${primaryError?.code ? `${primaryError.code}: ` : ""}${primaryError.message}`,
-      ...cleanup.details,
-    ],
-  });
-  failure.cause = primaryError;
-  return failure;
+async function syncDirectoryBestEffort(path) {
+  let handle;
+  try {
+    handle = await open(path, "r");
+    await handle.sync();
+  } catch (error) {
+    if (!["EINVAL", "ENOTSUP", "EBADF", "EISDIR"].includes(error?.code)) throw error;
+  } finally {
+    await handle?.close();
+  }
+}
+
+async function assertEpicScaffoldCurrent(anchor, proof) {
+  await assertEpicPathAnchor(anchor, proof.directory);
+  const directoryState = await lstat(proof.directory, { bigint: true });
+  if (!directoryState.isDirectory()
+    || directoryState.isSymbolicLink()
+    || !samePhysicalIdentity(physicalIdentity(directoryState), proof.directoryIdentity)) {
+    throw concurrentEpicTarget(proof.directory);
+  }
+  const entries = await readdir(proof.directory);
+  if (entries.length !== 1 || entries[0] !== "epic.md") {
+    throw concurrentEpicTarget(proof.directory);
+  }
+  const fileState = await lstat(proof.path, { bigint: true });
+  if (!fileState.isFile()
+    || fileState.isSymbolicLink()
+    || !samePhysicalIdentity(physicalIdentity(fileState), proof.fileIdentity)
+    || await readFile(proof.path, "utf8") !== proof.source) {
+    throw concurrentEpicTarget(proof.directory);
+  }
+  const finalDirectoryState = await lstat(proof.directory, { bigint: true });
+  const finalFileState = await lstat(proof.path, { bigint: true });
+  if (!samePhysicalIdentity(physicalIdentity(finalDirectoryState), proof.directoryIdentity)
+    || !samePhysicalIdentity(physicalIdentity(finalFileState), proof.fileIdentity)) {
+    throw concurrentEpicTarget(proof.directory);
+  }
+  await assertEpicPathAnchor(anchor, proof.directory);
+}
+
+async function publishEpicScaffold(
+  anchor,
+  epicDirectory,
+  source,
+  {
+    beforeParentCreate = null,
+    beforePublish = null,
+    afterDirectoryCreate = null,
+  } = {},
+) {
+  const parent = dirname(epicDirectory);
+  await beforeParentCreate?.({ parentPath: parent, targetPath: epicDirectory });
+  await assertEpicPathAnchor(anchor, parent);
+  const parentExisted = await pathExists(parent);
+  try {
+    await mkdir(parent, { recursive: true });
+    await assertEpicPathAnchor(anchor, parent);
+    await beforePublish?.({ targetPath: epicDirectory });
+    await assertEpicPathAnchor(anchor, parent);
+  } catch (error) {
+    if (!parentExisted) {
+      throw retainedEpicStateFailure(error, parent);
+    }
+    throw error;
+  }
+
+  try {
+    await mkdir(epicDirectory);
+  } catch (error) {
+    if (["EEXIST", "EISDIR", "ENOTDIR", "ELOOP"].includes(error?.code)) {
+      throw concurrentEpicTarget(epicDirectory, error);
+    }
+    throw error;
+  }
+
+  const path = join(epicDirectory, "epic.md");
+  let handle = null;
+  try {
+    const directoryState = await lstat(epicDirectory, { bigint: true });
+    if (!directoryState.isDirectory() || directoryState.isSymbolicLink()) {
+      throw concurrentEpicTarget(epicDirectory);
+    }
+    const directoryIdentity = physicalIdentity(directoryState);
+    await afterDirectoryCreate?.({ targetPath: epicDirectory, directoryIdentity });
+    await assertEpicPathAnchor(anchor, epicDirectory);
+    const preparedDirectoryState = await lstat(epicDirectory, { bigint: true });
+    if (!preparedDirectoryState.isDirectory()
+      || preparedDirectoryState.isSymbolicLink()
+      || !samePhysicalIdentity(physicalIdentity(preparedDirectoryState), directoryIdentity)
+      || (await readdir(epicDirectory)).length !== 0) {
+      throw concurrentEpicTarget(epicDirectory);
+    }
+    handle = await open(path, "wx");
+    await handle.writeFile(source, "utf8");
+    await handle.sync();
+    const fileState = await handle.stat({ bigint: true });
+    await handle.close();
+    handle = null;
+    await syncDirectoryBestEffort(epicDirectory);
+    await syncDirectoryBestEffort(parent);
+    const proof = {
+      directory: epicDirectory,
+      directoryIdentity,
+      path,
+      fileIdentity: physicalIdentity(fileState),
+      source,
+    };
+    await assertEpicScaffoldCurrent(anchor, proof);
+    return proof;
+  } catch (error) {
+    const closeErrors = [];
+    if (handle) {
+      try {
+        await handle.close();
+      } catch (closeError) {
+        closeErrors.push(closeError);
+      }
+    }
+    throw retainedEpicStateFailure(error, epicDirectory, closeErrors);
+  }
 }
 
 export async function createEpic(
@@ -160,28 +285,10 @@ export async function createEpic(
     repositories = [],
     dryRun = false,
     workspaceRoot: requestedWorkspaceRoot = null,
+    beforeParentCreate = null,
     beforePublish = null,
-    beforeHandoff = null,
-    afterStageRootMkdir = null,
-    afterPublicationJournalMkdir = null,
-    afterPublicationLiveOwner = null,
-    afterStageRootReservation = null,
-    afterStagedPayload = null,
-    afterStagedProgress = null,
-    afterStagedEntry = null,
-    afterStagingComplete = null,
-    afterPublicationPrepared = null,
-    afterReservationMkdir = null,
-    afterReservationReceiptWrite = null,
-    afterReservationReceipt = null,
-    afterReservation = null,
-    afterEntryPublication = null,
-    afterTemporaryVerification = null,
-    afterSourceCleanup = null,
-    afterHandoffCleanup = null,
-    afterJournalCleanup = null,
-    afterOwnerMarkerCleanup = null,
-    beforeValidationRollback = null,
+    afterDirectoryCreate = null,
+    afterValidationFailure = null,
     validate = validateArtifacts,
   } = {},
 ) {
@@ -243,15 +350,9 @@ export async function createEpic(
   const repositoryAnchor = await captureRepositoryAnchor(repositoryRoot);
 
   const directory = `${epicId.toLowerCase()}-${slug}`;
-  const epicDirectory = join(
-    repositoryRoot,
-    artifacts.epics,
-    directory,
-  );
+  const epicDirectory = join(repositoryRoot, artifacts.epics, directory);
   await assertEpicPathAnchor(repositoryAnchor, epicDirectory);
   const epicPath = join(epicDirectory, "epic.md");
-  const parent = dirname(epicDirectory);
-  const assertPublicationPath = (path) => assertEpicPathAnchor(repositoryAnchor, path);
   const result = {
     command: "epic-create",
     workspaceRoot,
@@ -263,97 +364,7 @@ export async function createEpic(
     path: relativeWorkspacePath(workspaceRoot, epicPath),
     validation: null,
   };
-  let renderedEntries = null;
-  if (!dryRun) {
-    const template = await readFile(EPIC_TEMPLATE_PATH, "utf8");
-    renderedEntries = [[
-      "epic.md",
-      renderEpicTemplate(template, {
-        epicId,
-        title: result.title,
-        date: selectedDate,
-      }),
-    ]];
-    await assertOperationConfigurationCurrent(operation);
-    await assertSelectedRepositorySnapshotsCurrent(
-      workspaceRoot,
-      config,
-      space,
-      selected,
-    );
-    const recovery = await recoverFlatDirectoryPublication(epicDirectory, renderedEntries, {
-      label: `Epic ${epicId}`,
-      assertPath: assertPublicationPath,
-      ownerRoot: repositoryRoot,
-    });
-    if (recovery.committed) {
-      let primaryError = null;
-      let finalized = null;
-      const assertRecoveryAuthority = async (publication = null) => {
-        if (publication) await assertPublishedFlatDirectory(publication);
-        else await recovery.assertCurrent();
-        await assertOperationConfigurationCurrent(operation);
-        await assertSelectedRepositorySnapshotsCurrent(
-          workspaceRoot,
-          config,
-          space,
-          selected,
-        );
-        if (publication) await assertPublishedFlatDirectory(publication);
-        else await recovery.assertCurrent();
-      };
-      try {
-        await assertRecoveryAuthority();
-        finalized = await recovery.finalize({
-          beforeCommit: async ({ publication }) => {
-            await assertRecoveryAuthority(publication);
-            result.validation = await validate(startPath, {
-              spaceId,
-              repositories: [repository.id ?? repository.resolvedPath],
-              epicId,
-              epicDirectory: directory,
-              repositoryProjection: repository,
-              workspaceRoot,
-            });
-            if (!result.validation.valid) {
-              throw new SddError("The recovered Epic failed structural validation; no Epic was kept.", {
-                code: "INVALID_EPIC_TEMPLATE",
-                details: result.validation.findings.map((finding) => `${finding.code}: ${finding.message}`),
-              });
-            }
-            await assertRecoveryAuthority(publication);
-          },
-        });
-      } catch (error) {
-        primaryError = error;
-      }
-      if (primaryError) {
-        let rollbackHookError = null;
-        if (beforeValidationRollback) {
-          try {
-            await beforeValidationRollback({ path: epicDirectory });
-          } catch (error) {
-            rollbackHookError = error;
-          }
-        }
-        let cleanup;
-        try {
-          cleanup = await recovery.rollback();
-        } catch (cleanupError) {
-          throw cleanupFailure(primaryError, cleanupError, epicDirectory);
-        }
-        if (!cleanup.removed || cleanup.concurrent) {
-          throw preservedPublicationError(primaryError, cleanup);
-        }
-        if (rollbackHookError) {
-          throw cleanupFailure(primaryError, rollbackHookError, epicDirectory);
-        }
-        throw primaryError;
-      }
-      await assertPublishedFlatDirectory(finalized.publication);
-      return result;
-    }
-  }
+
   if (await epicEntryPresent(repositoryAnchor, epicDirectory)) {
     throw new SddError(`Epic already exists: ${relativeWorkspacePath(workspaceRoot, epicDirectory)}`, {
       code: "EPIC_EXISTS",
@@ -361,112 +372,64 @@ export async function createEpic(
   }
   if (dryRun) return result;
 
-  const staged = await stageFlatDirectory(parent, directory, renderedEntries, {
-    label: `Epic ${epicId} staging directory`,
-    assertPath: assertPublicationPath,
-    ownerRoot: repositoryRoot,
-    afterStageRootMkdir,
-    afterStageRootReservation,
-    afterStagedPayload,
-    afterStagedProgress,
-    afterStagedEntry,
-    afterStagingComplete,
+  const template = await readFile(EPIC_TEMPLATE_PATH, "utf8");
+  const source = renderEpicTemplate(template, {
+    epicId,
+    title: result.title,
+    date: selectedDate,
   });
-  const prepared = await publishFlatDirectoryWithoutReplace(staged, epicDirectory, {
-    label: `Epic ${epicId}`,
-    beforePublish: async (context) => {
-      if (beforePublish) await beforePublish(context);
-      await assertOperationConfigurationCurrent(operation);
-      await assertSelectedRepositorySnapshotsCurrent(
-        workspaceRoot,
-        config,
-        space,
-        selected,
-      );
+  const assertCurrentAuthority = async () => {
+    await assertOperationConfigurationCurrent(operation);
+    await assertSelectedRepositorySnapshotsCurrent(workspaceRoot, config, space, selected);
+  };
+  await assertCurrentAuthority();
+  const proof = await publishEpicScaffold(repositoryAnchor, epicDirectory, source, {
+    beforeParentCreate: async (context) => {
+      await beforeParentCreate?.(context);
+      await assertCurrentAuthority();
     },
-    beforeHandoff,
-    afterPublicationJournalMkdir,
-    afterPublicationLiveOwner,
-    afterReservationMkdir,
-    afterReservationReceiptWrite,
-    afterReservationReceipt,
-    afterReservation,
-    afterEntryPublication,
-    afterTemporaryVerification,
-    afterSourceCleanup,
-    afterHandoffCleanup,
-    afterJournalCleanup,
-    afterOwnerMarkerCleanup,
-    assertPath: assertPublicationPath,
+    beforePublish: async (context) => {
+      await beforePublish?.(context);
+      await assertCurrentAuthority();
+    },
+    afterDirectoryCreate,
   });
 
   let primaryError = null;
-  let finalized = null;
-  const assertFinalAuthority = async (publication = null) => {
-    if (publication) await assertPublishedFlatDirectory(publication);
-    else await prepared.assertCurrent();
-    await assertOperationConfigurationCurrent(operation);
-    await assertSelectedRepositorySnapshotsCurrent(
-      workspaceRoot,
-      config,
-      space,
-      selected,
-    );
-    if (publication) await assertPublishedFlatDirectory(publication);
-    else await prepared.assertCurrent();
-  };
+  const additionalErrors = [];
   try {
-    if (afterPublicationPrepared) {
-      await afterPublicationPrepared({ path: epicDirectory, journalPath: prepared.journalPath });
-    }
-    await assertFinalAuthority();
-    finalized = await prepared.finalize({
-      beforeCommit: async ({ publication }) => {
-        await assertFinalAuthority(publication);
-        result.validation = await validate(startPath, {
-          spaceId,
-          repositories: [repository.id ?? repository.resolvedPath],
-          epicId,
-          epicDirectory: directory,
-          repositoryProjection: repository,
-          workspaceRoot,
-        });
-        if (!result.validation.valid) {
-          throw new SddError("The packaged Epic template failed structural validation; no Epic was kept.", {
-            code: "INVALID_EPIC_TEMPLATE",
-            details: result.validation.findings.map((finding) => `${finding.code}: ${finding.message}`),
-          });
-        }
-        await assertFinalAuthority(publication);
-      },
+    await assertEpicScaffoldCurrent(repositoryAnchor, proof);
+    await assertCurrentAuthority();
+    await assertEpicScaffoldCurrent(repositoryAnchor, proof);
+    result.validation = await validate(startPath, {
+      spaceId,
+      repositories: [repository.id ?? repository.resolvedPath],
+      epicId,
+      epicDirectory: directory,
+      repositoryProjection: repository,
+      workspaceRoot,
     });
+    if (!result.validation.valid) {
+      throw new SddError("The packaged Epic template failed structural validation.", {
+        code: "INVALID_EPIC_TEMPLATE",
+        details: result.validation.findings.map((finding) => `${finding.code}: ${finding.message}`),
+      });
+    }
+    await assertCurrentAuthority();
+    await assertEpicScaffoldCurrent(repositoryAnchor, proof);
   } catch (error) {
     primaryError = error;
   }
-  if (!primaryError) {
-    await assertPublishedFlatDirectory(finalized.publication);
-    return result;
-  }
 
-  let rollbackHookError = null;
-  if (beforeValidationRollback) {
-    try {
-      await beforeValidationRollback({ path: epicDirectory });
-    } catch (error) {
-      rollbackHookError = error;
+  if (primaryError) {
+    if (afterValidationFailure) {
+      try {
+        await afterValidationFailure({ path: epicDirectory });
+      } catch (error) {
+        additionalErrors.push(error);
+      }
     }
+    throw retainedEpicStateFailure(primaryError, epicDirectory, additionalErrors);
   }
-  let cleanup;
-  try {
-    cleanup = await prepared.rollback();
-  } catch (cleanupError) {
-    throw cleanupFailure(primaryError, cleanupError, epicDirectory);
-  }
-  if (!cleanup.removed || cleanup.concurrent) {
-    throw preservedPublicationError(primaryError, cleanup);
-  }
-  if (rollbackHookError) {
-    throw cleanupFailure(primaryError, rollbackHookError, epicDirectory);
-  }
-  throw primaryError;
+  return result;
 }

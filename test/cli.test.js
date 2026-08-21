@@ -3717,6 +3717,25 @@ test("CLI exposes epic create with JSON output", async (t) => {
   assert.equal(Object.hasOwn(result, "userRoot"), false);
   assert.equal(result.epicId, "SAMPLE-E002");
   assert.equal(result.validation.valid, true);
+
+  const { stdout: human } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "epic",
+    "create",
+    "sample",
+    "SAMPLE-E003",
+    "dry-run-output",
+    "--workspace",
+    root,
+    "--repo",
+    "sample-web",
+    "--date",
+    "2026-07-14",
+    "--dry-run",
+  ], { cwd: root });
+  assert.match(human, /^Would create Epic: SAMPLE-E003$/m);
+  assert.match(human, /^Repository: code\/sample-web$/m);
+  assert.match(human, /^Path: code\/sample-web\/docs\/epics\/sample-e003-dry-run-output\/epic\.md$/m);
 });
 
 test("change create skips archived repositories and rejects inactive Spaces", async (t) => {
@@ -7387,167 +7406,47 @@ async function assertCreateCollisionEntry(path, expected) {
   }
 }
 
-function createRaceOperations() {
-  return [
-    {
-      label: "Change",
-      destination: (root) =>
-        getActiveChangePath("2026-08-09-publication-race", root),
-      create: (root, hooks = {}) => createChange(root, "sample", "publication-race", {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-        ...hooks,
-      }),
-    },
-    {
-      label: "Epic",
-      destination: (root) => join(
+test("Epic creation preserves every destination type that appears before exclusive creation", async (t) => {
+  for (const kind of ["empty directory", "file", "symlink", "nonempty directory"]) {
+    await t.test(kind, async (subtest) => {
+      const root = await createMappedWorkspace();
+      subtest.after(() => rm(root, { recursive: true, force: true }));
+      await initWorkspace(root);
+      const destination = join(
         root,
         "code",
         "sample-web",
         "docs",
         "epics",
         "sample-e901-publication-race",
-      ),
-      create: (root, hooks = {}) => createEpic(
-        root,
-        "sample",
-        "SAMPLE-E901",
-        "publication-race",
-        {
+      );
+      let concurrentEntry;
+
+      await assert.rejects(
+        () => createEpic(root, "sample", "SAMPLE-E901", "publication-race", {
           date: "2026-08-09",
           repositories: ["sample-web"],
-          ...hooks,
-        },
-      ),
-    },
-  ];
-}
-
-test("Change and Epic creation preserve every destination type that appears before reservation", async (t) => {
-  for (const operation of createRaceOperations()) {
-    for (const kind of ["empty directory", "file", "symlink", "nonempty directory"]) {
-      await t.test(`${operation.label}: ${kind}`, async (subtest) => {
-        const root = await createMappedWorkspace();
-        subtest.after(() => rm(root, { recursive: true, force: true }));
-        await initWorkspace(root);
-        const destination = operation.destination(root);
-        let concurrentEntry;
-
-        await assert.rejects(
-          () => operation.create(root, {
-            beforePublish: async ({ targetPath }) => {
-              assert.equal(targetPath, destination);
-              concurrentEntry = await seedCreateCollisionEntry(kind, targetPath, root);
-            },
-          }),
-          (error) => error instanceof SddError
-            && ["CONCURRENT_CHANGE", "UNSAFE_ARTIFACT_PATH"].includes(error.code),
-        );
-        await assertCreateCollisionEntry(destination, concurrentEntry);
-
-        await rm(destination, { recursive: true, force: true });
-        const retried = await operation.create(root);
-        assert.equal(retried.command, operation.label === "Change" ? "change-create" : "epic-create");
-      });
-    }
-  }
-});
-
-test("Change and Epic creation preserve a replacement of their owned destination reservation", async (t) => {
-  for (const operation of createRaceOperations()) {
-    await t.test(operation.label, async (subtest) => {
-      const root = await createMappedWorkspace();
-      subtest.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const destination = operation.destination(root);
-      const displacedReservation = `${destination}.displaced-reservation`;
-      let replacement;
-
-      await assert.rejects(
-        () => operation.create(root, {
-          afterReservation: async ({ targetPath }) => {
+          beforePublish: async ({ targetPath }) => {
             assert.equal(targetPath, destination);
-            await rename(targetPath, displacedReservation);
-            await mkdir(targetPath);
-            await writeFile(join(targetPath, "marker.txt"), "newer reservation replacement\n", "utf8");
-            const state = await lstat(targetPath, { bigint: true });
-            replacement = {
-              dev: String(state.dev),
-              ino: String(state.ino),
-            };
+            concurrentEntry = await seedCreateCollisionEntry(kind, targetPath, root);
           },
         }),
-        (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
+        (error) => error instanceof SddError
+          && ["CONCURRENT_CHANGE", "UNSAFE_ARTIFACT_PATH"].includes(error.code),
       );
-
-      const current = await lstat(destination, { bigint: true });
-      assert.deepEqual(
-        { dev: String(current.dev), ino: String(current.ino) },
-        replacement,
-      );
-      assert.equal(
-        await readFile(join(destination, "marker.txt"), "utf8"),
-        "newer reservation replacement\n",
-      );
-      assert.deepEqual(await readdir(displacedReservation), []);
+      await assertCreateCollisionEntry(destination, concurrentEntry);
 
       await rm(destination, { recursive: true, force: true });
-      await rm(displacedReservation, { recursive: true, force: true });
-      assert.equal((await operation.create(root)).dryRun, false);
+      const retried = await createEpic(root, "sample", "SAMPLE-E901", "publication-race", {
+        date: "2026-08-09",
+        repositories: ["sample-web"],
+      });
+      assert.equal(retried.command, "epic-create");
     });
   }
 });
 
-test("Change and Epic creation preserve a predictable temporary replacement after final proof", async (t) => {
-  for (const operation of createRaceOperations()) {
-    await t.test(operation.label, async (subtest) => {
-      const root = await createMappedWorkspace();
-      subtest.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const destination = operation.destination(root);
-      let temporaryPath;
-      let displacedTemporary;
-      let replacement;
-
-      await assert.rejects(
-        () => operation.create(root, {
-          afterTemporaryVerification: async (context) => {
-            temporaryPath = context.temporaryPath;
-            displacedTemporary = `${temporaryPath}.displaced-owned-tree`;
-            await rename(temporaryPath, displacedTemporary);
-            await mkdir(temporaryPath);
-            await writeFile(join(temporaryPath, "marker.txt"), "newer temporary replacement\n", "utf8");
-            const state = await lstat(temporaryPath, { bigint: true });
-            replacement = {
-              dev: String(state.dev),
-              ino: String(state.ino),
-            };
-          },
-        }),
-        (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-      );
-
-      const current = await lstat(temporaryPath, { bigint: true });
-      assert.deepEqual(
-        { dev: String(current.dev), ino: String(current.ino) },
-        replacement,
-      );
-      assert.equal(
-        await readFile(join(temporaryPath, "marker.txt"), "utf8"),
-        "newer temporary replacement\n",
-      );
-      assert.ok((await readdir(displacedTemporary)).length > 0);
-      assert.equal(await pathExists(destination), false);
-
-      await rm(temporaryPath, { recursive: true, force: true });
-      await rm(displacedTemporary, { recursive: true, force: true });
-      assert.equal((await operation.create(root)).dryRun, false);
-    });
-  }
-});
-
-test("Epic validation rollback removes only its exact publication and preserves a replacement", async (t) => {
+test("Epic validation failure retains complete inspectable state and reports manual recovery", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
@@ -7557,49 +7456,155 @@ test("Epic validation rollback removes only its exact publication and preserves 
     "sample-web",
     "docs",
     "epics",
-    "sample-e902-validation-rollback",
+    "sample-e902-validation-residue",
   );
-  const displacedPublication = `${epicDirectory}.displaced-publication`;
-  let replacement;
+  let failure;
 
   await assert.rejects(
-    () => createEpic(root, "sample", "SAMPLE-E902", "validation-rollback", {
+    () => createEpic(root, "sample", "SAMPLE-E902", "validation-residue", {
       date: "2026-08-09",
       repositories: ["sample-web"],
       validate: async () => ({
         valid: false,
         findings: [{ code: "INJECTED_INVALID_EPIC", message: "Injected invalid Epic." }],
       }),
-      beforeValidationRollback: async ({ path }) => {
+    }),
+    (error) => {
+      failure = error;
+      return error instanceof SddError
+        && error.code === "MUTATION_RECOVERY_FAILED"
+        && error.retainedPaths.includes(epicDirectory)
+        && error.details.some((detail) => detail.includes("Retained path requiring inspection"))
+        && error.details.some((detail) => detail.includes("retry"));
+    },
+  );
+
+  assert.equal(failure.retainedPaths[0], epicDirectory);
+  assert.match(await readFile(join(epicDirectory, "epic.md"), "utf8"), /^id: SAMPLE-E902$/m);
+  await assert.rejects(
+    () => createEpic(root, "sample", "SAMPLE-E902", "validation-residue", {
+      date: "2026-08-09",
+      repositories: ["sample-web"],
+    }),
+    (error) => error instanceof SddError && error.code === "EPIC_EXISTS",
+  );
+
+  await rm(epicDirectory, { recursive: true, force: true });
+  assert.equal((await createEpic(root, "sample", "SAMPLE-E902", "validation-residue", {
+    date: "2026-08-09",
+    repositories: ["sample-web"],
+  })).validation.valid, true);
+});
+
+test("Epic validation recovery preserves a replacement and the displaced scaffold", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const epicDirectory = join(
+    root,
+    "code",
+    "sample-web",
+    "docs",
+    "epics",
+    "sample-e903-validation-replacement",
+  );
+  const displacedScaffold = `${epicDirectory}.displaced`;
+  let replacement;
+
+  await assert.rejects(
+    () => createEpic(root, "sample", "SAMPLE-E903", "validation-replacement", {
+      date: "2026-08-09",
+      repositories: ["sample-web"],
+      validate: async () => ({
+        valid: false,
+        findings: [{ code: "INJECTED_INVALID_EPIC", message: "Injected invalid Epic." }],
+      }),
+      afterValidationFailure: async ({ path }) => {
         assert.equal(path, epicDirectory);
-        await rename(path, displacedPublication);
+        await rename(path, displacedScaffold);
         await mkdir(path);
         await writeFile(join(path, "marker.txt"), "newer Epic replacement\n", "utf8");
         const state = await lstat(path, { bigint: true });
         replacement = { dev: String(state.dev), ino: String(state.ino) };
       },
     }),
-    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
+    (error) => error instanceof SddError
+      && error.code === "MUTATION_RECOVERY_FAILED"
+      && error.retainedPaths.includes(epicDirectory),
   );
 
   const current = await lstat(epicDirectory, { bigint: true });
-  assert.deepEqual(
-    { dev: String(current.dev), ino: String(current.ino) },
-    replacement,
-  );
-  assert.equal(
-    await readFile(join(epicDirectory, "marker.txt"), "utf8"),
-    "newer Epic replacement\n",
-  );
-  assert.equal(await pathExists(join(displacedPublication, "epic.md")), true);
+  assert.deepEqual({ dev: String(current.dev), ino: String(current.ino) }, replacement);
+  assert.equal(await readFile(join(epicDirectory, "marker.txt"), "utf8"), "newer Epic replacement\n");
+  assert.match(await readFile(join(displacedScaffold, "epic.md"), "utf8"), /^id: SAMPLE-E903$/m);
+});
 
-  await rm(epicDirectory, { recursive: true, force: true });
-  await rm(displacedPublication, { recursive: true, force: true });
-  const retried = await createEpic(root, "sample", "SAMPLE-E902", "validation-rollback", {
-    date: "2026-08-09",
-    repositories: ["sample-web"],
-  });
-  assert.equal(retried.validation.valid, true);
+test("Epic creation rejects a target replacement after exclusive directory creation", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const epicDirectory = join(
+    root,
+    "code",
+    "sample-web",
+    "docs",
+    "epics",
+    "sample-e904-directory-replacement",
+  );
+  const displacedDirectory = `${epicDirectory}.displaced`;
+  let replacement;
+
+  await assert.rejects(
+    () => createEpic(root, "sample", "SAMPLE-E904", "directory-replacement", {
+      date: "2026-08-09",
+      repositories: ["sample-web"],
+      afterDirectoryCreate: async ({ targetPath }) => {
+        assert.equal(targetPath, epicDirectory);
+        await rename(targetPath, displacedDirectory);
+        await mkdir(targetPath);
+        const state = await lstat(targetPath, { bigint: true });
+        replacement = { dev: String(state.dev), ino: String(state.ino) };
+      },
+    }),
+    (error) => error instanceof SddError
+      && error.code === "MUTATION_RECOVERY_FAILED"
+      && error.retainedPaths.includes(epicDirectory),
+  );
+
+  const current = await lstat(epicDirectory, { bigint: true });
+  assert.deepEqual({ dev: String(current.dev), ino: String(current.ino) }, replacement);
+  assert.deepEqual(await readdir(epicDirectory), []);
+  assert.deepEqual(await readdir(displacedDirectory), []);
+});
+
+test("Epic creation rechecks authority before creating a missing artifact parent", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const repositoryRoot = join(root, "code", "sample-web");
+  const repositoryConfigPath = getRepositoryConfigPath(repositoryRoot);
+  const repositoryConfig = await readRepositoryConfig(repositoryRoot);
+  repositoryConfig.artifacts.epics = "custom/new/epics";
+  await writeRepositoryConfig(repositoryRoot, repositoryConfig);
+  const artifactRoot = join(repositoryRoot, "custom");
+  let replacement;
+
+  await assert.rejects(
+    () => createEpic(root, "sample", "SAMPLE-E905", "authority-before-parent", {
+      date: "2026-08-09",
+      repositories: ["sample-web"],
+      beforeParentCreate: async () => {
+        replacement = await replaceLifecycleAuthorityFile(
+          repositoryConfigPath,
+          await readFile(repositoryConfigPath, "utf8"),
+        );
+      },
+    }),
+    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
+  );
+
+  await assertLifecycleAuthorityFileCurrent(replacement);
+  assert.equal(await pathExists(artifactRoot), false);
 });
 
 test("Epic create honors external portable identity and custom artifacts from unrelated cwd", async (t) => {
@@ -7654,7 +7659,11 @@ test("Epic create honors external portable identity and custom artifacts from un
   await assert.rejects(
     () => runCreate("SAMPLE-E903", "duplicate", repositoryRoot),
   );
-  assert.equal(await pathExists(duplicateDirectory), false);
+  assert.match(
+    await readFile(join(duplicateDirectory, "epic.md"), "utf8"),
+    /^id: SAMPLE-E903$/m,
+  );
+  await rm(duplicateDirectory, { recursive: true, force: true });
 
   const absoluteSelected = await runCreate("SAMPLE-E904", "current", repositoryRoot);
   assert.equal(absoluteSelected.repository.id, "web-app");
@@ -8028,7 +8037,7 @@ test("Epic creation rechecks that a selected repository contract remains absent"
     () => createEpic(root, "sample", "SAMPLE-E912", "absent-authority", {
       date: "2026-08-09",
       repositories: ["sample-web"],
-      beforePublish: async () => {
+      beforeParentCreate: async () => {
         const config = createRepositoryConfig("late-web");
         config.artifacts.epics = "late/epics";
         await writeRepositoryConfig(repositoryRoot, config);
@@ -8060,605 +8069,65 @@ test("Epic creation rechecks that a selected repository contract remains absent"
   );
 });
 
-const CREATE_CRASH_SCRIPT = `
-  import { createChange } from ${JSON.stringify(pathToFileURL(join(PACKAGE_ROOT, "src", "commands", "change-create.js")).href)};
-  import { createEpic } from ${JSON.stringify(pathToFileURL(join(PACKAGE_ROOT, "src", "commands", "epic-create.js")).href)};
-  const crashCase = JSON.parse(process.env.SDD_CREATE_CRASH_CASE);
-  const crash = () => process.exit(93);
-  const hooks = crashCase.point === "stage-root-reservation"
-    ? { afterStageRootReservation: crash }
-    : crashCase.point === "stage-root"
-      ? { afterStageRootMkdir: crash }
-      : crashCase.point === "stage-payload"
-        ? { afterStagedPayload: ({ entryIndex }) => {
-            if (entryIndex === crashCase.entryIndex) crash();
-          } }
-        : crashCase.point === "stage-progress"
-          ? { afterStagedProgress: ({ entryIndex }) => {
-              if (entryIndex === crashCase.entryIndex) crash();
-            } }
-          : crashCase.point === "stage-entry"
-            ? { afterStagedEntry: ({ entryIndex }) => {
-                if (entryIndex === crashCase.entryIndex) crash();
-              } }
-            : crashCase.point === "stage-complete"
-              ? { afterStagingComplete: crash }
-              : crashCase.point === "pre-handoff"
-                ? { beforeHandoff: crash }
-                : crashCase.point === "publication-journal-mkdir"
-                  ? { afterPublicationJournalMkdir: crash }
-                  : crashCase.point === "publication-live-owner"
-                    ? { afterPublicationLiveOwner: crash }
-                    : crashCase.point === "reservation-receipt-write"
-                      ? { afterReservationReceiptWrite: crash }
-                      : crashCase.point === "reservation-receipt"
-                        ? { afterReservationReceipt: crash }
-                      : crashCase.point === "reservation"
-                        ? { afterReservation: crash }
-                        : crashCase.point === "entry"
-                          ? { afterEntryPublication: ({ entryIndex }) => {
-                              if (entryIndex === 0) crash();
-                            } }
-                          : crashCase.point === "prepared"
-                            ? { afterPublicationPrepared: crash }
-                            : crashCase.point === "source-cleanup"
-                              ? { afterSourceCleanup: crash }
-                              : crashCase.point === "handoff-cleanup"
-                                ? { afterHandoffCleanup: crash }
-                                : crashCase.point === "journal-cleanup"
-                                  ? { afterJournalCleanup: crash }
-                                  : { afterOwnerMarkerCleanup: crash };
-  if (crashCase.kind === "Change") {
-    await createChange(crashCase.root, "sample", crashCase.slug, {
-      date: "2026-08-09",
-      repositories: ["sample-web"],
-      ...hooks,
-    });
-  } else {
-    await createEpic(crashCase.root, "sample", crashCase.epicId, crashCase.slug, {
-      date: "2026-08-09",
-      repositories: ["sample-web"],
-      ...hooks,
-    });
-  }
-`;
-
-function prepublicationCrashRecoveryCreateCases(root) {
-  const changePoints = [
-    ["stage-root-reservation", null],
-    ["stage-root", null],
-    ...["stage-payload", "stage-progress", "stage-entry"].flatMap((point) =>
-      [0, 1, 2].map((entryIndex) => [point, entryIndex])),
-    ["stage-complete", null],
-    ["pre-handoff", null],
-    ["publication-journal-mkdir", null],
-    ["publication-live-owner", null],
-  ];
-  const changeCases = changePoints.map(([point, entryIndex]) => {
-    const suffix = entryIndex === null ? point : `${point}-${entryIndex}`;
-    const slug = `crash-${suffix}`;
-    return {
-      kind: "Change",
-      point,
-      entryIndex,
-      slug,
-      destination: getActiveChangePath(`2026-08-09-${slug}`, root),
-      retry: () => createChange(root, "sample", slug, {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-      }),
-      expectedFiles: ["change.md"],
-    };
-  });
-  const epicPoints = [
-    ["stage-root-reservation", "SAMPLE-E930"],
-    ["stage-root", "SAMPLE-E931"],
-    ["stage-payload", "SAMPLE-E932"],
-    ["stage-progress", "SAMPLE-E933"],
-    ["stage-entry", "SAMPLE-E934"],
-    ["stage-complete", "SAMPLE-E935"],
-    ["pre-handoff", "SAMPLE-E936"],
-    ["publication-journal-mkdir", "SAMPLE-E937"],
-    ["publication-live-owner", "SAMPLE-E938"],
-  ];
-  const epicCases = epicPoints.map(([point, epicId]) => {
-    const slug = `crash-${point}`;
-    return {
-      kind: "Epic",
-      point,
-      entryIndex: ["stage-payload", "stage-progress", "stage-entry"].includes(point) ? 0 : null,
-      epicId,
-      slug,
-      destination: join(
-        root,
-        "code",
-        "sample-web",
-        "docs",
-        "epics",
-        `${epicId.toLowerCase()}-${slug}`,
-      ),
-      retry: () => createEpic(root, "sample", epicId, slug, {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-      }),
-      expectedFiles: ["epic.md"],
-    };
-  });
-  return [...changeCases, ...epicCases];
-}
-
-function crashRecoveryCreateCases(root) {
-  return [
-    ...prepublicationCrashRecoveryCreateCases(root),
-    {
-      kind: "Change",
-      point: "reservation",
-      slug: "crash-after-reservation",
-      destination: getActiveChangePath("2026-08-09-crash-after-reservation", root),
-      retry: () => createChange(root, "sample", "crash-after-reservation", {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-      }),
-      expectedFiles: ["change.md"],
-    },
-    {
-      kind: "Change",
-      point: "entry",
-      slug: "crash-after-first-link",
-      destination: getActiveChangePath("2026-08-09-crash-after-first-link", root),
-      retry: () => createChange(root, "sample", "crash-after-first-link", {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-      }),
-      expectedFiles: ["change.md"],
-    },
-    {
-      kind: "Epic",
-      point: "reservation",
-      epicId: "SAMPLE-E913",
-      slug: "crash-after-reservation",
-      destination: join(
-        root,
-        "code",
-        "sample-web",
-        "docs",
-        "epics",
-        "sample-e913-crash-after-reservation",
-      ),
-      retry: () => createEpic(root, "sample", "SAMPLE-E913", "crash-after-reservation", {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-      }),
-      expectedFiles: ["epic.md"],
-    },
-    {
-      kind: "Epic",
-      point: "entry",
-      committed: true,
-      epicId: "SAMPLE-E914",
-      slug: "crash-after-first-link",
-      destination: join(
-        root,
-        "code",
-        "sample-web",
-        "docs",
-        "epics",
-        "sample-e914-crash-after-first-link",
-      ),
-      retry: () => createEpic(root, "sample", "SAMPLE-E914", "crash-after-first-link", {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-      }),
-      expectedFiles: ["epic.md"],
-    },
-    {
-      kind: "Change",
-      point: "source-cleanup",
-      committed: true,
-      slug: "crash-after-source-cleanup",
-      destination: getActiveChangePath("2026-08-09-crash-after-source-cleanup", root),
-      retry: () => createChange(root, "sample", "crash-after-source-cleanup", {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-      }),
-      expectedFiles: ["change.md"],
-    },
-    {
-      kind: "Change",
-      point: "handoff-cleanup",
-      committed: true,
-      slug: "crash-after-handoff-cleanup",
-      destination: getActiveChangePath("2026-08-09-crash-after-handoff-cleanup", root),
-      retry: () => createChange(root, "sample", "crash-after-handoff-cleanup", {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-      }),
-      expectedFiles: ["change.md"],
-    },
-    {
-      kind: "Change",
-      point: "journal-cleanup",
-      committed: true,
-      slug: "crash-after-journal-cleanup",
-      destination: getActiveChangePath("2026-08-09-crash-after-journal-cleanup", root),
-      retry: () => createChange(root, "sample", "crash-after-journal-cleanup", {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-      }),
-      expectedFiles: ["change.md"],
-    },
-    {
-      kind: "Change",
-      point: "owner-marker-cleanup",
-      committed: true,
-      slug: "crash-after-owner-marker-cleanup",
-      destination: getActiveChangePath("2026-08-09-crash-after-owner-marker-cleanup", root),
-      retry: () => createChange(root, "sample", "crash-after-owner-marker-cleanup", {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-      }),
-      expectedFiles: ["change.md"],
-    },
-    {
-      kind: "Epic",
-      point: "source-cleanup",
-      committed: true,
-      epicId: "SAMPLE-E928",
-      slug: "crash-after-source-cleanup",
-      destination: join(
-        root,
-        "code",
-        "sample-web",
-        "docs",
-        "epics",
-        "sample-e928-crash-after-source-cleanup",
-      ),
-      retry: () => createEpic(root, "sample", "SAMPLE-E928", "crash-after-source-cleanup", {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-      }),
-      expectedFiles: ["epic.md"],
-    },
-    {
-      kind: "Epic",
-      point: "handoff-cleanup",
-      committed: true,
-      epicId: "SAMPLE-E920",
-      slug: "crash-after-handoff-cleanup",
-      destination: join(
-        root,
-        "code",
-        "sample-web",
-        "docs",
-        "epics",
-        "sample-e920-crash-after-handoff-cleanup",
-      ),
-      retry: () => createEpic(root, "sample", "SAMPLE-E920", "crash-after-handoff-cleanup", {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-      }),
-      expectedFiles: ["epic.md"],
-    },
-    {
-      kind: "Epic",
-      point: "journal-cleanup",
-      committed: true,
-      epicId: "SAMPLE-E921",
-      slug: "crash-after-journal-cleanup",
-      destination: join(
-        root,
-        "code",
-        "sample-web",
-        "docs",
-        "epics",
-        "sample-e921-crash-after-journal-cleanup",
-      ),
-      retry: () => createEpic(root, "sample", "SAMPLE-E921", "crash-after-journal-cleanup", {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-      }),
-      expectedFiles: ["epic.md"],
-    },
-    {
-      kind: "Epic",
-      point: "owner-marker-cleanup",
-      committed: true,
-      epicId: "SAMPLE-E927",
-      slug: "crash-after-owner-marker-cleanup",
-      destination: join(
-        root,
-        "code",
-        "sample-web",
-        "docs",
-        "epics",
-        "sample-e927-crash-after-owner-marker-cleanup",
-      ),
-      retry: () => createEpic(
-        root,
-        "sample",
-        "SAMPLE-E927",
-        "crash-after-owner-marker-cleanup",
-        {
-          date: "2026-08-09",
-          repositories: ["sample-web"],
-        },
-      ),
-      expectedFiles: ["epic.md"],
-    },
-    {
-      kind: "Change",
-      point: "reservation-receipt-write",
-      slug: "crash-after-reservation-receipt-write",
-      destination: getActiveChangePath("2026-08-09-crash-after-reservation-receipt-write", root),
-      retry: () => createChange(root, "sample", "crash-after-reservation-receipt-write", {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-      }),
-      expectedFiles: ["change.md"],
-    },
-    {
-      kind: "Change",
-      point: "reservation-receipt",
-      slug: "crash-after-reservation-receipt",
-      destination: getActiveChangePath("2026-08-09-crash-after-reservation-receipt", root),
-      retry: () => createChange(root, "sample", "crash-after-reservation-receipt", {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-      }),
-      expectedFiles: ["change.md"],
-    },
-    {
-      kind: "Change",
-      point: "prepared",
-      committed: true,
-      slug: "crash-after-publication-prepared",
-      destination: getActiveChangePath("2026-08-09-crash-after-publication-prepared", root),
-      retry: () => createChange(root, "sample", "crash-after-publication-prepared", {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-      }),
-      expectedFiles: ["change.md"],
-    },
-    {
-      kind: "Epic",
-      point: "reservation-receipt-write",
-      epicId: "SAMPLE-E941",
-      slug: "crash-after-reservation-receipt-write",
-      destination: join(
-        root,
-        "code",
-        "sample-web",
-        "docs",
-        "epics",
-        "sample-e941-crash-after-reservation-receipt-write",
-      ),
-      retry: () => createEpic(
-        root,
-        "sample",
-        "SAMPLE-E941",
-        "crash-after-reservation-receipt-write",
-        {
-          date: "2026-08-09",
-          repositories: ["sample-web"],
-        },
-      ),
-      expectedFiles: ["epic.md"],
-    },
-    {
-      kind: "Epic",
-      point: "reservation-receipt",
-      epicId: "SAMPLE-E939",
-      slug: "crash-after-reservation-receipt",
-      destination: join(
-        root,
-        "code",
-        "sample-web",
-        "docs",
-        "epics",
-        "sample-e939-crash-after-reservation-receipt",
-      ),
-      retry: () => createEpic(
-        root,
-        "sample",
-        "SAMPLE-E939",
-        "crash-after-reservation-receipt",
-        {
-          date: "2026-08-09",
-          repositories: ["sample-web"],
-        },
-      ),
-      expectedFiles: ["epic.md"],
-    },
-    {
-      kind: "Epic",
-      point: "prepared",
-      committed: true,
-      epicId: "SAMPLE-E940",
-      slug: "crash-after-publication-prepared",
-      destination: join(
-        root,
-        "code",
-        "sample-web",
-        "docs",
-        "epics",
-        "sample-e940-crash-after-publication-prepared",
-      ),
-      retry: () => createEpic(
-        root,
-        "sample",
-        "SAMPLE-E940",
-        "crash-after-publication-prepared",
-        {
-          date: "2026-08-09",
-          repositories: ["sample-web"],
-        },
-      ),
-      expectedFiles: ["epic.md"],
-    },
-  ];
-}
-
-test("Change and Epic create recover durable publication after child-process death", async (t) => {
+test("Epic create never mutates a same-content external ancestor replacement", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
+  const ancestor = join(root, "code", "sample-web", "docs", "epics");
+  const destination = join(ancestor, "sample-e915-ancestor-swap");
+  const outside = await createWorkspace("sdd-epic-ancestor-swap-");
+  t.after(() => rm(outside, { recursive: true, force: true }));
+  const displaced = `${ancestor}.owned-before-swap`;
+  let outsideHash;
 
-  for (const crashCase of crashRecoveryCreateCases(root)) {
-    await t.test(`${crashCase.kind}: ${crashCase.point}`, async () => {
-      await assert.rejects(
-        () => execFileAsync(process.execPath, [
-          "--input-type=module",
-          "--eval",
-          CREATE_CRASH_SCRIPT,
-        ], {
-          env: {
-            ...process.env,
-            SDD_CREATE_CRASH_CASE: JSON.stringify({
-              kind: crashCase.kind,
-              point: crashCase.point,
-              root,
-              slug: crashCase.slug,
-              epicId: crashCase.epicId,
-            }),
-          },
-        }),
-        (error) => error.code === 93,
-      );
+  await assert.rejects(
+    () => createEpic(root, "sample", "SAMPLE-E915", "ancestor-swap", {
+      date: "2026-08-09",
+      repositories: ["sample-web"],
+      beforePublish: async () => {
+        await rename(ancestor, displaced);
+        await rm(outside, { recursive: true });
+        await cp(displaced, outside, { recursive: true });
+        outsideHash = await hashDirectory(outside);
+        assert.equal(await hashDirectory(displaced), outsideHash);
+        await symlink(outside, ancestor);
+      },
+    }),
+    (error) => error instanceof SddError
+      && ["CONCURRENT_CHANGE", "MUTATION_RECOVERY_FAILED", "UNSAFE_ARTIFACT_PATH"].includes(error.code),
+  );
 
-      const result = await crashCase.retry();
-      assert.equal(result.dryRun, false);
-      assert.deepEqual(
-        (await readdir(crashCase.destination)).sort((left, right) => left.localeCompare(right)),
-        crashCase.expectedFiles,
-      );
-      const hiddenTransactions = (await readdir(dirname(crashCase.destination))).filter((name) =>
-        name.startsWith(".")
-        && name.includes(basename(crashCase.destination))
-        && name.includes(".sdd-"));
-      assert.deepEqual(hiddenTransactions, []);
-    });
-  }
+  assert.equal(await hashDirectory(outside), outsideHash);
+  assert.equal(await pathExists(join(outside, basename(destination))), false);
 });
 
-function ancestorSwapCreateCases(root) {
-  return [
-    {
-      label: "Change",
-      destination: getActiveChangePath("2026-08-09-ancestor-swap", root),
-      ancestor: getChangesRoot(root),
-      create: (beforePublish) => createChange(root, "sample", "ancestor-swap", {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-        beforePublish,
-      }),
-    },
-    {
-      label: "Epic",
-      destination: join(
-        root,
-        "code",
-        "sample-web",
-        "docs",
-        "epics",
-        "sample-e915-ancestor-swap",
-      ),
-      ancestor: join(root, "code", "sample-web", "docs", "epics"),
-      create: (beforePublish) => createEpic(root, "sample", "SAMPLE-E915", "ancestor-swap", {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-        beforePublish,
-      }),
-    },
-  ];
-}
-
-test("Change and Epic create never mutate a same-content external ancestor replacement", async (t) => {
-  for (const label of ["Change", "Epic"]) {
-    await t.test(label, async (subtest) => {
+test("Change create rolls back publication when authority changes before final commit", async (t) => {
+  for (const hookName of ["afterReservation", "afterHandoffCleanup"]) {
+    await t.test(hookName, async (subtest) => {
       const root = await createMappedWorkspace();
       subtest.after(() => rm(root, { recursive: true, force: true }));
       await initWorkspace(root);
-      const operation = ancestorSwapCreateCases(root)
-        .find((candidate) => candidate.label === label);
-      const outside = await createWorkspace(`sdd-${label.toLowerCase()}-ancestor-swap-`);
-      subtest.after(() => rm(outside, { recursive: true, force: true }));
-      const displaced = `${operation.ancestor}.owned-before-swap`;
-      let outsideHash;
-
+      const configPath = getWorkspaceConfigPath(root);
+      let replacement;
       await assert.rejects(
-        () => operation.create(async () => {
-          await rename(operation.ancestor, displaced);
-          await rm(outside, { recursive: true });
-          await cp(displaced, outside, { recursive: true });
-          outsideHash = await hashDirectory(outside);
-          assert.equal(await hashDirectory(displaced), outsideHash);
-          await symlink(outside, operation.ancestor);
-        }),
-        (error) => error instanceof SddError
-          && ["CONCURRENT_CHANGE", "MUTATION_RECOVERY_FAILED", "UNSAFE_ARTIFACT_PATH"].includes(error.code),
-      );
-
-      assert.equal(await hashDirectory(outside), outsideHash);
-      assert.equal(await pathExists(join(outside, basename(operation.destination))), false);
-    });
-  }
-});
-
-test("Change and Epic create roll back publication when authority changes before final commit", async (t) => {
-  const operations = [
-    {
-      label: "Change",
-      destination: (root) => getActiveChangePath("2026-08-09-final-authority", root),
-      create: (root, hookName, hook) => createChange(root, "sample", "final-authority", {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-        [hookName]: hook,
-      }),
-    },
-    {
-      label: "Epic",
-      destination: (root) => join(
-        root,
-        "code",
-        "sample-web",
-        "docs",
-        "epics",
-        "sample-e916-final-authority",
-      ),
-      create: (root, hookName, hook) => createEpic(
-        root,
-        "sample",
-        "SAMPLE-E916",
-        "final-authority",
-        {
+        () => createChange(root, "sample", "final-authority", {
           date: "2026-08-09",
           repositories: ["sample-web"],
-          [hookName]: hook,
-        },
-      ),
-    },
-  ];
-  for (const operation of operations) {
-    for (const hookName of ["afterReservation", "afterHandoffCleanup"]) {
-      await t.test(`${operation.label}: ${hookName}`, async (subtest) => {
-        const root = await createMappedWorkspace();
-        subtest.after(() => rm(root, { recursive: true, force: true }));
-        await initWorkspace(root);
-        const configPath = getWorkspaceConfigPath(root);
-        let replacement;
-        await assert.rejects(
-          () => operation.create(root, hookName, async () => {
+          [hookName]: async () => {
             replacement = await replaceLifecycleAuthorityFile(
               configPath,
               await readFile(configPath, "utf8"),
             );
-          }),
-          (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-        );
-        await assertLifecycleAuthorityFileCurrent(replacement);
-        assert.equal(await pathExists(operation.destination(root)), false);
-      });
-    }
+          },
+        }),
+        (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
+      );
+      await assertLifecycleAuthorityFileCurrent(replacement);
+      assert.equal(
+        await pathExists(getActiveChangePath("2026-08-09-final-authority", root)),
+        false,
+      );
+    });
   }
 });
 
@@ -8796,378 +8265,6 @@ test("Change close recovers the active Change when authority changes after retir
   assert.equal(await pathExists(activePath), true);
   assert.equal(await pathExists(closedPath), false);
 });
-
-test("Change and Epic publication never replace a raced handoff entry", async (t) => {
-  for (const operation of createRaceOperations()) {
-    for (const kind of ["empty directory", "file", "symlink", "nonempty directory"]) {
-      await t.test(`${operation.label}: ${kind}`, async (subtest) => {
-        const root = await createMappedWorkspace();
-        subtest.after(() => rm(root, { recursive: true, force: true }));
-        await initWorkspace(root);
-        let handoffPath;
-        let collision;
-        await assert.rejects(
-          () => operation.create(root, {
-            afterTemporaryVerification: async (context) => {
-              handoffPath = context.handoffPath;
-              collision = await seedCreateCollisionEntry(kind, handoffPath, root);
-            },
-          }),
-          (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-        );
-        await assertCreateCollisionEntry(handoffPath, collision);
-      });
-    }
-  }
-});
-
-test("Change and Epic publication do not adopt an immediate reservation replacement", async (t) => {
-  for (const operation of createRaceOperations()) {
-    await t.test(operation.label, async (subtest) => {
-      const root = await createMappedWorkspace();
-      subtest.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const destination = operation.destination(root);
-      const displaced = `${destination}.immediate-owned-reservation`;
-      let replacement;
-      await assert.rejects(
-        () => operation.create(root, {
-          afterReservationMkdir: async ({ targetPath }) => {
-            await rename(targetPath, displaced);
-            await mkdir(targetPath);
-            await writeFile(join(targetPath, "marker.txt"), "immediate replacement\n", "utf8");
-            const state = await lstat(targetPath, { bigint: true });
-            replacement = { dev: String(state.dev), ino: String(state.ino) };
-          },
-        }),
-        (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-      );
-      const current = await lstat(destination, { bigint: true });
-      assert.deepEqual(
-        { dev: String(current.dev), ino: String(current.ino) },
-        replacement,
-      );
-      assert.equal(
-        await readFile(join(destination, "marker.txt"), "utf8"),
-        "immediate replacement\n",
-      );
-      const displacedNames = await readdir(displaced);
-      assert.equal(displacedNames.length, 1);
-      assert.equal(displacedNames[0].startsWith(".sdd-publication-reservation-"), true);
-    });
-  }
-});
-
-test("publication recovery preserves a same-mode replacement and its moved reservation", async (t) => {
-  for (const operation of createRaceOperations()) {
-    await t.test(operation.label, async (subtest) => {
-      const root = await createMappedWorkspace();
-      subtest.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const destination = operation.destination(root);
-      const displaced = `${destination}.moved-reservation`;
-      let replacementIdentity;
-      await assert.rejects(
-        () => operation.create(root, {
-          afterReservation: async ({ targetPath }) => {
-            const reserved = await lstat(targetPath, { bigint: true });
-            await rename(targetPath, displaced);
-            await mkdir(targetPath, { mode: Number(reserved.mode & 0o777n) });
-            const replacement = await lstat(targetPath, { bigint: true });
-            replacementIdentity = {
-              dev: String(replacement.dev),
-              ino: String(replacement.ino),
-            };
-          },
-        }),
-        (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-      );
-      const current = await lstat(destination, { bigint: true });
-      assert.deepEqual(
-        { dev: String(current.dev), ino: String(current.ino) },
-        replacementIdentity,
-      );
-      assert.deepEqual(await readdir(destination), []);
-      assert.deepEqual(await readdir(displaced), []);
-      const journalPath = join(
-        dirname(destination),
-        `.${basename(destination)}.sdd-publication`,
-      );
-      assert.equal(await pathExists(journalPath), true);
-    });
-  }
-});
-
-test("same-process publication recovery cannot take over a live operation token", async (t) => {
-  const root = await createWorkspace("sdd-publication-live-token-");
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const targetPath = join(root, "published");
-  const entries = [["entry.txt", "owned publication\n"]];
-  const staged = await stageFlatDirectory(root, "published", entries, {
-    ownerRoot: root,
-  });
-  let entered;
-  let release;
-  const enteredGate = new Promise((resolveEntered) => {
-    entered = resolveEntered;
-  });
-  const releaseGate = new Promise((resolveRelease) => {
-    release = resolveRelease;
-  });
-  const publishing = publishFlatDirectoryWithoutReplace(staged, targetPath, {
-    beforePublish: async () => {
-      await rm(staged.stagingJournal.path, { recursive: true, force: true });
-      await rm(staged.stagingJournal.reservationPath, { force: true });
-      entered();
-      await releaseGate;
-    },
-  });
-  await enteredGate;
-  await assert.rejects(
-    () => recoverFlatDirectoryPublication(targetPath, entries, {
-      ownerRoot: root,
-    }),
-    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-  );
-  release();
-  const prepared = await publishing;
-  const finalized = await prepared.finalize();
-  await assertPublishedFlatDirectory(finalized.publication);
-});
-
-const AGED_LIVE_PUBLICATION_OWNER_SCRIPT = `
-  import { readFile, rm, writeFile } from "node:fs/promises";
-  import { basename, dirname, join } from "node:path";
-  import {
-    publishFlatDirectoryWithoutReplace,
-    stageFlatDirectory,
-  } from ${JSON.stringify(pathToFileURL(join(PACKAGE_ROOT, "src", "directory-publication.js")).href)};
-  const scenario = JSON.parse(process.env.SDD_AGED_LIVE_PUBLICATION_OWNER);
-  const targetPath = join(scenario.root, "published");
-  const entries = [["entry.txt", "aged live owner\\n"]];
-  const staged = await stageFlatDirectory(scenario.root, "published", entries, {
-    ownerRoot: scenario.root,
-  });
-  await publishFlatDirectoryWithoutReplace(staged, targetPath, {
-    beforePublish: async () => {
-      await rm(staged.stagingJournal.path, { recursive: true, force: true });
-      await rm(staged.stagingJournal.reservationPath, { force: true });
-      const journalPath = join(
-        dirname(targetPath),
-        \`.\${basename(targetPath)}.sdd-publication\`,
-      );
-      const intentPath = join(journalPath, "intent.json");
-      const intent = JSON.parse(await readFile(intentPath, "utf8"));
-      intent.createdAt = "2000-01-01T00:00:00.000Z";
-      await writeFile(intentPath, \`\${JSON.stringify(intent)}\\n\`, "utf8");
-      await writeFile(scenario.readyPath, "ready\\n", "utf8");
-      await new Promise((resolve) => setTimeout(resolve, 60_000));
-    },
-  });
-`;
-
-test("an aged publication journal remains owned across processes while its creator is live", async (t) => {
-  const root = await createWorkspace("sdd-aged-live-publication-");
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const readyPath = join(root, "aged-live-owner.ready");
-  const child = execFile(process.execPath, [
-    "--input-type=module",
-    "--eval",
-    AGED_LIVE_PUBLICATION_OWNER_SCRIPT,
-  ], {
-    env: {
-      ...process.env,
-      SDD_AGED_LIVE_PUBLICATION_OWNER: JSON.stringify({ root, readyPath }),
-    },
-  });
-  t.after(() => child.kill());
-  for (let attempt = 0; attempt < 200 && !(await pathExists(readyPath)); attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-  assert.equal(await pathExists(readyPath), true);
-  await assert.rejects(
-    () => recoverFlatDirectoryPublication(
-      join(root, "published"),
-      [["entry.txt", "aged live owner\n"]],
-      { ownerRoot: root },
-    ),
-    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-  );
-});
-
-const RELEASED_PUBLICATION_OWNER_SCRIPT = `
-  import { rm, mkdir, rename, writeFile } from "node:fs/promises";
-  import { join } from "node:path";
-  import { createEpic } from ${JSON.stringify(pathToFileURL(join(PACKAGE_ROOT, "src", "commands", "epic-create.js")).href)};
-  const scenario = JSON.parse(process.env.SDD_RELEASED_PUBLICATION_OWNER);
-  const destination = join(
-    scenario.root,
-    "code",
-    "sample-web",
-    "docs",
-    "epics",
-    "sample-e924-released-live-owner",
-  );
-  const displaced = destination + ".displaced";
-  try {
-    await createEpic(
-      scenario.root,
-      "sample",
-      "SAMPLE-E924",
-      "released-live-owner",
-      {
-        date: "2026-08-09",
-        repositories: ["sample-web"],
-        afterReservation: async ({ targetPath }) => {
-          await rename(targetPath, displaced);
-          await mkdir(targetPath);
-          await writeFile(join(targetPath, "replacement.txt"), "replacement\\n");
-        },
-      },
-    );
-  } catch {
-    await rm(destination, { recursive: true, force: true });
-    await rm(displaced, { recursive: true, force: true });
-  }
-  await writeFile(scenario.readyPath, "ready\\n");
-  await new Promise((resolve) => setTimeout(resolve, 60_000));
-`;
-
-test("cross-process recovery can claim a released token while its creator process remains alive", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const readyPath = join(root, "released-publication-owner.ready");
-  const child = execFile(process.execPath, [
-    "--input-type=module",
-    "--eval",
-    RELEASED_PUBLICATION_OWNER_SCRIPT,
-  ], {
-    env: {
-      ...process.env,
-      SDD_RELEASED_PUBLICATION_OWNER: JSON.stringify({ root, readyPath }),
-    },
-  });
-  t.after(() => child.kill());
-  for (let attempt = 0; attempt < 200 && !(await pathExists(readyPath)); attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-  assert.equal(await pathExists(readyPath), true);
-  const recovered = await createEpic(
-    root,
-    "sample",
-    "SAMPLE-E924",
-    "released-live-owner",
-    {
-      date: "2026-08-09",
-      repositories: ["sample-web"],
-    },
-  );
-  assert.equal(recovered.validation.valid, true);
-});
-
-test("recovered complete Epic publication is validated before it is accepted", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const destination = join(
-    root,
-    "code",
-    "sample-web",
-    "docs",
-    "epics",
-    "sample-e925-recovered-validation",
-  );
-  await assert.rejects(
-    () => execFileAsync(process.execPath, [
-      "--input-type=module",
-      "--eval",
-      CREATE_CRASH_SCRIPT,
-    ], {
-      env: {
-        ...process.env,
-        SDD_CREATE_CRASH_CASE: JSON.stringify({
-          kind: "Epic",
-          point: "entry",
-          root,
-          slug: "recovered-validation",
-          epicId: "SAMPLE-E925",
-        }),
-      },
-    }),
-    (error) => error.code === 93,
-  );
-  const duplicate = join(dirname(destination), "sample-e925-concurrent-duplicate");
-  await mkdir(duplicate);
-  await writeFile(
-    join(duplicate, "epic.md"),
-    await readFile(join(destination, "epic.md"), "utf8"),
-    "utf8",
-  );
-  await assert.rejects(
-    () => createEpic(root, "sample", "SAMPLE-E925", "recovered-validation", {
-      date: "2026-08-09",
-      repositories: ["sample-web"],
-    }),
-    (error) => error instanceof SddError
-      && error.code === "INVALID_EPIC_TEMPLATE"
-      && error.details.some((detail) => detail.includes("DUPLICATE_EPIC_ID")),
-  );
-  assert.equal(await pathExists(destination), false);
-  assert.equal(await pathExists(join(duplicate, "epic.md")), true);
-});
-
-test("recovered complete Epic publication rolls back on final authority drift", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const destination = join(
-    root,
-    "code",
-    "sample-web",
-    "docs",
-    "epics",
-    "sample-e926-recovered-authority",
-  );
-  await assert.rejects(
-    () => execFileAsync(process.execPath, [
-      "--input-type=module",
-      "--eval",
-      CREATE_CRASH_SCRIPT,
-    ], {
-      env: {
-        ...process.env,
-        SDD_CREATE_CRASH_CASE: JSON.stringify({
-          kind: "Epic",
-          point: "owner-marker-cleanup",
-          root,
-          slug: "recovered-authority",
-          epicId: "SAMPLE-E926",
-        }),
-      },
-    }),
-    (error) => error.code === 93,
-  );
-  const configPath = getWorkspaceConfigPath(root);
-  let replacement;
-  await assert.rejects(
-    () => createEpic(root, "sample", "SAMPLE-E926", "recovered-authority", {
-      date: "2026-08-09",
-      repositories: ["sample-web"],
-      validate: async () => {
-        replacement = await replaceLifecycleAuthorityFile(
-          configPath,
-          await readFile(configPath, "utf8"),
-        );
-        return { valid: true, findings: [] };
-      },
-    }),
-    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-  );
-  await assertLifecycleAuthorityFileCurrent(replacement);
-  assert.equal(await pathExists(destination), false);
-});
-
 
 test("lifecycle commit rechecks preserve unreadable and unsafe collision witnesses", async (t) => {
   const operations = lifecycleSelectionAuthorityOperations();

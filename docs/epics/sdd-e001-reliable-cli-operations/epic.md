@@ -59,7 +59,7 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 | Story | Implementation | Verification | Capability | Last Verified | Notes |
 |---|---|---|---|---|---|
 | S1 | implemented | verified | Validate navigable behavior and real evidence. | 2026-07-23 | Structure, anchors, evidence, report integrity, metadata, and focused reads fail closed with current proof. |
-| S2 | implemented | verified | Mutate only inside physical owner boundaries and preserve concurrent state safely. | 2026-08-19 | Configuration publication now uses its bounded current-consumer primitive; setup, update, installation, Epic creation, and lifecycle seams remain staged for later outcomes. Migration-grade replay and cross-artifact rollback are not accepted guarantees. |
+| S2 | implemented | partial | Mutate only inside physical owner boundaries and preserve concurrent state safely. | 2026-08-19 | Configuration and most bounded Epic behavior use current-consumer primitives; S6 remains blocked on exact directory-inode binding for the portable Epic payload write, while setup, update, installation, and lifecycle seams remain later outcomes. |
 | S3 | implemented | verified | Route one workspace-unique central Change across portable repository targets. | 2026-08-10 | Creation, lifecycle, physical confinement, and deterministic discovery use current workspace and repository contracts; legacy alpha formats are unsupported. |
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
 | S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-23 | Reports are versioned; PR/release paths are classified and rechecked; Git baselines are immutable and bounded. |
@@ -276,7 +276,7 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 ### Story S2: Safe And Recoverable Mutation
 
 Implementation: implemented
-Verification: verified
+Verification: partial
 Created: 2026-07-20
 Modified: 2026-08-19
 Last verified: 2026-08-19
@@ -363,7 +363,7 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 | S2/R2-S5 | `src/commands/init-installation.js#initRepository` | primary | Publishes the first portable repository contract through the exclusive no-replace configuration boundary so one concurrent writer wins without a generalized workspace lock. |
 | S2/R3-S1 | `src/config-publication.js#publishConfigFile` | primary | Publishes complete configuration YAML, preserves unexpected targets, retains inspectable recovery state when needed, and reports a safe retry/manual action. |
 | S2/R3-S1 | `src/fs.js#writeFileAtomically` | support | Continues publishing complete JSON installation evidence until the managed-install boundary is replaced by S8. |
-| S2/R3-S2 | `src/directory-publication.js#publishFlatDirectoryWithoutReplace` | primary | Currently scaffolds a validated Epic without replacing an existing target and reports retained recovery state. |
+| S2/R3-S2 | `src/commands/epic-create.js#publishEpicScaffold` | primary | Exclusively creates one owner-contained Epic directory and fsynced `epic.md`, preserves collisions or incomplete state for inspection, and reports a typed retry/manual-recovery action without journal replay. |
 | S2/R3-S3 | `src/fs.js#replaceFileAtomically` | primary | Currently publishes managed workflow files with no-replace and preserved-state behavior. |
 | S2/R3-S4 | `src/fs.js#replaceDirectoryAtomically` | primary | Currently reserves and publishes managed skill directories without replacing a concurrent target. |
 | S2/R3-S3, S2/R3-S4 | `src/mutation.js#withWorkspaceMutationLock` | support | Serializes current managed setup and update operations. |
@@ -384,6 +384,7 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
 | S2/R1-S1 | Automated test `test/cli.test.js#setup rejects a managed skills path through an external symlink ancestor` | Install planning refuses an external symlink ancestor before writing. | Passing 2026-08-07 |
+| S2/R1-S1 | Automated tests `test/cli.test.js#Epic create allows a selected mapping without portable config and confines custom roots physically`, `test/cli.test.js#Epic create never mutates a same-content external ancestor replacement`, and `test/cli.test.js#Epic creation rechecks authority before creating a missing artifact parent` | Epic scaffolding rejects configured and commit-window physical-owner escapes before writing the external target, and authority drift cannot create a missing artifact parent. | Passing 2026-08-19 |
 | S2/R1-S1 | Automated test `test/cli.test.js#change transition rejects an active Change through an external symlink ancestor` | Lifecycle mutation refuses an external artifact root and preserves its contents. | Passing 2026-07-20 |
 | S2/R1-S1 | Automated test `test/cli.test.js#validate rejects implementation and test evidence that resolve outside the repository` | Evidence acceptance uses the same physical ownership rule. | Passing 2026-07-20 |
 | S2/R1-S1 | Automated test `test/mutation.test.js#fixed SDD mutation paths reject a symlinked config directory` | Workflow, configuration, and lock paths cannot escape through `.sdd`. | Passing 2026-07-20 |
@@ -397,8 +398,13 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 | S2/R3-S1 | Automated test `test/cli.test.js#configure preserves a config that replaces its preflight snapshot before publish` | Configuration publication preserves a newer concurrent target and reports the conflict. | Passing 2026-08-19 |
 | S2/R3-S1 | Automated test `test/mutation.test.js#first-time setup preserves its complete config and reports a safe retry` | A later managed-install failure retains parseable workspace configuration, identifies it, and the same setup command completes safely on retry. | Passing 2026-08-19 |
 | S2/R3-S1 | Automated test `test/mutation.test.js#atomic JSON writes leave one complete parseable document` | Current installation-evidence publication still leaves one whole parseable JSON document pending S8. | Passing 2026-07-20 |
-| S2/R3-S2 | Automated test `test/cli.test.js#epic create refuses ambiguous repositories, collisions, and dry-run writes` | Epic creation refuses a colliding target and leaves it unchanged. | Passing 2026-07-20 |
-| S2/R3-S2 | Automated test `test/cli.test.js#epic create scaffolds and validates a canonical Epic in one repository` | A successful exclusive scaffold publishes one structurally valid Epic. | Passing 2026-07-20 |
+| S2/R3-S2 | Automated test `test/cli.test.js#epic create refuses ambiguous repositories, collisions, and dry-run writes` | Epic creation refuses a colliding target and leaves it unchanged. | Passing 2026-08-19 |
+| S2/R3-S2 | Automated test `test/cli.test.js#epic create scaffolds and validates a canonical Epic in one repository` | A successful exclusive scaffold publishes one structurally valid Epic. | Passing 2026-08-19 |
+| S2/R3-S2 | Automated test `test/cli.test.js#CLI exposes epic create with JSON output` | Epic creation preserves current JSON fields and human dry-run output without mutation. | Passing 2026-08-19 |
+| S2/R3-S2 | Automated test `test/cli.test.js#Epic creation preserves every destination type that appears before exclusive creation` | A raced file, directory, symlink, or nonempty directory remains the canonical target; retry succeeds only after explicit removal. | Passing 2026-08-19 |
+| S2/R3-S2 | Automated test `test/cli.test.js#Epic creation rejects a target replacement after exclusive directory creation` | The freshly created directory is identity-bound before payload write; a replacement is preserved empty and reported instead of being adopted. | Passing 2026-08-19 |
+| S2/R3-S2 | Automated test `test/cli.test.js#Epic validation failure retains complete inspectable state and reports manual recovery` | Failed structural validation retains complete inspectable scaffold state, reports `MUTATION_RECOVERY_FAILED`, names the retained path, and provides manual retry guidance. | Passing 2026-08-19 |
+| S2/R3-S2 | Automated test `test/cli.test.js#Epic validation recovery preserves a replacement and the displaced scaffold` | A target replacement after failed validation remains untouched while the displaced complete scaffold remains inspectable. | Passing 2026-08-19 |
 | S2/R3-S3 | Automated test `test/mutation.test.js#workflow replacement preserves an edit made inside the replacement window` | Managed workflow publication preserves newer content that appears during replacement. | Passing 2026-07-20 |
 | S2/R3-S3 | Automated test `test/cli.test.js#update refuses to overlap another managed mutation` | A held current-writer boundary blocks update without altering durable installation state. | Passing 2026-07-20 |
 | S2/R3-S4 | Automated test `test/mutation.test.js#skill replacement preserves an edit made inside the replacement window` | Managed skill publication preserves newer content that appears during replacement. | Passing 2026-07-20 |
@@ -408,13 +414,14 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 
 #### Verification Gaps
 
-- None.
+- `S2/R3-S2`: [user accepted 2026-08-19] Portable Node path APIs cannot bind the later `epic.md` creation to the exact empty directory inode returned by `mkdir`; a concurrent same-user process can replace that directory between syscalls. This accepted technical gap is limited to the owner-operated local CLI boundary and does not claim protection from that exact interleaving.
 
 #### Story Notes
 
 - Physical ownership is evaluated after resolving existing symlink ancestors; it is stronger than lexical `..` rejection.
 - The accepted recovery boundary is recorded in `docs/adrs/2026-08-19-use-current-consumer-cli-primitives.md`. Physical containment, no silent overwrite, complete individual durable files, required exclusive creation, and actionable preserved-state reporting remain required; migration-grade replay and cross-artifact rollback are not accepted guarantees.
-- The current implementation may provide stronger automatic recovery while the active simplification Change replaces one current command seam at a time. Epic maps and focused evidence must be reconciled after each replacement.
+- Remaining managed-install and lifecycle seams may temporarily provide stronger recovery while the active simplification Change replaces one current command boundary at a time.
+- Epic creation now uses exclusive owner-contained target creation and actionable preserved-state recovery; the generalized directory journal/replay implementation has no current consumer and was removed.
 - First repository configuration publication now relies on exclusive target creation rather than the generalized mutation lock. Setup/update and Change lifecycle locks remain current until S7-S9 replace their separate consumers.
 
 ### Story S3: Unambiguous Topology And Lifecycle Routing
