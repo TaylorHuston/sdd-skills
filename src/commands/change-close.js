@@ -4,6 +4,7 @@ import { assertValidChangeId } from "../change-id.js";
 import {
   assertChangeStoreConfinement,
   assertRequiredChangeFileSnapshotCurrent,
+  changeStoreEntryExists,
   getActiveChangePath,
   getClosedChangePath,
   getClosedChangesRoot,
@@ -17,8 +18,7 @@ import {
 import { CHANGE_SCHEMA_V2, parseChangeMetadata } from "../change-status.js";
 import { assertValidConfig, resolveWorkspaceStatus } from "../config.js";
 import { SddError } from "../errors.js";
-import { isDirectory, pathExists } from "../fs.js";
-import { withWorkspaceMutationLock } from "../mutation.js";
+import { isDirectory } from "../fs.js";
 import {
   assertOperationConfigurationCurrent,
   resolveOperationConfiguration,
@@ -31,8 +31,8 @@ export async function closeChange(
   {
     dryRun = false,
     beforeCommit = null,
+    beforeMove = null,
     workspaceRoot: requestedWorkspaceRoot = null,
-    lockToken = null,
   } = {},
 ) {
   assertValidChangeId(changeId);
@@ -41,15 +41,6 @@ export async function closeChange(
     requestedWorkspaceRoot ? { workspaceRoot: requestedWorkspaceRoot } : {},
   );
   const { workspaceRoot, config } = operation;
-  if (!dryRun && lockToken === null) {
-    return withWorkspaceMutationLock(workspaceRoot, (mutationLock) =>
-      closeChange(startPath, spaceId, changeId, {
-        dryRun,
-        beforeCommit,
-        workspaceRoot,
-        lockToken: mutationLock,
-      }));
-  }
 
   assertValidConfig(config, "close a Change");
   const space = config.ideas[spaceId];
@@ -71,7 +62,7 @@ export async function closeChange(
   await assertChangeStoreConfinement(sourceAbsolutePath, workspaceRoot);
   await assertChangeStoreConfinement(destinationAbsolutePath, workspaceRoot);
 
-  if (await pathExists(destinationAbsolutePath)) {
+  if (await changeStoreEntryExists(destinationAbsolutePath)) {
     throw new SddError(`Closed Change already exists: ${destinationPath}`, {
       code: await isDirectory(sourceAbsolutePath)
         ? "CHANGE_LOCATION_COLLISION"
@@ -124,35 +115,49 @@ export async function closeChange(
   );
 
   if (!dryRun) {
+    const assertCloseCurrent = async () => {
+      await assertOperationConfigurationCurrent(operation);
+      await assertSelectedRepositorySnapshotsCurrent(
+        workspaceRoot,
+        config,
+        space,
+        selectedRepositories,
+      );
+      await assertRequiredChangeFileSnapshotCurrent(
+        sourceAbsolutePath,
+        "change.md",
+        workspaceRoot,
+        snapshot,
+      );
+      if (await changeStoreEntryExists(destinationAbsolutePath)) {
+        throw new SddError(`Closed Change appeared before close: ${destinationPath}`, {
+          code: "CONCURRENT_CHANGE",
+        });
+      }
+    };
+
     await beforeCommit?.({
       sourcePath: sourceAbsolutePath,
       destinationPath: destinationAbsolutePath,
     });
-    await assertOperationConfigurationCurrent(operation);
-    await assertSelectedRepositorySnapshotsCurrent(
-      workspaceRoot,
-      config,
-      space,
-      selectedRepositories,
-    );
-    await assertRequiredChangeFileSnapshotCurrent(
-      sourceAbsolutePath,
-      "change.md",
-      workspaceRoot,
-      snapshot,
-    );
-    if (await pathExists(destinationAbsolutePath)) {
-      throw new SddError(`Closed Change appeared before close: ${destinationPath}`, {
-        code: "CONCURRENT_CHANGE",
-      });
-    }
-    await mkdir(getClosedChangesRoot(workspaceRoot), { recursive: true });
+    await assertCloseCurrent();
+    const closedRoot = getClosedChangesRoot(workspaceRoot);
+    await assertChangeStoreConfinement(closedRoot, workspaceRoot);
+    await mkdir(closedRoot, { recursive: true });
+    await assertChangeStoreConfinement(closedRoot, workspaceRoot);
+    await beforeMove?.({
+      sourcePath: sourceAbsolutePath,
+      destinationPath: destinationAbsolutePath,
+    });
+    await assertCloseCurrent();
+
     try {
       await rename(sourceAbsolutePath, destinationAbsolutePath);
     } catch (error) {
-      if (["EEXIST", "ENOTEMPTY"].includes(error?.code)) {
-        throw new SddError(`Closed Change appeared during close: ${destinationPath}`, {
+      if (["EEXIST", "ENOTEMPTY", "ENOENT", "ENOTDIR"].includes(error?.code)) {
+        throw new SddError(`Change moved or closed concurrently: ${destinationPath}`, {
           code: "CONCURRENT_CHANGE",
+          details: [error.message],
         });
       }
       throw error;

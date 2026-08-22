@@ -6,6 +6,7 @@ import { formatV2TaskIssues, parseV2ChangeTasks } from "../change-tasks-v2.js";
 import {
   assertChangeStoreConfinement,
   assertRequiredChangeFileSnapshotCurrent,
+  changeStoreEntryExists,
   getActiveChangePath,
   getClosedChangePath,
   missingCompatibleDesignSections,
@@ -26,8 +27,7 @@ import {
 } from "../change-status.js";
 import { assertValidConfig, resolveWorkspaceStatus } from "../config.js";
 import { SddError } from "../errors.js";
-import { isDirectory, pathExists } from "../fs.js";
-import { withWorkspaceMutationLock } from "../mutation.js";
+import { isDirectory } from "../fs.js";
 import {
   assertOperationConfigurationCurrent,
   resolveOperationConfiguration,
@@ -99,8 +99,8 @@ export async function transitionChange(
     to,
     dryRun = false,
     beforeCommit = null,
+    beforeReplace = null,
     workspaceRoot: requestedWorkspaceRoot = null,
-    lockToken = null,
   } = {},
 ) {
   assertValidChangeId(changeId);
@@ -110,17 +110,6 @@ export async function transitionChange(
     requestedWorkspaceRoot ? { workspaceRoot: requestedWorkspaceRoot } : {},
   );
   const { workspaceRoot, config } = operation;
-  if (!dryRun && lockToken === null) {
-    return withWorkspaceMutationLock(workspaceRoot, (mutationLock) =>
-      transitionChange(startPath, spaceId, changeId, {
-        from,
-        to,
-        dryRun,
-        beforeCommit,
-        workspaceRoot,
-        lockToken: mutationLock,
-      }));
-  }
 
   assertValidConfig(config, "transition a Change");
   const space = config.ideas[spaceId];
@@ -137,7 +126,7 @@ export async function transitionChange(
 
   const activePath = getActiveChangePath(changeId, workspaceRoot);
   const closedPath = getClosedChangePath(changeId, workspaceRoot);
-  if (await pathExists(closedPath)) {
+  if (await changeStoreEntryExists(closedPath)) {
     throw new SddError(`Change ID exists in closed history: ${changeId}`, {
       code: await isDirectory(activePath)
         ? "CHANGE_LOCATION_COLLISION"
@@ -205,53 +194,57 @@ export async function transitionChange(
   }
 
   if (!dryRun) {
+    const assertTransitionCurrent = async () => {
+      await assertOperationConfigurationCurrent(operation);
+      await assertSelectedRepositorySnapshotsCurrent(
+        workspaceRoot,
+        config,
+        space,
+        selectedRepositories,
+      );
+      await assertRequiredChangeFileSnapshotCurrent(
+        activePath,
+        "change.md",
+        workspaceRoot,
+        snapshot,
+      );
+      if (planningSnapshots) {
+        await assertRequiredChangeFileSnapshotCurrent(
+          activePath,
+          "tasks.md",
+          workspaceRoot,
+          planningSnapshots.tasks,
+        );
+        if (planningSnapshots.existingDesign) {
+          await assertRequiredChangeFileSnapshotCurrent(
+            activePath,
+            "design.md",
+            workspaceRoot,
+            planningSnapshots.existingDesign,
+          );
+        } else if (await readRequiredChangeFileSnapshot(
+          activePath,
+          "design.md",
+          workspaceRoot,
+        ) !== null) {
+          throw new SddError(
+            `Change design.md appeared after planning was validated: ${changeId}`,
+            { code: "CONCURRENT_CHANGE" },
+          );
+        }
+      }
+      if (await changeStoreEntryExists(closedPath)) {
+        throw new SddError(`Change moved to closed history: ${changeId}`, {
+          code: "CONCURRENT_CHANGE",
+        });
+      }
+    };
+
     await beforeCommit?.({
       changePath: activePath,
       changeFilePath: join(activePath, "change.md"),
     });
-    await assertOperationConfigurationCurrent(operation);
-    await assertSelectedRepositorySnapshotsCurrent(
-      workspaceRoot,
-      config,
-      space,
-      selectedRepositories,
-    );
-    await assertRequiredChangeFileSnapshotCurrent(
-      activePath,
-      "change.md",
-      workspaceRoot,
-      snapshot,
-    );
-    if (planningSnapshots) {
-      await assertRequiredChangeFileSnapshotCurrent(
-        activePath,
-        "tasks.md",
-        workspaceRoot,
-        planningSnapshots.tasks,
-      );
-      if (planningSnapshots.existingDesign) {
-        await assertRequiredChangeFileSnapshotCurrent(
-          activePath,
-          "design.md",
-          workspaceRoot,
-          planningSnapshots.existingDesign,
-        );
-      } else if (await readRequiredChangeFileSnapshot(
-        activePath,
-        "design.md",
-        workspaceRoot,
-      ) !== null) {
-        throw new SddError(
-          `Change design.md appeared after planning was validated: ${changeId}`,
-          { code: "CONCURRENT_CHANGE" },
-        );
-      }
-    }
-    if (await pathExists(closedPath)) {
-      throw new SddError(`Change moved to closed history: ${changeId}`, {
-        code: "CONCURRENT_CHANGE",
-      });
-    }
+    await assertTransitionCurrent();
 
     const temporaryPath = join(
       dirname(join(activePath, "change.md")),
@@ -263,7 +256,23 @@ export async function transitionChange(
         flag: "wx",
         mode: snapshot.mode,
       });
-      await rename(temporaryPath, join(activePath, "change.md"));
+      await beforeReplace?.({
+        changePath: activePath,
+        changeFilePath: join(activePath, "change.md"),
+        temporaryPath,
+      });
+      await assertTransitionCurrent();
+      try {
+        await rename(temporaryPath, join(activePath, "change.md"));
+      } catch (error) {
+        if (["ENOENT", "ENOTDIR", "EISDIR"].includes(error?.code)) {
+          throw new SddError(`Change moved or changed during transition: ${changeId}`, {
+            code: "CONCURRENT_CHANGE",
+            details: [error.message],
+          });
+        }
+        throw error;
+      }
     } finally {
       await rm(temporaryPath, { force: true });
     }

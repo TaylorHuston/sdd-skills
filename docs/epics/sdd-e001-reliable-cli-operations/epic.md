@@ -59,8 +59,8 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 | Story | Implementation | Verification | Capability | Last Verified | Notes |
 |---|---|---|---|---|---|
 | S1 | implemented | verified | Validate navigable behavior and real evidence. | 2026-07-23 | Structure, anchors, evidence, report integrity, metadata, and focused reads fail closed with current proof. |
-| S2 | implemented | partial | Mutate only inside physical owner boundaries and preserve concurrent state safely. | 2026-08-19 | Configuration and most bounded Epic behavior use current-consumer primitives; S6 remains blocked on exact directory-inode binding for the portable Epic payload write, while setup, update, installation, and lifecycle seams remain later outcomes. |
-| S3 | implemented | verified | Route one workspace-unique central Change across portable repository targets. | 2026-08-10 | Creation, lifecycle, physical confinement, and deterministic discovery use current workspace and repository contracts; legacy alpha formats are unsupported. |
+| S2 | partial | partial | Mutate only inside physical owner boundaries and preserve concurrent state safely. | 2026-08-21 | Configuration, Epic creation, and Change lifecycle commands use bounded current-consumer primitives; the dated accepted local-filesystem gaps remain explicit, while managed installation remains later work. |
+| S3 | partial | partial | Route one workspace-unique central Change across portable repository targets. | 2026-08-21 | Lifecycle commands no longer consume the managed-install lock and preserve every tested pre-syscall conflict; exact final path-based syscall races are dated accepted gaps rather than claimed atomicity. |
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
 | S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-23 | Reports are versioned; PR/release paths are classified and rechecked; Git baselines are immutable and bounded. |
 | S6 | implemented | partial | Carry one progressive central Change through focused planning, risk-triggered Review, conditional Epic reconciliation, and a content-identical local outcome commit. | 2026-08-17 | The one supported current workflow is v2; the unrelated accepted aggregate NUL-path gap remains explicit. |
@@ -275,11 +275,11 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 
 ### Story S2: Safe And Recoverable Mutation
 
-Implementation: implemented
+Implementation: partial
 Verification: partial
 Created: 2026-07-20
-Modified: 2026-08-19
-Last verified: 2026-08-19
+Modified: 2026-08-21
+Last verified: 2026-08-21
 
 As a developer, I want filesystem mutations to stay inside their physical repository or selected workspace owner and preserve concurrent work, so that setup and lifecycle commands cannot silently damage unrelated data.
 
@@ -358,8 +358,8 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 | S2/R1 | `src/fs.js#isPathPhysicallyInside` | primary | Resolves existing ancestors before authorizing a child path. |
 | S2/R1 | `src/skills.js#applySkillSync` | support | Rechecks every managed-skill target immediately before mutation. |
 | S2/R1 | `src/config.js#writeWorkspaceConfig` | support | Refuses a configuration file below a symlinked external `.sdd` directory. |
-| S2/R2 | `src/commands/change-transition.js#transitionChange` | primary | Compares staged `change.md` with commit-time content and preserves concurrent edits. |
-| S2/R2 | `src/commands/change-close.js#closeChange` | primary | Rechecks central status and ownership at commit time. |
+| S2/R2 | `src/commands/change-transition.js#transitionChange` | primary | Rechecks the bounded `change.md`, workspace, and repository snapshots after staging and immediately before its mode-preserving atomic replacement. |
+| S2/R2 | `src/commands/change-close.js#closeChange` | primary | Rechecks status, ownership, and destination absence immediately before the direct active-to-closed rename. |
 | S2/R2-S5 | `src/commands/init-installation.js#initRepository` | primary | Publishes the first portable repository contract through the exclusive no-replace configuration boundary so one concurrent writer wins without a generalized workspace lock. |
 | S2/R3-S1 | `src/config-publication.js#publishConfigFile` | primary | Publishes complete configuration YAML, preserves unexpected targets, retains inspectable recovery state when needed, and reports a safe retry/manual action. |
 | S2/R3-S1 | `src/fs.js#writeFileAtomically` | support | Continues publishing complete JSON installation evidence until the managed-install boundary is replaced by S8. |
@@ -377,7 +377,7 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 
 #### Implementation Gaps
 
-- None.
+- `S2/R2-S1`, `S2/R2-S4`: plain Node path APIs cannot atomically bind the final observed Change file/source directory and absent destination to the subsequent replacement or move syscall; a same-user actor can change those paths after the last explicit recheck.
 
 #### Verified By
 
@@ -388,8 +388,8 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 | S2/R1-S1 | Automated test `test/cli.test.js#change transition rejects an active Change through an external symlink ancestor` | Lifecycle mutation refuses an external artifact root and preserves its contents. | Passing 2026-07-20 |
 | S2/R1-S1 | Automated test `test/cli.test.js#validate rejects implementation and test evidence that resolve outside the repository` | Evidence acceptance uses the same physical ownership rule. | Passing 2026-07-20 |
 | S2/R1-S1 | Automated test `test/mutation.test.js#fixed SDD mutation paths reject a symlinked config directory` | Workflow, configuration, and lock paths cannot escape through `.sdd`. | Passing 2026-07-20 |
-| S2/R2-S1 | Automated test `test/change-contract.test.js#planning completes the same Change before lifecycle work continues` | A commit-time `change.md` edit aborts the simplified transition with `CONCURRENT_CHANGE`, preserves `planned`, and remains retryable. | Passing 2026-08-16 |
-| S2/R2-S4 | Automated test `test/cli.test.js#change close rechecks status at commit time` | Close refuses a Change reopened after preflight. | Passing 2026-07-20 |
+| S2/R2-S1 | Automated tests `test/change-contract.test.js#planning completes the same Change before lifecycle work continues` and `test/cli.test.js#change transition preserves an edit made at the final replacement boundary` | Edits injected before the last snapshot recheck abort with `CONCURRENT_CHANGE`, preserve current content, and remove staged replacement residue. | Passing 2026-08-21 |
+| S2/R2-S4 | Automated tests `test/cli.test.js#change close rechecks status at commit time` and `test/cli.test.js#change close preserves a destination that appears before the final move` | A reopen or nonempty destination injected before the last move recheck remains canonical. | Passing 2026-08-21 |
 | S2/R2-S5 | Automated test `test/cli.test.js#repository init rejects concurrent first initialization without losing the winner` | Two overlapping initializers leave one complete accepted repository contract; the prepared loser receives an actionable `CONCURRENT_CHANGE`, and no publication residue remains. | Passing 2026-08-19 |
 | S2/R3-S1 | Automated tests `test/workspace-config.test.js#expected-absent config publication preserves a file that appears before publish` and `test/workspace-config.test.js#expected-absent repository config publication preserves a file that appears before publish` | Exclusive first publication preserves a complete concurrent workspace or repository winner. | Passing 2026-08-19 |
 | S2/R3-S1 | Automated test `test/workspace-config.test.js#configuration publication writes complete YAML and preserves file mode` | Configuration replacement remains parseable and preserves accepted permissions. | Passing 2026-08-19 |
@@ -414,6 +414,8 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 
 #### Verification Gaps
 
+- `S2/R2-S1`: [user accepted 2026-08-21] Portable Node cannot atomically condition final `change.md` replacement on the exact snapshot observed immediately before `rename`; a concurrent same-user path replacement in that final window can be overwritten. Acceptance is limited to the owner-operated local CLI and does not claim atomic compare-and-set.
+- `S2/R2-S4`: [user accepted 2026-08-21] Portable Node cannot atomically condition the active-to-closed directory move on the exact status/source/destination state observed immediately before `rename`; a final-window reopen or empty destination can be moved or replaced. Acceptance is limited to the owner-operated local CLI and does not claim atomic move-if-current.
 - `S2/R3-S2`: [user accepted 2026-08-19] Portable Node path APIs cannot bind the later `epic.md` creation to the exact empty directory inode returned by `mkdir`; a concurrent same-user process can replace that directory between syscalls. This accepted technical gap is limited to the owner-operated local CLI boundary and does not claim protection from that exact interleaving.
 
 #### Story Notes
@@ -422,15 +424,15 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 - The accepted recovery boundary is recorded in `docs/adrs/2026-08-19-use-current-consumer-cli-primitives.md`. Physical containment, no silent overwrite, complete individual durable files, required exclusive creation, and actionable preserved-state reporting remain required; migration-grade replay and cross-artifact rollback are not accepted guarantees.
 - Remaining managed-install and lifecycle seams may temporarily provide stronger recovery while the active simplification Change replaces one current command boundary at a time.
 - Epic creation now uses exclusive owner-contained target creation and actionable preserved-state recovery; the generalized directory journal/replay implementation has no current consumer and was removed.
-- First repository configuration publication now relies on exclusive target creation rather than the generalized mutation lock. Setup/update and Change lifecycle locks remain current until S7-S9 replace their separate consumers.
+- First repository configuration and central Change lifecycle commands now use their narrow no-overwrite boundaries rather than the generalized mutation lock. Only setup/update managed-install serialization remains current until S8-S9 replace that boundary.
 
 ### Story S3: Unambiguous Topology And Lifecycle Routing
 
-Implementation: implemented
-Verification: verified
+Implementation: partial
+Verification: partial
 Created: 2026-07-20
-Modified: 2026-08-10
-Last verified: 2026-08-10
+Modified: 2026-08-21
+Last verified: 2026-08-21
 
 As a developer, I want one workspace-unique Change record with explicit portable repository targets, so that lifecycle commands cannot invent ownership, split status across copies, or mutate outside the selected workspace.
 
@@ -511,7 +513,7 @@ The CLI SHALL resolve an explicit command workspace first, then `SDD_WORKSPACE_R
 
 | Requirement / Scenario | Location / Anchor | Kind | Responsibility |
 |---|---|---|---|
-| S3/R1, S3/R3-S1 | `src/commands/change-create.js#createChange` | primary | Creates one proposed `change.md`, records Space and optional repository metadata, and rejects an active or closed ID before publication. |
+| S3/R1, S3/R3-S1 | `src/commands/change-create.js#createChange` | primary | Exclusively creates one proposed central Change, preserves a concurrent or replaced target, and rejects active or closed identity collisions without a workspace mutation lock. |
 | S3/R1 | `src/change-repositories.js#resolveRepositoryTargets` | support | Resolves stable mapped or repository-only target IDs without inventing repository-local Change ownership. |
 | S3/R2 | `src/config.js#validateConfig` | primary | Enforces current config shape, portable repository IDs, and physical ownership invariants. |
 | S3/R2 | `schemas/workspace.schema.json#sdd-v3` | support | Publishes the checked workspace configuration contract. |
@@ -519,8 +521,8 @@ The CLI SHALL resolve an explicit command workspace first, then `SDD_WORKSPACE_R
 | S3/R2 | `src/workspace.js#resolveWorkspaceContext` | primary | Rejects duplicate physical repositories and ambiguous portable identities while retaining valid repository-only context. |
 | S3/R2-S3 | `src/change-store.js#assertChangeStoreConfinement` | primary | Confines active and closed central paths to the selected workspace. |
 | S3/R3 | `src/change-store.js#listStoredChanges` | support | Enumerates the active and closed workspace inventory without assigning uniqueness-enforcement responsibility to the inventory helper. |
-| S3/R3-S2 | `src/commands/change-transition.js#transitionChange` | primary | Applies compare-and-set status mutation to one central `change.md`. |
-| S3/R3-S3 | `src/commands/change-close.js#closeChange` | primary | Moves one `in_review` central Change into closed history. |
+| S3/R3-S2 | `src/commands/change-transition.js#transitionChange` | primary | Applies a mode-preserving compare-and-set status replacement after final workspace, repository, and file snapshot checks. |
+| S3/R3-S3 | `src/commands/change-close.js#closeChange` | primary | Rechecks current authority and destination absence, then directly moves one `in_review` central Change into closed history. |
 | S3/R2-S4, S3/R3-S1 | `src/commands/validate.js#validateCentralChanges` | primary | Rejects missing and cross-Space repository metadata and reports an active/closed ID collision for every central Change. |
 | S3/R2-S4 | `src/commands/status.js#buildSpace` | support | Keeps Space-owned Changes visible and reports unresolved target IDs when mappings drift. |
 | S3/R3-S1 | `src/commands/status.js#readCentralChanges` | support | Refuses to project an active/closed duplicate as two independent status records. |
@@ -529,7 +531,7 @@ The CLI SHALL resolve an explicit command workspace first, then `SDD_WORKSPACE_R
 
 #### Implementation Gaps
 
-- None.
+- `S3/R3-S1`, `S3/R3-S2`, `S3/R3-S3`: lifecycle commands preserve tested current-writer conflicts without the generalized lock, but portable path-based creation/replacement/move cannot atomically bind the last observed active/closed identity across the final syscall.
 
 #### Verified By
 
@@ -539,18 +541,23 @@ The CLI SHALL resolve an explicit command workspace first, then `SDD_WORKSPACE_R
 | S3/R2-S1 | Automated tests `test/cli.test.js#runtime config validation rejects unknown keys`, `test/cli.test.js#context rejects physical aliases claimed as different repositories`, and `test/schema-contracts.test.js#workspace and repository schemas reuse the runtime lexical path contract` | Runtime and published schemas reject unknown or unsafe shape and duplicate physical ownership consistently. | Passing 2026-08-10 |
 | S3/R2-S2 | Automated test `test/cli.test.js#context rejects a repository-only ID that collides with an existing Idea` | A duplicate portable ID cannot silently claim another owner. | Passing 2026-08-07 |
 | S3/R2-S3 | Automated tests `test/cli.test.js#validation rejects a central Change store symlinked outside its owner` and `test/cli.test.js#change transition rejects an active Change through an external symlink ancestor` | Workspace-owned Change paths cannot traverse a physical owner boundary. | Passing 2026-08-07 |
-| S3/R3-S1, S3/R3-S2, S3/R3-S3 | Automated test `test/change-contract.test.js#planning completes the same Change before lifecycle work continues` | The progressive record rejects an ID already in closed history, transitions one `change.md` through planned, in-progress, and in-review, preserves commit-time edits, and closes the same record by location. | Passing 2026-08-16 |
+| S3/R3-S1 | Automated tests `test/cli.test.js#Change creation treats a dangling closed-history entry as an identity collision`, `test/cli.test.js#concurrent Change creation preserves one complete central winner`, and `test/cli.test.js#Change creation preserves a replacement after exclusive directory creation` | Pre-existing active/closed entries, concurrent same-ID creation, and a replacement injected after exclusive directory creation remain canonical through the tested rechecks. | Passing 2026-08-21 |
+| S3/R3-S2 | Automated tests `test/change-contract.test.js#planning completes the same Change before lifecycle work continues`, `test/cli.test.js#change transition updates an active Change with compare-and-set semantics`, and `test/cli.test.js#change transition preserves an edit made at the final replacement boundary` | One central `change.md` transitions with preserved mode, while stale or injected pre-rename content remains canonical. | Passing 2026-08-21 |
+| S3/R3-S3 | Automated tests `test/change-contract.test.js#planning completes the same Change before lifecycle work continues`, `test/cli.test.js#change close rechecks status at commit time`, and `test/cli.test.js#change close preserves a destination that appears before the final move` | Close moves a current `in_review` record and preserves reopened active or nonempty closed state observed by the final explicit recheck. | Passing 2026-08-21 |
+| S3/R3-S1, S3/R3-S2, S3/R3-S3 | Automated test `test/cli.test.js#Change lifecycle commands do not consume the managed-install mutation lock` | Create, transition, and close complete through their narrow boundaries while the separate managed-install lock remains present and unchanged. | Passing 2026-08-21 |
 | S3/R2-S4 | Automated tests `test/cli.test.js#validate rejects absent and cross-Space Change repository IDs deterministically` and `test/cli.test.js#status retains Space-owned Changes whose repository IDs no longer resolve` | Invalid ownership fails validation without hiding the Space-owned work from status. | Passing 2026-08-07 |
 | S3/R5-S1 | Automated tests `test/workspace-config.test.js#workspace discovery honors explicit, environment, target, and cwd precedence`, `test/workspace-config.test.js#cwd workspace resolves a physically mapped external repository`, and `test/cli.test.js#CLI context keeps cwd as the target when --workspace supplies external ownership` | Discovery selects the deterministic workspace owner while the explicit workspace option remains authority and never replaces the command's cwd target. | Passing 2026-08-07 |
 | S3/R5-S2 | Automated tests `test/workspace-config.test.js#an unmapped external target cannot borrow the cwd workspace` and `test/workspace-config.test.js#workspace discovery never falls back to HOME or SDD_USER_HOME` | Unmapped external targets fail without borrowing cwd or home authority. | Passing 2026-08-07 |
 
 #### Verification Gaps
 
-- None.
+- `S3/R3-S1`: [user accepted 2026-08-21] Portable Node cannot bind successful creation to the exact active/closed identity across the final `change.md` write and post-publication checks; a same-user final-window replacement or active/closed duplicate remains possible. Acceptance is limited to the owner-operated local CLI and does not claim final publication identity binding.
+- `S3/R3-S2`: [user accepted 2026-08-21] Portable Node ordinary `rename` is not a final compare-and-set primitive; a same-user replacement after the last snapshot check can be overwritten. Acceptance is limited to the owner-operated local CLI and does not claim atomic compare-and-set.
+- `S3/R3-S3`: [user accepted 2026-08-21] Portable Node ordinary directory `rename` cannot atomically require both the exact active source and an absent destination; a same-user final-window reopen or empty destination remains possible. Acceptance is limited to the owner-operated local CLI and does not claim atomic move-if-current.
 
 #### Story Notes
 
-- The focused progressive lifecycle contract passes; a clean aggregate package run remains a Change-level release gate rather than missing Scenario evidence.
+- The focused progressive lifecycle contract passes through every explicit recheck; the exact final path-based syscall windows are user-accepted 2026-08-21 rather than claimed atomicity. A clean aggregate package run remains a Change-level release gate rather than missing Scenario evidence.
 - Repository-only context remains portable through its stable repository ID, but an external repository selects a workspace only through an explicit command root, `SDD_WORKSPACE_ROOT`, or an enclosing current-directory workspace that maps it.
 
 ### Story S4: Bounded And Context-Aware Diagnostics

@@ -1,8 +1,9 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
   assertChangeStoreConfinement,
+  changeStoreEntryExists,
   getActiveChangePath,
   getChangesRoot,
   getClosedChangePath,
@@ -16,8 +17,6 @@ import { setChangeMetadata } from "../change-status.js";
 import { assertValidConfig, resolveWorkspaceStatus } from "../config.js";
 import { PACKAGE_ROOT } from "../constants.js";
 import { SddError } from "../errors.js";
-import { pathExists } from "../fs.js";
-import { withWorkspaceMutationLock } from "../mutation.js";
 import {
   assertOperationConfigurationCurrent,
   resolveOperationConfiguration,
@@ -30,8 +29,6 @@ const CHANGE_TEMPLATE = join(
   "assets",
   "change-template.md",
 );
-const CENTRAL_CHANGE_LOCK = Symbol("central-change-lock");
-
 function changeTitle(slug) {
   return slug
     .split("-")
@@ -56,6 +53,32 @@ function localDate() {
   return [now.getFullYear(), now.getMonth() + 1, now.getDate()]
     .map((value, index) => String(value).padStart(index === 0 ? 4 : 2, "0"))
     .join("-");
+}
+
+function concurrentCreate(changeId, path, detail) {
+  return new SddError(`Change creation conflicted with current state: ${changeId}`, {
+    code: "CONCURRENT_CHANGE",
+    details: [
+      detail,
+      `Preserved Change path: ${path}`,
+      "Inspect the preserved state and retry with a different ID or after resolving the collision.",
+    ],
+  });
+}
+
+function createRecoveryFailure(changeId, path, error) {
+  const failure = new SddError(`Change creation requires manual recovery: ${changeId}`, {
+    code: "MUTATION_RECOVERY_FAILED",
+    details: [
+      `Original error: ${error?.code ? `${error.code}: ` : ""}${error?.message ?? String(error)}`,
+      `Retained Change path requiring inspection: ${path}`,
+      "Preserve the intended complete Change or remove only the confirmed incomplete residue, then retry.",
+    ],
+  });
+  failure.cause = error;
+  failure.errors = [error];
+  failure.retainedPaths = [path];
+  return failure;
 }
 
 function renderChange(source, { title, spaceId, repositories }) {
@@ -89,7 +112,8 @@ export async function createChange(
     repositories = [],
     dryRun = false,
     workspaceRoot: requestedWorkspaceRoot = null,
-    lockToken = null,
+    beforePublish = null,
+    afterDirectoryCreate = null,
   } = {},
 ) {
   const operation = await resolveOperationConfiguration(
@@ -97,20 +121,6 @@ export async function createChange(
     requestedWorkspaceRoot ? { workspaceRoot: requestedWorkspaceRoot } : {},
   );
   const { workspaceRoot, config } = operation;
-  if (!dryRun && lockToken !== CENTRAL_CHANGE_LOCK) {
-    return withWorkspaceMutationLock(workspaceRoot, () => createChange(
-      startPath,
-      spaceId,
-      slug,
-      {
-        date,
-        repositories,
-        dryRun,
-        workspaceRoot,
-        lockToken: CENTRAL_CHANGE_LOCK,
-      },
-    ));
-  }
 
   assertValidConfig(config, "create a Change");
   const space = config.ideas[spaceId];
@@ -155,7 +165,7 @@ export async function createChange(
   const title = changeTitle(slug);
   const files = ["change.md"];
 
-  if (await pathExists(absolutePath) || await pathExists(closedPath)) {
+  if (await changeStoreEntryExists(absolutePath) || await changeStoreEntryExists(closedPath)) {
     throw new SddError(
       `Change ID already exists in central active or closed history: ${changeId}`,
       { code: "CHANGE_EXISTS" },
@@ -180,6 +190,7 @@ export async function createChange(
     spaceId,
     repositories: selectedRepositories,
   });
+  await beforePublish?.({ targetPath: absolutePath, closedPath });
   await assertOperationConfigurationCurrent(operation);
   await assertSelectedRepositorySnapshotsCurrent(
     workspaceRoot,
@@ -187,8 +198,10 @@ export async function createChange(
     space,
     selectedRepositories,
   );
-  await mkdir(getChangesRoot(workspaceRoot), { recursive: true });
-  await assertChangeStoreConfinement(getChangesRoot(workspaceRoot), workspaceRoot);
+  const changesRoot = getChangesRoot(workspaceRoot);
+  await assertChangeStoreConfinement(changesRoot, workspaceRoot);
+  await mkdir(changesRoot, { recursive: true });
+  await assertChangeStoreConfinement(changesRoot, workspaceRoot);
   try {
     await mkdir(absolutePath);
   } catch (error) {
@@ -200,7 +213,23 @@ export async function createChange(
     throw error;
   }
 
+  const createdState = await lstat(absolutePath, { bigint: true });
   try {
+    await afterDirectoryCreate?.({ targetPath: absolutePath, closedPath });
+    await assertChangeStoreConfinement(absolutePath, workspaceRoot);
+    const visibleState = await lstat(absolutePath, { bigint: true });
+    if (
+      !visibleState.isDirectory()
+      || visibleState.isSymbolicLink()
+      || visibleState.dev !== createdState.dev
+      || visibleState.ino !== createdState.ino
+    ) {
+      throw concurrentCreate(
+        changeId,
+        absolutePath,
+        "The exclusively created Change directory was replaced before change.md publication.",
+      );
+    }
     await writeFile(join(absolutePath, "change.md"), source, { flag: "wx" });
     await assertOperationConfigurationCurrent(operation);
     await assertSelectedRepositorySnapshotsCurrent(
@@ -209,14 +238,16 @@ export async function createChange(
       space,
       selectedRepositories,
     );
-    if (await pathExists(closedPath)) {
-      throw new SddError(`Change ID appeared in closed history: ${changeId}`, {
-        code: "CONCURRENT_CHANGE",
-      });
+    if (await changeStoreEntryExists(closedPath)) {
+      throw concurrentCreate(
+        changeId,
+        absolutePath,
+        `Closed history appeared during creation: ${closedPath}`,
+      );
     }
   } catch (error) {
-    await rm(absolutePath, { recursive: true, force: true });
-    throw error;
+    if (["CONCURRENT_CHANGE", "UNSAFE_ARTIFACT_PATH"].includes(error?.code)) throw error;
+    throw createRecoveryFailure(changeId, absolutePath, error);
   }
 
   return {

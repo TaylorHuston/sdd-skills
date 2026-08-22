@@ -79,6 +79,10 @@ async function lstatIfPresent(path) {
   }
 }
 
+export async function changeStoreEntryExists(path) {
+  return (await lstatIfPresent(path)) !== null;
+}
+
 function sameFileIdentity(left, right) {
   return left !== null
     && right !== null

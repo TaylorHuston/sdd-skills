@@ -17,7 +17,6 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, sep } from "node:path";
-import { pathToFileURL } from "node:url";
 import test, { after } from "node:test";
 import { promisify } from "node:util";
 import { parse } from "yaml";
@@ -61,7 +60,6 @@ import { PACKAGE_ROOT, WORKFLOW_SOURCE_PATH } from "../src/constants.js";
 import { SddError } from "../src/errors.js";
 import { hashDirectory, hashFile, pathExists } from "../src/fs.js";
 import { collectConfigureOptions, collectSetupOptions } from "../src/prompts.js";
-import { withWorkspaceMutationLock } from "../src/mutation.js";
 const execFileAsync = promisify(execFile);
 
 const inheritedWorkspaceRoot = process.env.SDD_WORKSPACE_ROOT;
@@ -269,6 +267,7 @@ async function writeChange(root, repository, changeId, status, { closed = false 
     join(changePath, "change.md"),
     [
       "---",
+      "schema: sdd-change-v2",
       `status: ${status}`,
       "space: sample",
       "repositories:",
@@ -1518,84 +1517,6 @@ test("Change consumers still report a stable missing required file", async (t) =
       );
     }
   }
-});
-
-test("all lifecycle operations route through one workspace Change store", async (t) => {
-  const root = await createMappedWorkspace();
-  const decoyHome = join(root, "home");
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-
-  const created = await createChange(
-    join(root, "code", "sample-web"),
-    "sample",
-    "central-routing",
-    { date: "2026-08-07", repositories: ["sample-web"] },
-  );
-  const changeId = created.changeId;
-  const centralPath = join(root, ".sdd", "changes", changeId);
-  assert.equal(created.workspaceRoot, root);
-  assert.equal(Object.hasOwn(created, "userRoot"), false);
-  assert.equal(await pathExists(centralPath), true);
-  assert.equal(await pathExists(join(decoyHome, ".sdd", "changes", changeId)), false);
-
-  await writeFile(
-    join(centralPath, "change.md"),
-    `${await readFile(join(centralPath, "change.md"), "utf8")}\n## Current Context\n\nCurrent system.\n\n## Behavioral Changes\n\nObservable behavior.\n\n## Technical Decision Handoffs\n\nOne constrained path.\n\n## Selected Approach\n\nUse the existing seam.\n\n## Alternatives Considered\n\nNone.\n\n## Implementation Constraints\n\nPreserve compatibility.\n\n## Verification Strategy\n\nFocused proof.\n\n## Risks / Trade-Offs\n\nLow risk.\n`,
-    "utf8",
-  );
-  await writeFile(
-    join(centralPath, "tasks.md"),
-    [
-      "# Tasks: Central Routing",
-      "## Resume Here",
-      "## Checklist",
-      "## Implementation Ledger",
-      "## Verification Ledger",
-      "## Open Questions",
-      "## Closeout",
-    ].join("\n"),
-    "utf8",
-  );
-
-  const lockPath = join(root, ".sdd", "mutation.lock");
-  await writeFile(lockPath, "held\n", "utf8");
-  await assert.rejects(
-    () => transitionChange(join(root, "code", "sample-web"), "sample", changeId, {
-      from: "proposed",
-      to: "planned",
-    }),
-    (error) => error instanceof SddError
-      && error.code === "OPERATION_IN_PROGRESS"
-      && error.message.includes(lockPath),
-  );
-  await rm(lockPath);
-
-  let transitioned;
-  for (const [from, to] of [
-    ["proposed", "planned"],
-    ["planned", "in_progress"],
-    ["in_progress", "in_review"],
-  ]) {
-    transitioned = await transitionChange(join(root, "code", "sample-web"), "sample", changeId, { from, to });
-  }
-  assert.equal(transitioned.workspaceRoot, root);
-  assert.equal(Object.hasOwn(transitioned, "userRoot"), false);
-
-  const status = await getStatus(root, "sample");
-  assert.equal(status.workspaceRoot, root);
-  assert.equal(Object.hasOwn(status, "userRoot"), false);
-  assert.equal(status.activeChanges[0].changeId, changeId);
-  const validation = await validateArtifacts(root, { spaceId: "sample", changeId });
-  assert.equal(validation.workspaceRoot, root);
-  assert.equal(Object.hasOwn(validation, "userRoot"), false);
-  assert.equal(validation.summary.changes, 1);
-
-  const closed = await closeChange(root, "sample", changeId);
-  assert.equal(closed.workspaceRoot, root);
-  assert.equal(Object.hasOwn(closed, "userRoot"), false);
-  assert.equal(await pathExists(centralPath), false);
-  assert.equal(await pathExists(join(root, ".sdd", "changes", "closed", changeId)), true);
 });
 
 test("repository init rejects concurrent first initialization without losing the winner", async (t) => {
@@ -3912,43 +3833,124 @@ test("change create rejects unsafe slugs and impossible dates before writing", a
 
 
 
-async function interruptCloseProcess(
-  root,
-  changeId,
-  {
-    hook = "afterCloseTransactionPhase",
-    phase = null,
-    kind = null,
-    step = null,
-    occurrence = 1,
-  } = {},
-) {
-  const closeModule = pathToFileURL(
-    join(PACKAGE_ROOT, "src", "commands", "change-close.js"),
-  ).href;
-  const source = `
-    import { closeChange } from ${JSON.stringify(closeModule)};
-    let occurrences = 0;
-    const options = {};
-    options[${JSON.stringify(hook)}] = (context = {}) => {
-      if (${JSON.stringify(phase)} !== null && context.phase !== ${JSON.stringify(phase)}) return;
-      if (${JSON.stringify(kind)} !== null && context.kind !== ${JSON.stringify(kind)}) return;
-      if (${JSON.stringify(step)} !== null && context.step !== ${JSON.stringify(step)}) return;
-      occurrences += 1;
-      if (occurrences === ${occurrence}) process.exit(86);
-    };
-    await closeChange(
-      ${JSON.stringify(root)},
-      "sample",
-      ${JSON.stringify(changeId)},
-      options,
-    );
-  `;
+test("Change creation treats a dangling closed-history entry as an identity collision", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-08-19-dangling-closed";
+  const closedPath = getClosedChangePath(changeId, root);
+  const danglingTarget = join(root, "missing-closed-change");
+  await symlink(danglingTarget, closedPath);
+
   await assert.rejects(
-    execFileAsync(process.execPath, ["--input-type=module", "--eval", source]),
-    (error) => error.code === 86,
+    () => createChange(root, "sample", "dangling-closed", {
+      date: "2026-08-19",
+      repositories: ["sample-web"],
+    }),
+    (error) => error instanceof SddError && error.code === "CHANGE_EXISTS",
   );
-}
+
+  assert.equal(await readlink(closedPath), danglingTarget);
+  assert.equal(await pathExists(getActiveChangePath(changeId, root)), false);
+});
+
+test("concurrent Change creation preserves one complete central winner", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+
+  let arrivals = 0;
+  let release;
+  const bothReady = new Promise((resolve) => {
+    release = resolve;
+  });
+  const beforePublish = async () => {
+    arrivals += 1;
+    if (arrivals === 2) release();
+    await bothReady;
+  };
+  const attempts = await Promise.allSettled([
+    createChange(root, "sample", "one-winner", {
+      date: "2026-08-19",
+      repositories: ["sample-web"],
+      beforePublish,
+    }),
+    createChange(root, "sample", "one-winner", {
+      date: "2026-08-19",
+      repositories: ["sample-web"],
+      beforePublish,
+    }),
+  ]);
+
+  assert.equal(attempts.filter((attempt) => attempt.status === "fulfilled").length, 1);
+  const rejected = attempts.find((attempt) => attempt.status === "rejected");
+  assert.equal(rejected.reason.code, "CHANGE_EXISTS");
+  const changePath = getActiveChangePath("2026-08-19-one-winner", root);
+  const source = await readFile(join(changePath, "change.md"), "utf8");
+  assert.match(source, /^status: proposed$/m);
+  assert.match(source, /^space: sample$/m);
+  assert.deepEqual(await readdir(changePath), ["change.md"]);
+});
+
+test("Change creation preserves a replacement after exclusive directory creation", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-08-19-create-replacement";
+  const activePath = getActiveChangePath(changeId, root);
+  const displacedPath = `${activePath}.displaced`;
+  const marker = "concurrent winner\n";
+
+  await assert.rejects(
+    () => createChange(root, "sample", "create-replacement", {
+      date: "2026-08-19",
+      repositories: ["sample-web"],
+      afterDirectoryCreate: async ({ targetPath }) => {
+        await rename(targetPath, displacedPath);
+        await mkdir(targetPath);
+        await writeFile(join(targetPath, "winner.txt"), marker, "utf8");
+      },
+    }),
+    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
+  );
+
+  assert.equal(await readFile(join(activePath, "winner.txt"), "utf8"), marker);
+  assert.deepEqual(await readdir(activePath), ["winner.txt"]);
+  assert.deepEqual(await readdir(displacedPath), []);
+});
+
+test("Change lifecycle commands do not consume the managed-install mutation lock", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const lockPath = join(root, ".sdd", "mutation.lock");
+  await writeFile(lockPath, "managed install held\n", "utf8");
+
+  const created = await createChange(root, "sample", "narrow-lifecycle", {
+    date: "2026-08-19",
+    repositories: ["sample-web"],
+  });
+  const activePath = getActiveChangePath(created.changeId, root);
+  const source = await readFile(join(activePath, "change.md"), "utf8");
+  await writeFile(
+    join(activePath, "change.md"),
+    source.replace("status: proposed", "status: in_review"),
+    "utf8",
+  );
+  await transitionChange(root, "sample", created.changeId, {
+    from: "in_review",
+    to: "in_progress",
+  });
+  await transitionChange(root, "sample", created.changeId, {
+    from: "in_progress",
+    to: "in_review",
+  });
+  await closeChange(root, "sample", created.changeId);
+
+  assert.equal(await readFile(lockPath, "utf8"), "managed install held\n");
+  assert.equal(await pathExists(activePath), false);
+  assert.equal(await pathExists(getClosedChangePath(created.changeId, root)), true);
+});
 
 test("change close preserves restrictive directory modes through publication and cleanup", async (t) => {
   const root = await createMappedWorkspace();
@@ -4051,6 +4053,29 @@ test("change close rechecks status at commit time", async (t) => {
   assert.equal(await readFile(changeFilePath, "utf8"), latestChange);
 });
 
+test("change close preserves a destination that appears before the final move", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-08-19-close-destination-race";
+  await writeChange(root, "sample-web", changeId, "in_review");
+  const activePath = getActiveChangePath(changeId, root);
+  const closedPath = getClosedChangePath(changeId, root);
+
+  await assert.rejects(
+    () => closeChange(root, "sample", changeId, {
+      beforeMove: async ({ destinationPath }) => {
+        await mkdir(destinationPath);
+        await writeFile(join(destinationPath, "winner.txt"), "winner\n", "utf8");
+      },
+    }),
+    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
+  );
+
+  assert.equal(await pathExists(activePath), true);
+  assert.equal(await readFile(join(closedPath, "winner.txt"), "utf8"), "winner\n");
+});
+
 test("change transition updates an active Change with compare-and-set semantics", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -4073,6 +4098,33 @@ test("change transition updates an active Change with compare-and-set semantics"
     /^status: in_progress$/m,
   );
   assert.equal((await lstat(changeFilePath)).mode & 0o777, 0o640);
+});
+
+test("change transition preserves an edit made at the final replacement boundary", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-08-19-transition-final-edit";
+  await writeChange(root, "sample-web", changeId, "in_progress");
+  const activePath = getActiveChangePath(changeId, root);
+  const changeFilePath = join(activePath, "change.md");
+  const latestChange = `${await readFile(changeFilePath, "utf8")}\nConcurrent note.\n`;
+  let temporaryPath;
+
+  await assert.rejects(
+    () => transitionChange(root, "sample", changeId, {
+      from: "in_progress",
+      to: "in_review",
+      beforeReplace: async (context) => {
+        temporaryPath = context.temporaryPath;
+        await writeFile(changeFilePath, latestChange, "utf8");
+      },
+    }),
+    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
+  );
+
+  assert.equal(await readFile(changeFilePath, "utf8"), latestChange);
+  assert.equal(await pathExists(temporaryPath), false);
 });
 
 test("change transition rejects an active Change through an external symlink ancestor", async (t) => {
@@ -7925,40 +7977,12 @@ function lifecycleSelectionAuthorityOperations() {
       },
     },
     {
-      label: "Epic create",
-      prepare: async () => null,
-      run: (root, replaceAuthority) => createEpic(
-        root,
-        "sample",
-        "SAMPLE-E911",
-        "selection-authority",
-        {
-          date: "2026-08-09",
-          repositories: ["sample-web"],
-          beforePublish: replaceAuthority,
-        },
-      ),
-      assertUncommitted: async (root) => {
-        assert.equal(
-          await pathExists(join(
-            root,
-            "code",
-            "sample-web",
-            "docs",
-            "epics",
-            "sample-e911-selection-authority",
-          )),
-          false,
-        );
-      },
-    },
-    {
       label: "Change transition",
       prepare: async (root) => {
         await writeChange(root, "sample-web", transitionId, "in_progress");
         return captureLifecycleAuthorityFile(join(
           getActiveChangePath(transitionId, root),
-          "tasks.md",
+          "change.md",
         ));
       },
       run: (root, replaceAuthority) => transitionChange(
@@ -7971,8 +7995,8 @@ function lifecycleSelectionAuthorityOperations() {
           beforeCommit: replaceAuthority,
         },
       ),
-      assertUncommitted: async (root, tasksProof) => {
-        await assertLifecycleAuthorityFileCurrent(tasksProof);
+      assertUncommitted: async (root, changeProof) => {
+        await assertLifecycleAuthorityFileCurrent(changeProof);
         assert.equal(await pathExists(getClosedChangePath(transitionId, root)), false);
       },
     },
@@ -7982,7 +8006,7 @@ function lifecycleSelectionAuthorityOperations() {
         await writeChange(root, "sample-web", closeId, "in_review");
         return captureLifecycleAuthorityFile(join(
           getActiveChangePath(closeId, root),
-          "tasks.md",
+          "change.md",
         ));
       },
       run: (root, replaceAuthority) => closeChange(
@@ -7991,8 +8015,8 @@ function lifecycleSelectionAuthorityOperations() {
         closeId,
         { beforeCommit: replaceAuthority },
       ),
-      assertUncommitted: async (root, tasksProof) => {
-        await assertLifecycleAuthorityFileCurrent(tasksProof);
+      assertUncommitted: async (root, changeProof) => {
+        await assertLifecycleAuthorityFileCurrent(changeProof);
         assert.equal(await pathExists(getClosedChangePath(closeId, root)), false);
       },
     },
@@ -8099,171 +8123,6 @@ test("Epic create never mutates a same-content external ancestor replacement", a
 
   assert.equal(await hashDirectory(outside), outsideHash);
   assert.equal(await pathExists(join(outside, basename(destination))), false);
-});
-
-test("Change create rolls back publication when authority changes before final commit", async (t) => {
-  for (const hookName of ["afterReservation", "afterHandoffCleanup"]) {
-    await t.test(hookName, async (subtest) => {
-      const root = await createMappedWorkspace();
-      subtest.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const configPath = getWorkspaceConfigPath(root);
-      let replacement;
-      await assert.rejects(
-        () => createChange(root, "sample", "final-authority", {
-          date: "2026-08-09",
-          repositories: ["sample-web"],
-          [hookName]: async () => {
-            replacement = await replaceLifecycleAuthorityFile(
-              configPath,
-              await readFile(configPath, "utf8"),
-            );
-          },
-        }),
-        (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-      );
-      await assertLifecycleAuthorityFileCurrent(replacement);
-      assert.equal(
-        await pathExists(getActiveChangePath("2026-08-09-final-authority", root)),
-        false,
-      );
-    });
-  }
-});
-
-test("Change create treats dangling closed-history links as collisions and rolls back active publication", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-08-09-dangling-closed-collision";
-  const activePath = getActiveChangePath(changeId, root);
-  const closedPath = getClosedChangePath(changeId, root);
-  const danglingTarget = join(root, "missing-closed-change");
-
-  await assert.rejects(
-    () => createChange(root, "sample", "dangling-closed-collision", {
-      date: "2026-08-09",
-      repositories: ["sample-web"],
-      afterReservation: async () => symlink(danglingTarget, closedPath),
-    }),
-    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-  );
-  assert.equal(await pathExists(activePath), false);
-  assert.equal(await readlink(closedPath), danglingTarget);
-});
-
-test("Change close rechecks selected authority at destination and retirement boundaries", async (t) => {
-  const cases = [
-    {
-      label: "before destination claim",
-      hook: "beforeDestinationClaim",
-    },
-    {
-      label: "before recovery-backup claim",
-      hook: "beforeBackupClaim",
-    },
-  ];
-  for (const [index, race] of cases.entries()) {
-    await t.test(race.label, async (subtest) => {
-      const root = await createMappedWorkspace();
-      subtest.after(() => rm(root, { recursive: true, force: true }));
-      await initWorkspace(root);
-      const changeId = `2026-08-09-close-late-authority-${index + 1}`;
-      const activePath = getActiveChangePath(changeId, root);
-      const closedPath = getClosedChangePath(changeId, root);
-      const configPath = getRepositoryConfigPath(join(root, "code", "sample-web"));
-      await writeChange(root, "sample-web", changeId, "in_review");
-      const tasksProof = await captureLifecycleAuthorityFile(join(activePath, "tasks.md"));
-      let replacement;
-      let recoveryPath = null;
-
-      await assert.rejects(
-        () => closeChange(root, "sample", changeId, {
-          [race.hook]: async (context) => {
-            recoveryPath = context.recoveryPath ?? null;
-            replacement = await replaceLifecycleAuthorityFile(
-              configPath,
-              await readFile(configPath, "utf8"),
-            );
-          },
-        }),
-        (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-      );
-
-      await assertLifecycleAuthorityFileCurrent(replacement);
-      await assertLifecycleAuthorityFileCurrent(tasksProof);
-      assert.equal(await pathExists(activePath), true);
-      assert.equal(await pathExists(closedPath), false);
-      if (recoveryPath) assert.equal(await pathExists(recoveryPath), false);
-    });
-  }
-});
-
-test("Change transition restores the source when selected authority changes after backup", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-08-09-transition-late-authority";
-  const activePath = getActiveChangePath(changeId, root);
-  const tasksPath = join(activePath, "tasks.md");
-  const configPath = getRepositoryConfigPath(join(root, "code", "sample-web"));
-  await writeChange(root, "sample-web", changeId, "in_progress");
-  const tasksProof = await captureLifecycleAuthorityFile(tasksPath);
-  let replacement;
-  let temporaryPath;
-  let backupPath;
-
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      from: "in_progress",
-      to: "in_review",
-      afterBackup: async (context) => {
-        temporaryPath = context.temporaryPath;
-        backupPath = context.backupPath;
-        replacement = await replaceLifecycleAuthorityFile(
-          configPath,
-          await readFile(configPath, "utf8"),
-        );
-      },
-    }),
-    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-  );
-
-  await assertLifecycleAuthorityFileCurrent(replacement);
-  await assertLifecycleAuthorityFileCurrent(tasksProof);
-  assert.equal(await pathExists(getClosedChangePath(changeId, root)), false);
-  assert.equal(await pathExists(temporaryPath), false);
-  assert.equal(await pathExists(backupPath), false);
-});
-
-test("Change close recovers the active Change when authority changes after retirement", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-08-09-close-post-move-authority";
-  const activePath = getActiveChangePath(changeId, root);
-  const closedPath = getClosedChangePath(changeId, root);
-  const configPath = getRepositoryConfigPath(join(root, "code", "sample-web"));
-  await writeChange(root, "sample-web", changeId, "in_review");
-  const tasksProof = await captureLifecycleAuthorityFile(join(activePath, "tasks.md"));
-  let replacement;
-
-  await assert.rejects(
-    () => closeChange(root, "sample", changeId, {
-      afterMove: async () => {
-        replacement = await replaceLifecycleAuthorityFile(
-          configPath,
-          await readFile(configPath, "utf8"),
-        );
-      },
-    }),
-    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-  );
-
-  await assertLifecycleAuthorityFileCurrent(replacement);
-  await assertLifecycleAuthorityFileCurrent(tasksProof);
-  assert.equal(await pathExists(activePath), true);
-  assert.equal(await pathExists(closedPath), false);
 });
 
 test("lifecycle commit rechecks preserve unreadable and unsafe collision witnesses", async (t) => {
