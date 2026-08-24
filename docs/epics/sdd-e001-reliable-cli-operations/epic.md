@@ -3,8 +3,8 @@ schema: sdd-epic-v2
 id: SDD-E001
 status: active
 created: 2026-07-20
-modified: 2026-08-19
-last_verified: 2026-08-18
+modified: 2026-08-23
+last_verified: 2026-08-23
 stories:
   - S1
   - S2
@@ -59,7 +59,7 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 | Story | Implementation | Verification | Capability | Last Verified | Notes |
 |---|---|---|---|---|---|
 | S1 | implemented | verified | Validate navigable behavior and real evidence. | 2026-07-23 | Structure, anchors, evidence, report integrity, metadata, and focused reads fail closed with current proof. |
-| S2 | partial | partial | Mutate only inside physical owner boundaries and preserve concurrent state safely. | 2026-08-21 | Configuration, Epic creation, and Change lifecycle commands use bounded current-consumer primitives; the dated accepted local-filesystem gaps remain explicit, while managed installation remains later work. |
+| S2 | partial | partial | Mutate only inside physical owner boundaries and preserve concurrent state safely. | 2026-08-23 | Configuration, Epic creation, Change lifecycle, managed workflow, and installation evidence use bounded current-consumer primitives; managed-skill synchronization remains for S9 and the dated accepted local-filesystem gaps remain explicit. |
 | S3 | partial | partial | Route one workspace-unique central Change across portable repository targets. | 2026-08-21 | Lifecycle commands no longer consume the managed-install lock and preserve every tested pre-syscall conflict; exact final path-based syscall races are dated accepted gaps rather than claimed atomicity. |
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
 | S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-23 | Reports are versioned; PR/release paths are classified and rechecked; Git baselines are immutable and bounded. |
@@ -278,8 +278,8 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 Implementation: partial
 Verification: partial
 Created: 2026-07-20
-Modified: 2026-08-21
-Last verified: 2026-08-21
+Modified: 2026-08-23
+Last verified: 2026-08-23
 
 As a developer, I want filesystem mutations to stay inside their physical repository or selected workspace owner and preserve concurrent work, so that setup and lifecycle commands cannot silently damage unrelated data.
 
@@ -356,23 +356,23 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 | Requirement / Scenario | Location / Anchor | Kind | Responsibility |
 |---|---|---|---|
 | S2/R1 | `src/fs.js#isPathPhysicallyInside` | primary | Resolves existing ancestors before authorizing a child path. |
-| S2/R1 | `src/skills.js#applySkillSync` | support | Rechecks every managed-skill target immediately before mutation. |
+| S2/R1, S2/R4 | `src/skills.js#applySkillSync` | support | Rechecks every managed-skill target and the immutable selected-workspace authority around publication and cleanup. |
 | S2/R1 | `src/config.js#writeWorkspaceConfig` | support | Refuses a configuration file below a symlinked external `.sdd` directory. |
 | S2/R2 | `src/commands/change-transition.js#transitionChange` | primary | Rechecks the bounded `change.md`, workspace, and repository snapshots after staging and immediately before its mode-preserving atomic replacement. |
 | S2/R2 | `src/commands/change-close.js#closeChange` | primary | Rechecks status, ownership, and destination absence immediately before the direct active-to-closed rename. |
 | S2/R2-S5 | `src/commands/init-installation.js#initRepository` | primary | Publishes the first portable repository contract through the exclusive no-replace configuration boundary so one concurrent writer wins without a generalized workspace lock. |
 | S2/R3-S1 | `src/config-publication.js#publishConfigFile` | primary | Publishes complete configuration YAML, preserves unexpected targets, retains inspectable recovery state when needed, and reports a safe retry/manual action. |
-| S2/R3-S1 | `src/fs.js#writeFileAtomically` | support | Continues publishing complete JSON installation evidence until the managed-install boundary is replaced by S8. |
+| S2/R3-S1, S2/R3-S3, S2/R4-S2 | `src/managed-file-publication.js#publishManagedFile` | primary | Publishes complete managed workflow and installation-evidence files, preserves concurrent targets, retains exact inspectable state, and checks the immutable selected-workspace authority at parent creation, staging, publication, and verification boundaries. |
 | S2/R3-S2 | `src/commands/epic-create.js#publishEpicScaffold` | primary | Exclusively creates one owner-contained Epic directory and fsynced `epic.md`, preserves collisions or incomplete state for inspection, and reports a typed retry/manual-recovery action without journal replay. |
-| S2/R3-S3 | `src/fs.js#replaceFileAtomically` | primary | Currently publishes managed workflow files with no-replace and preserved-state behavior. |
-| S2/R3-S4 | `src/fs.js#replaceDirectoryAtomically` | primary | Currently reserves and publishes managed skill directories without replacing a concurrent target. |
-| S2/R3-S3, S2/R3-S4 | `src/mutation.js#withWorkspaceMutationLock` | support | Serializes current managed setup and update operations. |
-| S2/R3-S3, S2/R3-S4 | `src/installation.js#applyManagedInstallation` | support | Coordinates current workflow, skill, and installation-evidence refresh. |
-| S2/R3-S1, S2/R3-S3, S2/R3-S4 | `src/commands/init-installation.js#setupInstallation` | support | Preserves a successfully published workspace configuration with retry guidance if the remaining managed installation cannot complete, while setup/update serialization remains for S8-S9. |
+| S2/R3-S4, S2/R4-S2 | `src/fs.js#replaceDirectoryAtomically` | primary | Currently reserves and publishes managed skill directories without replacing a concurrent target and invokes the caller's immutable-owner guard before staging begins. |
+| S2/R3-S3, S2/R3-S4, S2/R4-S2 | `src/mutation.js#withWorkspaceMutationLock` | support | Exclusively admits one current setup/update writer, preserves a lock replacement during guarded release, and supplies immutable selected-workspace authority checks; retained state requires explicit inspection rather than dead-owner replay. |
+| S2/R3-S3 | `src/installation.js#applyManagedInstallation` | primary | Coordinates workflow and installation-evidence publication, preserves complete partial state, and reports the exact safe retry/manual action without global rollback. |
+| S2/R3-S4 | `src/installation.js#applyManagedInstallation` | support | Continues coordinating current managed-skill refresh until S9 replaces aggregate skill recovery. |
+| S2/R3-S1, S2/R3-S3, S2/R3-S4 | `src/commands/init-installation.js#setupInstallation` | support | Preserves successfully published workspace configuration and managed artifacts with retry guidance when the remaining installation cannot complete. |
 | S2/R3-S3, S2/R3-S4 | `src/commands/update.js#updateWorkspace` | support | Refreshes current workspace-managed artifacts. |
-| S2/R3-S3 | `src/workflow.js#applyWorkflowSync` | support | Applies and verifies current managed workflow replacement. |
+| S2/R3-S3 | `src/workflow.js#applyWorkflowSync` | support | Applies and verifies complete workflow publication while preserving a local or concurrent winner. |
 | S2/R3-S4 | `src/skills.js#applySkillSync` | support | Applies and verifies current managed skill replacement. |
-| S2/R4 | `src/commands/init-installation.js#setupInstallation` | primary | Creates or reconciles the selected workspace's configuration, workflow, install lock, and contained managed-skill registry. |
+| S2/R4 | `src/commands/init-installation.js#setupInstallation` | primary | Creates or reconciles the selected workspace's configuration, workflow, install lock, and contained managed-skill registry while carrying the lock-bound workspace identity through each mutation boundary. |
 | S2/R4 | `src/config.js#resolveWorkspaceSkillsDirectory` | support | Rejects lexical or physical managed-skill paths outside the workspace owner. |
 
 #### Implementation Gaps
@@ -387,7 +387,7 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 | S2/R1-S1 | Automated tests `test/cli.test.js#Epic create allows a selected mapping without portable config and confines custom roots physically`, `test/cli.test.js#Epic create never mutates a same-content external ancestor replacement`, and `test/cli.test.js#Epic creation rechecks authority before creating a missing artifact parent` | Epic scaffolding rejects configured and commit-window physical-owner escapes before writing the external target, and authority drift cannot create a missing artifact parent. | Passing 2026-08-19 |
 | S2/R1-S1 | Automated test `test/cli.test.js#change transition rejects an active Change through an external symlink ancestor` | Lifecycle mutation refuses an external artifact root and preserves its contents. | Passing 2026-07-20 |
 | S2/R1-S1 | Automated test `test/cli.test.js#validate rejects implementation and test evidence that resolve outside the repository` | Evidence acceptance uses the same physical ownership rule. | Passing 2026-07-20 |
-| S2/R1-S1 | Automated test `test/mutation.test.js#fixed SDD mutation paths reject a symlinked config directory` | Workflow, configuration, and lock paths cannot escape through `.sdd`. | Passing 2026-07-20 |
+| S2/R1-S1 | Automated test `test/mutation.test.js#fixed SDD mutation paths reject a symlinked config directory` | Workflow, configuration, and lock paths cannot escape through `.sdd`. | Passing 2026-08-23 |
 | S2/R2-S1 | Automated tests `test/change-contract.test.js#planning completes the same Change before lifecycle work continues` and `test/cli.test.js#change transition preserves an edit made at the final replacement boundary` | Edits injected before the last snapshot recheck abort with `CONCURRENT_CHANGE`, preserve current content, and remove staged replacement residue. | Passing 2026-08-21 |
 | S2/R2-S4 | Automated tests `test/cli.test.js#change close rechecks status at commit time` and `test/cli.test.js#change close preserves a destination that appears before the final move` | A reopen or nonempty destination injected before the last move recheck remains canonical. | Passing 2026-08-21 |
 | S2/R2-S5 | Automated test `test/cli.test.js#repository init rejects concurrent first initialization without losing the winner` | Two overlapping initializers leave one complete accepted repository contract; the prepared loser receives an actionable `CONCURRENT_CHANGE`, and no publication residue remains. | Passing 2026-08-19 |
@@ -396,8 +396,8 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 | S2/R3-S1 | Automated test `test/workspace-config.test.js#config publication rejects an owner-local ancestor replacement` | Publication remains bound to the prepared physical owner-local ancestor chain. | Passing 2026-08-19 |
 | S2/R3-S1 | Automated test `test/workspace-config.test.js#configuration replacement preserves winners after displacement and publication` | A winner appearing after displacement or after staged publication remains canonical; retained original/requested files stay parseable and the error identifies safe recovery. | Passing 2026-08-19 |
 | S2/R3-S1 | Automated test `test/cli.test.js#configure preserves a config that replaces its preflight snapshot before publish` | Configuration publication preserves a newer concurrent target and reports the conflict. | Passing 2026-08-19 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#first-time setup preserves its complete config and reports a safe retry` | A later managed-install failure retains parseable workspace configuration, identifies it, and the same setup command completes safely on retry. | Passing 2026-08-19 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#atomic JSON writes leave one complete parseable document` | Current installation-evidence publication still leaves one whole parseable JSON document pending S8. | Passing 2026-07-20 |
+| S2/R3-S1 | Automated test `test/mutation.test.js#first setup preserves complete config and reports bounded retry state` | A later managed-install failure retains parseable workspace configuration and workflow state and identifies the same setup command as the safe retry. | Passing 2026-08-23 |
+| S2/R3-S1, S2/R3-S3 | Automated tests `test/mutation.test.js#managed installation preserves refreshed workflow and parseable prior evidence on lock failure`, `test/mutation.test.js#managed installation preserves a concurrent complete installation-evidence winner`, `test/mutation.test.js#managed installation preserves a workflow replacement at the final success boundary`, and `test/mutation.test.js#managed installation preserves an installation-evidence replacement at the final success boundary` | Installation failure preserves the complete prior or concurrent durable file, including final-success-boundary replacements, while reporting the exact partial state and safe retry. | Passing 2026-08-23 |
 | S2/R3-S2 | Automated test `test/cli.test.js#epic create refuses ambiguous repositories, collisions, and dry-run writes` | Epic creation refuses a colliding target and leaves it unchanged. | Passing 2026-08-19 |
 | S2/R3-S2 | Automated test `test/cli.test.js#epic create scaffolds and validates a canonical Epic in one repository` | A successful exclusive scaffold publishes one structurally valid Epic. | Passing 2026-08-19 |
 | S2/R3-S2 | Automated test `test/cli.test.js#CLI exposes epic create with JSON output` | Epic creation preserves current JSON fields and human dry-run output without mutation. | Passing 2026-08-19 |
@@ -405,12 +405,12 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 | S2/R3-S2 | Automated test `test/cli.test.js#Epic creation rejects a target replacement after exclusive directory creation` | The freshly created directory is identity-bound before payload write; a replacement is preserved empty and reported instead of being adopted. | Passing 2026-08-19 |
 | S2/R3-S2 | Automated test `test/cli.test.js#Epic validation failure retains complete inspectable state and reports manual recovery` | Failed structural validation retains complete inspectable scaffold state, reports `MUTATION_RECOVERY_FAILED`, names the retained path, and provides manual retry guidance. | Passing 2026-08-19 |
 | S2/R3-S2 | Automated test `test/cli.test.js#Epic validation recovery preserves a replacement and the displaced scaffold` | A target replacement after failed validation remains untouched while the displaced complete scaffold remains inspectable. | Passing 2026-08-19 |
-| S2/R3-S3 | Automated test `test/mutation.test.js#workflow replacement preserves an edit made inside the replacement window` | Managed workflow publication preserves newer content that appears during replacement. | Passing 2026-07-20 |
-| S2/R3-S3 | Automated test `test/cli.test.js#update refuses to overlap another managed mutation` | A held current-writer boundary blocks update without altering durable installation state. | Passing 2026-07-20 |
+| S2/R3-S3 | Automated tests `test/mutation.test.js#workflow refresh preserves a concurrent complete replacement`, `test/mutation.test.js#workflow refresh writes one complete file and preserves its mode`, and `test/mutation.test.js#workflow refresh reports packaged partial state without rolling back` | Workflow refresh preserves a newer target, publishes one complete mode-preserving file, and reports packaged partial state without restoring a prior global installation. | Passing 2026-08-23 |
+| S2/R3-S3 | Automated tests `test/mutation.test.js#managed setup and update serialize one current writer`, `test/mutation.test.js#managed writer release preserves a replacement lock`, and `test/cli.test.js#update refuses to overlap another managed mutation` | One setup/update writer owns the bounded refresh; overlapping attempts and a release-boundary replacement preserve the current lock and return actionable retained state. | Passing 2026-08-23 |
 | S2/R3-S4 | Automated test `test/mutation.test.js#skill replacement preserves an edit made inside the replacement window` | Managed skill publication preserves newer content that appears during replacement. | Passing 2026-07-20 |
 | S2/R3-S4 | Automated tests `test/cli.test.js#update refuses to overwrite locally modified managed skills` and `test/cli.test.js#update removes a retired skill only when it matches its managed hash` | Skill refresh preserves local modifications and removes only content still owned by installation evidence. | Passing 2026-07-20 |
 | S2/R4-S1 | Automated tests `test/workspace-config.test.js#managed skill directory is lexically and physically workspace-contained` and `test/cli.test.js#setup rejects a managed skills path through an external symlink ancestor` | Setup rejects absolute, traversal, and symlink escapes before installation writes. | Passing 2026-08-07 |
-| S2/R4-S2 | Automated tests `test/cli.test.js#CLI setup owns only the explicit workspace and exposes workspace output fields` and `test/workspace-config.test.js#workspace discovery never falls back to HOME or SDD_USER_HOME` | Setup and discovery ignore decoy home installations and write only below the selected workspace. | Passing 2026-08-07 |
+| S2/R4-S2 | Automated tests `test/mutation.test.js#managed writer rejects a selected workspace replacement before lock-directory creation`, `test/mutation.test.js#setup rejects a selected workspace root replacement before managed writes`, `test/mutation.test.js#managed-file staging rejects a selected workspace root replacement`, `test/mutation.test.js#managed skill staging rejects a selected workspace root replacement`, `test/cli.test.js#CLI setup owns only the explicit workspace and exposes workspace output fields`, `test/cli.test.js#CLI update with an explicit workspace leaves a populated decoy home unchanged`, and `test/workspace-config.test.js#workspace discovery never falls back to HOME or SDD_USER_HOME` | Lock acquisition, setup directories, managed-file staging, and retained managed-skill staging reject replacement of the originally selected workspace before writing the replacement target; setup, update, and discovery ignore decoy home installations. | Passing 2026-08-23 |
 
 #### Verification Gaps
 
@@ -422,9 +422,9 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 
 - Physical ownership is evaluated after resolving existing symlink ancestors; it is stronger than lexical `..` rejection.
 - The accepted recovery boundary is recorded in `docs/adrs/2026-08-19-use-current-consumer-cli-primitives.md`. Physical containment, no silent overwrite, complete individual durable files, required exclusive creation, and actionable preserved-state reporting remain required; migration-grade replay and cross-artifact rollback are not accepted guarantees.
-- Remaining managed-install and lifecycle seams may temporarily provide stronger recovery while the active simplification Change replaces one current command boundary at a time.
+- Remaining managed-skill seams may temporarily provide stronger recovery while S9 replaces aggregate directory rollback around the final current consumer.
 - Epic creation now uses exclusive owner-contained target creation and actionable preserved-state recovery; the generalized directory journal/replay implementation has no current consumer and was removed.
-- First repository configuration and central Change lifecycle commands now use their narrow no-overwrite boundaries rather than the generalized mutation lock. Only setup/update managed-install serialization remains current until S8-S9 replace that boundary.
+- First repository configuration and central Change lifecycle commands use their narrow no-overwrite boundaries. Setup/update retain only a bounded one-writer lock, complete managed-file publication, and actionable partial-state reporting; dead-owner replay, workflow rollback, and cross-artifact installation rollback are no longer current guarantees.
 
 ### Story S3: Unambiguous Topology And Lifecycle Routing
 

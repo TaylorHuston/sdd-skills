@@ -465,8 +465,20 @@ export async function applySkillSync(
     cleanupMkdir,
     cleanupRmdir,
     cleanupUnlink,
+    assertOwnerCurrent = null,
+    beforeSkillPublication = null,
   } = {},
 ) {
+  const checkOwner = async () => assertOwnerCurrent?.();
+  const checkSkillPublication = async (context) => {
+    await beforeSkillPublication?.(context);
+    await checkOwner();
+  };
+  const guardedSkillCleanup = async (context) => {
+    await checkOwner();
+    await beforeSkillCleanup?.(context);
+    await checkOwner();
+  };
   const mutatingActions = new Set([
     "install",
     "update",
@@ -556,7 +568,7 @@ export async function applySkillSync(
       ownerRoot: workspaceRoot,
       label: "Managed skill recovery backup",
       phase,
-      beforeSkillCleanup,
+      beforeSkillCleanup: guardedSkillCleanup,
       cleanupMkdir,
       cleanupRmdir,
       cleanupUnlink,
@@ -574,13 +586,18 @@ export async function applySkillSync(
         expectedSnapshot: { missing: true, binding: snapshot.targetBinding },
         expectedSourceSnapshot: snapshot.backupManifest,
         ownerRoot: workspaceRoot,
+        beforeReplace: checkSkillPublication,
+        afterBackup: checkOwner,
+        beforePublish: checkOwner,
         afterPublish: async () => {
+          await checkOwner();
           restoredPublication = await captureSkillDirectory(
             snapshot.entry.target,
             workspaceRoot,
             `Restored managed skill ${snapshot.entry.skillName}`,
             { expectedBinding: snapshot.targetBinding },
           );
+          await checkOwner();
         },
       });
       const restored = await captureSkillDirectory(
@@ -640,7 +657,7 @@ export async function applySkillSync(
           label: `Managed skill rollback target ${entry.skillName}`,
           phase: "rollback-target",
           skillName: entry.skillName,
-          beforeSkillCleanup,
+          beforeSkillCleanup: guardedSkillCleanup,
           cleanupMkdir,
           cleanupRmdir,
           cleanupUnlink,
@@ -698,7 +715,9 @@ export async function applySkillSync(
   };
 
   if (!dryRun) {
+    await checkOwner();
     for (const entry of candidates) {
+      await checkOwner();
       if (!(await isPathPhysicallyInside(workspaceRoot, entry.target))) {
         throw new SddError(
           `Managed skill target resolves outside its workspace: ${entry.target}`,
@@ -738,12 +757,14 @@ export async function applySkillSync(
 
     if (snapshots.some((snapshot) => snapshot.existed)) {
       try {
+        await checkOwner();
         backupRootAuthority = await createBoundDirectory(backupRoot, {
           ownerRoot: workspaceRoot,
           label: "Managed skill recovery backup",
           unsafeCode: "UNSAFE_SKILL_DIRECTORY",
           mode: 0o700,
         });
+        await checkOwner();
         backupRootManifest = backupRootAuthority;
       } catch (error) {
         throw skillRecoveryFailure(
@@ -762,12 +783,17 @@ export async function applySkillSync(
             expectedHash: null,
             expectedSourceSnapshot: snapshot.targetManifest,
             ownerRoot: workspaceRoot,
+            beforeReplace: checkSkillPublication,
+            afterBackup: checkOwner,
+            beforePublish: checkOwner,
             afterPublish: async () => {
+              await checkOwner();
               snapshot.backupManifest = await readBoundDirectory(snapshot.backupPath, {
                 ownerRoot: workspaceRoot,
                 label: `Managed skill backup ${snapshot.entry.skillName}`,
                 unsafeCode: "UNSAFE_SKILL_DIRECTORY",
               });
+              await checkOwner();
               backupPublicationCaptured = true;
             },
           });
@@ -842,13 +868,18 @@ export async function applySkillSync(
             expectedHash: entry.targetHash,
             expectedSnapshot: snapshot.targetSnapshot,
             ownerRoot: workspaceRoot,
+            beforeReplace: checkSkillPublication,
+            afterBackup: checkOwner,
+            beforePublish: checkOwner,
             afterPublish: async () => {
+              await checkOwner();
               snapshot.publishedManifest = await readBoundDirectory(entry.target, {
                 ownerRoot: workspaceRoot,
                 label: `Published managed skill ${entry.skillName}`,
                 unsafeCode: "UNSAFE_SKILL_DIRECTORY",
               });
               await rebaseAbsentTargetBindings(snapshot);
+              await checkOwner();
               publicationCaptured = true;
             },
           });
@@ -867,7 +898,7 @@ export async function applySkillSync(
             label: `Managed skill removal ${entry.skillName}`,
             phase: "remove-target",
             skillName: entry.skillName,
-            beforeSkillCleanup,
+            beforeSkillCleanup: guardedSkillCleanup,
             cleanupMkdir,
             cleanupRmdir,
             cleanupUnlink,
@@ -880,7 +911,9 @@ export async function applySkillSync(
           }
         }
       }
+      await checkOwner();
       await verifySkillSyncPlan(workspaceRoot, plan);
+      await checkOwner();
     } catch (error) {
       await rollback(error);
       throw error;

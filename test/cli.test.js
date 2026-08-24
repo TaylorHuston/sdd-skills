@@ -687,7 +687,12 @@ test("update refuses to overlap another managed mutation", async (t) => {
   await initWorkspace(root);
   const installLockPath = getWorkspaceInstallLockPath(root);
   const before = await readFile(installLockPath, "utf8");
-  await writeFile(join(root, ".sdd", "mutation.lock"), "held\n", "utf8");
+  const heldMutationLock = join(root, ".sdd", "mutation.lock");
+  await writeFile(
+    heldMutationLock,
+    `${JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() })}\n`,
+    "utf8",
+  );
 
   await assert.rejects(
     () => updateWorkspace(root),

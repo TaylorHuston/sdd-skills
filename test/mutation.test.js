@@ -22,8 +22,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-import { readWorkspaceConfig, writeWorkspaceConfig } from "../src/config.js";
+import { readWorkspaceConfig } from "../src/config.js";
 import { setupInstallation } from "../src/commands/init-installation.js";
+import { WORKFLOW_SOURCE_PATH } from "../src/constants.js";
 import {
   hashDirectory,
   hashFile,
@@ -31,16 +32,13 @@ import {
   readBoundDirectory,
   readBoundRegularFile,
   removeBoundDirectory,
-  removeBoundRegularFile,
   replaceDirectoryAtomically,
-  replaceFileAtomically,
-  writeFileAtomically,
-  writeJson,
 } from "../src/fs.js";
 import {
   applyManagedInstallation,
   serializeManagedInstallationLock,
 } from "../src/installation.js";
+import { publishManagedFile } from "../src/managed-file-publication.js";
 import { withWorkspaceMutationLock } from "../src/mutation.js";
 import {
   applySkillSync,
@@ -50,1312 +48,8 @@ import {
 import { applyWorkflowSync, planWorkflowSync } from "../src/workflow.js";
 
 function mutationLockPath(root) {
-  return join(root, ".sdd-mutation.lock");
+  return join(root, ".sdd", "mutation.lock");
 }
-
-function mutationReclaimPath(root) {
-  return join(root, ".sdd-mutation.lock.reclaim");
-}
-
-async function authenticatedMutationLockSource(root, owner) {
-  const configDirectory = join(root, ".sdd");
-  const [workspaceState, configState] = await Promise.all([
-    stat(root),
-    lstat(configDirectory),
-  ]);
-  return `${JSON.stringify({
-    ...owner,
-    workspaceIdentity: {
-      dev: String(workspaceState.dev),
-      ino: String(workspaceState.ino),
-    },
-    configIdentity: {
-      dev: String(configState.dev),
-      ino: String(configState.ino),
-    },
-  })}\n`;
-}
-
-test("atomic JSON writes leave one complete parseable document", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-atomic-json-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const path = join(root, ".sdd", "install-lock.json");
-
-  await Promise.all(
-    Array.from({ length: 20 }, (_, index) => writeJson(path, {
-      index,
-      payload: String(index).repeat(2_000),
-    })),
-  );
-
-  const result = JSON.parse(await readFile(path, "utf8"));
-  assert.equal(typeof result.index, "number");
-  assert.equal(result.payload, String(result.index).repeat(2_000));
-});
-
-test("atomic JSON writes preserve the existing file mode", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-atomic-mode-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const path = join(root, "config.json");
-  await writeFile(path, "{}\n", { mode: 0o640 });
-  await chmod(path, 0o640);
-
-  await writeJson(path, { updated: true });
-
-  assert.equal((await stat(path)).mode & 0o777, 0o640);
-});
-
-test("workspace mutation lock recovers a stale dead-owner lock", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-stale-lock-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const lockPath = mutationLockPath(root);
-  const configDirectory = join(root, ".sdd");
-  await mkdir(configDirectory, { recursive: true });
-  const [workspaceState, configState] = await Promise.all([
-    stat(root),
-    lstat(configDirectory),
-  ]);
-  await writeFile(lockPath, `${JSON.stringify({
-    pid: 99_999_999,
-    createdAt: "2026-01-01T00:00:00.000Z",
-    workspaceIdentity: {
-      dev: String(workspaceState.dev),
-      ino: String(workspaceState.ino),
-    },
-    configIdentity: {
-      dev: String(configState.dev),
-      ino: String(configState.ino),
-    },
-  })}\n`);
-
-  const result = await withWorkspaceMutationLock(root, async () => "completed");
-
-  assert.equal(result, "completed");
-  assert.equal(await pathExists(lockPath), false);
-});
-
-test("identity-less dead-owner canonical lock is opaque and preserved", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-stale-opaque-root-lock-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const lockPath = mutationLockPath(root);
-  const reclaimPath = mutationReclaimPath(root);
-  const lockSource = `${JSON.stringify({
-    pid: 99_999_999,
-    token: "identity-less-root",
-    createdAt: "2026-01-01T00:00:00.000Z",
-  })}\n`;
-  await mkdir(join(root, ".sdd"));
-  await writeFile(lockPath, lockSource);
-  let entered = false;
-
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => {
-      entered = true;
-    }),
-    (error) => error.code === "OPERATION_IN_PROGRESS"
-      && error.details.includes(
-        "The canonical lock is missing or mismatches required workspace/configuration-directory identities.",
-      ),
-  );
-
-  assert.equal(entered, false);
-  assert.equal(await readFile(lockPath, "utf8"), lockSource);
-  assert.equal(await pathExists(reclaimPath), false);
-});
-
-test("stale recovery reclaims paired root and legacy guards from one dead owner", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-stale-paired-guards-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const configDirectory = join(root, ".sdd");
-  const lockPath = mutationLockPath(root);
-  const legacyLockPath = join(configDirectory, "mutation.lock");
-  await mkdir(configDirectory);
-  const [workspaceState, configState] = await Promise.all([
-    stat(root),
-    lstat(configDirectory),
-  ]);
-  const lockSource = `${JSON.stringify({
-    pid: 99_999_999,
-    createdAt: "2026-01-01T00:00:00.000Z",
-    workspaceIdentity: {
-      dev: String(workspaceState.dev),
-      ino: String(workspaceState.ino),
-    },
-    configIdentity: {
-      dev: String(configState.dev),
-      ino: String(configState.ino),
-    },
-  })}\n`;
-  await writeFile(lockPath, lockSource);
-  await link(lockPath, legacyLockPath);
-
-  const result = await withWorkspaceMutationLock(root, async () => "completed");
-
-  assert.equal(result, "completed");
-  assert.equal(await pathExists(lockPath), false);
-  assert.equal(await pathExists(legacyLockPath), false);
-});
-
-test("stale recovery reclaims a legacy-only guard after root release", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-stale-legacy-only-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const configDirectory = join(root, ".sdd");
-  const legacyLockPath = join(configDirectory, "mutation.lock");
-  await mkdir(configDirectory);
-  const [workspaceState, configState] = await Promise.all([
-    stat(root),
-    lstat(configDirectory),
-  ]);
-  const lockSource = `${JSON.stringify({
-    pid: 99_999_999,
-    createdAt: "2026-01-01T00:00:00.000Z",
-    workspaceIdentity: {
-      dev: String(workspaceState.dev),
-      ino: String(workspaceState.ino),
-    },
-    configIdentity: {
-      dev: String(configState.dev),
-      ino: String(configState.ino),
-    },
-  })}\n`;
-  await writeFile(legacyLockPath, lockSource);
-
-  const result = await withWorkspaceMutationLock(root, async () => "completed");
-
-  assert.equal(result, "completed");
-  assert.equal(await pathExists(mutationLockPath(root)), false);
-  assert.equal(await pathExists(legacyLockPath), false);
-});
-
-test("legacy-only stale recovery accepts an explicit identity-less sentinel", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-stale-legacy-compatible-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const configDirectory = join(root, ".sdd");
-  const legacyLockPath = join(configDirectory, "mutation.lock");
-  const legacySource = `${JSON.stringify({
-    pid: 99_999_999,
-    token: "legacy-compatible",
-    createdAt: "2026-01-01T00:00:00.000Z",
-  })}\n`;
-  await mkdir(configDirectory);
-  await writeFile(legacyLockPath, legacySource);
-
-  const result = await withWorkspaceMutationLock(root, async () => "completed");
-
-  assert.equal(result, "completed");
-  assert.equal(await pathExists(mutationLockPath(root)), false);
-  assert.equal(await pathExists(legacyLockPath), false);
-});
-
-test("stale lock recovery refuses authority retained across a config swap", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-stale-lock-authority-swap-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const configDirectory = join(root, ".sdd");
-  const displacedDirectory = join(root, ".sdd-displaced");
-  const lockPath = mutationLockPath(root);
-  await mkdir(configDirectory);
-  const [workspaceState, configState] = await Promise.all([
-    stat(root),
-    lstat(configDirectory),
-  ]);
-  await rename(configDirectory, displacedDirectory);
-  await mkdir(configDirectory);
-  const lockSource = `${JSON.stringify({
-    pid: 99_999_999,
-    createdAt: "2026-01-01T00:00:00.000Z",
-    workspaceIdentity: {
-      dev: String(workspaceState.dev),
-      ino: String(workspaceState.ino),
-    },
-    configIdentity: {
-      dev: String(configState.dev),
-      ino: String(configState.ino),
-    },
-  })}\n`;
-  await writeFile(lockPath, lockSource);
-  let entered = false;
-
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => {
-      entered = true;
-    }),
-    (error) => error.code === "OPERATION_IN_PROGRESS"
-      && error.details.includes(
-        "The canonical lock is missing or mismatches required workspace/configuration-directory identities.",
-      ),
-  );
-
-  assert.equal(entered, false);
-  assert.equal(await readFile(lockPath, "utf8"), lockSource);
-  assert.equal((await lstat(configDirectory)).isDirectory(), true);
-});
-
-test("stale lock reclamation admits only one contender", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-stale-lock-contenders-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const lockPath = mutationLockPath(root);
-  await mkdir(join(root, ".sdd"), { recursive: true });
-  await writeFile(lockPath, await authenticatedMutationLockSource(root, {
-    pid: 99_999_999,
-    token: "stale",
-    createdAt: "2026-01-01T00:00:00.000Z",
-  }));
-
-  let observedCount = 0;
-  let releaseObserved;
-  const bothObserved = new Promise((resolve) => {
-    releaseObserved = resolve;
-  });
-  const afterStaleLockObserved = async () => {
-    observedCount += 1;
-    if (observedCount === 2) releaseObserved();
-    await bothObserved;
-  };
-  let signalQuarantined;
-  const quarantined = new Promise((resolve) => {
-    signalQuarantined = resolve;
-  });
-  let releaseQuarantine;
-  const quarantineHeld = new Promise((resolve) => {
-    releaseQuarantine = resolve;
-  });
-  let entered = 0;
-  const options = {
-    afterStaleLockObserved,
-    afterStaleLockQuarantined: async () => {
-      signalQuarantined();
-      await quarantineHeld;
-    },
-  };
-  const contenders = [
-    withWorkspaceMutationLock(root, async () => {
-      entered += 1;
-      return "first";
-    }, options),
-    withWorkspaceMutationLock(root, async () => {
-      entered += 1;
-      return "second";
-    }, options),
-  ];
-  const outcomes = contenders.map((contender) => contender.then(
-    (value) => ({ status: "fulfilled", value }),
-    (reason) => ({ status: "rejected", reason }),
-  ));
-
-  await quarantined;
-  const rejected = await Promise.race(outcomes.map((outcome) => outcome.then(
-    (result) => result.status === "rejected" ? result.reason : null,
-  )));
-  assert.equal(rejected.code, "OPERATION_IN_PROGRESS");
-  assert.equal(entered, 0);
-  releaseQuarantine();
-  const settled = await Promise.all(outcomes);
-
-  assert.equal(settled.filter((result) => result.status === "fulfilled").length, 1);
-  assert.equal(settled.filter((result) => result.status === "rejected").length, 1);
-  assert.equal(entered, 1);
-  assert.equal(await pathExists(lockPath), false);
-});
-
-test("stale lock reclamation preserves a replacement that wins the observation race", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-stale-lock-replaced-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const lockPath = mutationLockPath(root);
-  await mkdir(join(root, ".sdd"), { recursive: true });
-  await writeFile(lockPath, await authenticatedMutationLockSource(root, {
-    pid: 99_999_999,
-    token: "stale",
-    createdAt: "2026-01-01T00:00:00.000Z",
-  }));
-  const replacement = `${JSON.stringify({
-    pid: process.pid,
-    token: "replacement",
-    createdAt: new Date().toISOString(),
-  })}\n`;
-  let entered = false;
-
-  await assert.rejects(
-    withWorkspaceMutationLock(root, async () => {
-      entered = true;
-    }, {
-      afterStaleLockObserved: async () => {
-        await rm(lockPath);
-        await writeFile(lockPath, replacement);
-      },
-    }),
-    (error) => error.code === "OPERATION_IN_PROGRESS",
-  );
-
-  assert.equal(entered, false);
-  assert.equal(await readFile(lockPath, "utf8"), replacement);
-});
-
-test("stale lock reclamation preserves paths replaced after quarantine", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-stale-lock-hook-replaced-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const configDirectory = join(root, ".sdd");
-  const lockPath = mutationLockPath(root);
-  const reclaimPath = mutationReclaimPath(root);
-  const quarantineReplacementPath = join(configDirectory, "quarantine-replacement");
-  const reclaimReplacementPath = join(configDirectory, "reclaim-replacement");
-  const quarantineReplacement = `${JSON.stringify({
-    pid: process.pid,
-    token: "replacement-quarantine",
-  })}\n`;
-  const reclaimReplacement = `${JSON.stringify({
-    pid: process.pid,
-    token: "replacement-reclaim",
-  })}\n`;
-  await mkdir(configDirectory, { recursive: true });
-  await writeFile(lockPath, await authenticatedMutationLockSource(root, {
-    pid: 99_999_999,
-    token: "stale",
-    createdAt: "2026-01-01T00:00:00.000Z",
-  }));
-  await writeFile(quarantineReplacementPath, quarantineReplacement);
-  await writeFile(reclaimReplacementPath, reclaimReplacement);
-  let retainedQuarantinePath;
-  let entered = false;
-
-  await assert.rejects(
-    withWorkspaceMutationLock(root, async () => {
-      entered = true;
-    }, {
-      afterStaleLockQuarantined: async ({ quarantinePath }) => {
-        retainedQuarantinePath = quarantinePath;
-        await rename(quarantineReplacementPath, quarantinePath);
-        await rename(reclaimReplacementPath, reclaimPath);
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.includes(
-        `Retained lock path requiring inspection: ${retainedQuarantinePath}`,
-      )
-      && error.details.includes(`Retained lock path requiring inspection: ${reclaimPath}`),
-  );
-
-  assert.equal(entered, false);
-  assert.equal(await readFile(retainedQuarantinePath, "utf8"), quarantineReplacement);
-  assert.equal(await readFile(reclaimPath, "utf8"), reclaimReplacement);
-});
-
-test("stale reclamation preserves an opaque replacement of its reclaim claim", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-stale-claim-replaced-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const configDirectory = join(root, ".sdd");
-  const lockPath = mutationLockPath(root);
-  const reclaimPath = mutationReclaimPath(root);
-  const replacementPath = join(configDirectory, "reclaim-replacement");
-  const stale = await authenticatedMutationLockSource(root, {
-    pid: 99_999_999,
-    token: "stale",
-    createdAt: "2026-01-01T00:00:00.000Z",
-  });
-  const replacement = `${JSON.stringify({
-    pid: process.pid,
-    token: "opaque-reclaim-replacement",
-  })}\n`;
-  await mkdir(configDirectory, { recursive: true });
-  await writeFile(lockPath, stale);
-  await writeFile(replacementPath, replacement);
-  let entered = false;
-
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => {
-      entered = true;
-    }, {
-      afterStaleReclaimLinked: async () => {
-        await rename(replacementPath, reclaimPath);
-      },
-    }),
-    (error) => error.code === "OPERATION_IN_PROGRESS"
-      && error.details.includes(`Reclaim retained for inspection: ${reclaimPath}`),
-  );
-
-  assert.equal(entered, false);
-  assert.equal(await readFile(lockPath, "utf8"), stale);
-  assert.equal(await readFile(reclaimPath, "utf8"), replacement);
-});
-
-test("stale reclamation removes its owned claim when the canonical lock disappears", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-stale-lock-disappears-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const configDirectory = join(root, ".sdd");
-  const lockPath = mutationLockPath(root);
-  const reclaimPath = mutationReclaimPath(root);
-  await mkdir(configDirectory, { recursive: true });
-  await writeFile(lockPath, await authenticatedMutationLockSource(root, {
-    pid: 99_999_999,
-    token: "stale",
-    createdAt: "2026-01-01T00:00:00.000Z",
-  }));
-  let removed = false;
-
-  const result = await withWorkspaceMutationLock(root, async () => "completed", {
-    afterStaleReclaimLinked: async () => {
-      if (removed) return;
-      removed = true;
-      await rm(lockPath);
-    },
-  });
-
-  assert.equal(result, "completed");
-  assert.equal(removed, true);
-  assert.equal(await pathExists(lockPath), false);
-  assert.equal(await pathExists(reclaimPath), false);
-});
-
-test("managed installation rolls back workflow and skills when lock persistence fails", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-install-rollback-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const workflowSource = join(root, "workflow-source.md");
-  const workflowTarget = join(root, "managed", "workflow.md");
-  const skillSource = join(root, "skill-source");
-  const skillTarget = join(root, "managed", "skills", "sdd-example");
-  await writeFile(workflowSource, "# Workflow\n");
-  await mkdir(skillSource, { recursive: true });
-  await writeFile(join(skillSource, "SKILL.md"), "# Skill\n");
-  const workflowHash = await hashFile(workflowSource);
-  const skillHash = await hashDirectory(skillSource);
-
-  await assert.rejects(
-    () => applyManagedInstallation(root, {
-      workflowPlan: {
-        action: "install",
-        source: workflowSource,
-        target: workflowTarget,
-        sourceHash: workflowHash,
-        targetHash: null,
-        previousHash: null,
-        lock: { path: "workflow.md", hash: workflowHash },
-      },
-      skillPlan: {
-        skillsDirectory: join(root, "managed", "skills"),
-        actions: [{
-          skillName: "sdd-example",
-          action: "install",
-          source: skillSource,
-          target: skillTarget,
-          sourceHash: skillHash,
-          targetHash: null,
-          previousHash: null,
-        }],
-        lock: {
-          version: 1,
-          packageVersion: "test",
-          schemaVersion: "test",
-          skillsDirectory: "managed/skills",
-          managedSkills: { "sdd-example": skillHash },
-        },
-      },
-      writeLock: async () => { throw new Error("injected lock persistence failure"); },
-    }),
-    /injected lock persistence failure/,
-  );
-
-  assert.equal(await pathExists(workflowTarget), false);
-  assert.equal(await pathExists(skillTarget), false);
-});
-
-test("managed installation removes workflow recovery backups after update rollback", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-update-backup-cleanup-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const managed = join(root, "managed");
-  const source = join(root, "workflow-source.md");
-  const target = join(managed, "workflow.md");
-  await mkdir(managed, { recursive: true });
-  await writeFile(source, "new workflow\n");
-  await writeFile(target, "old workflow\n");
-  const sourceHash = await hashFile(source);
-  const targetHash = await hashFile(target);
-
-  await assert.rejects(
-    () => applyManagedInstallation(root, {
-      workflowPlan: {
-        workspaceRoot: root,
-        action: "update",
-        source,
-        target,
-        sourceHash,
-        targetHash,
-        lock: { path: "managed/workflow.md", hash: sourceHash },
-      },
-      skillPlan: {
-        skillsDirectory: join(root, "skills"),
-        actions: [],
-        lock: { managedSkills: {} },
-      },
-      writeLock: async () => { throw new Error("injected lock failure after workflow update"); },
-    }),
-    /injected lock failure after workflow update/,
-  );
-
-  assert.equal(await readFile(target, "utf8"), "old workflow\n");
-  assert.equal((await readdir(managed)).some((name) => name.startsWith(".sdd-workflow-backup-")), false);
-});
-
-test("managed installation preserves retained backup details after finalization fails", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-install-finalize-details-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const managed = join(root, "managed");
-  const source = join(root, "workflow-source.md");
-  const target = join(managed, "workflow.md");
-  let backup;
-  let displacedBackup;
-  await mkdir(managed, { recursive: true });
-  await writeFile(source, "new workflow\n");
-  await writeFile(target, "old workflow\n");
-  const sourceHash = await hashFile(source);
-  const targetHash = await hashFile(target);
-
-  await assert.rejects(
-    () => applyManagedInstallation(root, {
-      workflowPlan: {
-        workspaceRoot: root,
-        action: "update",
-        source,
-        target,
-        sourceHash,
-        targetHash,
-        lock: { path: "managed/workflow.md", hash: sourceHash },
-      },
-      skillPlan: {
-        skillsDirectory: join(root, "skills"),
-        actions: [],
-        lock: { managedSkills: {} },
-      },
-      afterCommit: async () => {
-        const name = (await readdir(managed))
-          .find((entry) => entry.startsWith(".sdd-workflow-backup-"));
-        backup = join(managed, name);
-        displacedBackup = `${backup}.displaced`;
-        await rename(backup, displacedBackup);
-        await mkdir(join(backup, "nested"), { recursive: true });
-        await writeFile(join(backup, "nested", "opaque.txt"), "opaque backup\n");
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.committed === true
-      && error.retainedPaths.includes(backup)
-      && error.details.some((detail) => detail.includes(backup))
-      && error.errors?.length === 1,
-  );
-
-  assert.equal(await readFile(target, "utf8"), "new workflow\n");
-  assert.equal(await readFile(join(backup, "nested", "opaque.txt"), "utf8"), "opaque backup\n");
-  assert.equal((await lstat(displacedBackup)).isFile(), true);
-  assert.equal(await pathExists(join(root, ".sdd", "install-lock.json")), true);
-});
-
-test("managed installation rejects a workflow plan owned by another workspace", async (t) => {
-  const requestedRoot = await mkdtemp(join(tmpdir(), "sdd-install-requested-owner-"));
-  const plannedRoot = await mkdtemp(join(tmpdir(), "sdd-install-planned-owner-"));
-  t.after(() => rm(requestedRoot, { recursive: true, force: true }));
-  t.after(() => rm(plannedRoot, { recursive: true, force: true }));
-  const source = join(plannedRoot, "source.md");
-  const target = join(plannedRoot, "managed", "workflow.md");
-  await writeFile(source, "managed workflow\n");
-  const sourceHash = await hashFile(source);
-
-  await assert.rejects(
-    () => applyManagedInstallation(requestedRoot, {
-      workflowPlan: {
-        workspaceRoot: plannedRoot,
-        action: "install",
-        source,
-        target,
-        sourceHash,
-        targetHash: null,
-        lock: { path: "managed/workflow.md", hash: sourceHash },
-      },
-      skillPlan: {
-        skillsDirectory: join(requestedRoot, "skills"),
-        actions: [],
-        lock: { managedSkills: {} },
-      },
-    }),
-    (error) => error.code === "UNSAFE_CONFIG_PATH"
-      && error.details.includes(`Planned workspace: ${plannedRoot}`)
-      && error.details.includes(`Requested workspace: ${requestedRoot}`),
-  );
-
-  assert.equal(await pathExists(target), false);
-  assert.equal(await pathExists(join(requestedRoot, ".sdd", "install-lock.json")), false);
-});
-
-test("fixed SDD mutation paths reject a symlinked config directory", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-config-symlink-"));
-  const external = await mkdtemp(join(tmpdir(), "sdd-config-external-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  t.after(() => rm(external, { recursive: true, force: true }));
-  await symlink(external, join(root, ".sdd"));
-
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => {}),
-    (error) => error.code === "UNSAFE_CONFIG_PATH",
-  );
-  await assert.rejects(
-    () => planWorkflowSync(root),
-    (error) => error.code === "UNSAFE_CONFIG_PATH",
-  );
-  await assert.rejects(
-    () => writeWorkspaceConfig(root, { version: 1 }),
-    (error) => error.code === "UNSAFE_CONFIG_PATH",
-  );
-  await assert.rejects(
-    () => applyManagedInstallation(root, {
-      skillPlan: { skillsDirectory: join(root, "skills"), actions: [], lock: {} },
-    }),
-    (error) => error.code === "UNSAFE_CONFIG_PATH",
-  );
-  assert.equal((await stat(external)).isDirectory(), true);
-  assert.equal((await readdir(external)).length, 0);
-});
-
-test("workspace-root guard survives a config-directory swap during lock acquisition", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-lock-config-acquire-swap-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const configDirectory = join(root, ".sdd");
-  const displacedDirectory = join(root, ".sdd-displaced");
-  const replacementMarker = join(configDirectory, "replacement-marker");
-  const lockPath = mutationLockPath(root);
-  await mkdir(configDirectory, { recursive: true });
-  await writeFile(join(configDirectory, "original-marker"), "original\n");
-  let swapped = false;
-  let firstEntered = false;
-  let secondEntered = false;
-  let secondOutcome;
-
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => {
-      firstEntered = true;
-    }, {
-      openFile: async (...args) => {
-        const handle = await open(...args);
-        return {
-          stat: async (...statArgs) => {
-            const state = await handle.stat(...statArgs);
-            if (!swapped) {
-              swapped = true;
-              await rename(configDirectory, displacedDirectory);
-              await mkdir(configDirectory);
-              await writeFile(replacementMarker, "replacement\n");
-              secondOutcome = await withWorkspaceMutationLock(root, async () => {
-                secondEntered = true;
-              }).then(
-                (value) => ({ status: "fulfilled", value }),
-                (reason) => ({ status: "rejected", reason }),
-              );
-            }
-            return state;
-          },
-          close: (...closeArgs) => handle.close(...closeArgs),
-          writeFile: (...writeArgs) => handle.writeFile(...writeArgs),
-          sync: (...syncArgs) => handle.sync(...syncArgs),
-        };
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes(
-        "Configuration directory identity changed",
-      ))
-      && error.details.includes(`Retained lock path requiring inspection: ${lockPath}`),
-  );
-
-  assert.equal(firstEntered, false);
-  assert.equal(secondEntered, false);
-  assert.equal(secondOutcome.status, "rejected");
-  assert.equal(secondOutcome.reason.code, "OPERATION_IN_PROGRESS");
-  assert.equal(await readFile(replacementMarker, "utf8"), "replacement\n");
-  assert.equal(
-    await readFile(join(displacedDirectory, "original-marker"), "utf8"),
-    "original\n",
-  );
-  assert.equal((await lstat(lockPath)).isFile(), true);
-});
-
-test("workspace-root guard admits exactly one callback while config authority is swapped", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-lock-config-callback-swap-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const configDirectory = join(root, ".sdd");
-  const displacedDirectory = join(root, ".sdd-displaced");
-  const replacementMarker = join(configDirectory, "replacement-marker");
-  const lockPath = mutationLockPath(root);
-  await mkdir(configDirectory, { recursive: true });
-  await writeFile(join(configDirectory, "original-marker"), "original\n");
-  let callbacks = 0;
-  let contenderOutcome;
-
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => {
-      callbacks += 1;
-      await rename(configDirectory, displacedDirectory);
-      contenderOutcome = await withWorkspaceMutationLock(root, async () => {
-        callbacks += 1;
-      }).then(
-        (value) => ({ status: "fulfilled", value }),
-        (reason) => ({ status: "rejected", reason }),
-      );
-      assert.equal(await pathExists(configDirectory), false);
-      await mkdir(configDirectory);
-      await writeFile(replacementMarker, "replacement\n");
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes(
-        "Configuration directory identity changed",
-      ))
-      && error.details.includes(`Retained lock path requiring inspection: ${lockPath}`),
-  );
-
-  assert.equal(callbacks, 1);
-  assert.equal(contenderOutcome.status, "rejected");
-  assert.equal(contenderOutcome.reason.code, "OPERATION_IN_PROGRESS");
-  assert.equal(await readFile(replacementMarker, "utf8"), "replacement\n");
-  assert.equal(
-    await readFile(join(displacedDirectory, "original-marker"), "utf8"),
-    "original\n",
-  );
-  assert.equal((await lstat(lockPath)).isFile(), true);
-});
-
-test("workspace-root guard rejects a pre-existing legacy lock without modifying it", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-lock-legacy-guard-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const configDirectory = join(root, ".sdd");
-  const legacyLockPath = join(configDirectory, "mutation.lock");
-  const legacySource = `${JSON.stringify({
-    pid: process.pid,
-    token: "legacy-owner",
-    createdAt: "2026-01-01T00:00:00.000Z",
-  })}\n`;
-  await mkdir(configDirectory, { recursive: true });
-  await writeFile(legacyLockPath, legacySource);
-  let entered = false;
-
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => {
-      entered = true;
-    }),
-    (error) => error.code === "OPERATION_IN_PROGRESS",
-  );
-
-  assert.equal(entered, false);
-  assert.equal(await readFile(legacyLockPath, "utf8"), legacySource);
-  assert.equal(await pathExists(mutationLockPath(root)), false);
-});
-
-test("workspace-root guard holds an authenticated legacy sentinel through the callback", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-lock-legacy-sentinel-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const legacyLockPath = join(root, ".sdd", "mutation.lock");
-  const lockPath = mutationLockPath(root);
-
-  const result = await withWorkspaceMutationLock(root, async ({ source }) => {
-    assert.equal(await readFile(legacyLockPath, "utf8"), source);
-    const configState = await lstat(join(root, ".sdd"));
-    assert.deepEqual(JSON.parse(source).configIdentity, {
-      dev: String(configState.dev),
-      ino: String(configState.ino),
-    });
-    await assert.rejects(
-      () => open(legacyLockPath, "wx", 0o600),
-      (error) => error.code === "EEXIST",
-    );
-    return "completed";
-  });
-
-  assert.equal(result, "completed");
-  assert.equal(await pathExists(legacyLockPath), false);
-  assert.equal(await pathExists(lockPath), false);
-});
-
-test("mutation lock cleans up a failed acquisition write", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-lock-acquire-fail-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const lockPath = mutationLockPath(root);
-
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => {}, {
-      openFile: async (...args) => {
-        const handle = await open(...args);
-        return {
-          stat: (...statArgs) => handle.stat(...statArgs),
-          close: (...closeArgs) => handle.close(...closeArgs),
-          writeFile: async () => { throw new Error("injected lock write failure"); },
-          sync: (...syncArgs) => handle.sync(...syncArgs),
-        };
-      },
-    }),
-    /injected lock write failure/,
-  );
-  assert.equal(await pathExists(lockPath), false);
-});
-
-test("config-directory creation failure releases the owned workspace-root guard", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-lock-config-create-fail-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const lockPath = mutationLockPath(root);
-  const configDirectory = join(root, ".sdd");
-  let entered = false;
-
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => {
-      entered = true;
-    }, {
-      createDirectory: async () => {
-        throw new Error("injected config creation failure");
-      },
-    }),
-    /injected config creation failure/,
-  );
-
-  assert.equal(entered, false);
-  assert.equal(await pathExists(lockPath), false);
-  assert.equal(await pathExists(configDirectory), false);
-});
-
-test("config-directory creation binds the inode returned by its creation step", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-lock-config-create-swap-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const configDirectory = join(root, ".sdd");
-  const displacedDirectory = join(root, ".sdd-displaced");
-  const replacementMarker = join(configDirectory, "replacement-marker");
-  const lockPath = mutationLockPath(root);
-  let entered = false;
-
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => {
-      entered = true;
-    }, {
-      createDirectory: async (path) => {
-        await mkdir(path);
-        const createdState = await lstat(path);
-        await rename(path, displacedDirectory);
-        await mkdir(path);
-        await writeFile(replacementMarker, "replacement\n");
-        return createdState;
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes(
-        "Configuration directory identity changed",
-      ))
-      && error.details.includes(`Retained lock path requiring inspection: ${lockPath}`),
-  );
-
-  assert.equal(entered, false);
-  assert.equal(await readFile(replacementMarker, "utf8"), "replacement\n");
-  assert.equal((await lstat(displacedDirectory)).isDirectory(), true);
-  assert.equal((await lstat(lockPath)).isFile(), true);
-});
-
-test("acquisition race reports both ownership and close failures", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-lock-acquire-close-fail-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const lockPath = mutationLockPath(root);
-  const reclaimPath = mutationReclaimPath(root);
-  let injectedReclaim = false;
-  let entered = false;
-
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => {
-      entered = true;
-    }, {
-      openFile: async (...args) => {
-        const handle = await open(...args);
-        return {
-          stat: async (...statArgs) => {
-            const state = await handle.stat(...statArgs);
-            if (!injectedReclaim) {
-              injectedReclaim = true;
-              await writeFile(reclaimPath, "opaque reclaim\n");
-            }
-            return state;
-          },
-          close: async () => {
-            await handle.close();
-            throw new Error("injected acquisition close failure");
-          },
-          writeFile: (...writeArgs) => handle.writeFile(...writeArgs),
-          sync: (...syncArgs) => handle.sync(...syncArgs),
-        };
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.startsWith(
-        "Original error: OPERATION_IN_PROGRESS:",
-      ))
-      && error.details.includes("Close error: injected acquisition close failure"),
-  );
-
-  assert.equal(entered, false);
-  assert.equal(await pathExists(lockPath), false);
-  assert.equal(await readFile(reclaimPath, "utf8"), "opaque reclaim\n");
-});
-
-test("mutation lock reports a retained lock when release loses directory permission", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-lock-release-fail-"));
-  const lockPath = mutationLockPath(root);
-  t.after(async () => {
-    await chmod(root, 0o700).catch(() => {});
-    await rm(root, { recursive: true, force: true });
-  });
-
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => {
-      await chmod(root, 0o500);
-      return "completed";
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.includes(`Retained lock path requiring inspection: ${lockPath}`)
-      && error.details.some((detail) => detail.includes("EACCES"))
-      && error.details.some((detail) => detail.includes("confirming no SDD mutation is active")),
-  );
-
-  await chmod(root, 0o700);
-  const retainedSource = await readFile(lockPath, "utf8");
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => "must not run"),
-    (error) => error.code === "OPERATION_IN_PROGRESS",
-  );
-  assert.equal(await readFile(lockPath, "utf8"), retainedSource);
-});
-
-test("mutation lock reports release failure and preserves a replacement owner", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-lock-replaced-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const lockPath = mutationLockPath(root);
-  const replacement = `${JSON.stringify({ pid: process.pid, token: "replacement" })}\n`;
-
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => {
-      await rm(lockPath);
-      await writeFile(lockPath, replacement);
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.includes(`Retained lock path requiring inspection: ${lockPath}`),
-  );
-
-  assert.equal(await readFile(lockPath, "utf8"), replacement);
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => "must not run"),
-    (error) => error.code === "OPERATION_IN_PROGRESS",
-  );
-  assert.equal(await readFile(lockPath, "utf8"), replacement);
-});
-
-test("mutation release preserves an opaque replacement of its release guard", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-release-guard-replaced-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const configDirectory = join(root, ".sdd");
-  const lockPath = mutationLockPath(root);
-  const reclaimPath = mutationReclaimPath(root);
-  const replacementPath = join(configDirectory, "reclaim-replacement");
-  const replacement = `${JSON.stringify({
-    pid: process.pid,
-    token: "opaque-release-guard-replacement",
-  })}\n`;
-  await mkdir(configDirectory, { recursive: true });
-  await writeFile(replacementPath, replacement);
-  let ownedSource;
-
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async ({ source }) => {
-      ownedSource = source;
-    }, {
-      afterReleaseGuardLinked: async () => {
-        await rename(replacementPath, reclaimPath);
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.includes(`Retained lock path requiring inspection: ${lockPath}`)
-      && error.details.includes(`Retained lock path requiring inspection: ${reclaimPath}`),
-  );
-
-  assert.equal(await readFile(lockPath, "utf8"), ownedSource);
-  assert.equal(await readFile(reclaimPath, "utf8"), replacement);
-});
-
-test("mutation release preserves an occupied exclusive quarantine target", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-lock-quarantine-collision-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const lockPath = mutationLockPath(root);
-  const reclaimPath = mutationReclaimPath(root);
-  const legacyLockPath = join(root, ".sdd", "mutation.lock");
-  const winner = `${JSON.stringify({
-    pid: process.pid,
-    token: "quarantine-winner",
-  })}\n`;
-  let ownedSource;
-  let quarantinePath;
-
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async ({ source }) => {
-      ownedSource = source;
-    }, {
-      afterLockObserved: async (context) => {
-        quarantinePath = context.quarantinePath;
-        await writeFile(quarantinePath, winner, { flag: "wx" });
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.includes(`Retained lock path requiring inspection: ${lockPath}`)
-      && error.details.includes(`Retained lock path requiring inspection: ${quarantinePath}`)
-      && error.details.includes(`Retained lock path requiring inspection: ${legacyLockPath}`),
-  );
-
-  assert.equal(await readFile(lockPath, "utf8"), ownedSource);
-  assert.equal(await readFile(quarantinePath, "utf8"), winner);
-  assert.equal(await readFile(legacyLockPath, "utf8"), ownedSource);
-  assert.equal(await pathExists(reclaimPath), false);
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => "must not run"),
-    (error) => error.code === "OPERATION_IN_PROGRESS",
-  );
-  assert.equal(await readFile(lockPath, "utf8"), ownedSource);
-  assert.equal(await readFile(quarantinePath, "utf8"), winner);
-});
-
-test("release-claim cleanup preserves an occupied exclusive quarantine target", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-reclaim-quarantine-collision-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const lockPath = mutationLockPath(root);
-  const reclaimPath = mutationReclaimPath(root);
-  const legacyLockPath = join(root, ".sdd", "mutation.lock");
-  const winner = `${JSON.stringify({
-    pid: process.pid,
-    token: "reclaim-quarantine-winner",
-  })}\n`;
-  let ownedSource;
-  let quarantinePath;
-
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async ({ source }) => {
-      ownedSource = source;
-    }, {
-      afterOwnedPathObserved: async (context) => {
-        if (context.path !== reclaimPath) return;
-        quarantinePath = context.quarantinePath;
-        await writeFile(quarantinePath, winner, { flag: "wx" });
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.includes(`Retained lock path requiring inspection: ${reclaimPath}`)
-      && error.details.includes(`Retained lock path requiring inspection: ${quarantinePath}`)
-      && error.details.includes(`Retained lock path requiring inspection: ${legacyLockPath}`),
-  );
-
-  assert.equal(await pathExists(lockPath), false);
-  assert.equal(await readFile(reclaimPath, "utf8"), ownedSource);
-  assert.equal(await readFile(quarantinePath, "utf8"), winner);
-  assert.equal(await readFile(legacyLockPath, "utf8"), ownedSource);
-  let entered = false;
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => {
-      entered = true;
-    }),
-    (error) => error.code === "OPERATION_IN_PROGRESS",
-  );
-  assert.equal(entered, false);
-  assert.equal(await readFile(reclaimPath, "utf8"), ownedSource);
-  assert.equal(await readFile(quarantinePath, "utf8"), winner);
-});
-
-test("release-claim cleanup preserves a source replaced after observation", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-reclaim-source-replaced-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const lockPath = mutationLockPath(root);
-  const reclaimPath = mutationReclaimPath(root);
-  const legacyLockPath = join(root, ".sdd", "mutation.lock");
-  const replacement = `${JSON.stringify({
-    pid: process.pid,
-    token: "reclaim-source-replacement",
-  })}\n`;
-  let quarantinePath;
-
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => {}, {
-      afterOwnedPathObserved: async (context) => {
-        if (context.path !== reclaimPath) return;
-        quarantinePath = context.quarantinePath;
-        await rm(reclaimPath);
-        await writeFile(reclaimPath, replacement, { flag: "wx" });
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.includes(`Retained lock path requiring inspection: ${reclaimPath}`)
-      && error.details.includes(`Retained lock path requiring inspection: ${legacyLockPath}`),
-  );
-
-  assert.equal(await pathExists(lockPath), false);
-  assert.equal(await readFile(reclaimPath, "utf8"), replacement);
-  assert.equal(await pathExists(quarantinePath), false);
-  assert.equal((await lstat(legacyLockPath)).isFile(), true);
-  let entered = false;
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => {
-      entered = true;
-    }),
-    (error) => error.code === "OPERATION_IN_PROGRESS",
-  );
-  assert.equal(entered, false);
-  assert.equal(await readFile(reclaimPath, "utf8"), replacement);
-});
-
-test("mutation release never displaces a replacement for a third contender", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-lock-release-three-way-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const configDirectory = join(root, ".sdd");
-  const lockPath = mutationLockPath(root);
-  const reclaimPath = mutationReclaimPath(root);
-  const replacementPath = join(configDirectory, "replacement.lock");
-  const replacement = `${JSON.stringify({
-    pid: process.pid,
-    token: "replacement",
-    createdAt: new Date().toISOString(),
-  })}\n`;
-  await mkdir(configDirectory, { recursive: true });
-  await writeFile(replacementPath, replacement);
-  let signalQuarantined;
-  const quarantined = new Promise((resolve) => {
-    signalQuarantined = resolve;
-  });
-  let resumeRelease;
-  const releaseHeld = new Promise((resolve) => {
-    resumeRelease = resolve;
-  });
-  let thirdEntered = false;
-
-  const ownerOutcome = withWorkspaceMutationLock(root, async () => "first", {
-    afterLockObserved: async () => {
-      await rename(replacementPath, lockPath);
-    },
-    afterLockQuarantined: async () => {
-      signalQuarantined();
-      await releaseHeld;
-    },
-  }).then(
-    (value) => ({ status: "fulfilled", value }),
-    (reason) => ({ status: "rejected", reason }),
-  );
-
-  await quarantined;
-  const contenderResult = await withWorkspaceMutationLock(root, async () => {
-    thirdEntered = true;
-    return "third";
-  }).then(
-    (value) => ({ status: "fulfilled", value }),
-    (reason) => ({ status: "rejected", reason }),
-  );
-  resumeRelease();
-  const ownerResult = await ownerOutcome;
-
-  assert.equal(ownerResult.status, "rejected");
-  assert.equal(ownerResult.reason.code, "MUTATION_RECOVERY_FAILED");
-  assert.equal(contenderResult.status, "rejected");
-  assert.equal(contenderResult.reason.code, "OPERATION_IN_PROGRESS");
-  assert.equal(thirdEntered, false);
-  assert.equal(await readFile(lockPath, "utf8"), replacement);
-  assert.equal(await pathExists(reclaimPath), false);
-});
-
-test("mutation callback and release failures preserve both causes", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-lock-callback-release-fail-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const lockPath = mutationLockPath(root);
-  const reclaimPath = mutationReclaimPath(root);
-  const legacyLockPath = join(root, ".sdd", "mutation.lock");
-  let ownedSource;
-
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async ({ source }) => {
-      ownedSource = source;
-      throw new Error("injected callback failure");
-    }, {
-      afterReleaseGuardLinked: async () => {
-        assert.equal(await readFile(legacyLockPath, "utf8"), ownedSource);
-        await assert.rejects(
-          () => open(legacyLockPath, "wx", 0o600),
-          (error) => error.code === "EEXIST",
-        );
-        throw new Error("injected release failure");
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.includes("Original error: injected callback failure")
-      && error.details.includes(`Retained lock path requiring inspection: ${lockPath}`)
-      && error.details.includes(`Retained lock path requiring inspection: ${reclaimPath}`)
-      && error.details.includes(`Retained lock path requiring inspection: ${legacyLockPath}`)
-      && error.details.some((detail) => detail.includes("injected release failure"))
-      && error.errors?.some((cause) => cause.message === "injected callback failure")
-      && error.errors?.some((cause) => cause.code === "MUTATION_RECOVERY_FAILED"),
-  );
-
-  assert.equal(await readFile(lockPath, "utf8"), ownedSource);
-  assert.equal(await readFile(reclaimPath, "utf8"), ownedSource);
-  assert.equal(await readFile(legacyLockPath, "utf8"), ownedSource);
-});
-
-test("mutation callback and close failures preserve both causes", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-lock-callback-close-fail-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const lockPath = mutationLockPath(root);
-
-  await assert.rejects(
-    () => withWorkspaceMutationLock(root, async () => {
-      throw new Error("injected callback failure");
-    }, {
-      openFile: async (...args) => {
-        const handle = await open(...args);
-        return {
-          stat: (...statArgs) => handle.stat(...statArgs),
-          close: async () => {
-            await handle.close();
-            throw new Error("injected close failure");
-          },
-          writeFile: (...writeArgs) => handle.writeFile(...writeArgs),
-          truncate: (...truncateArgs) => handle.truncate(...truncateArgs),
-          write: (...writeArgs) => handle.write(...writeArgs),
-          sync: (...syncArgs) => handle.sync(...syncArgs),
-        };
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.includes("Original error: injected callback failure")
-      && error.details.includes("Close error: injected close failure")
-      && error.errors?.some((cause) => cause.message === "injected callback failure")
-      && error.errors?.some((cause) => cause.message === "injected close failure"),
-  );
-
-  assert.equal(await pathExists(lockPath), false);
-});
-
-test("workflow sync restores the old target when replacement commits then throws", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-workflow-post-commit-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const source = join(root, "source.md");
-  const target = join(root, "target.md");
-  await writeFile(source, "new workflow\n");
-  await writeFile(target, "old workflow\n");
-  const plan = {
-    action: "update",
-    source,
-    target,
-    sourceHash: await hashFile(source),
-    targetHash: await hashFile(target),
-  };
-
-  await assert.rejects(
-    () => applyWorkflowSync(plan, {
-      replaceFile: async (...args) => {
-        await replaceFileAtomically(...args);
-        throw new Error("injected post-commit cleanup failure");
-      },
-    }),
-    /injected post-commit cleanup failure/,
-  );
-  assert.equal(await readFile(target, "utf8"), "old workflow\n");
-});
 
 test("skill sync restores the old target when replacement commits then throws", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "sdd-skill-post-commit-"));
@@ -1564,49 +258,6 @@ test("managed installation rejects a same-byte skill inode swap before lock comm
   assert.equal(await pathExists(join(root, ".sdd", "install-lock.json")), false);
 });
 
-test("managed installation rejects a same-byte workflow inode swap before lock commit", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-workflow-adopt-drift-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const source = join(root, "workflow-source.md");
-  const target = join(root, "workflow-target.md");
-  await writeFile(source, "matching workflow\n");
-  await writeFile(target, "matching workflow\n");
-  const displacedTarget = join(root, "published-workflow.md");
-  const publishedState = await lstat(target, { bigint: true });
-  let winnerState;
-  const sourceHash = await hashFile(source);
-
-  await assert.rejects(
-    () => applyManagedInstallation(root, {
-      workflowPlan: {
-        workspaceRoot: root,
-        action: "adopt",
-        source,
-        target,
-        sourceHash,
-        targetHash: sourceHash,
-        lock: { path: "workflow-target.md", hash: sourceHash },
-      },
-      skillPlan: {
-        skillsDirectory: join(root, "skills"),
-        actions: [],
-        lock: { managedSkills: {} },
-      },
-      beforeLockCommit: async () => {
-        await rename(target, displacedTarget);
-        await writeFile(target, "matching workflow\n");
-        assert.equal(await hashFile(target), sourceHash);
-        winnerState = await lstat(target, { bigint: true });
-      },
-    }),
-    (error) => error.code === "CONCURRENT_CHANGE",
-  );
-  assert.notEqual(String(winnerState.ino), String(publishedState.ino));
-  assert.equal(await readFile(target, "utf8"), "matching workflow\n");
-  assert.equal(await readFile(displacedTarget, "utf8"), "matching workflow\n");
-  assert.equal(await pathExists(join(root, ".sdd", "install-lock.json")), false);
-});
-
 test("symlink-bearing forced skill updates authenticate on commit and rollback", async (t) => {
   for (const outcome of ["commit", "rollback"]) {
     await t.test(outcome, async (t) => {
@@ -1655,63 +306,6 @@ test("symlink-bearing forced skill updates authenticate on commit and rollback",
       assert.equal(await readlink(join(target, "alias.md")), "SKILL.md");
     });
   }
-});
-
-test("first-time setup preserves its complete config and reports a safe retry", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-setup-preserved-config-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const configPath = join(root, ".sdd", "config.yaml");
-
-  await assert.rejects(
-    () => setupInstallation(root, {
-      planningRoot: "ideas",
-      repositoryRoots: ["repos"],
-      skillsDirectory: "skills",
-      writeLock: async () => { throw new Error("injected setup lock failure"); },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes("injected setup lock failure"))
-      && error.details.includes(`Preserved workspace configuration: ${configPath}`)
-      && error.details.some((detail) => detail.includes("retry the same setup command")),
-  );
-
-  const preserved = await readWorkspaceConfig(root);
-  assert.equal(preserved.planning.root, "ideas");
-  assert.deepEqual(preserved.repositories.roots, { repos: "repos" });
-  assert.equal(await pathExists(join(root, ".sdd", ".gitignore")), false);
-  assert.equal(await pathExists(join(root, "skills", "sdd-apply")), false);
-
-  const retried = await setupInstallation(root);
-  assert.equal(retried.createdWorkspaceConfig, false);
-  assert.deepEqual(await readWorkspaceConfig(root), preserved);
-  assert.equal(await pathExists(join(root, "skills", "sdd-apply")), true);
-});
-
-test("workflow replacement preserves an edit made inside the replacement window", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-workflow-cas-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const source = join(root, "source.md");
-  const target = join(root, "target.md");
-  await writeFile(source, "package workflow\n");
-  await writeFile(target, "old workflow\n");
-  const plan = {
-    action: "update",
-    source,
-    target,
-    sourceHash: await hashFile(source),
-    targetHash: await hashFile(target),
-  };
-
-  await assert.rejects(
-    () => applyWorkflowSync(plan, {
-      replaceFile: async (...args) => {
-        await writeFile(target, "concurrent workflow\n");
-        await replaceFileAtomically(...args);
-      },
-    }),
-    (error) => ["CONCURRENT_CHANGE", "MUTATION_RECOVERY_FAILED"].includes(error.code),
-  );
-  assert.equal(await readFile(target, "utf8"), "concurrent workflow\n");
 });
 
 test("skill replacement preserves an edit made inside the replacement window", async (t) => {
@@ -2157,769 +751,6 @@ test("skill rollback aggregates cleanup swaps for every applied target", async (
   }
 });
 
-test("absent workflow failure preserves a swapped published target", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-workflow-failure-target-swap-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const source = join(root, "source.md");
-  const target = join(root, "managed", "workflow.md");
-  const displaced = `${target}.published`;
-  await mkdir(join(root, "managed"), { recursive: true });
-  await writeFile(source, "managed workflow\n");
-
-  await assert.rejects(
-    async () => applyWorkflowSync({
-      workspaceRoot: root,
-      action: "install",
-      source,
-      target,
-      sourceHash: await hashFile(source),
-      targetHash: null,
-    }, {
-      replaceFile: async (...args) => {
-        await replaceFileAtomically(...args);
-        throw new Error("injected workflow failure");
-      },
-      beforeWorkflowCleanup: async ({ phase, path }) => {
-        if (phase !== "failure-target") return;
-        await rename(path, displaced);
-        await writeFile(path, "opaque workflow replacement\n");
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes(target)),
-  );
-
-  assert.equal(await readFile(target, "utf8"), "opaque workflow replacement\n");
-  assert.equal(await readFile(displaced, "utf8"), "managed workflow\n");
-});
-
-test("absent workflow rollback preserves a swapped published target", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-workflow-rollback-target-swap-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const source = join(root, "source.md");
-  const target = join(root, "managed", "workflow.md");
-  const displaced = `${target}.published`;
-  await mkdir(join(root, "managed"), { recursive: true });
-  await writeFile(source, "managed workflow\n");
-  const result = await applyWorkflowSync({
-    workspaceRoot: root,
-    action: "install",
-    source,
-    target,
-    sourceHash: await hashFile(source),
-    targetHash: null,
-  }, {
-    beforeWorkflowCleanup: async ({ phase, path }) => {
-      if (phase !== "rollback-target") return;
-      await rename(path, displaced);
-      await writeFile(path, "opaque rollback replacement\n");
-    },
-  });
-
-  await assert.rejects(
-    () => result.rollback(),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes(target)),
-  );
-  assert.equal(await readFile(target, "utf8"), "opaque rollback replacement\n");
-  assert.equal(await readFile(displaced, "utf8"), "managed workflow\n");
-});
-
-test("workflow rollback preserves an external same-content ancestor replacement", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-workflow-ancestor-swap-"));
-  const externalManaged = await mkdtemp(join(tmpdir(), "sdd-workflow-external-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  t.after(() => rm(externalManaged, { recursive: true, force: true }));
-  const source = join(root, "source.md");
-  const managed = join(root, "managed");
-  const target = join(managed, "workflow.md");
-  const externalTarget = join(externalManaged, "workflow.md");
-  const displacedManaged = `${managed}.displaced`;
-  await mkdir(managed);
-  await writeFile(source, "managed workflow\n");
-  await writeFile(externalTarget, "managed workflow\n");
-  const result = await applyWorkflowSync({
-    workspaceRoot: root,
-    action: "install",
-    source,
-    target,
-    sourceHash: await hashFile(source),
-    targetHash: null,
-  }, {
-    beforeWorkflowCleanup: async ({ phase }) => {
-      if (phase !== "rollback-target") return;
-      await rename(managed, displacedManaged);
-      await symlink(externalManaged, managed, "dir");
-    },
-  });
-
-  await assert.rejects(
-    () => result.rollback(),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED",
-  );
-  assert.equal(await readFile(externalTarget, "utf8"), "managed workflow\n");
-  assert.equal(
-    await readFile(join(displacedManaged, "workflow.md"), "utf8"),
-    "managed workflow\n",
-  );
-  assert.equal((await lstat(managed)).isSymbolicLink(), true);
-});
-
-test("workflow rollback and finalize preserve swapped recovery backups", async (t) => {
-  for (const operation of ["rollback", "finalize"]) {
-    await t.test(operation, async (t) => {
-      const root = await mkdtemp(join(tmpdir(), `sdd-workflow-${operation}-backup-swap-`));
-      t.after(() => rm(root, { recursive: true, force: true }));
-      const source = join(root, "source.md");
-      const target = join(root, "managed", "workflow.md");
-      let backup;
-      let displacedBackup;
-      await mkdir(join(root, "managed"), { recursive: true });
-      await writeFile(source, "new workflow\n");
-      await writeFile(target, "old workflow\n");
-      const phase = `${operation}-backup`;
-      const result = await applyWorkflowSync({
-        workspaceRoot: root,
-        action: "update",
-        source,
-        target,
-        sourceHash: await hashFile(source),
-        targetHash: await hashFile(target),
-      }, {
-        beforeWorkflowCleanup: async ({ phase: cleanupPhase, path }) => {
-          if (cleanupPhase !== phase) return;
-          backup = path;
-          displacedBackup = `${path}.displaced`;
-          await rename(path, displacedBackup);
-          await mkdir(join(path, "nested"), { recursive: true });
-          await writeFile(join(path, "nested", "opaque.txt"), "opaque backup replacement\n");
-        },
-      });
-
-      await assert.rejects(
-        () => result[operation](),
-        (error) => error.code === "MUTATION_RECOVERY_FAILED"
-          && error.details.some((detail) => detail.includes(backup)),
-      );
-      assert.equal(
-        await readFile(join(backup, "nested", "opaque.txt"), "utf8"),
-        "opaque backup replacement\n",
-      );
-      assert.equal((await lstat(displacedBackup)).isFile(), true);
-      assert.equal(
-        await readFile(target, "utf8"),
-        operation === "rollback" ? "old workflow\n" : "new workflow\n",
-      );
-    });
-  }
-});
-
-test("workflow rollback retries backup cleanup without deleting its restored target", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-workflow-rollback-retry-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const source = join(root, "source.md");
-  const managed = join(root, "managed");
-  const target = join(managed, "workflow.md");
-  let failCleanup = true;
-  await mkdir(managed);
-  await writeFile(source, "new workflow\n");
-  await writeFile(target, "old workflow\n");
-  const result = await applyWorkflowSync({
-    workspaceRoot: root,
-    action: "update",
-    source,
-    target,
-    sourceHash: await hashFile(source),
-    targetHash: await hashFile(target),
-  }, {
-    beforeWorkflowCleanup: async ({ phase }) => {
-      if (phase !== "rollback-backup" || !failCleanup) return;
-      failCleanup = false;
-      throw new Error("injected one-shot backup cleanup failure");
-    },
-  });
-
-  await assert.rejects(
-    () => result.rollback(),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED",
-  );
-  assert.equal(await readFile(target, "utf8"), "old workflow\n");
-  await result.rollback();
-  assert.equal(await readFile(target, "utf8"), "old workflow\n");
-  assert.equal(
-    (await readdir(managed)).some((name) => name.startsWith(".sdd-workflow-backup-")),
-    false,
-  );
-});
-
-test("managed installation rolls back its lock when adopt drifts during lock persistence", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-adopt-write-drift-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const source = join(root, "source", "sdd-example");
-  const target = join(root, "skills", "sdd-example");
-  await mkdir(source, { recursive: true });
-  await mkdir(target, { recursive: true });
-  await writeFile(join(source, "SKILL.md"), "matching skill\n");
-  await writeFile(join(target, "SKILL.md"), "matching skill\n");
-  const sourceHash = await hashDirectory(source);
-
-  await assert.rejects(
-    () => applyManagedInstallation(root, {
-      skillPlan: {
-        skillsDirectory: join(root, "skills"),
-        actions: [{
-          skillName: "sdd-example",
-          action: "adopt",
-          source,
-          target,
-          sourceHash,
-          targetHash: sourceHash,
-        }],
-        lock: { managedSkills: { "sdd-example": sourceHash } },
-      },
-      writeLock: async (path, value) => {
-        await writeFileAtomically(path, value);
-        await writeFile(join(target, "SKILL.md"), "drift during lock write\n");
-      },
-    }),
-    (error) => error.code === "SKILL_CONFLICT",
-  );
-  assert.equal(await readFile(join(target, "SKILL.md"), "utf8"), "drift during lock write\n");
-  assert.equal(await pathExists(join(root, ".sdd", "install-lock.json")), false);
-});
-
-test("managed installation preserves an install lock edited before CAS publication", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-install-lock-prepublish-race-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const lockPath = join(root, ".sdd", "install-lock.json");
-  const original = "{\"owner\":\"original\"}\n";
-  const winner = "{\"owner\":\"external\"}\n";
-  await mkdir(join(root, ".sdd"), { recursive: true });
-  await writeFile(lockPath, original, "utf8");
-
-  await assert.rejects(
-    applyManagedInstallation(root, {
-      skillPlan: {
-        skillsDirectory: join(root, "skills"),
-        actions: [],
-        lock: { managedSkills: {} },
-      },
-      beforeLockCommit: () => writeFile(lockPath, winner, "utf8"),
-    }),
-    (error) => error?.code === "CONCURRENT_CHANGE",
-  );
-  assert.equal(await readFile(lockPath, "utf8"), winner);
-});
-
-test("managed installation preserves a same-byte inode swapped after lock commit", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-install-lock-postcommit-race-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const lockPath = join(root, ".sdd", "install-lock.json");
-  const displaced = join(root, ".sdd", "install-lock.displaced.json");
-  let publishedIdentity;
-  let winnerIdentity;
-
-  await assert.rejects(
-    applyManagedInstallation(root, {
-      skillPlan: {
-        skillsDirectory: join(root, "skills"),
-        actions: [],
-        lock: { managedSkills: {} },
-      },
-      afterCommit: async () => {
-        const source = await readFile(lockPath, "utf8");
-        const publishedState = await lstat(lockPath, { bigint: true });
-        publishedIdentity = `${publishedState.dev}:${publishedState.ino}`;
-        await rename(lockPath, displaced);
-        await writeFile(lockPath, source, "utf8");
-        const winnerState = await lstat(lockPath, { bigint: true });
-        winnerIdentity = `${winnerState.dev}:${winnerState.ino}`;
-      },
-    }),
-    (error) => error?.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes(
-        "Installation lock changed concurrently and was preserved",
-      )),
-  );
-  assert.notEqual(winnerIdentity, publishedIdentity);
-  assert.equal(
-    await readFile(lockPath, "utf8"),
-    await readFile(displaced, "utf8"),
-  );
-});
-
-test("managed installation recovers its published lock when writer cleanup fails", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-install-lock-postpublish-failure-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const workflowSource = join(root, "workflow-source.md");
-  const workflowTarget = join(root, "managed", "workflow.md");
-  const skillSource = join(root, "skill-source");
-  const skillTarget = join(root, "managed", "skills", "sdd-example");
-  const lockPath = join(root, ".sdd", "install-lock.json");
-  await writeFile(workflowSource, "# Workflow\n", "utf8");
-  await mkdir(skillSource, { recursive: true });
-  await writeFile(join(skillSource, "SKILL.md"), "# Skill\n", "utf8");
-  const workflowHash = await hashFile(workflowSource);
-  const skillHash = await hashDirectory(skillSource);
-
-  await assert.rejects(
-    applyManagedInstallation(root, {
-      workflowPlan: {
-        workspaceRoot: root,
-        action: "install",
-        source: workflowSource,
-        target: workflowTarget,
-        sourceHash: workflowHash,
-        targetHash: null,
-        previousHash: null,
-        lock: { path: "managed/workflow.md", hash: workflowHash },
-      },
-      skillPlan: {
-        skillsDirectory: join(root, "managed", "skills"),
-        actions: [{
-          skillName: "sdd-example",
-          action: "install",
-          source: skillSource,
-          target: skillTarget,
-          sourceHash: skillHash,
-          targetHash: null,
-          previousHash: null,
-        }],
-        lock: { managedSkills: { "sdd-example": skillHash } },
-      },
-      writeLock: (path, value, options) => writeFileAtomically(path, value, {
-        ...options,
-        cleanupRename: async () => {
-          throw new Error("injected post-publication cleanup failure");
-        },
-      }),
-    }),
-    (error) => error?.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes(
-        "injected post-publication cleanup failure",
-      )),
-  );
-  assert.equal(await pathExists(lockPath), false);
-  assert.equal(await pathExists(skillTarget), false);
-  assert.equal(await pathExists(workflowTarget), false);
-});
-
-test("setup rejects an external Change-store symlink before creating closed history", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-setup-changes-symlink-"));
-  const external = await mkdtemp(join(tmpdir(), "sdd-setup-changes-external-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  t.after(() => rm(external, { recursive: true, force: true }));
-  await mkdir(join(root, ".sdd"), { recursive: true });
-  await symlink(external, join(root, ".sdd", "changes"));
-
-  for (const dryRun of [true, false]) {
-    await assert.rejects(
-      () => setupInstallation(root, {
-        planningRoot: "ideas",
-        repositoryRoots: ["repos"],
-        skillsDirectory: "skills",
-        dryRun,
-      }),
-      (error) => error.code === "UNSAFE_ARTIFACT_PATH",
-    );
-  }
-
-  assert.equal(await pathExists(join(external, "closed")), false);
-});
-
-test("first-time setup rejects a dangling workspace configuration without replacing it", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-setup-config-symlink-"));
-  const external = await mkdtemp(join(tmpdir(), "sdd-config-target-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  t.after(() => rm(external, { recursive: true, force: true }));
-  const configDirectory = join(root, ".sdd");
-  const configPath = join(configDirectory, "config.yaml");
-  const externalTarget = join(external, "created-by-symlink");
-  await mkdir(configDirectory, { recursive: true });
-  await symlink(externalTarget, configPath);
-
-  await assert.rejects(
-    () => setupInstallation(root, {
-      planningRoot: "ideas",
-      repositoryRoots: ["repos"],
-      skillsDirectory: "skills",
-    }),
-    (error) => error.code === "UNSAFE_CONFIG_PATH",
-  );
-
-  assert.equal(await pathExists(externalTarget), false);
-  assert.equal((await lstat(configPath)).isSymbolicLink(), true);
-});
-
-test("first-time setup rejects a dangling gitignore without replacing it", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-setup-ignore-symlink-"));
-  const external = await mkdtemp(join(tmpdir(), "sdd-ignore-external-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  t.after(() => rm(external, { recursive: true, force: true }));
-  const ignorePath = join(root, ".sdd", ".gitignore");
-  await mkdir(join(root, ".sdd"), { recursive: true });
-  const externalTarget = join(external, "created-by-symlink");
-  await symlink(externalTarget, ignorePath);
-
-  await assert.rejects(
-    () => setupInstallation(root, {
-      planningRoot: "ideas",
-      repositoryRoots: ["repos"],
-      skillsDirectory: "skills",
-    }),
-    (error) => error.code === "UNSAFE_CONFIG_PATH",
-  );
-  assert.equal(await pathExists(externalTarget), false);
-  assert.equal((await lstat(ignorePath)).isSymbolicLink(), true);
-});
-
-test("first-time setup preserves dangling fixed files that appear during publication", async (t) => {
-  for (const relativePath of ["config.yaml", ".gitignore"]) {
-    await t.test(relativePath, async (t) => {
-      const root = await mkdtemp(join(tmpdir(), "sdd-setup-publication-race-"));
-      const external = await mkdtemp(join(tmpdir(), "sdd-publication-target-"));
-      t.after(() => rm(root, { recursive: true, force: true }));
-      t.after(() => rm(external, { recursive: true, force: true }));
-      const fixedPath = join(root, ".sdd", relativePath);
-      const externalTarget = join(external, "must-not-be-created");
-
-      await assert.rejects(
-        () => setupInstallation(root, {
-          planningRoot: "ideas",
-          repositoryRoots: ["repos"],
-          skillsDirectory: "skills",
-          beforeSetupFilePublish: async ({ path }) => {
-            if (path === fixedPath) await symlink(externalTarget, fixedPath);
-          },
-        }),
-        (error) => [
-          "CONCURRENT_CHANGE",
-          "MUTATION_RECOVERY_FAILED",
-          "UNSAFE_CONFIG_PATH",
-        ].includes(error.code),
-      );
-
-      assert.equal(await pathExists(externalTarget), false);
-      assert.equal((await lstat(fixedPath)).isSymbolicLink(), true);
-    });
-  }
-});
-
-test("setup directory rollback invokes removal hooks on its authenticated claim", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-setup-directory-claim-swap-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const closedChangesRoot = join(root, ".sdd", "changes", "closed");
-  let cleanupClaim = null;
-  let displacedClaim = null;
-
-  await assert.rejects(
-    () => setupInstallation(root, {
-      planningRoot: "ideas",
-      repositoryRoots: ["repos"],
-      skillsDirectory: "skills",
-      writeLock: async () => {
-        throw new Error("injected setup rollback");
-      },
-      beforeSetupRollbackQuarantineRemoval: async ({ label, quarantine }) => {
-        if (label !== "Workspace closed Change store") return;
-        cleanupClaim = quarantine;
-        displacedClaim = `${quarantine}.displaced`;
-        assert.deepEqual(await readdir(cleanupClaim), []);
-        await rename(cleanupClaim, displacedClaim);
-        await mkdir(cleanupClaim);
-        await writeFile(join(cleanupClaim, "opaque.txt"), "opaque claim replacement\n");
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes(cleanupClaim)),
-  );
-
-  assert.equal(
-    await readFile(join(cleanupClaim, "opaque.txt"), "utf8"),
-    "opaque claim replacement\n",
-  );
-  assert.equal((await lstat(displacedClaim)).isDirectory(), true);
-  assert.equal((await lstat(closedChangesRoot)).isDirectory(), true);
-});
-
-test("setup rollback preserves a same-byte replacement installation lock", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-setup-lock-identity-swap-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const lockPath = join(root, ".sdd", "install-lock.json");
-  const displacedLock = `${lockPath}.displaced`;
-  const initialSource = "{}\n";
-  await mkdir(join(root, ".sdd"), { recursive: true });
-  await writeFile(lockPath, initialSource);
-
-  await assert.rejects(
-    () => setupInstallation(root, {
-      planningRoot: "ideas",
-      repositoryRoots: ["repos"],
-      skillsDirectory: "skills",
-      writeLock: async (path) => {
-        await rename(path, displacedLock);
-        await writeFile(path, initialSource);
-        throw new Error("injected same-byte lock replacement");
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes(lockPath)),
-  );
-
-  assert.equal(await readFile(lockPath, "utf8"), initialSource);
-  assert.equal(await readFile(displacedLock, "utf8"), initialSource);
-  assert.equal(await pathExists(join(root, ".sdd", "config.yaml")), true);
-  assert.equal(await pathExists(join(root, ".sdd", ".gitignore")), true);
-});
-
-test("setup cleanup accepts the authenticated lock inode restored by managed recovery", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-setup-lock-recovery-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const configDirectory = join(root, ".sdd");
-  const lockPath = join(configDirectory, "install-lock.json");
-  const initialSource = "{}\n";
-  await mkdir(configDirectory);
-  await writeFile(lockPath, initialSource);
-
-  await assert.rejects(
-    () => setupInstallation(root, {
-      planningRoot: "ideas",
-      repositoryRoots: ["repos"],
-      skillsDirectory: "skills",
-      writeLock: (path, value, options) => writeFileAtomically(path, value, {
-        ...options,
-        cleanupRename: async () => {
-          throw new Error("injected post-publication cleanup failure");
-        },
-      }),
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED",
-  );
-
-  assert.equal(await readFile(lockPath, "utf8"), initialSource);
-  assert.equal(await pathExists(join(configDirectory, "config.yaml")), true);
-  assert.equal(await pathExists(join(configDirectory, ".gitignore")), false);
-});
-
-test("first-time setup removes a new Change-store directory after ownership capture fails", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-init-directory-capture-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const changesRoot = join(root, ".sdd", "changes");
-  const primaryFailure = new Error("injected directory ownership capture failure");
-
-  await assert.rejects(
-    () => setupInstallation(root, {
-      planningRoot: "ideas",
-      repositoryRoots: ["repos"],
-      skillsDirectory: "skills",
-      afterSetupDirectoryOwnershipCapture: ({ path }) => {
-        if (path === changesRoot) throw primaryFailure;
-      },
-    }),
-    (error) => error === primaryFailure,
-  );
-
-  assert.equal(await pathExists(changesRoot), false);
-  assert.equal(await pathExists(join(root, ".sdd", "config.yaml")), false);
-});
-
-test("directory ownership rollback preserves a replacement and reports both failures", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-init-directory-capture-cleanup-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const changesRoot = join(root, ".sdd", "changes");
-  const foreignPath = join(changesRoot, "concurrent-owner");
-  const primaryFailure = new Error("injected directory ownership capture failure");
-
-  await assert.rejects(
-    () => setupInstallation(root, {
-      planningRoot: "ideas",
-      repositoryRoots: ["repos"],
-      skillsDirectory: "skills",
-      afterSetupDirectoryOwnershipCapture: async ({ path }) => {
-        if (path !== changesRoot) return;
-        await rm(path, { recursive: true });
-        await mkdir(path);
-        await writeFile(foreignPath, "concurrent owner\n");
-        throw primaryFailure;
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.errors[0] === primaryFailure
-      && error.errors.some((failure) => failure.code === "CONCURRENT_CHANGE")
-      && error.details.some((detail) => detail.includes(
-        "Original error: injected directory ownership capture failure",
-      ))
-      && error.details.some((detail) => detail.includes(changesRoot)),
-  );
-
-  assert.equal(await readFile(foreignPath, "utf8"), "concurrent owner\n");
-});
-
-test("setup rejects a swapped SDD parent even when the Change-store inode is preserved", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-init-parent-swap-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await Promise.all([
-    mkdir(join(root, "ideas"), { recursive: true }),
-    mkdir(join(root, "code"), { recursive: true }),
-  ]);
-  const configDirectory = join(root, ".sdd");
-  const displacedConfigDirectory = join(root, ".sdd-displaced");
-  const changesRoot = join(configDirectory, "changes");
-  const replacementMarker = join(changesRoot, "replacement-owner.txt");
-  let injected = false;
-
-  await assert.rejects(
-    () => setupInstallation(root, {
-      planningRoot: "ideas",
-      repositoryRoots: ["code"],
-      skillsDirectory: ".agents/skills",
-      afterSetupDirectoryOwnershipCapture: async ({ path }) => {
-        if (injected || path !== changesRoot) return;
-        injected = true;
-        await rename(configDirectory, displacedConfigDirectory);
-        await mkdir(configDirectory);
-        await rename(join(displacedConfigDirectory, "changes"), changesRoot);
-        await writeFile(replacementMarker, "replacement owner\n");
-      },
-    }),
-    (error) => error?.code === "MUTATION_RECOVERY_FAILED"
-      && error.errors.some((failure) => failure?.code === "CONCURRENT_CHANGE"),
-  );
-
-  assert.equal(injected, true);
-  assert.equal(await readFile(replacementMarker, "utf8"), "replacement owner\n");
-  assert.equal(await pathExists(join(configDirectory, "config.yaml")), false);
-});
-
-test("failed first-time setup rolls back around a pre-existing installation lock", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-init-existing-lock-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const installLockPath = join(root, ".sdd", "install-lock.json");
-  const installLockSource = "{}\n";
-  await mkdir(join(root, ".sdd"), { recursive: true });
-  await writeFile(installLockPath, installLockSource);
-
-  await assert.rejects(
-    () => setupInstallation(root, {
-      planningRoot: "ideas",
-      repositoryRoots: ["code"],
-      skillsDirectory: ".agents/skills",
-      writeLock: async () => { throw new Error("injected init lock failure"); },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes("injected init lock failure"))
-      && error.details.some((detail) => detail.includes("retry the same setup command")),
-  );
-
-  assert.equal(await readFile(installLockPath, "utf8"), installLockSource);
-  assert.equal(await pathExists(join(root, ".sdd", "config.yaml")), true);
-  assert.equal(await pathExists(join(root, ".sdd", ".gitignore")), false);
-  assert.equal(await pathExists(join(root, ".sdd", "changes")), false);
-});
-
-test("failed first-time setup preserves pre-existing empty Change-store directories", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-init-existing-changes-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const changesRoot = join(root, ".sdd", "changes");
-  const closedChangesRoot = join(changesRoot, "closed");
-  await mkdir(closedChangesRoot, { recursive: true });
-
-  await assert.rejects(
-    () => setupInstallation(root, {
-      planningRoot: "ideas",
-      repositoryRoots: ["code"],
-      skillsDirectory: ".agents/skills",
-      writeLock: async () => { throw new Error("injected init lock failure"); },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes("injected init lock failure"))
-      && error.details.some((detail) => detail.includes("retry the same setup command")),
-  );
-
-  assert.equal((await lstat(changesRoot)).isDirectory(), true);
-  assert.equal((await lstat(closedChangesRoot)).isDirectory(), true);
-  assert.equal(await pathExists(join(root, ".sdd", "config.yaml")), true);
-  assert.equal(await pathExists(join(root, ".sdd", ".gitignore")), false);
-});
-
-test("failed first-time setup removes only the Change-store directory it created", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-init-owned-closed-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const changesRoot = join(root, ".sdd", "changes");
-  const closedChangesRoot = join(changesRoot, "closed");
-  await mkdir(changesRoot, { recursive: true });
-
-  await assert.rejects(
-    () => setupInstallation(root, {
-      planningRoot: "ideas",
-      repositoryRoots: ["code"],
-      skillsDirectory: ".agents/skills",
-      writeLock: async () => { throw new Error("injected init lock failure"); },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes("injected init lock failure"))
-      && error.details.some((detail) => detail.includes("retry the same setup command")),
-  );
-
-  assert.equal((await lstat(changesRoot)).isDirectory(), true);
-  assert.equal(await pathExists(closedChangesRoot), false);
-});
-
-test("first-time setup reports both the initiating and rollback failures", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-init-cleanup-failure-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const closedChangesRoot = join(root, ".sdd", "changes", "closed");
-
-  await assert.rejects(
-    () => setupInstallation(root, {
-      planningRoot: "ideas",
-      repositoryRoots: ["code"],
-      skillsDirectory: ".agents/skills",
-      writeLock: async () => {
-        throw new Error("injected setup primary failure");
-      },
-      beforeSetupRollbackQuarantine: async ({ path }) => {
-        if (path !== closedChangesRoot) return;
-        await rm(closedChangesRoot, { recursive: true });
-        await writeFile(closedChangesRoot, "concurrent owner\n");
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.cause instanceof AggregateError
-      && error.errors.some((failure) =>
-        failure.message.includes("injected setup primary failure"))
-      && error.errors.some((failure) => failure.code === "CONCURRENT_CHANGE")
-      && error.details.some((detail) => detail.includes(
-        "Original error: injected setup primary failure",
-      ))
-      && error.details.some((detail) => detail.includes(closedChangesRoot)),
-  );
-
-  assert.equal(await readFile(closedChangesRoot, "utf8"), "concurrent owner\n");
-});
-
-test("file replacement preserves a target recreated at publish time", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-file-publish-race-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const source = join(root, "source.md");
-  const target = join(root, "target.md");
-  await writeFile(source, "package version\n");
-  await writeFile(target, "original version\n");
-  const expectedHash = await hashFile(target);
-
-  await assert.rejects(
-    () => replaceFileAtomically(source, target, {
-      expectedHash,
-      ownerRoot: root,
-      beforePublish: () => writeFile(target, "recreated version\n"),
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED",
-  );
-
-  assert.equal(await readFile(target, "utf8"), "recreated version\n");
-  assert.ok((await readdir(root)).some((name) => name.startsWith(".target.md.sdd-old-")));
-});
-
 test("directory replacement preserves a target recreated at publish time", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "sdd-directory-publish-race-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -2978,33 +809,6 @@ async function assertReplacementRaceWinner(root, target, kind) {
   }
 }
 
-test("file publication preserves every concurrent target entry type", async (t) => {
-  for (const kind of ["file", "symlink", "empty-directory", "nonempty-directory"]) {
-    await t.test(kind, async (t) => {
-      const root = await mkdtemp(join(tmpdir(), `sdd-file-target-${kind}-`));
-      t.after(() => rm(root, { recursive: true, force: true }));
-      const source = join(root, "source.md");
-      const target = join(root, "target.md");
-      await writeFile(source, "package version\n");
-      await writeFile(target, "original version\n");
-      const expectedHash = await hashFile(target);
-
-      await assert.rejects(
-        () => replaceFileAtomically(source, target, {
-          expectedHash,
-          ownerRoot: root,
-          beforePublish: () => createReplacementRaceWinner(root, target, kind),
-        }),
-        (error) => error.code === "MUTATION_RECOVERY_FAILED"
-          && error.details.some((detail) => detail.includes("Retained backup:")),
-      );
-
-      await assertReplacementRaceWinner(root, target, kind);
-      assert.ok((await readdir(root)).some((name) => name.startsWith(".target.md.sdd-old-")));
-    });
-  }
-});
-
 test("directory publication preserves every concurrent target entry type", async (t) => {
   for (const kind of ["file", "symlink", "empty-directory", "nonempty-directory"]) {
     await t.test(kind, async (t) => {
@@ -3032,38 +836,6 @@ test("directory publication preserves every concurrent target entry type", async
       assert.ok((await readdir(root)).some((name) => name.startsWith(".target.sdd-old-")));
     });
   }
-});
-
-test("file replacement reports an authenticated backup moved to an arbitrary sibling", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-file-backup-swap-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const source = join(root, "source.md");
-  const target = join(root, "target.md");
-  await writeFile(source, "package version\n");
-  await writeFile(target, "original version\n");
-  const expectedHash = await hashFile(target);
-  let backup;
-  const retainedOriginal = join(root, "original-retained.md");
-
-  await assert.rejects(
-    () => replaceFileAtomically(source, target, {
-      expectedHash,
-      ownerRoot: root,
-      afterBackup: async (publication) => {
-        backup = publication.backup;
-        await rename(backup, retainedOriginal);
-        await writeFile(backup, "opaque backup replacement\n");
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && !error.details.includes(`Retained backup: ${backup}`)
-      && error.details.includes(`Concurrent/opaque retained path: ${backup}`)
-      && error.details.includes(`Retained backup: ${retainedOriginal}`)
-      && error.details.includes(`Retained path: ${retainedOriginal}`),
-  );
-
-  assert.equal(await readFile(backup, "utf8"), "opaque backup replacement\n");
-  assert.equal(await readFile(retainedOriginal, "utf8"), "original version\n");
 });
 
 test("directory replacement preserves an opaque backup-path swap", async (t) => {
@@ -3103,32 +875,6 @@ test("directory replacement preserves an opaque backup-path swap", async (t) => 
   );
 });
 
-test("file restoration never overwrites a concurrent restore winner", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-file-restore-swap-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const source = join(root, "source.md");
-  const target = join(root, "target.md");
-  await writeFile(source, "package version\n");
-  await writeFile(target, "original version\n");
-  const expectedHash = await hashFile(target);
-
-  await assert.rejects(
-    () => replaceFileAtomically(source, target, {
-      expectedHash,
-      ownerRoot: root,
-      afterBackup: () => {
-        throw new Error("injected pre-publication failure");
-      },
-      beforeRestore: () => writeFile(target, "restore winner\n"),
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.errors.some((failure) => failure.message.includes("injected pre-publication failure")),
-  );
-
-  assert.equal(await readFile(target, "utf8"), "restore winner\n");
-  assert.ok((await readdir(root)).some((name) => name.startsWith(".target.md.sdd-old-")));
-});
-
 test("directory restoration never overwrites a concurrent restore winner", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "sdd-directory-restore-swap-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -3158,35 +904,6 @@ test("directory restoration never overwrites a concurrent restore winner", async
 
   assert.equal(await readFile(join(target, "winner.txt"), "utf8"), "restore winner\n");
   assert.ok((await readdir(root)).some((name) => name.startsWith(".target.sdd-old-")));
-});
-
-test("file cleanup preserves an opaque temporary-path swap", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-file-temporary-swap-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const source = join(root, "source.md");
-  const target = join(root, "target.md");
-  await writeFile(source, "package version\n");
-  await writeFile(target, "original version\n");
-  const expectedHash = await hashFile(target);
-  let temporary;
-
-  await assert.rejects(
-    () => replaceFileAtomically(source, target, {
-      expectedHash,
-      ownerRoot: root,
-      beforeCleanup: async ({ kind, path }) => {
-        if (kind !== "temporary") return;
-        temporary = path;
-        await rename(path, `${path}.authenticated`);
-        await writeFile(path, "opaque temporary replacement\n");
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.includes(`Retained path: ${temporary}`),
-  );
-
-  assert.equal(await readFile(target, "utf8"), "package version\n");
-  assert.equal(await readFile(temporary, "utf8"), "opaque temporary replacement\n");
 });
 
 test("directory cleanup preserves an opaque temporary-path swap", async (t) => {
@@ -3256,40 +973,6 @@ test("nested directory publication detects a reservation entry swap", async (t) 
     "nested reservation winner\n",
   );
   assert.ok((await readdir(root)).some((name) => name.startsWith(".target.sdd-old-")));
-});
-
-test("file replacement aggregates temporary and backup cleanup swaps", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-file-dual-cleanup-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const source = join(root, "source.md");
-  const target = join(root, "target.md");
-  await writeFile(source, "package version\n");
-  await writeFile(target, "original version\n");
-  const expectedHash = await hashFile(target);
-  const swapped = [];
-
-  await assert.rejects(
-    () => replaceFileAtomically(source, target, {
-      expectedHash,
-      ownerRoot: root,
-      beforeCleanup: async ({ kind, path }) => {
-        if (!["temporary", "backup"].includes(kind)) return;
-        swapped.push(path);
-        await rename(path, `${path}.authenticated`);
-        await writeFile(path, `opaque ${kind}\n`);
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.errors.length >= 2
-      && swapped.every((path) => error.details.includes(`Retained path: ${path}`)),
-  );
-
-  assert.equal(swapped.length, 2);
-  assert.equal(await readFile(target, "utf8"), "package version\n");
-  assert.deepEqual(
-    new Set(await Promise.all(swapped.map((path) => readFile(path, "utf8")))),
-    new Set(["opaque temporary\n", "opaque backup\n"]),
-  );
 });
 
 test("directory replacement aggregates temporary and backup cleanup swaps", async (t) => {
@@ -3525,72 +1208,6 @@ test("directory cleanup reports a mode-widened complete backup as authenticated"
   assert.equal((await stat(retainedBackup)).mode & 0o777, 0o755);
 });
 
-test("replacement primitives require an explicit owner root", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-replacement-owner-required-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const fileSource = join(root, "source.md");
-  const fileTarget = join(root, "target.md");
-  const directorySource = join(root, "source");
-  const directoryTarget = join(root, "target");
-  await writeFile(fileSource, "package file\n");
-  await writeFile(fileTarget, "original file\n");
-  await mkdir(directorySource);
-  await mkdir(directoryTarget);
-  await writeFile(join(directorySource, "SKILL.md"), "package directory\n");
-  await writeFile(join(directoryTarget, "SKILL.md"), "original directory\n");
-
-  await assert.rejects(
-    () => replaceFileAtomically(fileSource, fileTarget),
-    (error) => error.code === "UNSAFE_REPLACEMENT_PATH",
-  );
-  await assert.rejects(
-    () => replaceDirectoryAtomically(directorySource, directoryTarget),
-    (error) => error.code === "UNSAFE_REPLACEMENT_PATH",
-  );
-
-  assert.equal(await readFile(fileTarget, "utf8"), "original file\n");
-  assert.equal(
-    await readFile(join(directoryTarget, "SKILL.md"), "utf8"),
-    "original directory\n",
-  );
-});
-
-test("file replacement rejects an owner-ancestor swap to external same-content state", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-file-owner-swap-"));
-  const external = await mkdtemp(join(tmpdir(), "sdd-file-owner-external-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  t.after(() => rm(external, { recursive: true, force: true }));
-  const managed = join(root, "managed");
-  const retainedManaged = join(root, "managed-authenticated");
-  const source = join(root, "source.md");
-  const target = join(managed, "target.md");
-  const externalTarget = join(external, "target.md");
-  await mkdir(managed);
-  await writeFile(source, "package version\n");
-  await writeFile(target, "original version\n");
-  await writeFile(externalTarget, "package version\n");
-  const expectedHash = await hashFile(target);
-
-  await assert.rejects(
-    () => replaceFileAtomically(source, target, {
-      expectedHash,
-      ownerRoot: root,
-      beforePublish: async () => {
-        await rename(managed, retainedManaged);
-        await symlink(external, managed);
-      },
-    }),
-    (error) => ["CONCURRENT_CHANGE", "MUTATION_RECOVERY_FAILED"].includes(error.code),
-  );
-
-  assert.equal((await lstat(managed)).isSymbolicLink(), true);
-  assert.equal(await readFile(externalTarget, "utf8"), "package version\n");
-  assert.deepEqual(await readdir(external), ["target.md"]);
-  assert.ok(
-    (await readdir(retainedManaged)).some((name) => name.startsWith(".target.md.sdd-old-")),
-  );
-});
-
 test("directory replacement rejects an owner-ancestor swap to external same-content state", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "sdd-directory-owner-swap-"));
   const external = await mkdtemp(join(tmpdir(), "sdd-directory-owner-external-"));
@@ -3630,242 +1247,6 @@ test("directory replacement rejects an owner-ancestor swap to external same-cont
   assert.deepEqual(await readdir(external), ["target"]);
   assert.ok(
     (await readdir(retainedManaged)).some((name) => name.startsWith(".target.sdd-old-")),
-  );
-});
-
-test("bound regular-file removal deletes its authenticated file", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-bound-file-remove-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const target = join(root, "owned.txt");
-  await writeFile(target, "owned bytes\n");
-  const snapshot = await readBoundRegularFile(target, {
-    ownerRoot: root,
-    label: "Owned test file",
-  });
-
-  const removed = await removeBoundRegularFile(target, snapshot, {
-    ownerRoot: root,
-    label: "Owned test file",
-  });
-
-  assert.equal(removed.bytes.toString("utf8"), "owned bytes\n");
-  assert.equal(await pathExists(target), false);
-  assert.deepEqual(await readdir(root), []);
-});
-
-test("bound regular-file removal rejects an ancestor swap to external same-content state", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-bound-file-owner-swap-"));
-  const external = await mkdtemp(join(tmpdir(), "sdd-bound-file-owner-external-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  t.after(() => rm(external, { recursive: true, force: true }));
-  const managed = join(root, "managed");
-  const retainedManaged = join(root, "managed-authenticated");
-  const target = join(managed, "owned.txt");
-  const externalTarget = join(external, "owned.txt");
-  await mkdir(managed);
-  await writeFile(target, "same bytes\n");
-  await writeFile(externalTarget, "same bytes\n");
-  const snapshot = await readBoundRegularFile(target, {
-    ownerRoot: root,
-    label: "Owned test file",
-  });
-
-  await assert.rejects(
-    () => removeBoundRegularFile(target, snapshot, {
-      ownerRoot: root,
-      label: "Owned test file",
-      beforeCleanup: async () => {
-        await rename(managed, retainedManaged);
-        await symlink(external, managed);
-      },
-    }),
-    (error) => ["CONCURRENT_CHANGE", "MUTATION_RECOVERY_FAILED"].includes(error.code),
-  );
-
-  assert.equal((await lstat(managed)).isSymbolicLink(), true);
-  assert.equal(await readFile(externalTarget, "utf8"), "same bytes\n");
-  assert.deepEqual(await readdir(external), ["owned.txt"]);
-  assert.equal(await readFile(join(retainedManaged, "owned.txt"), "utf8"), "same bytes\n");
-});
-
-test("bound regular-file removal retains an authenticated quarantine after an entry swap", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-bound-file-quarantine-swap-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const target = join(root, "owned.txt");
-  await writeFile(target, "authenticated bytes\n");
-  const snapshot = await readBoundRegularFile(target, {
-    ownerRoot: root,
-    label: "Owned test file",
-  });
-  let quarantine = null;
-  let quarantineRoot = null;
-
-  await assert.rejects(
-    () => removeBoundRegularFile(target, snapshot, {
-      ownerRoot: root,
-      label: "Owned test file",
-      afterQuarantine: async ({ quarantine: claimed }) => {
-        quarantine = claimed;
-        quarantineRoot = dirname(claimed);
-        await rename(claimed, `${claimed}.authenticated`);
-        await writeFile(claimed, "opaque replacement\n");
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.includes(`Retained path: ${quarantineRoot}`),
-  );
-
-  assert.equal(await pathExists(target), false);
-  assert.equal(await readFile(quarantine, "utf8"), "opaque replacement\n");
-  assert.equal(
-    await readFile(`${quarantine}.authenticated`, "utf8"),
-    "authenticated bytes\n",
-  );
-});
-
-test("bound regular-file removal preserves a canonical replacement made at remove-canonical", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-bound-file-remove-canonical-swap-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const target = join(root, "owned.txt");
-  const authenticated = join(root, "owned.authenticated.txt");
-  await writeFile(target, "authenticated bytes\n");
-  const snapshot = await readBoundRegularFile(target, {
-    ownerRoot: root,
-    label: "Owned test file",
-  });
-  let quarantineRoot = null;
-
-  await assert.rejects(
-    () => removeBoundRegularFile(target, snapshot, {
-      ownerRoot: root,
-      label: "Owned test file",
-      beforeRemovalMutation: async (mutation) => {
-        if (mutation.action !== "remove-canonical") return;
-        quarantineRoot = dirname(mutation.target);
-        await rename(mutation.path, authenticated);
-        await writeFile(mutation.path, "opaque replacement\n");
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.includes(`Retained path: ${quarantineRoot}`),
-  );
-
-  assert.equal(await readFile(target, "utf8"), "opaque replacement\n");
-  assert.equal(await readFile(authenticated, "utf8"), "authenticated bytes\n");
-  assert.equal(
-    await readFile(join(quarantineRoot, "entry"), "utf8"),
-    "authenticated bytes\n",
-  );
-});
-
-test("bound regular-file removal preserves a quarantine replacement made at remove-source", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-bound-file-remove-source-swap-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const target = join(root, "owned.txt");
-  await writeFile(target, "authenticated bytes\n");
-  const snapshot = await readBoundRegularFile(target, {
-    ownerRoot: root,
-    label: "Owned test file",
-  });
-  let quarantine = null;
-  let authenticated = null;
-  let unlinkSlot = null;
-
-  await assert.rejects(
-    () => removeBoundRegularFile(target, snapshot, {
-      ownerRoot: root,
-      label: "Owned test file",
-      beforeRemovalMutation: async (mutation) => {
-        if (mutation.action !== "remove-source") return;
-        quarantine = mutation.path;
-        authenticated = join(root, "quarantine-authenticated.txt");
-        unlinkSlot = mutation.target;
-        await rename(mutation.path, authenticated);
-        await writeFile(mutation.path, "opaque replacement\n");
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.includes(`Retained path: ${dirname(quarantine)}`),
-  );
-
-  assert.equal(await pathExists(target), false);
-  assert.equal(await readFile(quarantine, "utf8"), "opaque replacement\n");
-  assert.equal(await readFile(authenticated, "utf8"), "authenticated bytes\n");
-  assert.equal(await readFile(unlinkSlot, "utf8"), "authenticated bytes\n");
-});
-
-
-test("first setup preserves a same-byte config replacement made by its lock writer", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-setup-config-first-race-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const configPath = join(root, ".sdd", "config.yaml");
-  const displacedConfig = join(root, "setup-owned-config.yaml");
-  let replacementSource;
-
-  await assert.rejects(
-    setupInstallation(root, {
-      planningRoot: "ideas",
-      repositoryRoots: ["repos"],
-      skillsDirectory: ".agents/skills",
-      writeLock: async (lockPath, lockSource, options) => {
-        replacementSource = await readFile(configPath, "utf8");
-        await rename(configPath, displacedConfig);
-        await writeFile(configPath, replacementSource, "utf8");
-        return writeFileAtomically(lockPath, lockSource, options);
-      },
-    }),
-    (error) => error?.code === "MUTATION_RECOVERY_FAILED",
-  );
-  assert.equal(await readFile(configPath, "utf8"), replacementSource);
-  assert.equal(await readFile(displacedConfig, "utf8"), replacementSource);
-  assert.equal(await pathExists(join(root, ".sdd", "install-lock.json")), false);
-  assert.equal(
-    await pathExists(join(root, ".sdd", "story-driven-development.md")),
-    false,
-  );
-  assert.equal(
-    await pathExists(join(root, ".agents", "skills", "sdd-change")),
-    false,
-  );
-});
-
-test("repeated setup preserves a same-byte config replacement and restores its lock", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-setup-config-repeat-race-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const setupOptions = {
-    planningRoot: "ideas",
-    repositoryRoots: ["repos/alpha", "services/beta"],
-    skillsDirectory: ".agents/skills",
-  };
-  await setupInstallation(root, setupOptions);
-  const configPath = join(root, ".sdd", "config.yaml");
-  const lockPath = join(root, ".sdd", "install-lock.json");
-  const displacedConfig = join(root, "previous-config.yaml");
-  const configSource = await readFile(configPath, "utf8");
-  const lockSource = await readFile(lockPath, "utf8");
-
-  await assert.rejects(
-    setupInstallation(root, {
-      ...setupOptions,
-      repositoryRoots: [...setupOptions.repositoryRoots].reverse(),
-      writeLock: async (target, source, options) => {
-        await rename(configPath, displacedConfig);
-        await writeFile(configPath, configSource, "utf8");
-        return writeFileAtomically(target, source, options);
-      },
-    }),
-    (error) => error?.code === "CONCURRENT_CHANGE",
-  );
-  assert.equal(await readFile(configPath, "utf8"), configSource);
-  assert.equal(await readFile(displacedConfig, "utf8"), configSource);
-  assert.equal(await readFile(lockPath, "utf8"), lockSource);
-  assert.equal(
-    await pathExists(join(root, ".sdd", "story-driven-development.md")),
-    true,
-  );
-  assert.equal(
-    await pathExists(join(root, ".agents", "skills", "sdd-change")),
-    true,
   );
 });
 
@@ -3949,48 +1330,6 @@ test("directory replacement stages read-only directory modes owner-writable then
   );
 });
 
-test("file replacement reports directory fsync failures by durability phase", async (t) => {
-  for (const failurePhase of [
-    "backup-reservation",
-    "backup-removal",
-    "publication",
-    "backup-cleanup",
-  ]) {
-    await t.test(failurePhase, async (t) => {
-      const root = await mkdtemp(join(tmpdir(), `sdd-file-fsync-${failurePhase}-`));
-      t.after(() => rm(root, { recursive: true, force: true }));
-      const source = join(root, "source.md");
-      const target = join(root, "target.md");
-      await writeFile(source, "package version\n");
-      await writeFile(target, "original version\n");
-      const expectedHash = await hashFile(target);
-      const phases = [];
-
-      await assert.rejects(
-        () => replaceFileAtomically(source, target, {
-          expectedHash,
-          ownerRoot: root,
-          syncDirectoryPath: async (_path, metadata) => {
-            phases.push(metadata.phase);
-            if (metadata.phase === failurePhase) {
-              throw new Error(`injected ${failurePhase} fsync failure`);
-            }
-          },
-        }),
-        (error) => error.code === "MUTATION_RECOVERY_FAILED"
-          && phases.includes(failurePhase),
-      );
-
-      assert.equal(
-        await readFile(target, "utf8"),
-        ["backup-reservation", "backup-removal"].includes(failurePhase)
-          ? "original version\n"
-          : "package version\n",
-      );
-    });
-  }
-});
-
 test("directory replacement reports tree and cleanup fsync failures by phase", async (t) => {
   for (const failurePhase of [
     "backup-tree",
@@ -4034,267 +1373,503 @@ test("directory replacement reports tree and cleanup fsync failures by phase", a
   }
 });
 
-test("replacement primitives bind relative paths before hooks can change cwd", async (t) => {
-  const previousCwd = process.cwd();
-  const root = await mkdtemp(join(tmpdir(), "sdd-replacement-cwd-binding-"));
-  const decoy = await mkdtemp(join(tmpdir(), "sdd-replacement-cwd-decoy-"));
+test("managed writer rejects a selected workspace replacement before lock-directory creation", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-lock-owner-"));
+  const external = await mkdtemp(join(tmpdir(), "sdd-lock-owner-external-"));
+  const displaced = `${root}-displaced`;
   t.after(async () => {
-    process.chdir(previousCwd);
-    await Promise.all([
-      rm(root, { recursive: true, force: true }),
-      rm(decoy, { recursive: true, force: true }),
-    ]);
+    await rm(root, { recursive: true, force: true });
+    await rm(displaced, { recursive: true, force: true });
+    await rm(external, { recursive: true, force: true });
   });
 
-  try {
-    const fileSource = join(root, "source.md");
-    const fileTarget = join(root, "target.md");
-    await writeFile(fileSource, "package file\n");
-    await writeFile(fileTarget, "original file\n");
-    await writeFile(join(decoy, "target.md"), "decoy file\n");
-    process.chdir(root);
-    await replaceFileAtomically("source.md", "target.md", {
-      expectedHash: await hashFile(fileTarget),
-      ownerRoot: ".",
-      beforePublish: () => process.chdir(decoy),
-    });
-    assert.equal(await readFile(fileTarget, "utf8"), "package file\n");
-    assert.equal(await readFile(join(decoy, "target.md"), "utf8"), "decoy file\n");
-
-    const directorySource = join(root, "source");
-    const directoryTarget = join(root, "target");
-    await mkdir(directorySource);
-    await mkdir(directoryTarget);
-    await mkdir(join(decoy, "target"));
-    await writeFile(join(directorySource, "SKILL.md"), "package directory\n");
-    await writeFile(join(directoryTarget, "SKILL.md"), "original directory\n");
-    await writeFile(join(decoy, "target", "SKILL.md"), "decoy directory\n");
-    process.chdir(root);
-    await replaceDirectoryAtomically("source", "target", {
-      expectedHash: await hashDirectory(directoryTarget),
-      ownerRoot: ".",
-      beforePublish: () => process.chdir(decoy),
-    });
-    assert.equal(
-      await readFile(join(directoryTarget, "SKILL.md"), "utf8"),
-      "package directory\n",
-    );
-    assert.equal(
-      await readFile(join(decoy, "target", "SKILL.md"), "utf8"),
-      "decoy directory\n",
-    );
-  } finally {
-    process.chdir(previousCwd);
-  }
-});
-
-test("file cleanup fsync guards retain names recreated during sync", async (t) => {
-  for (const kind of ["temporary", "backup"]) {
-    await t.test(kind, async (t) => {
-      const root = await mkdtemp(join(tmpdir(), `sdd-file-fsync-${kind}-swap-`));
-      t.after(() => rm(root, { recursive: true, force: true }));
-      const source = join(root, "source.md");
-      const target = join(root, "target.md");
-      await writeFile(source, "package version\n");
-      await writeFile(target, "original version\n");
-      const expectedHash = await hashFile(target);
-      let recreated = null;
-
-      await assert.rejects(
-        () => replaceFileAtomically(source, target, {
-          expectedHash,
-          ownerRoot: root,
-          syncDirectoryPath: async (_path, metadata) => {
-            if (metadata.phase !== `${kind}-cleanup` || recreated !== null) return;
-            recreated = metadata[kind];
-            await writeFile(recreated, `opaque ${kind}\n`);
-          },
-        }),
-        (error) => error.code === "MUTATION_RECOVERY_FAILED"
-          && error.details.includes(`Retained path: ${recreated}`),
-      );
-
-      assert.equal(await readFile(target, "utf8"), "package version\n");
-      assert.equal(await readFile(recreated, "utf8"), `opaque ${kind}\n`);
-    });
-  }
-});
-
-test("setup preserves a workflow inode swapped during its final success guard", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-setup-final-workflow-swap-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const workflowPath = join(root, ".sdd", "story-driven-development.md");
-  const displacedWorkflow = join(root, "published-workflow.md");
-  let workflowSource;
-  let publishedIdentity;
-  let winnerIdentity;
-  let failure;
-
   await assert.rejects(
-    setupInstallation(root, {
-      planningRoot: "ideas",
-      repositoryRoots: ["repos"],
-      skillsDirectory: ".agents/skills",
-      beforeManagedInstallationSuccess: async () => {
-        workflowSource = await readFile(workflowPath, "utf8");
-        const publishedState = await lstat(workflowPath, { bigint: true });
-        publishedIdentity = `${publishedState.dev}:${publishedState.ino}`;
-        await rename(workflowPath, displacedWorkflow);
-        await writeFile(workflowPath, workflowSource, "utf8");
-        const winnerState = await lstat(workflowPath, { bigint: true });
-        winnerIdentity = `${winnerState.dev}:${winnerState.ino}`;
+    () => withWorkspaceMutationLock(root, async () => {}, {
+      beforeLockDirectoryCreate: async () => {
+        await rename(root, displaced);
+        await symlink(external, root, "dir");
       },
     }),
-    (error) => {
-      failure = error;
-      return error?.code === "MUTATION_RECOVERY_FAILED";
-    },
+    (error) => error.code === "UNSAFE_CONFIG_PATH"
+      && error.message.includes("Selected workspace authority changed"),
   );
-  const installationFailure = failure.message === "Managed installation failed and recovery was incomplete."
-    ? failure
-    : failure.errors.find((error) =>
-        error?.message === "Managed installation failed and recovery was incomplete.");
-  assert.equal(installationFailure.originalError.code, "CONCURRENT_CHANGE");
-  assert.equal(installationFailure.errors[0], installationFailure.originalError);
-  assert.equal(installationFailure.cause instanceof AggregateError, true);
-  assert.equal(
-    installationFailure.failures.some(({ label, error }) =>
-      label === "Managed workflow rollback"
-      && error.code === "MUTATION_RECOVERY_FAILED"),
-    true,
-  );
-  assert.equal(installationFailure.retainedPaths.includes(workflowPath), true);
 
-  assert.notEqual(winnerIdentity, publishedIdentity);
-  assert.equal(await readFile(workflowPath, "utf8"), workflowSource);
-  assert.equal(await readFile(displacedWorkflow, "utf8"), workflowSource);
-  assert.equal(await pathExists(join(root, ".sdd", "install-lock.json")), false);
+  assert.deepEqual(await readdir(external), []);
 });
 
-test("setup preserves an install-lock inode swapped during its final success guard", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-setup-final-lock-swap-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const displacedLock = join(root, "published-install-lock.json");
-  let lockSource;
-  let lockPath;
-  let publishedIdentity;
-  let winnerIdentity;
-
-  await assert.rejects(
-    setupInstallation(root, {
-      planningRoot: "ideas",
-      repositoryRoots: ["repos"],
-      skillsDirectory: ".agents/skills",
-      beforeManagedInstallationSuccess: async (context) => {
-        lockPath = context.lockPath;
-        lockSource = await readFile(lockPath, "utf8");
-        const publishedState = await lstat(lockPath, { bigint: true });
-        publishedIdentity = `${publishedState.dev}:${publishedState.ino}`;
-        await rename(lockPath, displacedLock);
-        await writeFile(lockPath, lockSource, "utf8");
-        const winnerState = await lstat(lockPath, { bigint: true });
-        winnerIdentity = `${winnerState.dev}:${winnerState.ino}`;
-      },
-    }),
-    (error) => error?.code === "MUTATION_RECOVERY_FAILED",
-  );
-
-  assert.notEqual(winnerIdentity, publishedIdentity);
-  assert.equal(await readFile(lockPath, "utf8"), lockSource);
-  assert.equal(await readFile(displacedLock, "utf8"), lockSource);
-  assert.equal(
-    await pathExists(join(root, ".sdd", "story-driven-development.md")),
-    false,
-  );
-  assert.equal(
-    await pathExists(join(root, ".agents", "skills", "sdd-change")),
-    false,
-  );
-});
-
-test("setup final invariants preserve an external Change-store replacement", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-setup-change-store-swap-"));
-  const external = await mkdtemp(join(tmpdir(), "sdd-setup-change-store-external-"));
+test("fixed SDD mutation paths reject a symlinked config directory", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-fixed-path-owner-"));
+  const external = await mkdtemp(join(tmpdir(), "sdd-fixed-path-external-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   t.after(() => rm(external, { recursive: true, force: true }));
-  const changesRoot = join(root, ".sdd", "changes");
-  const displacedChanges = join(root, "owned-changes");
-  const externalMarker = join(external, "opaque.txt");
-  await mkdir(join(changesRoot, "closed"), { recursive: true });
-  await writeFile(externalMarker, "external winner\n");
+  await symlink(external, join(root, ".sdd"), "dir");
 
   await assert.rejects(
-    setupInstallation(root, {
+    () => setupInstallation(root, {
       planningRoot: "ideas",
       repositoryRoots: ["repos"],
       skillsDirectory: ".agents/skills",
-      beforeManagedInstallationSuccess: async () => {
-        await rename(changesRoot, displacedChanges);
-        await symlink(external, changesRoot, "dir");
-      },
     }),
-    (error) => error?.code === "CONCURRENT_CHANGE"
-      && error.message.includes(changesRoot),
+    (error) => error.code === "UNSAFE_CONFIG_PATH",
   );
-
-  assert.equal((await lstat(changesRoot)).isSymbolicLink(), true);
-  assert.equal(await readFile(externalMarker, "utf8"), "external winner\n");
-  assert.equal(
-    (await lstat(join(displacedChanges, "closed"))).isDirectory(),
-    true,
-  );
-  assert.equal(await pathExists(join(root, ".sdd", "install-lock.json")), false);
-  assert.equal(
-    await pathExists(join(root, ".sdd", "story-driven-development.md")),
-    false,
-  );
+  assert.deepEqual(await readdir(external), []);
 });
 
-test("setup commit signal preserves owned directories when finalization fails", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-setup-commit-signal-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await setupInstallation(root, {
-    planningRoot: "ideas",
-    repositoryRoots: ["repos"],
-    skillsDirectory: ".agents/skills",
+test("setup rejects a selected workspace root replacement before managed writes", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-workspace-owner-"));
+  const external = await mkdtemp(join(tmpdir(), "sdd-workspace-owner-external-"));
+  const displaced = `${root}-displaced`;
+  t.after(async () => {
+    await rm(root, { recursive: true, force: true });
+    await rm(displaced, { recursive: true, force: true });
+    await rm(external, { recursive: true, force: true });
   });
-  const lockPath = join(root, ".sdd", "install-lock.json");
-  const workflowPath = join(root, ".sdd", "story-driven-development.md");
-  const changesRoot = join(root, ".sdd", "changes");
-  const desiredLock = await readFile(lockPath, "utf8");
-  const desiredWorkflow = await readFile(workflowPath, "utf8");
-  await writeFile(workflowPath, "locally drifted workflow\n");
-  await rm(changesRoot, { recursive: true, force: true });
-  let backup;
-  let displacedBackup;
 
   await assert.rejects(
-    setupInstallation(root, {
-      force: true,
-      beforeManagedInstallationSuccess: async () => {
-        const backupName = (await readdir(dirname(workflowPath)))
-          .find((name) => name.startsWith(".sdd-workflow-backup-"));
-        assert.equal(typeof backupName, "string");
-        backup = join(dirname(workflowPath), backupName);
-        displacedBackup = `${backup}.displaced`;
-        await rename(backup, displacedBackup);
-        await mkdir(backup);
-        await writeFile(join(backup, "opaque.txt"), "opaque backup replacement\n");
+    () => setupInstallation(root, {
+      planningRoot: "ideas",
+      repositoryRoots: ["repos"],
+      skillsDirectory: ".agents/skills",
+      beforeSetupDirectoryMutation: async () => {
+        await rename(root, displaced);
+        await symlink(external, root, "dir");
       },
     }),
-    (error) => error?.code === "MUTATION_RECOVERY_FAILED"
-      && error.committed === true
-      && error.retainedPaths.includes(backup),
+    (error) => error.code === "MUTATION_RECOVERY_FAILED"
+      && error.details.some((detail) => detail.includes("Selected workspace authority changed")),
   );
 
-  assert.equal(await readFile(lockPath, "utf8"), desiredLock);
-  assert.equal(await readFile(workflowPath, "utf8"), desiredWorkflow);
-  assert.equal((await lstat(changesRoot)).isDirectory(), true);
-  assert.equal((await lstat(join(changesRoot, "closed"))).isDirectory(), true);
-  assert.equal(
-    await readFile(join(backup, "opaque.txt"), "utf8"),
-    "opaque backup replacement\n",
+  assert.deepEqual(await readdir(external), []);
+  assert.equal(await pathExists(join(displaced, ".sdd", "config.yaml")), true);
+  assert.equal(await pathExists(join(displaced, ".sdd", "changes")), false);
+});
+
+test("managed skill staging rejects a selected workspace root replacement", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-skill-owner-"));
+  const external = await mkdtemp(join(tmpdir(), "sdd-skill-owner-external-"));
+  const displaced = `${root}-displaced`;
+  t.after(async () => {
+    await rm(root, { recursive: true, force: true });
+    await rm(displaced, { recursive: true, force: true });
+    await rm(external, { recursive: true, force: true });
+  });
+  const source = join(root, "source", "sdd-example");
+  const target = join(root, ".agents", "skills", "sdd-example");
+  await mkdir(source, { recursive: true });
+  await writeFile(join(source, "SKILL.md"), "packaged skill\n");
+  const sourceHash = await hashDirectory(source);
+  const selected = await stat(root, { bigint: true });
+  let replaced = false;
+  const assertOwnerCurrent = async () => {
+    const current = await stat(root, { bigint: true });
+    if (current.dev !== selected.dev || current.ino !== selected.ino) {
+      throw new Error("selected workspace owner changed");
+    }
+  };
+
+  await assert.rejects(
+    () => applySkillSync(root, {
+      skillsDirectory: join(root, ".agents", "skills"),
+      actions: [{
+        skillName: "sdd-example",
+        action: "install",
+        source,
+        target,
+        sourceHash,
+        targetHash: null,
+      }],
+    }, {
+      assertOwnerCurrent,
+      beforeSkillPublication: async () => {
+        if (replaced) return;
+        replaced = true;
+        await rename(root, displaced);
+        await symlink(external, root, "dir");
+      },
+    }),
+    (error) => error.code === "MUTATION_RECOVERY_FAILED",
   );
-  assert.equal((await lstat(displacedBackup)).isFile(), true);
-  assert.equal(await pathExists(join(root, ".sdd", "config.yaml")), true);
+
+  assert.deepEqual(await readdir(external), []);
+});
+
+test("managed setup and update serialize one current writer", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-current-writer-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  let entered;
+  const owner = withWorkspaceMutationLock(root, async () => {
+    entered = true;
+    await held;
+  });
+  while (!entered) await new Promise((resolve) => setTimeout(resolve, 5));
+
+  const source = await readFile(mutationLockPath(root), "utf8");
+  assert.equal(typeof JSON.parse(source).token, "string");
+  await assert.rejects(
+    () => withWorkspaceMutationLock(root, async () => {}),
+    (error) => error.code === "OPERATION_IN_PROGRESS"
+      && error.details.some((detail) => detail.includes("remove the retained lock manually")),
+  );
+
+  release();
+  await owner;
+  assert.equal(await pathExists(mutationLockPath(root)), false);
+});
+
+test("managed writer release preserves a replacement lock", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-current-writer-release-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const displaced = join(root, "owned-mutation.lock");
+  const replacement = `${JSON.stringify({
+    pid: process.pid,
+    token: "replacement",
+    createdAt: new Date().toISOString(),
+  })}\n`;
+
+  await assert.rejects(
+    () => withWorkspaceMutationLock(root, async () => {}, {
+      beforeLockRelease: async ({ lockPath }) => {
+        await rename(lockPath, displaced);
+        await writeFile(lockPath, replacement, { mode: 0o600 });
+      },
+    }),
+    (error) => error.code === "MUTATION_RECOVERY_FAILED"
+      && error.message.includes("replacement mutation lock")
+      && error.retainedPaths.includes(mutationLockPath(root)),
+  );
+
+  assert.equal(await readFile(mutationLockPath(root), "utf8"), replacement);
+  assert.equal((await lstat(displaced)).isFile(), true);
+});
+
+test("managed-file staging rejects a selected workspace root replacement", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-managed-file-owner-"));
+  const external = await mkdtemp(join(tmpdir(), "sdd-managed-file-owner-external-"));
+  const displaced = `${root}-displaced`;
+  t.after(async () => {
+    await rm(root, { recursive: true, force: true });
+    await rm(displaced, { recursive: true, force: true });
+    await rm(external, { recursive: true, force: true });
+  });
+  const target = join(root, "managed", "workflow.md");
+  await mkdir(dirname(target), { recursive: true });
+  const selected = await stat(root, { bigint: true });
+  const assertOwnerCurrent = async () => {
+    const current = await stat(root, { bigint: true });
+    if (current.dev !== selected.dev || current.ino !== selected.ino) {
+      throw new Error("selected workspace owner changed");
+    }
+  };
+
+  await assert.rejects(
+    () => publishManagedFile(root, target, "packaged workflow\n", {
+      expected: null,
+      assertOwnerCurrent,
+      beforeStage: async () => {
+        await rename(root, displaced);
+        await symlink(external, root, "dir");
+      },
+    }),
+    /selected workspace owner changed/,
+  );
+
+  assert.deepEqual(await readdir(external), []);
+});
+
+test("workflow refresh preserves a concurrent complete replacement", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-workflow-conflict-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const source = join(root, "source.md");
+  const target = join(root, "target.md");
+  await writeFile(source, "packaged workflow\n");
+  await writeFile(target, "previous workflow\n");
+  const plan = {
+    workspaceRoot: root,
+    action: "update",
+    source,
+    target,
+    sourceHash: await hashFile(source),
+    targetHash: await hashFile(target),
+  };
+
+  await assert.rejects(
+    () => applyWorkflowSync(plan, {
+      publishFile: async (...args) => {
+        await writeFile(target, "concurrent workflow\n");
+        return publishManagedFile(...args);
+      },
+    }),
+    (error) => error.code === "WORKFLOW_CONFLICT"
+      && error.details.some((detail) => detail.includes("Inspect the preserved workflow")),
+  );
+  assert.equal(await readFile(target, "utf8"), "concurrent workflow\n");
+});
+
+test("workflow refresh writes one complete file and preserves its mode", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-workflow-complete-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const source = join(root, "source.md");
+  const target = join(root, "target.md");
+  const packaged = `# Packaged workflow\n\n${"complete line\n".repeat(500)}`;
+  await writeFile(source, packaged);
+  await writeFile(target, "previous workflow\n", { mode: 0o640 });
+  await chmod(target, 0o640);
+
+  await applyWorkflowSync({
+    workspaceRoot: root,
+    action: "update",
+    source,
+    target,
+    sourceHash: await hashFile(source),
+    targetHash: await hashFile(target),
+  });
+
+  assert.equal(await readFile(target, "utf8"), packaged);
+  assert.equal((await stat(target)).mode & 0o777, 0o640);
+});
+
+test("workflow refresh reports packaged partial state without rolling back", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-workflow-partial-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const source = join(root, "source.md");
+  const target = join(root, "target.md");
+  await writeFile(source, "packaged workflow\n");
+  await writeFile(target, "previous workflow\n");
+  const plan = {
+    workspaceRoot: root,
+    action: "update",
+    source,
+    target,
+    sourceHash: await hashFile(source),
+    targetHash: await hashFile(target),
+  };
+
+  await assert.rejects(
+    () => applyWorkflowSync(plan, {
+      publishFile: async (...args) => {
+        await publishManagedFile(...args);
+        throw new Error("injected post-publication failure");
+      },
+    }),
+    (error) => error.code === "MUTATION_RECOVERY_FAILED"
+      && error.details.some((detail) => detail.includes("contains the packaged version"))
+      && error.details.some((detail) => detail.includes("Retry the same setup or update command")),
+  );
+  assert.equal(await readFile(target, "utf8"), "packaged workflow\n");
+});
+
+test("managed installation preserves refreshed workflow and parseable prior evidence on lock failure", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-managed-partial-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const workflowSource = join(root, "workflow-source.md");
+  const workflowTarget = join(root, "managed", "workflow.md");
+  const skillSource = join(root, "skill-source");
+  const skillTarget = join(root, "managed", "skills", "sdd-example");
+  const lockPath = join(root, ".sdd", "install-lock.json");
+  await mkdir(join(root, ".sdd"), { recursive: true });
+  await mkdir(join(workflowTarget, ".."), { recursive: true });
+  await mkdir(skillSource, { recursive: true });
+  await mkdir(skillTarget, { recursive: true });
+  await writeFile(workflowSource, "new workflow\n");
+  await writeFile(workflowTarget, "old workflow\n");
+  await writeFile(join(skillSource, "SKILL.md"), "new skill\n");
+  await writeFile(join(skillTarget, "SKILL.md"), "old skill\n");
+  const priorLock = {
+    managedSkills: { "sdd-example": await hashDirectory(skillTarget) },
+    managedWorkflow: { path: "managed/workflow.md", hash: await hashFile(workflowTarget) },
+  };
+  await writeFile(lockPath, `${JSON.stringify(priorLock, null, 2)}\n`);
+  const workflowHash = await hashFile(workflowSource);
+  const workflowTargetHash = await hashFile(workflowTarget);
+  const skillHash = await hashDirectory(skillSource);
+  const skillTargetHash = await hashDirectory(skillTarget);
+
+  await assert.rejects(
+    () => applyManagedInstallation(root, {
+      workflowPlan: {
+        workspaceRoot: root,
+        action: "update",
+        source: workflowSource,
+        target: workflowTarget,
+        sourceHash: workflowHash,
+        targetHash: workflowTargetHash,
+        lock: { path: "managed/workflow.md", hash: workflowHash },
+      },
+      skillPlan: {
+        skillsDirectory: join(root, "managed", "skills"),
+        actions: [{
+          skillName: "sdd-example",
+          action: "update",
+          source: skillSource,
+          target: skillTarget,
+          sourceHash: skillHash,
+          targetHash: skillTargetHash,
+        }],
+        lock: { managedSkills: { "sdd-example": skillHash } },
+      },
+      writeLock: async () => { throw new Error("injected evidence failure"); },
+    }),
+    (error) => error.code === "MUTATION_RECOVERY_FAILED"
+      && error.details.some((detail) => detail.includes("Preserved managed workflow at packaged content"))
+      && error.details.some((detail) => detail.includes("pre-refresh state")),
+  );
+
+  assert.equal(await readFile(workflowTarget, "utf8"), "new workflow\n");
+  assert.equal(await readFile(join(skillTarget, "SKILL.md"), "utf8"), "old skill\n");
+  assert.deepEqual(JSON.parse(await readFile(lockPath, "utf8")), priorLock);
+});
+
+test("managed installation preserves a concurrent complete installation-evidence winner", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-install-evidence-winner-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const lockPath = join(root, ".sdd", "install-lock.json");
+  await mkdir(join(root, ".sdd"), { recursive: true });
+  const priorLock = { managedSkills: {} };
+  const winner = {
+    managedSkills: {},
+    managedWorkflow: {
+      path: ".sdd/story-driven-development.md",
+      hash: `sha256:${"a".repeat(64)}`,
+    },
+  };
+  await writeFile(lockPath, `${JSON.stringify(priorLock, null, 2)}\n`);
+
+  await assert.rejects(
+    () => applyManagedInstallation(root, {
+      skillPlan: {
+        skillsDirectory: join(root, ".agents", "skills"),
+        actions: [],
+        lock: { managedSkills: {} },
+      },
+      writeLock: async (path, source, options) => {
+        await writeFile(path, `${JSON.stringify(winner, null, 2)}\n`);
+        return publishManagedFile(root, path, source, {
+          ...options,
+          label: "Installation evidence",
+        });
+      },
+    }),
+    (error) => error.code === "MUTATION_RECOVERY_FAILED"
+      && error.details.some((detail) => detail.includes("Original detail: Preserved path"))
+      && error.details.some((detail) => detail.includes("previous complete lock preserved"))
+      && error.details.some((detail) => detail.includes("Retry the same setup or update command")),
+  );
+
+  assert.deepEqual(JSON.parse(await readFile(lockPath, "utf8")), winner);
+});
+
+test("managed installation preserves a workflow replacement at the final success boundary", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-final-workflow-winner-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const workflowSource = join(root, "workflow-source.md");
+  const workflowTarget = join(root, ".sdd", "story-driven-development.md");
+  const lockPath = join(root, ".sdd", "install-lock.json");
+  const displacedWorkflow = join(root, "published-workflow.md");
+  await mkdir(join(root, ".sdd"), { recursive: true });
+  await writeFile(workflowSource, "packaged workflow\n");
+  await writeFile(workflowTarget, "previous workflow\n");
+  const previousHash = await hashFile(workflowTarget);
+  await writeFile(lockPath, `${JSON.stringify({
+    managedSkills: {},
+    managedWorkflow: { path: ".sdd/story-driven-development.md", hash: previousHash },
+  }, null, 2)}\n`);
+  const sourceHash = await hashFile(workflowSource);
+
+  await assert.rejects(
+    () => applyManagedInstallation(root, {
+      workflowPlan: {
+        workspaceRoot: root,
+        action: "update",
+        source: workflowSource,
+        target: workflowTarget,
+        sourceHash,
+        targetHash: previousHash,
+        lock: { path: ".sdd/story-driven-development.md", hash: sourceHash },
+      },
+      skillPlan: {
+        skillsDirectory: join(root, ".agents", "skills"),
+        actions: [],
+        lock: { managedSkills: {} },
+      },
+      beforeSuccess: async () => {
+        await rename(workflowTarget, displacedWorkflow);
+        await writeFile(workflowTarget, "concurrent workflow winner\n");
+      },
+    }),
+    (error) => error.code === "MUTATION_RECOVERY_FAILED"
+      && error.details.some((detail) => detail.includes("requested complete lock published"))
+      && error.details.some((detail) => detail.includes(
+        "Preserved managed workflow with other complete content",
+      ))
+      && !error.details.some((detail) => detail.includes(
+        "Preserved managed workflow at packaged content",
+      )),
+  );
+
+  assert.equal(await readFile(workflowTarget, "utf8"), "concurrent workflow winner\n");
+  assert.equal(await readFile(displacedWorkflow, "utf8"), "packaged workflow\n");
+  assert.equal(typeof JSON.parse(await readFile(lockPath, "utf8")).managedWorkflow.hash, "string");
+});
+
+test("managed installation preserves an installation-evidence replacement at the final success boundary", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-final-lock-winner-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const lockPath = join(root, ".sdd", "install-lock.json");
+  const displacedLock = join(root, "published-install-lock.json");
+  await mkdir(join(root, ".sdd"), { recursive: true });
+  await writeFile(lockPath, `${JSON.stringify({ managedSkills: {} }, null, 2)}\n`);
+  const winner = {
+    managedSkills: {},
+    managedWorkflow: {
+      path: ".sdd/story-driven-development.md",
+      hash: `sha256:${"b".repeat(64)}`,
+    },
+  };
+
+  await assert.rejects(
+    () => applyManagedInstallation(root, {
+      skillPlan: {
+        skillsDirectory: join(root, ".agents", "skills"),
+        actions: [],
+        lock: { managedSkills: {} },
+      },
+      beforeSuccess: async () => {
+        await rename(lockPath, displacedLock);
+        await writeFile(lockPath, `${JSON.stringify(winner, null, 2)}\n`);
+      },
+    }),
+    (error) => error.code === "MUTATION_RECOVERY_FAILED"
+      && error.details.some((detail) => detail.includes("other complete lock preserved"))
+      && error.details.some((detail) => detail.includes("Retry the same setup or update command")),
+  );
+
+  assert.deepEqual(JSON.parse(await readFile(lockPath, "utf8")), winner);
+  assert.deepEqual(JSON.parse(await readFile(displacedLock, "utf8")), { managedSkills: {} });
+});
+
+test("first setup preserves complete config and reports bounded retry state", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-setup-partial-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const configPath = join(root, ".sdd", "config.yaml");
+
+  await assert.rejects(
+    () => setupInstallation(root, {
+      planningRoot: "ideas",
+      repositoryRoots: ["repos"],
+      skillsDirectory: ".agents/skills",
+      writeLock: async () => { throw new Error("injected setup evidence failure"); },
+    }),
+    (error) => error.code === "MUTATION_RECOVERY_FAILED"
+      && error.details.includes(`Preserved workspace configuration: ${configPath}`)
+      && error.details.some((detail) => detail.includes("Retry the same setup command")),
+  );
+
+  assert.equal((await readWorkspaceConfig(root)).schema, "sdd-v3");
+  assert.equal(
+    await readFile(join(root, ".sdd", "story-driven-development.md"), "utf8"),
+    await readFile(WORKFLOW_SOURCE_PATH, "utf8"),
+  );
+  assert.equal(await pathExists(join(root, ".sdd", "install-lock.json")), false);
 });
