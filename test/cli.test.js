@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import {
   chmod,
@@ -16,7 +15,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, relative, sep } from "node:path";
+import { basename, dirname, join } from "node:path";
 import test, { after } from "node:test";
 import { promisify } from "node:util";
 import { parse } from "yaml";
@@ -72,38 +71,6 @@ after(() => {
   if (inheritedUserHome === undefined) delete process.env.SDD_USER_HOME;
   else process.env.SDD_USER_HOME = inheritedUserHome;
 });
-
-async function releasedLegacyDirectoryHash(root) {
-  async function collect(directory) {
-    const entries = await readdir(directory, { withFileTypes: true });
-    entries.sort((left, right) => left.name.localeCompare(right.name));
-    const collected = [];
-    for (const entry of entries) {
-      const absolutePath = join(directory, entry.name);
-      const relativePath = relative(root, absolutePath).split(sep).join("/");
-      if (entry.isDirectory()) {
-        collected.push({ type: "directory", relativePath, absolutePath });
-        collected.push(...await collect(absolutePath));
-      } else if (entry.isFile()) {
-        collected.push({ type: "file", relativePath, absolutePath });
-      } else if (entry.isSymbolicLink()) {
-        collected.push({ type: "symlink", relativePath, absolutePath });
-      } else {
-        throw new Error(`Unsupported released-lock fixture entry: ${absolutePath}`);
-      }
-    }
-    return collected;
-  }
-
-  const hash = createHash("sha256");
-  for (const entry of await collect(root)) {
-    hash.update(`${entry.type}\0${entry.relativePath}\0`);
-    if (entry.type === "file") hash.update(await readFile(entry.absolutePath));
-    else if (entry.type === "symlink") hash.update(await readlink(entry.absolutePath));
-    hash.update("\0");
-  }
-  return `sha256:${hash.digest("hex")}`;
-}
 
 async function initWorkspace(root, options = {}) {
   return setupInstallation(root, {

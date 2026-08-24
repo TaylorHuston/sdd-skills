@@ -247,7 +247,7 @@ async function managedRefreshFailure(
     workflowPlan,
     workflowApplied,
     skillsApplied,
-    skillsRolledBack,
+    skillState = null,
     lockPath,
     lockState,
     recoveryError = null,
@@ -264,11 +264,21 @@ async function managedRefreshFailure(
     `Original error: ${describeError(error)}`,
     ...(error?.details ?? []).map((detail) => `Original detail: ${detail}`),
     workflowState.detail,
-    skillsApplied
-      ? skillsRolledBack
-        ? "Managed skill changes were returned to their pre-refresh state."
-        : "Managed skill refresh state was preserved for inspection."
-      : "Managed skills were not changed by this operation.",
+    ...(skillState
+      ? [
+          ...skillState.completed.map(({ skillName, action }) =>
+            `Completed managed skill preserved: ${skillName} (${action}).`),
+          ...(skillState.failed
+            ? [`Failed managed skill: ${skillState.failed.skillName} (${skillState.failed.action}).`]
+            : []),
+          ...skillState.pending.map(({ skillName, action }) =>
+            `Residual managed skill action: ${skillName} (${action}).`),
+          ...skillState.retainedPaths.map((path) =>
+            `Managed skill retained path: ${path}`),
+        ]
+      : [skillsApplied
+          ? "Completed managed skill changes were preserved."
+          : "Managed skills were not changed by this operation."]),
     `Installation evidence state: ${lockState}: ${lockPath}`,
     ...(recoveryError
       ? [
@@ -306,6 +316,7 @@ export async function applyManagedInstallation(
     onCommitted = null,
     writeLock = null,
     assertOwnerCurrent = null,
+    skillOptions = {},
   },
 ) {
   const lockPath = getWorkspaceInstallLockPath(workspaceRoot);
@@ -357,7 +368,10 @@ export async function applyManagedInstallation(
     workflowApplied = Boolean(workflowPlan
       && ["install", "update", "update-forced", "replace-forced"].includes(workflowPlan.action));
     await assertOwnerCurrent?.();
-    skills = await applySkillSync(workspaceRoot, skillPlan, { assertOwnerCurrent });
+    skills = await applySkillSync(workspaceRoot, skillPlan, {
+      ...skillOptions,
+      assertOwnerCurrent,
+    });
     skillsApplied = skillPlan.actions.some(({ action }) => [
       "install", "update", "update-forced", "replace-forced", "remove", "remove-forced",
     ].includes(action));
@@ -412,42 +426,19 @@ export async function applyManagedInstallation(
         lockState = "retained lock requires inspection";
       }
     }
-    let recoveryError = null;
-    let skillsRolledBack = false;
-    if (skills?.rollback && lockState !== "requested complete lock published") {
-      try {
-        await skills.rollback(error);
-        skillsRolledBack = true;
-      } catch (rollbackError) {
-        recoveryError = rollbackError;
-      }
-    }
+    const skillState = error?.skillState ?? null;
+    if (skillState?.completed?.length > 0) skillsApplied = true;
     throw await managedRefreshFailure(error, {
       workspaceRoot,
       workflowPlan,
       workflowApplied,
       skillsApplied,
-      skillsRolledBack,
+      skillState,
       lockPath,
       lockState,
-      recoveryError,
       assertOwnerCurrent,
     });
   }
 
-  try {
-    await skills.finalize?.();
-  } catch (error) {
-    throw await managedRefreshFailure(error, {
-      workspaceRoot,
-      workflowPlan,
-      workflowApplied,
-      skillsApplied,
-      skillsRolledBack: false,
-      lockPath,
-      lockState: "requested complete lock published",
-      assertOwnerCurrent,
-    });
-  }
   return { workflow, skills };
 }

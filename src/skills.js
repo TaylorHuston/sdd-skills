@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-import { lstat, readFile, readdir } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 
 import { BUNDLED_SKILLS_DIRECTORY, PACKAGE_JSON_PATH } from "./constants.js";
@@ -9,20 +8,25 @@ import {
 } from "./config.js";
 import { SddError } from "./errors.js";
 import {
-  createBoundDirectory,
-  directoryHashMatches,
-  directoryManifestHashVersions,
-  directoryHashVersion,
   hashDirectory,
-  sameBoundDirectoryBinding,
-  isDirectory,
-  isPathPhysicallyInside,
   pathExists,
   readBoundDirectory,
   readBoundRegularFile,
-  removeBoundDirectory,
-  replaceDirectoryAtomically,
 } from "./fs.js";
+import {
+  ensureManagedSkillRegistry,
+  publishManagedSkill,
+} from "./managed-skill-publication.js";
+
+const STRONG_DIRECTORY_HASH = /^sha256-directory-v2:[a-f0-9]{64}$/;
+const MUTATING_ACTIONS = new Set([
+  "install",
+  "update",
+  "update-forced",
+  "replace-forced",
+  "remove",
+  "remove-forced",
+]);
 
 async function readPackageVersion() {
   const packageJson = JSON.parse(await readFile(PACKAGE_JSON_PATH, "utf8"));
@@ -33,20 +37,16 @@ function invalidInstallLock(message) {
   return new SddError(message, { code: "INVALID_INSTALL_LOCK" });
 }
 
-function isInstallLockRecord(value) {
+function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-export function validateManagedInstallationLock(
-  lock,
-  { requireStrongSkillHashes = false } = {},
-) {
-  if (!isInstallLockRecord(lock) || !isInstallLockRecord(lock.managedSkills)) {
+export function validateManagedInstallationLock(lock) {
+  if (!isRecord(lock) || !isRecord(lock.managedSkills)) {
     throw invalidInstallLock("Installation lock must contain a managedSkills object.");
   }
   if (
-    (lock.version !== undefined
-      && (!Number.isSafeInteger(lock.version) || lock.version < 1))
+    (lock.version !== undefined && (!Number.isSafeInteger(lock.version) || lock.version < 1))
     || (lock.packageVersion !== undefined
       && (typeof lock.packageVersion !== "string" || !lock.packageVersion))
     || (lock.schemaVersion !== undefined
@@ -56,26 +56,15 @@ export function validateManagedInstallationLock(
   ) {
     throw invalidInstallLock("Installation lock metadata is malformed.");
   }
-
-  const versions = new Set();
   for (const [skillName, hash] of Object.entries(lock.managedSkills)) {
-    const version = directoryHashVersion(hash);
-    if (!/^sdd-[a-z0-9-]+$/.test(skillName) || version === null) {
+    if (!/^sdd-[a-z0-9-]+$/.test(skillName) || !STRONG_DIRECTORY_HASH.test(hash)) {
       throw invalidInstallLock(`Installation lock has an invalid managed skill hash: ${skillName}`);
     }
-    if (requireStrongSkillHashes && version !== "strong") {
-      throw invalidInstallLock(`New installation lock cannot persist a legacy skill hash: ${skillName}`);
-    }
-    versions.add(version);
   }
-  if (versions.size > 1) {
-    throw invalidInstallLock("Installation lock mixes managed skill hash versions.");
-  }
-
   if (
     lock.managedWorkflow !== undefined
     && (
-      !isInstallLockRecord(lock.managedWorkflow)
+      !isRecord(lock.managedWorkflow)
       || typeof lock.managedWorkflow.path !== "string"
       || !lock.managedWorkflow.path
       || !/^sha256:[a-f0-9]{64}$/.test(lock.managedWorkflow.hash)
@@ -113,8 +102,7 @@ export async function readInstallLockSnapshot(
     });
   }
   try {
-    const config = validateManagedInstallationLock(JSON.parse(file.source));
-    return { ...file, config };
+    return { ...file, config: validateManagedInstallationLock(JSON.parse(file.source)) };
   } catch (error) {
     throw new SddError(`Cannot parse SDD installation lock at ${path}: ${error.message}`, {
       code: "INVALID_INSTALL_LOCK",
@@ -126,199 +114,12 @@ export async function readInstallLock(workspaceRoot) {
   return (await readInstallLockSnapshot(workspaceRoot))?.config ?? null;
 }
 
-async function assertSkillDirectoryInsideWorkspace(workspaceRoot, configuredDirectory) {
-  return resolveWorkspaceSkillsDirectory(workspaceRoot, configuredDirectory);
-}
-function sameDirectoryIdentity(left, right) {
-  return left?.dev === right?.dev && left?.ino === right?.ino;
-}
-
-function sameDirectoryEntry(left, right, { identities = true } = {}) {
-  if (
-    left?.type !== right?.type
-    || left?.relativePath !== right?.relativePath
-    || left?.mode !== right?.mode
-    || (identities && !sameDirectoryIdentity(left.identity, right.identity))
-  ) {
-    return false;
-  }
-  if (left.type === "directory") return true;
-  if (left.type === "file") return left.bytes.equals(right.bytes);
-  return Buffer.isBuffer(left.linkTarget)
-    ? Buffer.isBuffer(right.linkTarget) && left.linkTarget.equals(right.linkTarget)
-    : left.linkTarget === right.linkTarget;
-}
-
-function sameDirectoryManifest(
-  left,
-  right,
-  { identities = true, binding = identities } = {},
-) {
-  return left !== null
-    && right !== null
-    && left.missing !== true
-    && right.missing !== true
-    && (!binding || sameBoundDirectoryBinding(left.binding, right.binding))
-    && (!identities || sameDirectoryIdentity(left.root?.identity, right.root?.identity))
-    && left.root?.mode === right.root?.mode
-    && left.entries?.length === right.entries?.length
-    && left.entries.every((entry, index) =>
-      sameDirectoryEntry(entry, right.entries[index], { identities }));
-}
-function sameOptionalDirectoryManifest(left, right, options) {
-  return (left === null && right === null)
-    || sameDirectoryManifest(left, right, options);
-}
-
-function sameDirectoryBindingExtension(previous, current) {
-  if (
-    !previous
-    || !current
-    || !Array.isArray(previous.ancestors)
-    || !Array.isArray(current.ancestors)
-    || previous.ancestors.length > current.ancestors.length
-  ) {
-    return false;
-  }
-  return sameBoundDirectoryBinding(previous, {
-    ...current,
-    ancestors: current.ancestors.slice(0, previous.ancestors.length),
-  });
-}
-
-function backupRootMatchesSnapshots(root, snapshots) {
-  const expected = new Map();
-  for (const snapshot of snapshots) {
-    if (snapshot.backupManifest === null) continue;
-    const prefix = snapshot.entry.skillName;
-    expected.set(prefix, {
-      type: "directory",
-      relativePath: prefix,
-      identity: snapshot.backupManifest.root.identity,
-      mode: snapshot.backupManifest.root.mode,
-    });
-    for (const entry of snapshot.backupManifest.entries) {
-      const relativePath = `${prefix}/${entry.relativePath}`;
-      expected.set(relativePath, { ...entry, relativePath });
-    }
-  }
-  return root.entries.length === expected.size
-    && root.entries.every((entry) => sameDirectoryEntry(entry, expected.get(entry.relativePath)));
-}
-
-function skillRecoveryFailure(
-  message,
-  {
-    originalError = null,
-    failures = [],
-    retainedPaths = [],
-  } = {},
-) {
-  const errors = [
-    ...(originalError ? [originalError] : []),
-    ...failures.map(({ error }) => error),
-  ];
-  const failure = new SddError(message, {
-    code: "MUTATION_RECOVERY_FAILED",
-    details: [
-      ...(originalError ? [`Original error: ${originalError.message}`] : []),
-      ...failures.flatMap(({ label, error }) => [
-        `${label}: ${error.message}`,
-        ...(error?.details ?? []).map((detail) => `${label} detail: ${detail}`),
-      ]),
-      ...[...new Set(retainedPaths)]
-        .map((path) => `Retained path requiring inspection: ${path}`),
-    ],
-  });
-  if (errors.length > 0) {
-    failure.errors = errors;
-    failure.cause = new AggregateError(errors, failure.message);
-  }
-  return failure;
-}
-
-async function captureSkillDirectory(
-  path,
-  ownerRoot,
-  label,
-  {
-    expectedBinding = undefined,
-    returnMissingBinding = false,
-  } = {},
-) {
-  const manifest = await readBoundDirectory(path, {
-    ownerRoot,
-    allowMissing: true,
-    returnMissingBinding,
-    label,
-    unsafeCode: "UNSAFE_SKILL_DIRECTORY",
-    expectedBinding,
-  });
-  return manifest?.missing === true && !returnMissingBinding ? null : manifest;
-}
-
-async function cleanupSkillDirectory(
-  path,
-  manifest,
-  {
-    ownerRoot,
-    label,
-    phase,
-    skillName = null,
-    beforeSkillCleanup,
-    cleanupMkdir,
-    cleanupRmdir,
-    cleanupUnlink,
-  },
-) {
-  try {
-    const cleanup = await removeBoundDirectory(path, manifest, {
-      ownerRoot,
-      label,
-      unsafeCode: "UNSAFE_SKILL_DIRECTORY",
-      beforeCleanup: beforeSkillCleanup
-        ? (cleanupState) => beforeSkillCleanup({
-          ...cleanupState,
-          phase,
-          skillName,
-        })
-        : null,
-      cleanupMkdir,
-      cleanupRmdir,
-      cleanupUnlink,
-    });
-    if (cleanup.failures.length > 0) {
-      try {
-        await lstat(path);
-        cleanup.retainedPaths.push(path);
-      } catch {
-        // The original bound name is absent; the helper reports any retained quarantine.
-      }
-      cleanup.retainedPaths = [...new Set(cleanup.retainedPaths)];
-    }
-    return cleanup;
-  } catch (error) {
-    let retained = false;
-    try {
-      await lstat(path);
-      retained = true;
-    } catch {
-      // The bound name was removed; any retained quarantine is reported by the nested error.
-    }
-    return {
-      removed: false,
-      failures: [{ label, error }],
-      retainedPaths: retained ? [path] : [],
-    };
-  }
-}
-
 export async function planSkillSync(
   workspaceRoot,
   config,
   { force = false, installLockSnapshot: requestedInstallLockSnapshot } = {},
 ) {
-  const skillsDirectory = await assertSkillDirectoryInsideWorkspace(
+  const skillsDirectory = await resolveWorkspaceSkillsDirectory(
     workspaceRoot,
     config.skills.directory,
   );
@@ -328,14 +129,13 @@ export async function planSkillSync(
   const previousLock = installLockSnapshot?.config ?? null;
   if (previousLock !== null) validateManagedInstallationLock(previousLock);
   const previousSkills = previousLock?.managedSkills ?? {};
-  const actions = [];
   const bundledSkills = await listBundledSkills();
-  const bundledSkillNames = new Set(bundledSkills);
+  const bundledNames = new Set(bundledSkills);
+  const actions = [];
 
   for (const skillName of bundledSkills) {
     const source = join(BUNDLED_SKILLS_DIRECTORY, skillName);
     const target = join(skillsDirectory, skillName);
-    const targetPathExists = await pathExists(target);
     const sourceHash = await hashDirectory(source);
     const targetSnapshot = await readBoundDirectory(target, {
       ownerRoot: workspaceRoot,
@@ -344,34 +144,15 @@ export async function planSkillSync(
       label: `Managed skill ${skillName}`,
       unsafeCode: "UNSAFE_SKILL_DIRECTORY",
     });
-    const targetExists = targetSnapshot.missing !== true;
-    const targetHashes = targetExists
-      ? directoryManifestHashVersions(targetSnapshot)
-      : null;
-    const targetHash = targetHashes?.strong ?? null;
-    if (targetPathExists && !targetExists) {
-      throw new SddError(`Managed skill target is not a directory: ${target}`, {
-        code: "UNSAFE_SKILL_DIRECTORY",
-      });
-    }
+    const targetHash = targetSnapshot.missing === true ? null : targetSnapshot.hash;
     const previousHash = previousSkills[skillName] ?? null;
-
     let action;
-    if (!targetExists) {
-      action = "install";
-    } else if (targetHash === sourceHash) {
-      action = previousHash ? "unchanged" : "adopt";
-    } else if (force) {
-      action = previousHash ? "update-forced" : "replace-forced";
-    // Released hashes did not cover modes. Accept their exact historical ownership here,
-    // then carry the strong target hash into apply so any post-plan byte or mode drift fails closed.
-    } else if (previousHash && directoryHashMatches(targetHashes, previousHash)) {
-      action = "update";
-    } else {
-      action = "conflict";
-    }
-
-    const plannedAction = {
+    if (targetHash === null) action = "install";
+    else if (targetHash === sourceHash) action = previousHash ? "unchanged" : "adopt";
+    else if (force) action = previousHash ? "update-forced" : "replace-forced";
+    else if (previousHash !== null && targetHash === previousHash) action = "update";
+    else action = "conflict";
+    actions.push({
       skillName,
       action,
       source,
@@ -379,55 +160,37 @@ export async function planSkillSync(
       sourceHash,
       targetHash,
       previousHash,
-    };
-    Object.defineProperty(plannedAction, "targetBinding", {
-      value: targetSnapshot.binding,
-      enumerable: false,
-      writable: true,
     });
-    actions.push(plannedAction);
   }
 
   for (const [skillName, previousHash] of Object.entries(previousSkills)) {
-    if (bundledSkillNames.has(skillName) || !/^sdd-[a-z0-9-]+$/.test(skillName)) continue;
+    if (bundledNames.has(skillName) || !/^sdd-[a-z0-9-]+$/.test(skillName)) continue;
     const target = join(skillsDirectory, skillName);
     if (!(await pathExists(target))) continue;
-    const targetSnapshot = await readBoundDirectory(target, {
-      ownerRoot: workspaceRoot,
-      label: `Managed skill ${skillName}`,
-      unsafeCode: "UNSAFE_SKILL_DIRECTORY",
-    });
-    const targetHashes = directoryManifestHashVersions(targetSnapshot);
-    const targetHash = targetHashes.strong;
-    const action = directoryHashMatches(targetHashes, previousHash)
-      ? "remove"
-      : force
-        ? "remove-forced"
-        : "conflict";
-    const plannedAction = {
+    const targetHash = await hashDirectory(target);
+    actions.push({
       skillName,
-      action,
+      action: targetHash === previousHash
+        ? "remove"
+        : force
+          ? "remove-forced"
+          : "conflict",
       source: null,
       target,
       sourceHash: null,
       targetHash,
       previousHash,
-    };
-    Object.defineProperty(plannedAction, "targetBinding", {
-      value: targetSnapshot.binding,
-      enumerable: false,
-      writable: true,
     });
-    actions.push(plannedAction);
   }
 
-  const conflicts = actions.filter((entry) => entry.action === "conflict");
+  const conflicts = actions.filter(({ action }) => action === "conflict");
   if (conflicts.length > 0) {
     throw new SddError(
       "Managed skill installation would overwrite local changes. Resolve the conflicts or rerun with --force.",
       {
         code: "SKILL_CONFLICT",
-        details: conflicts.map((entry) => `${entry.skillName}: ${relative(workspaceRoot, entry.target)}`),
+        details: conflicts.map(({ skillName, target }) =>
+          `${skillName}: ${relative(workspaceRoot, target)}`),
       },
     );
   }
@@ -442,8 +205,8 @@ export async function planSkillSync(
       skillsDirectory: config.skills.directory,
       managedSkills: Object.fromEntries(
         actions
-          .filter((entry) => entry.sourceHash)
-          .map((entry) => [entry.skillName, entry.sourceHash]),
+          .filter(({ sourceHash }) => sourceHash !== null)
+          .map(({ skillName, sourceHash }) => [skillName, sourceHash]),
       ),
     },
   };
@@ -455,523 +218,170 @@ export async function planSkillSync(
   return plan;
 }
 
-export async function applySkillSync(
-  workspaceRoot,
-  plan,
-  {
-    dryRun = false,
-    replaceDirectory = replaceDirectoryAtomically,
-    beforeSkillCleanup = null,
-    cleanupMkdir,
-    cleanupRmdir,
-    cleanupUnlink,
-    assertOwnerCurrent = null,
-    beforeSkillPublication = null,
-  } = {},
-) {
-  const checkOwner = async () => assertOwnerCurrent?.();
-  const checkSkillPublication = async (context) => {
-    await beforeSkillPublication?.(context);
-    await checkOwner();
-  };
-  const guardedSkillCleanup = async (context) => {
-    await checkOwner();
-    await beforeSkillCleanup?.(context);
-    await checkOwner();
-  };
-  const mutatingActions = new Set([
-    "install",
-    "update",
-    "update-forced",
-    "replace-forced",
-    "remove",
-    "remove-forced",
-  ]);
-  const candidates = plan.actions.filter((entry) => mutatingActions.has(entry.action));
-  const backupRoot = join(
-    plan.skillsDirectory,
-    `.sdd-sync-backup-${process.pid}-${randomUUID()}`,
-  );
-
-  const setTargetBinding = (snapshot, binding) => {
-    if (Object.hasOwn(snapshot.entry, "targetBinding")) {
-      snapshot.entry.targetBinding = binding;
-    } else {
-      Object.defineProperty(snapshot.entry, "targetBinding", {
-        value: binding,
-        enumerable: false,
-        writable: true,
-      });
-    }
-    snapshot.targetBinding = binding;
-  };
-
-  const rebaseAbsentTargetBindings = async (publishedSnapshot) => {
-    if (publishedSnapshot.existed) return;
-    for (const snapshot of snapshots) {
-      if (snapshot.existed) continue;
-      const current = snapshot === publishedSnapshot
-        ? snapshot.publishedManifest
-        : await captureSkillDirectory(
-          snapshot.entry.target,
-          workspaceRoot,
-          `Managed skill ${snapshot.entry.skillName}`,
-          { returnMissingBinding: true },
-        );
-      const publishedBinding = publishedSnapshot.publishedManifest?.binding;
-      const samePublishedParent = publishedBinding
-        && sameBoundDirectoryBinding(current?.binding, {
-          ...publishedBinding,
-          path: current?.binding?.path,
-        });
-      if (
-        current === null
-        || !sameDirectoryBindingExtension(snapshot.targetBinding, current.binding)
-        || !samePublishedParent
-      ) {
-        throw new SddError(
-          `Managed skill owner authority changed during parent creation: ${snapshot.entry.skillName}`,
-          { code: "CONCURRENT_CHANGE" },
-        );
-      }
-      setTargetBinding(snapshot, current.binding);
-      snapshot.targetSnapshot = current;
-    }
-  };
-  const snapshots = [];
-  const applied = [];
-  let backupRootAuthority = null;
-  let backupRootManifest = null;
-
-  const captureBackupRoot = async () => {
-    const current = await readBoundDirectory(backupRoot, {
-      ownerRoot: workspaceRoot,
-      label: "Managed skill recovery backup",
-      unsafeCode: "UNSAFE_SKILL_DIRECTORY",
-    });
-    if (
-      !sameDirectoryIdentity(current.root.identity, backupRootAuthority?.root?.identity)
-      || !backupRootMatchesSnapshots(current, snapshots)
-    ) {
-      throw new SddError(`Managed skill recovery backup changed: ${backupRoot}`, {
-        code: "CONCURRENT_CHANGE",
-      });
-    }
-    return current;
-  };
-
-  const cleanupBackupRoot = async (phase) => {
-    if (backupRootManifest === null) {
-      return { removed: false, failures: [], retainedPaths: [] };
-    }
-    const cleanup = await cleanupSkillDirectory(backupRoot, backupRootManifest, {
-      ownerRoot: workspaceRoot,
-      label: "Managed skill recovery backup",
-      phase,
-      beforeSkillCleanup: guardedSkillCleanup,
-      cleanupMkdir,
-      cleanupRmdir,
-      cleanupUnlink,
-    });
-    if (cleanup.removed) backupRootManifest = null;
-    return cleanup;
-  };
-
-  const restoreSnapshot = async (snapshot, failures, retainedPaths) => {
-    try {
-      backupRootManifest = await captureBackupRoot();
-      let restoredPublication = null;
-      await replaceDirectoryAtomically(snapshot.backupPath, snapshot.entry.target, {
-        expectedHash: null,
-        expectedSnapshot: { missing: true, binding: snapshot.targetBinding },
-        expectedSourceSnapshot: snapshot.backupManifest,
-        ownerRoot: workspaceRoot,
-        beforeReplace: checkSkillPublication,
-        afterBackup: checkOwner,
-        beforePublish: checkOwner,
-        afterPublish: async () => {
-          await checkOwner();
-          restoredPublication = await captureSkillDirectory(
-            snapshot.entry.target,
-            workspaceRoot,
-            `Restored managed skill ${snapshot.entry.skillName}`,
-            { expectedBinding: snapshot.targetBinding },
-          );
-          await checkOwner();
-        },
-      });
-      const restored = await captureSkillDirectory(
-        snapshot.entry.target,
-        workspaceRoot,
-        `Restored managed skill ${snapshot.entry.skillName}`,
-        { expectedBinding: snapshot.targetBinding },
-      );
-      if (
-        restoredPublication === null
-        || !sameDirectoryManifest(restored, restoredPublication)
-      ) {
-        throw new SddError(
-          `Managed skill recovery target changed after publication: ${snapshot.entry.target}`,
-          { code: "CONCURRENT_CHANGE" },
-        );
-      }
-      if (!sameDirectoryManifest(restored, snapshot.targetManifest, { identities: false })) {
-        throw new SddError(
-          `Managed skill recovery restored unexpected content: ${snapshot.entry.target}`,
-          { code: "CONCURRENT_CHANGE" },
-        );
-      }
-      snapshot.restoredManifest = restored;
-      backupRootManifest = await captureBackupRoot();
-    } catch (error) {
-      failures.push({ label: `${snapshot.entry.skillName} restore`, error });
-      retainedPaths.push(snapshot.entry.target, backupRoot);
-    }
-  };
-
-  const rollback = async (originalError = null) => {
-    const failures = [];
-    const retainedPaths = [];
-    for (const snapshot of [...applied].reverse()) {
-      const { entry } = snapshot;
-      let current;
-      try {
-        current = await captureSkillDirectory(
-          entry.target,
-          workspaceRoot,
-          `Managed skill rollback target ${entry.skillName}`,
-          { expectedBinding: snapshot.targetBinding },
-        );
-      } catch (error) {
-        failures.push({ label: `${entry.skillName} target inspection`, error });
-        retainedPaths.push(entry.target);
-        continue;
-      }
-
-      const acceptedOriginal = snapshot.restoredManifest ?? snapshot.targetManifest;
-      if (sameOptionalDirectoryManifest(current, acceptedOriginal)) continue;
-
-      if (snapshot.publishedManifest !== null) {
-        const cleanup = await cleanupSkillDirectory(entry.target, snapshot.publishedManifest, {
-          ownerRoot: workspaceRoot,
-          label: `Managed skill rollback target ${entry.skillName}`,
-          phase: "rollback-target",
-          skillName: entry.skillName,
-          beforeSkillCleanup: guardedSkillCleanup,
-          cleanupMkdir,
-          cleanupRmdir,
-          cleanupUnlink,
-        });
-        failures.push(...cleanup.failures);
-        retainedPaths.push(...cleanup.retainedPaths);
-        try {
-          current = await captureSkillDirectory(
-            entry.target,
-            workspaceRoot,
-            `Managed skill rollback target ${entry.skillName}`,
-            { expectedBinding: snapshot.targetBinding },
-          );
-        } catch (error) {
-          failures.push({ label: `${entry.skillName} post-cleanup inspection`, error });
-          retainedPaths.push(entry.target);
-          continue;
-        }
-      }
-
-      if (sameOptionalDirectoryManifest(current, acceptedOriginal)) continue;
-      if (current !== null) {
-        failures.push({
-          label: `${entry.skillName} rollback collision`,
-          error: new Error("Newer target content was preserved."),
-        });
-        retainedPaths.push(entry.target, backupRoot);
-        continue;
-      }
-      if (snapshot.existed) {
-        await restoreSnapshot(snapshot, failures, retainedPaths);
-      }
-    }
-
-    if (failures.length > 0) {
-      retainedPaths.push(backupRoot);
-      throw skillRecoveryFailure(
-        "Managed skill update failed and recovery was incomplete.",
-        { originalError, failures, retainedPaths },
-      );
-    }
-
-    const cleanup = await cleanupBackupRoot("rollback-backup");
-    if (cleanup.failures.length > 0) {
-      throw skillRecoveryFailure(
-        "Managed skill update failed and recovery-backup cleanup was incomplete.",
-        {
-          originalError,
-          failures: cleanup.failures,
-          retainedPaths: cleanup.retainedPaths,
-        },
-      );
-    }
-    applied.length = 0;
-  };
-
-  if (!dryRun) {
-    await checkOwner();
-    for (const entry of candidates) {
-      await checkOwner();
-      if (!(await isPathPhysicallyInside(workspaceRoot, entry.target))) {
-        throw new SddError(
-          `Managed skill target resolves outside its workspace: ${entry.target}`,
-          { code: "UNSAFE_SKILL_DIRECTORY" },
-        );
-      }
-      const targetSnapshot = await captureSkillDirectory(
-        entry.target,
-        workspaceRoot,
-        `Managed skill ${entry.skillName}`,
-        {
-          expectedBinding: entry.targetBinding,
-          returnMissingBinding: true,
-        },
-      );
-      const targetManifest = targetSnapshot.missing === true ? null : targetSnapshot;
-      if ((targetManifest?.hash ?? null) !== entry.targetHash) {
-        throw new SddError(
-          `Managed skill changed after update planning: ${entry.skillName}`,
-          { code: "SKILL_CONFLICT" },
-        );
-      }
-      const snapshot = {
-        entry,
-        existed: targetManifest !== null,
-        targetSnapshot,
-        targetManifest,
-        targetBinding: targetSnapshot.binding,
-        backupPath: join(backupRoot, entry.skillName),
-        backupManifest: null,
-        publishedManifest: null,
-        restoredManifest: null,
-      };
-      setTargetBinding(snapshot, targetSnapshot.binding);
-      snapshots.push(snapshot);
-    }
-
-    if (snapshots.some((snapshot) => snapshot.existed)) {
-      try {
-        await checkOwner();
-        backupRootAuthority = await createBoundDirectory(backupRoot, {
-          ownerRoot: workspaceRoot,
-          label: "Managed skill recovery backup",
-          unsafeCode: "UNSAFE_SKILL_DIRECTORY",
-          mode: 0o700,
-        });
-        await checkOwner();
-        backupRootManifest = backupRootAuthority;
-      } catch (error) {
-        throw skillRecoveryFailure(
-          "Managed skill recovery-backup authority could not be captured.",
-          {
-            originalError: error,
-            retainedPaths: [backupRoot],
-          },
-        );
-      }
-      try {
-        for (const snapshot of snapshots) {
-          if (!snapshot.existed) continue;
-          let backupPublicationCaptured = false;
-          await replaceDirectoryAtomically(snapshot.entry.target, snapshot.backupPath, {
-            expectedHash: null,
-            expectedSourceSnapshot: snapshot.targetManifest,
-            ownerRoot: workspaceRoot,
-            beforeReplace: checkSkillPublication,
-            afterBackup: checkOwner,
-            beforePublish: checkOwner,
-            afterPublish: async () => {
-              await checkOwner();
-              snapshot.backupManifest = await readBoundDirectory(snapshot.backupPath, {
-                ownerRoot: workspaceRoot,
-                label: `Managed skill backup ${snapshot.entry.skillName}`,
-                unsafeCode: "UNSAFE_SKILL_DIRECTORY",
-              });
-              await checkOwner();
-              backupPublicationCaptured = true;
-            },
-          });
-          if (!backupPublicationCaptured) {
-            throw new SddError(
-              `Managed skill backup publisher did not authenticate its result: ${snapshot.backupPath}`,
-              { code: "MUTATION_RECOVERY_FAILED" },
-            );
-          }
-          const current = await captureSkillDirectory(
-            snapshot.entry.target,
-            workspaceRoot,
-            `Managed skill ${snapshot.entry.skillName}`,
-            { expectedBinding: snapshot.targetBinding },
-          );
-          if (
-            !sameDirectoryManifest(current, snapshot.targetManifest)
-            || !sameDirectoryManifest(
-              snapshot.backupManifest,
-              snapshot.targetManifest,
-              { identities: false },
-            )
-          ) {
-            throw new SddError(
-              `Managed skill changed while creating its recovery backup: ${snapshot.entry.skillName}`,
-              { code: "SKILL_CONFLICT" },
-            );
-          }
-          backupRootManifest = await captureBackupRoot();
-        }
-      } catch (error) {
-        const failures = [];
-        const retainedPaths = [];
-        try {
-          backupRootManifest = await captureBackupRoot();
-          const cleanup = await cleanupBackupRoot("backup-construction");
-          failures.push(...cleanup.failures);
-          retainedPaths.push(...cleanup.retainedPaths);
-        } catch (cleanupError) {
-          failures.push({ label: "Managed skill backup cleanup", error: cleanupError });
-          retainedPaths.push(backupRoot);
-        }
-        if (failures.length > 0) {
-          throw skillRecoveryFailure(
-            "Managed skill backup creation failed and cleanup was incomplete.",
-            { originalError: error, failures, retainedPaths },
-          );
-        }
-        throw error;
-      }
-    }
-
-    try {
-      for (const snapshot of snapshots) {
-        const { entry } = snapshot;
-        const current = await captureSkillDirectory(
-          entry.target,
-          workspaceRoot,
-          `Managed skill ${entry.skillName}`,
-          { expectedBinding: snapshot.targetBinding },
-        );
-        if (!sameOptionalDirectoryManifest(current, snapshot.targetManifest)) {
-          throw new SddError(
-            `Managed skill changed immediately before update: ${entry.skillName}`,
-            { code: "SKILL_CONFLICT" },
-          );
-        }
-        applied.push(snapshot);
-        if (["install", "update", "update-forced", "replace-forced"].includes(entry.action)) {
-          let publicationCaptured = false;
-          await replaceDirectory(entry.source, entry.target, {
-            expectedHash: entry.targetHash,
-            expectedSnapshot: snapshot.targetSnapshot,
-            ownerRoot: workspaceRoot,
-            beforeReplace: checkSkillPublication,
-            afterBackup: checkOwner,
-            beforePublish: checkOwner,
-            afterPublish: async () => {
-              await checkOwner();
-              snapshot.publishedManifest = await readBoundDirectory(entry.target, {
-                ownerRoot: workspaceRoot,
-                label: `Published managed skill ${entry.skillName}`,
-                unsafeCode: "UNSAFE_SKILL_DIRECTORY",
-              });
-              await rebaseAbsentTargetBindings(snapshot);
-              await checkOwner();
-              publicationCaptured = true;
-            },
-          });
-          if (!publicationCaptured) {
-            throw new SddError(
-              `Managed skill publisher did not authenticate its result: ${entry.target}`,
-              {
-                code: "MUTATION_RECOVERY_FAILED",
-                details: [`Retained path requiring inspection: ${entry.target}`],
-              },
-            );
-          }
-        } else if (["remove", "remove-forced"].includes(entry.action)) {
-          const cleanup = await cleanupSkillDirectory(entry.target, snapshot.targetManifest, {
-            ownerRoot: workspaceRoot,
-            label: `Managed skill removal ${entry.skillName}`,
-            phase: "remove-target",
-            skillName: entry.skillName,
-            beforeSkillCleanup: guardedSkillCleanup,
-            cleanupMkdir,
-            cleanupRmdir,
-            cleanupUnlink,
-          });
-          if (cleanup.failures.length > 0) {
-            throw skillRecoveryFailure("Managed skill removal was incomplete.", {
-              failures: cleanup.failures,
-              retainedPaths: cleanup.retainedPaths,
-            });
-          }
-        }
-      }
-      await checkOwner();
-      await verifySkillSyncPlan(workspaceRoot, plan);
-      await checkOwner();
-    } catch (error) {
-      await rollback(error);
-      throw error;
-    }
-  }
-
-  const result = {
-    skillsDirectory: plan.skillsDirectory,
-    actions: plan.actions.map(({ skillName, action, sourceHash }) => ({
-      skillName,
-      action,
-      hash: sourceHash,
-    })),
-  };
-  Object.defineProperties(result, {
-    rollback: { value: rollback, enumerable: false },
-    finalize: {
-      value: async () => {
-        const cleanup = await cleanupBackupRoot("finalize-backup");
-        if (cleanup.failures.length > 0) {
-          throw skillRecoveryFailure(
-            "Managed skill recovery-backup cleanup was incomplete.",
-            {
-              failures: cleanup.failures,
-              retainedPaths: cleanup.retainedPaths,
-            },
-          );
-        }
-        applied.length = 0;
-      },
-      enumerable: false,
-    },
-    verify: {
-      value: () => verifySkillSyncPlan(workspaceRoot, plan),
-      enumerable: false,
-    },
-  });
-  return result;
+function sameIdentity(left, right) {
+  return left?.dev === right?.dev && left?.ino === right?.ino;
 }
 
-async function verifySkillSyncPlan(workspaceRoot, plan) {
+function sameSkillSnapshot(left, right) {
+  if (left?.missing === true || right?.missing === true) {
+    return left?.missing === true && right?.missing === true;
+  }
+  return left?.hash === right?.hash
+    && left.root?.mode === right.root?.mode
+    && sameIdentity(left.root?.identity, right.root?.identity)
+    && left.entries?.length === right.entries?.length
+    && left.entries.every((entry, index) => {
+      const other = right.entries[index];
+      if (
+        entry.type !== other?.type
+        || entry.relativePath !== other.relativePath
+        || entry.mode !== other.mode
+        || !sameIdentity(entry.identity, other.identity)
+      ) return false;
+      if (entry.type === "file") return entry.bytes.equals(other.bytes);
+      if (entry.type === "symlink") {
+        return Buffer.isBuffer(entry.linkTarget)
+          && Buffer.isBuffer(other.linkTarget)
+          && entry.linkTarget.equals(other.linkTarget);
+      }
+      return true;
+    });
+}
+
+async function captureExpectedSkills(workspaceRoot, plan) {
+  const expected = [];
   for (const entry of plan.actions) {
+    const snapshot = await readBoundDirectory(entry.target, {
+      ownerRoot: workspaceRoot,
+      allowMissing: true,
+      returnMissingBinding: true,
+      label: `Managed skill ${entry.skillName}`,
+      unsafeCode: "UNSAFE_SKILL_DIRECTORY",
+    });
+    const hash = snapshot.missing === true ? null : snapshot.hash;
+    if (hash !== entry.sourceHash) {
+      throw new SddError(`Managed skill changed before installation lock commit: ${entry.skillName}`, {
+        code: "SKILL_CONFLICT",
+      });
+    }
+    expected.push({ entry, snapshot });
+  }
+  return expected;
+}
+
+async function verifyExpectedSkills(workspaceRoot, expected) {
+  for (const { entry, snapshot } of expected) {
     const current = await readBoundDirectory(entry.target, {
       ownerRoot: workspaceRoot,
       allowMissing: true,
       returnMissingBinding: true,
       label: `Managed skill ${entry.skillName}`,
       unsafeCode: "UNSAFE_SKILL_DIRECTORY",
-      expectedBinding: entry.targetBinding,
     });
-    const expectedHash = entry.sourceHash;
-    const currentHash = current.missing === true ? null : current.hash;
-    if (currentHash !== expectedHash) {
+    if (!sameSkillSnapshot(current, snapshot)) {
       throw new SddError(`Managed skill changed before installation lock commit: ${entry.skillName}`, {
         code: "SKILL_CONFLICT",
       });
     }
   }
+}
+
+function partialSkillFailure(error, state) {
+  const details = [
+    `Original error: ${error.message}`,
+    ...(error?.details ?? []).map((detail) => `Original detail: ${detail}`),
+    ...state.completed.map(({ skillName, action }) =>
+      `Completed managed skill: ${skillName} (${action}).`),
+    ...state.unchanged.map(({ skillName, action }) =>
+      `Unchanged managed skill: ${skillName} (${action}).`),
+    ...(state.failed
+      ? [`Failed managed skill: ${state.failed.skillName} (${state.failed.action}).`]
+      : []),
+    ...state.pending.map(({ skillName, action }) =>
+      `Residual managed skill action: ${skillName} (${action}).`),
+    ...state.retainedPaths.map((path) => `Retained path requiring inspection: ${path}`),
+    "Installation evidence was not advanced. Inspect retained state, retry the same setup or update command when it is intended, use --force only to replace deliberate local content, or recover the named path manually.",
+  ];
+  const failure = new SddError("Managed skill refresh stopped with preserved partial state.", {
+    code: "MUTATION_RECOVERY_FAILED",
+    details,
+  });
+  failure.cause = error;
+  failure.skillState = state;
+  failure.retainedPaths = state.retainedPaths;
+  return failure;
+}
+
+export async function applySkillSync(
+  workspaceRoot,
+  plan,
+  {
+    dryRun = false,
+    assertOwnerCurrent = null,
+    beforeSkillPublication = null,
+  } = {},
+) {
+  const resultActions = plan.actions.map(({ skillName, action, sourceHash }) => ({
+    skillName,
+    action,
+    hash: sourceHash,
+  }));
+  if (dryRun) return { skillsDirectory: plan.skillsDirectory, actions: resultActions };
+
+  const candidates = plan.actions.filter(({ action }) => MUTATING_ACTIONS.has(action));
+  const state = {
+    completed: [],
+    unchanged: plan.actions
+      .filter(({ action }) => !MUTATING_ACTIONS.has(action))
+      .map(({ skillName, action }) => ({ skillName, action })),
+    failed: null,
+    pending: candidates.map(({ skillName, action }) => ({ skillName, action })),
+    retainedPaths: [],
+  };
+  let assertRegistry = null;
+  if (candidates.length > 0) {
+    try {
+      assertRegistry = await ensureManagedSkillRegistry(workspaceRoot, plan.skillsDirectory, {
+        assertOwnerCurrent,
+        beforeMutation: beforeSkillPublication,
+      });
+    } catch (error) {
+      throw partialSkillFailure(error, state);
+    }
+  }
+
+  for (const entry of candidates) {
+    state.pending.shift();
+    try {
+      const completed = await publishManagedSkill(workspaceRoot, entry, {
+        assertRegistry,
+        assertOwnerCurrent,
+        beforeMutation: beforeSkillPublication,
+      });
+      state.completed.push({ skillName: completed.skillName, action: completed.action });
+    } catch (error) {
+      if (error?.completed) {
+        state.completed.push({ skillName: entry.skillName, action: entry.action });
+      } else {
+        state.failed = { skillName: entry.skillName, action: entry.action };
+      }
+      state.retainedPaths.push(...(error?.retainedPaths ?? []));
+      throw partialSkillFailure(error, state);
+    }
+  }
+
+  let expected;
+  try {
+    expected = await captureExpectedSkills(workspaceRoot, plan);
+  } catch (error) {
+    throw partialSkillFailure(error, state);
+  }
+  const result = { skillsDirectory: plan.skillsDirectory, actions: resultActions };
+  Object.defineProperty(result, "verify", {
+    value: () => verifyExpectedSkills(workspaceRoot, expected),
+    enumerable: false,
+  });
+  return result;
 }
 
 export async function inspectSkillInstallation(workspaceRoot, config) {
@@ -988,17 +398,14 @@ export async function inspectSkillInstallation(workspaceRoot, config) {
     }
     throw error;
   }
-
   const lock = await readInstallLock(workspaceRoot);
-  if (!lock) {
-    findings.push({ level: "error", message: "Missing .sdd/install-lock.json." });
-  } else if (lock.skillsDirectory !== config.skills.directory) {
+  if (!lock) findings.push({ level: "error", message: "Missing .sdd/install-lock.json." });
+  else if (lock.skillsDirectory !== config.skills.directory) {
     findings.push({
       level: "error",
       message: "The installation lock skill directory does not match config.yaml.",
     });
   }
-
   for (const entry of plan.actions) {
     if (entry.action === "install") {
       findings.push({ level: "error", message: `Missing managed skill: ${entry.skillName}.` });

@@ -29,7 +29,7 @@ Use operation-specific primitives with this bounded recovery contract:
 
 Replace one current command boundary at a time, prove its observable contract, then delete the superseded generic implementation and tests once no current consumer remains. Preserve external command names, JSON contracts, workspace ownership, physical confinement, Change compare-and-set behavior, and candidate integrity unless a separately accepted Requirement revision says otherwise.
 
-Use a material reduction target as a guardrail rather than a deletion oracle. Reduce runtime and test lines by at least 50% before Change closeout, with no outcome allowed to introduce another generalized transaction or compatibility framework without a demonstrated current consumer.
+Use a material reduction target as a guardrail rather than a deletion oracle. The original 50% global target was tested against the completed current-consumer inventory. On 2026-08-24 the owner revised it to require at least 40% fewer runtime lines and 25% fewer test lines globally, plus at least 50% reduction in the S9-owned filesystem/managed-synchronization runtime seams and their mutation-test seam. The revision preserves a material global reduction while preventing unrelated current validation, lifecycle, and CLI coverage from being deleted merely to satisfy a numeric target. No outcome may introduce another generalized transaction or compatibility framework without a demonstrated current consumer.
 
 ## Options Considered
 
@@ -76,7 +76,7 @@ Implementation and Review must prove:
 - setup, update, init, Epic creation, Change creation/transition/close, validation, status, context, and candidate resolution retain their documented human and JSON contracts where touched;
 - removed migration/replay/publication guarantees have no current production consumer and no contradictory current documentation or Epic claim;
 - each outcome records before/after runtime lines, test lines, focused test duration, and changed authority surfaces;
-- final runtime and tests each fall by at least 50% from the accepted pre-cleanup baseline, or the owner explicitly revises the target based on the current-consumer inventory;
+- final runtime falls by at least 40% and tests by at least 25% from the accepted pre-cleanup baseline, while S9's filesystem/managed-synchronization runtime seams and mutation-test seam each fall by at least 50% from the S8 baseline;
 - focused command tests, syntax/diff checks, scoped SDD validation, package inventory, and a disposable current-workspace smoke test pass; broad historical migration suites are not recreated.
 
 ## Reconsider When
@@ -86,5 +86,5 @@ Reconsider this decision if:
 - a stable external release creates a real compatibility obligation for automatic migration or crash replay;
 - concurrent multi-process mutation becomes an ordinary supported operating mode rather than a defensive edge;
 - current consumers demonstrate that manual recovery cannot protect user data adequately;
-- incremental replacement cannot remove at least half of the current runtime and test surface without repeated cross-cutting candidates;
+- incremental replacement cannot meet the revised material global and seam-specific reductions without repeated cross-cutting candidates;
 - a hosted or multi-user SDD service requires transactional state beyond local Git and workspace files.
