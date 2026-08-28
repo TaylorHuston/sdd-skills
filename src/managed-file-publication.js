@@ -39,8 +39,18 @@ function concurrentChange(path, label, details = []) {
   });
 }
 
-function recoveryFailure(path, label, error, retainedPaths, published = null) {
+function recoveryFailure(
+  path,
+  label,
+  error,
+  retainedPaths,
+  published = null,
+  recordedRecoveryPaths = [],
+  recordedResiduePaths = [],
+) {
   const retained = [...new Set(retainedPaths.filter(Boolean))];
+  const recorded = [...new Set(recordedRecoveryPaths.filter(Boolean))];
+  const residue = [...new Set(recordedResiduePaths.filter(Boolean))];
   const failure = new SddError(`${label} publication requires manual recovery.`, {
     code: "MUTATION_RECOVERY_FAILED",
     details: [
@@ -48,12 +58,19 @@ function recoveryFailure(path, label, error, retainedPaths, published = null) {
       `Original error: ${error?.code ? `${error.code}: ` : ""}${error?.message ?? String(error)}`,
       ...(error?.details ?? []).map((detail) => `Original detail: ${detail}`),
       ...retained.map((retainedPath) => `Retained path requiring inspection: ${retainedPath}`),
-      "Inspect the retained complete files, keep the intended state, then retry setup or update.",
+      ...recorded.map((recordedPath) => `Recovery path recorded before inspection failure: ${recordedPath}`),
+      ...residue.map((residuePath) => `Staging path recorded before cleanup could be verified: ${residuePath}`),
+      ...(recorded.length > 0 || residue.length > 0
+        ? ["If a same-user actor moved a staging file or owner ancestor concurrently, inspect the owner location for the recorded recovery and staging names."]
+        : []),
+      "Inspect the retained complete files or recorded names, remove owned staging residue, keep the intended state, then retry setup or update.",
     ],
   });
   failure.errors = [error];
   failure.cause = error;
-  failure.retainedPaths = retained;
+  failure.retainedPaths = [...new Set([...retained, ...recorded, ...residue])];
+  failure.recordedRecoveryPaths = recorded;
+  failure.recordedResiduePaths = residue;
   if (published) failure.published = published;
   return failure;
 }
@@ -127,19 +144,19 @@ async function verifyPublished(ownerRoot, path, label, staged, ownerBinding) {
   return published;
 }
 
-async function removeIfOwned(path, expected) {
+async function cleanupOwnedFile(path, expected) {
   let state;
   try {
     state = await lstat(path, { bigint: true });
   } catch (error) {
-    if (error?.code === "ENOENT") return true;
+    if (error?.code === "ENOENT") return "unverified";
     throw error;
   }
   if (!state.isFile() || state.isSymbolicLink() || !sameIdentity(identity(state), expected.identity)) {
-    return false;
+    return "retained";
   }
   await rm(path);
-  return true;
+  return "removed";
 }
 
 async function restoreDisplaced(ownerRoot, path, recoveryPath, label, displaced, ownerBinding) {
@@ -180,6 +197,7 @@ export async function publishManagedFile(
     label = "Managed installation file",
     beforeStage = null,
     beforePublish = null,
+    afterDisplace = null,
     afterPublish = null,
     onPublished = null,
     assertOwnerCurrent = null,
@@ -219,15 +237,20 @@ export async function publishManagedFile(
     : effectiveExpected?.mode ?? current?.mode ?? 0o600;
 
   let handle = null;
+  let stagingPathCreated = false;
   let staged = null;
   let displaced = null;
+  let displacementRecorded = false;
   let published = null;
   let primaryError = null;
   const retainedPaths = [];
+  const recordedRecoveryPaths = [];
+  const recordedResiduePaths = [];
   try {
     await beforeStage?.({ temporary, target: path, recoveryPath });
     await assertOwnerCurrent?.();
     handle = await open(temporary, "wx", mode);
+    stagingPathCreated = true;
     const temporaryState = await handle.stat({ bigint: true });
     staged = {
       source,
@@ -263,6 +286,8 @@ export async function publishManagedFile(
         }
         throw error;
       }
+      displacementRecorded = true;
+      await afterDisplace?.({ temporary, target: path, recoveryPath });
       displaced = await readManagedFile(ownerRoot, recoveryPath, label, {
         expectedOwnerBinding: ownerBinding,
       });
@@ -275,8 +300,13 @@ export async function publishManagedFile(
           displaced,
           ownerBinding,
         );
-        if (restored) await removeIfOwned(recoveryPath, displaced);
-        else retainedPaths.push(recoveryPath);
+        if (restored) {
+          const cleanup = await cleanupOwnedFile(recoveryPath, displaced);
+          if (cleanup === "removed") displacementRecorded = false;
+          if (cleanup === "retained") retainedPaths.push(recoveryPath);
+        } else {
+          retainedPaths.push(recoveryPath);
+        }
         throw concurrentChange(path, label, restored ? [] : [
           `Retained displaced file: ${recoveryPath}`,
         ]);
@@ -292,8 +322,13 @@ export async function publishManagedFile(
           displaced,
           ownerBinding,
         );
-        if (restored) await removeIfOwned(recoveryPath, displaced);
-        else retainedPaths.push(recoveryPath);
+        if (restored) {
+          const cleanup = await cleanupOwnedFile(recoveryPath, displaced);
+          if (cleanup === "removed") displacementRecorded = false;
+          if (cleanup === "retained") retainedPaths.push(recoveryPath);
+        } else {
+          retainedPaths.push(recoveryPath);
+        }
         if (["EEXIST", "ENOENT", "ENOTDIR", "EISDIR", "ELOOP"].includes(error?.code)) {
           throw concurrentChange(path, label, [
             error.message,
@@ -313,43 +348,50 @@ export async function publishManagedFile(
     published = await verifyPublished(ownerRoot, path, label, staged, ownerBinding);
     await syncDirectoryBestEffort(parent);
     if (displaced !== null) {
-      const removed = await removeIfOwned(recoveryPath, displaced);
-      if (!removed) retainedPaths.push(recoveryPath);
+      const cleanup = await cleanupOwnedFile(recoveryPath, displaced);
+      if (cleanup === "removed") displacementRecorded = false;
+      if (cleanup === "retained") retainedPaths.push(recoveryPath);
     }
   } catch (error) {
     primaryError = error;
   }
 
-  if (primaryError && displaced !== null) {
-    try {
-      await lstat(recoveryPath);
-      retainedPaths.push(recoveryPath);
-    } catch (error) {
-      if (error?.code !== "ENOENT") retainedPaths.push(recoveryPath);
-    }
+  if (displacementRecorded && !retainedPaths.includes(recoveryPath)) {
+    recordedRecoveryPaths.push(recoveryPath);
   }
   if (handle) {
     try {
       await handle.close();
-    } catch {
-      retainedPaths.push(temporary);
+    } catch (error) {
+      primaryError = primaryError ?? error;
     }
   }
   if (staged !== null) {
     try {
-      if (!(await removeIfOwned(temporary, staged))) retainedPaths.push(temporary);
+      const cleanup = await cleanupOwnedFile(temporary, staged);
+      if (cleanup === "retained") retainedPaths.push(temporary);
+      if (cleanup === "unverified") recordedResiduePaths.push(temporary);
     } catch {
-      retainedPaths.push(temporary);
+      recordedResiduePaths.push(temporary);
     }
+  } else if (stagingPathCreated) {
+    recordedResiduePaths.push(temporary);
   }
 
-  if (retainedPaths.length > 0 || (published && primaryError)) {
+  if (
+    retainedPaths.length > 0
+    || recordedRecoveryPaths.length > 0
+    || recordedResiduePaths.length > 0
+    || (published && primaryError)
+  ) {
     throw recoveryFailure(
       path,
       label,
       primaryError ?? new Error("Managed file cleanup failed."),
       retainedPaths,
       published,
+      recordedRecoveryPaths,
+      recordedResiduePaths,
     );
   }
   if (primaryError) throw primaryError;

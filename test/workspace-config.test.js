@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { chmod, lstat, mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import test from "node:test";
 import { parse } from "yaml";
 
@@ -790,20 +790,32 @@ test("config publication rejects an owner-local ancestor replacement", async (t)
   await writeWorkspaceConfig(workspaceRoot, original);
   const configPath = getWorkspaceConfigPath(workspaceRoot);
   const snapshot = await readWorkspaceConfigSnapshot(workspaceRoot);
+  let recordedStagingPath;
+  let failure;
 
   await assert.rejects(
     writeWorkspaceConfig(workspaceRoot, requested, {
       expected: snapshot,
-      beforePublish: async () => {
+      beforePublish: async ({ temporary }) => {
+        recordedStagingPath = temporary;
         await rename(configDirectory, displacedDirectory);
         await mkdir(configDirectory);
         await rename(join(displacedDirectory, "config.yaml"), configPath);
       },
     }),
-    (error) => error?.code === "CONCURRENT_CHANGE",
+    (error) => {
+      failure = error;
+      return error?.code === "MUTATION_RECOVERY_FAILED"
+        && error.cause?.code === "CONCURRENT_CHANGE"
+        && error.recordedResiduePaths?.includes(recordedStagingPath);
+    },
   );
 
+  const actualStagingPath = join(displacedDirectory, basename(recordedStagingPath));
   assert.equal(await readFile(configPath, "utf8"), snapshot.source);
+  await assert.rejects(lstat(recordedStagingPath), (error) => error?.code === "ENOENT");
+  assert.equal(parse(await readFile(actualStagingPath, "utf8")).planning.root, "requested-planning");
+  assert.equal(failure.retainedPaths.includes(recordedStagingPath), true);
 });
 
 test("expected-absent config publication preserves a file that appears before publish", async (t) => {

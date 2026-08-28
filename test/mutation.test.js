@@ -14,10 +14,11 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import test from "node:test";
 
 import { readWorkspaceConfig } from "../src/config.js";
+import { publishConfigFile } from "../src/config-publication.js";
 import { setupInstallation } from "../src/commands/init-installation.js";
 import { WORKFLOW_SOURCE_PATH } from "../src/constants.js";
 import {
@@ -104,6 +105,364 @@ test("directory hashes distinguish framing collisions and include modes", async 
   assert.equal(await hashDirectory(single), await hashDirectory(split));
   await chmod(join(split, "a"), 0o600);
   assert.notEqual(await hashDirectory(single), await hashDirectory(split));
+});
+
+test("config publication reports recovery path when displacement read fails", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-config-recovery-read-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const target = join(root, ".sdd", "config.yaml");
+  await mkdir(dirname(target), { recursive: true });
+  await writeFile(target, "schema: sdd-v3\n", { mode: 0o640 });
+  await chmod(target, 0o640);
+  let recordedStagingPath;
+  let failure;
+
+  await assert.rejects(
+    () => publishConfigFile(root, target, "schema: replacement\n", {
+      afterDisplace: ({ temporary }) => {
+        recordedStagingPath = temporary;
+        throw Object.assign(new Error("injected displaced-config read failure"), { code: "EIO" });
+      },
+    }),
+    (error) => {
+      failure = error;
+      return error.code === "MUTATION_RECOVERY_FAILED"
+        && error.details.some((detail) => detail.includes("injected displaced-config read failure"))
+        && error.details.some((detail) => detail.includes("Recovery path recorded before inspection failure:"))
+        && error.details.some((detail) => detail.includes("retry"));
+    },
+  );
+
+  assert.equal(failure.retainedPaths.length, 1);
+  assert.deepEqual(failure.recordedRecoveryPaths, failure.retainedPaths);
+  assert.deepEqual(failure.recordedResiduePaths, []);
+  assert.equal(await pathExists(recordedStagingPath), false);
+  assert.equal(await pathExists(target), false);
+  assert.equal(await readFile(failure.retainedPaths[0], "utf8"), "schema: sdd-v3\n");
+  assert.equal((await lstat(failure.retainedPaths[0])).mode & 0o777, 0o640);
+});
+
+test("managed file publication reports recovery path when displacement read fails", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-managed-recovery-read-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const target = join(root, ".sdd", "story-driven-development.md");
+  await mkdir(dirname(target), { recursive: true });
+  await writeFile(target, "# Previous workflow\n", { mode: 0o640 });
+  await chmod(target, 0o640);
+  let recordedStagingPath;
+  let failure;
+
+  await assert.rejects(
+    () => publishManagedFile(root, target, "# Packaged workflow\n", {
+      label: "Managed workflow",
+      afterDisplace: ({ temporary }) => {
+        recordedStagingPath = temporary;
+        throw Object.assign(new Error("injected displaced-managed-file read failure"), { code: "EIO" });
+      },
+    }),
+    (error) => {
+      failure = error;
+      return error.code === "MUTATION_RECOVERY_FAILED"
+        && error.details.some((detail) => detail.includes("injected displaced-managed-file read failure"))
+        && error.details.some((detail) => detail.includes("Recovery path recorded before inspection failure:"))
+        && error.details.some((detail) => detail.includes("retry"));
+    },
+  );
+
+  assert.equal(failure.retainedPaths.length, 1);
+  assert.deepEqual(failure.recordedRecoveryPaths, failure.retainedPaths);
+  assert.deepEqual(failure.recordedResiduePaths, []);
+  assert.equal(await pathExists(recordedStagingPath), false);
+  assert.equal(await pathExists(target), false);
+  assert.equal(await readFile(failure.retainedPaths[0], "utf8"), "# Previous workflow\n");
+  assert.equal((await lstat(failure.retainedPaths[0])).mode & 0o777, 0o640);
+});
+
+test("config publication reports recorded recovery name after owner-parent movement", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-config-recovery-owner-move-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const targetParent = join(root, ".sdd");
+  const movedParent = join(root, ".sdd-moved");
+  const target = join(targetParent, "config.yaml");
+  await mkdir(targetParent);
+  await writeFile(target, "schema: sdd-v3\n", { mode: 0o640 });
+  await chmod(target, 0o640);
+  let recordedPath;
+  let recordedStagingPath;
+  let failure;
+
+  await assert.rejects(
+    () => publishConfigFile(root, target, "schema: replacement\n", {
+      afterDisplace: async ({ recoveryPath, temporary }) => {
+        recordedPath = recoveryPath;
+        recordedStagingPath = temporary;
+        await rename(targetParent, movedParent);
+        await mkdir(targetParent);
+      },
+    }),
+    (error) => {
+      failure = error;
+      return error.code === "MUTATION_RECOVERY_FAILED"
+        && error.cause?.code === "CONCURRENT_CHANGE"
+        && error.recordedRecoveryPaths?.includes(recordedPath)
+        && error.recordedResiduePaths?.includes(recordedStagingPath)
+        && error.details.some((detail) => detail.includes("same-user actor moved a staging file or owner ancestor concurrently"))
+        && error.details.some((detail) => detail.includes("Staging path recorded before cleanup could be verified:"));
+    },
+  );
+
+  const actualPath = join(movedParent, basename(recordedPath));
+  const actualStagingPath = join(movedParent, basename(recordedStagingPath));
+  const movedNames = (await readdir(movedParent)).sort();
+  assert.deepEqual(movedNames, [basename(recordedPath), basename(recordedStagingPath)].sort());
+  assert.deepEqual(
+    movedNames.filter((name) => name.includes(".sdd-config-") && !name.includes("-recovery-")),
+    failure.recordedResiduePaths.map((path) => basename(path)),
+  );
+  assert.equal(await pathExists(recordedPath), false);
+  assert.equal(await pathExists(recordedStagingPath), false);
+  assert.equal(await readFile(actualPath, "utf8"), "schema: sdd-v3\n");
+  assert.equal((await lstat(actualPath)).mode & 0o777, 0o640);
+  assert.equal(await readFile(actualStagingPath, "utf8"), "schema: replacement\n");
+  assert.equal((await lstat(actualStagingPath)).mode & 0o777, 0o640);
+});
+
+test("managed file publication reports recorded recovery name after owner-parent movement", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-managed-recovery-owner-move-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const targetParent = join(root, ".sdd");
+  const movedParent = join(root, ".sdd-moved");
+  const target = join(targetParent, "story-driven-development.md");
+  await mkdir(targetParent);
+  await writeFile(target, "# Previous workflow\n", { mode: 0o640 });
+  await chmod(target, 0o640);
+  let recordedPath;
+  let recordedStagingPath;
+  let failure;
+
+  await assert.rejects(
+    () => publishManagedFile(root, target, "# Packaged workflow\n", {
+      label: "Managed workflow",
+      afterDisplace: async ({ recoveryPath, temporary }) => {
+        recordedPath = recoveryPath;
+        recordedStagingPath = temporary;
+        await rename(targetParent, movedParent);
+        await mkdir(targetParent);
+      },
+    }),
+    (error) => {
+      failure = error;
+      return error.code === "MUTATION_RECOVERY_FAILED"
+        && error.cause?.code === "CONCURRENT_CHANGE"
+        && error.recordedRecoveryPaths?.includes(recordedPath)
+        && error.recordedResiduePaths?.includes(recordedStagingPath)
+        && error.details.some((detail) => detail.includes("same-user actor moved a staging file or owner ancestor concurrently"))
+        && error.details.some((detail) => detail.includes("Staging path recorded before cleanup could be verified:"));
+    },
+  );
+
+  const actualPath = join(movedParent, basename(recordedPath));
+  const actualStagingPath = join(movedParent, basename(recordedStagingPath));
+  const movedNames = (await readdir(movedParent)).sort();
+  assert.deepEqual(movedNames, [basename(recordedPath), basename(recordedStagingPath)].sort());
+  assert.deepEqual(
+    movedNames.filter((name) => name.includes(".sdd-managed-") && !name.includes("-recovery-")),
+    failure.recordedResiduePaths.map((path) => basename(path)),
+  );
+  assert.equal(await pathExists(recordedPath), false);
+  assert.equal(await pathExists(recordedStagingPath), false);
+  assert.equal(await readFile(actualPath, "utf8"), "# Previous workflow\n");
+  assert.equal((await lstat(actualPath)).mode & 0o777, 0o640);
+  assert.equal(await readFile(actualStagingPath, "utf8"), "# Packaged workflow\n");
+  assert.equal((await lstat(actualStagingPath)).mode & 0o777, 0o640);
+});
+
+test("config publication reports staging movement during final cleanup", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-config-final-cleanup-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const target = join(root, ".sdd", "config.yaml");
+  const movedStagingPath = join(root, "moved-config-staging");
+  await mkdir(dirname(target), { recursive: true });
+  await writeFile(target, "schema: sdd-v3\n", { mode: 0o640 });
+  await chmod(target, 0o640);
+  let recordedStagingPath;
+  let failure;
+
+  await assert.rejects(
+    () => publishConfigFile(root, target, "schema: replacement\n", {
+      afterPublish: async ({ temporary }) => {
+        recordedStagingPath = temporary;
+        await rename(temporary, movedStagingPath);
+      },
+    }),
+    (error) => {
+      failure = error;
+      return error.code === "MUTATION_RECOVERY_FAILED"
+        && error.recordedResiduePaths?.includes(recordedStagingPath)
+        && error.details.some((detail) => detail.includes("Staging path recorded before cleanup could be verified:"));
+    },
+  );
+
+  assert.deepEqual(failure.recordedRecoveryPaths, []);
+  assert.equal(failure.retainedPaths.includes(recordedStagingPath), true);
+  assert.equal(await pathExists(recordedStagingPath), false);
+  assert.equal(await readFile(target, "utf8"), "schema: replacement\n");
+  assert.equal((await lstat(target)).mode & 0o777, 0o640);
+  assert.equal(await readFile(movedStagingPath, "utf8"), "schema: replacement\n");
+  assert.equal((await lstat(movedStagingPath)).mode & 0o777, 0o640);
+});
+
+test("managed file publication reports staging movement during final cleanup", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-managed-final-cleanup-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const target = join(root, ".sdd", "story-driven-development.md");
+  const movedStagingPath = join(root, "moved-managed-staging");
+  await mkdir(dirname(target), { recursive: true });
+  await writeFile(target, "# Previous workflow\n", { mode: 0o640 });
+  await chmod(target, 0o640);
+  let recordedStagingPath;
+  let failure;
+
+  await assert.rejects(
+    () => publishManagedFile(root, target, "# Packaged workflow\n", {
+      label: "Managed workflow",
+      afterPublish: async ({ temporary }) => {
+        recordedStagingPath = temporary;
+        await rename(temporary, movedStagingPath);
+      },
+    }),
+    (error) => {
+      failure = error;
+      return error.code === "MUTATION_RECOVERY_FAILED"
+        && error.recordedResiduePaths?.includes(recordedStagingPath)
+        && error.details.some((detail) => detail.includes("Staging path recorded before cleanup could be verified:"));
+    },
+  );
+
+  assert.deepEqual(failure.recordedRecoveryPaths, []);
+  assert.equal(failure.retainedPaths.includes(recordedStagingPath), true);
+  assert.equal(await pathExists(recordedStagingPath), false);
+  assert.equal(await readFile(target, "utf8"), "# Packaged workflow\n");
+  assert.equal((await lstat(target)).mode & 0o777, 0o640);
+  assert.equal(await readFile(movedStagingPath, "utf8"), "# Packaged workflow\n");
+  assert.equal((await lstat(movedStagingPath)).mode & 0o777, 0o640);
+});
+
+test("config publication reports recovery movement during final cleanup", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-config-recovery-cleanup-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const target = join(root, ".sdd", "config.yaml");
+  const movedRecoveryPath = join(root, "moved-config-recovery");
+  await mkdir(dirname(target), { recursive: true });
+  await writeFile(target, "schema: sdd-v3\n", { mode: 0o640 });
+  await chmod(target, 0o640);
+  let recordedRecoveryPath;
+  let recordedStagingPath;
+  let failure;
+
+  await assert.rejects(
+    () => publishConfigFile(root, target, "schema: replacement\n", {
+      afterPublish: async ({ recoveryPath, temporary }) => {
+        recordedRecoveryPath = recoveryPath;
+        recordedStagingPath = temporary;
+        await rename(recoveryPath, movedRecoveryPath);
+      },
+    }),
+    (error) => {
+      failure = error;
+      return error.code === "MUTATION_RECOVERY_FAILED"
+        && error.recordedRecoveryPaths?.includes(recordedRecoveryPath)
+        && error.details.some((detail) => detail.includes("Recovery path recorded before inspection failure:"));
+    },
+  );
+
+  assert.deepEqual(failure.recordedResiduePaths, []);
+  assert.equal(await pathExists(recordedRecoveryPath), false);
+  assert.equal(await pathExists(recordedStagingPath), false);
+  assert.equal(await readFile(target, "utf8"), "schema: replacement\n");
+  assert.equal((await lstat(target)).mode & 0o777, 0o640);
+  assert.equal(await readFile(movedRecoveryPath, "utf8"), "schema: sdd-v3\n");
+  assert.equal((await lstat(movedRecoveryPath)).mode & 0o777, 0o640);
+});
+
+test("managed file publication reports recovery movement during final cleanup", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-managed-recovery-cleanup-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const target = join(root, ".sdd", "story-driven-development.md");
+  const movedRecoveryPath = join(root, "moved-managed-recovery");
+  await mkdir(dirname(target), { recursive: true });
+  await writeFile(target, "# Previous workflow\n", { mode: 0o640 });
+  await chmod(target, 0o640);
+  let recordedRecoveryPath;
+  let recordedStagingPath;
+  let failure;
+
+  await assert.rejects(
+    () => publishManagedFile(root, target, "# Packaged workflow\n", {
+      label: "Managed workflow",
+      afterPublish: async ({ recoveryPath, temporary }) => {
+        recordedRecoveryPath = recoveryPath;
+        recordedStagingPath = temporary;
+        await rename(recoveryPath, movedRecoveryPath);
+      },
+    }),
+    (error) => {
+      failure = error;
+      return error.code === "MUTATION_RECOVERY_FAILED"
+        && error.recordedRecoveryPaths?.includes(recordedRecoveryPath)
+        && error.details.some((detail) => detail.includes("Recovery path recorded before inspection failure:"));
+    },
+  );
+
+  assert.deepEqual(failure.recordedResiduePaths, []);
+  assert.equal(await pathExists(recordedRecoveryPath), false);
+  assert.equal(await pathExists(recordedStagingPath), false);
+  assert.equal(await readFile(target, "utf8"), "# Packaged workflow\n");
+  assert.equal((await lstat(target)).mode & 0o777, 0o640);
+  assert.equal(await readFile(movedRecoveryPath, "utf8"), "# Previous workflow\n");
+  assert.equal((await lstat(movedRecoveryPath)).mode & 0o777, 0o640);
+});
+
+test("config publication combines retained recovery and unverified staging cleanup", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "sdd-config-combined-cleanup-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const target = join(root, ".sdd", "config.yaml");
+  const movedStagingPath = join(root, "moved-config-combined-staging");
+  await mkdir(dirname(target), { recursive: true });
+  await writeFile(target, "schema: sdd-v3\n", { mode: 0o640 });
+  await chmod(target, 0o640);
+  let recordedRecoveryPath;
+  let recordedStagingPath;
+  let failure;
+
+  await assert.rejects(
+    () => publishConfigFile(root, target, "schema: replacement\n", {
+      afterPublish: async ({ recoveryPath, temporary }) => {
+        recordedRecoveryPath = recoveryPath;
+        recordedStagingPath = temporary;
+        await rename(temporary, movedStagingPath);
+        await rm(recoveryPath);
+        await writeFile(recoveryPath, "schema: concurrent-recovery\n", { mode: 0o600 });
+      },
+    }),
+    (error) => {
+      failure = error;
+      return error.code === "MUTATION_RECOVERY_FAILED"
+        && error.retainedPaths?.includes(recordedRecoveryPath)
+        && error.recordedResiduePaths?.includes(recordedStagingPath)
+        && error.details.some((detail) => detail.includes(`Retained path requiring inspection: ${recordedRecoveryPath}`))
+        && error.details.some((detail) => detail.includes(`Staging path recorded before cleanup could be verified: ${recordedStagingPath}`));
+    },
+  );
+
+  assert.deepEqual(failure.recordedRecoveryPaths, []);
+  assert.equal(await pathExists(recordedStagingPath), false);
+  assert.equal(await readFile(target, "utf8"), "schema: replacement\n");
+  assert.equal((await lstat(target)).mode & 0o777, 0o640);
+  assert.equal(await readFile(recordedRecoveryPath, "utf8"), "schema: concurrent-recovery\n");
+  assert.equal((await lstat(recordedRecoveryPath)).mode & 0o777, 0o600);
+  assert.equal(await readFile(movedStagingPath, "utf8"), "schema: replacement\n");
+  assert.equal((await lstat(movedStagingPath)).mode & 0o777, 0o640);
 });
 
 test("managed skill refresh preserves completed work and reports residual actions without rollback", async (t) => {
