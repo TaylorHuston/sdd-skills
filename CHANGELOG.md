@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-29
+
 ### Added
 
 - Added one workspace-scoped SDD installation: private topology, central Changes, managed doctrine, installation evidence, and managed skills belong to an explicit workspace, while repositories retain portable identity and Epic, ADR, and audit paths.
