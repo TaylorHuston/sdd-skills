@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -23,6 +23,17 @@ async function missing(...parts) {
   }
 }
 
+async function javascriptFiles(directory, suffix = ".js") {
+  return (await readdir(packagePath(directory)))
+    .filter((name) => name.endsWith(suffix))
+    .map((name) => join(directory, name));
+}
+
+async function lineCount(paths) {
+  const sources = await Promise.all(paths.map((path) => source(path)));
+  return sources.reduce((total, contents) => total + contents.split("\n").length - 1, 0);
+}
+
 const legacyProducerPatterns = [
   /Closure receipt: required/,
   /^## Implementation Ledger$/m,
@@ -32,6 +43,25 @@ const legacyProducerPatterns = [
   /sdd-slice-review-v1/,
   /sdd-slice-closure-v2/,
 ];
+
+test("final candidate retains accepted architecture reductions", async () => {
+  const runtimePaths = [
+    ...await javascriptFiles("src"),
+    ...await javascriptFiles(join("src", "commands")),
+  ];
+  const testPaths = await javascriptFiles("test", ".test.js");
+  const seamPaths = ["src/fs.js", "src/installation.js", "src/managed-skill-publication.js", "src/skills.js"];
+  const metrics = {
+    runtime: [await lineCount(runtimePaths), 26_669, 0.40],
+    tests: [await lineCount(testPaths), 17_257, 0.25],
+    s9Runtime: [await lineCount(seamPaths), 5_941, 0.50],
+    mutationTest: [await lineCount(["test/mutation.test.js"]), 1_875, 0.50],
+  };
+  for (const [name, [current, baseline, reduction]] of Object.entries(metrics)) {
+    const maximum = Math.floor(baseline * (1 - reduction));
+    assert.ok(current <= maximum, `${name}: ${current} exceeds ${maximum} from baseline ${baseline}`);
+  }
+});
 
 test("current Change templates use one v2 three-artifact contract", async () => {
   const [changeSkill, changeTemplate, docsChange, tasksTemplate, docsTasks, reviewTemplate, docsReview] = await Promise.all([
