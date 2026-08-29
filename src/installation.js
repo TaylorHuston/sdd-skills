@@ -275,6 +275,11 @@ async function managedRefreshFailure(
             `Residual managed skill action: ${skillName} (${action}).`),
           ...skillState.retainedPaths.map((path) =>
             `Managed skill retained path: ${path}`),
+          ...skillState.recordedSkillPaths.map((path) =>
+            `Managed skill path recorded before registry-owner drift (do not follow its current pathname): ${path}`),
+          ...(skillState.recordedSkillPaths.length === 0 ? [] : [
+            "Inspect the displaced original managed skills directory for the recorded basenames; do not follow the current registry pathname.",
+          ]),
         ]
       : [skillsApplied
           ? "Completed managed skill changes were preserved."
@@ -286,7 +291,7 @@ async function managedRefreshFailure(
           ...(recoveryError?.details ?? []).map((detail) => `Managed skill recovery detail: ${detail}`),
         ]
       : []),
-    "Inspect the named workflow, managed skills, and parseable installation evidence. Retry the same setup or update command when the preserved state is intended; otherwise reconcile local changes or use --force deliberately.",
+    "Inspect the named workflow, verified retained managed skills, displaced original registry names, and parseable installation evidence. Retry the same setup or update command when the preserved state is intended; otherwise reconcile local changes or use --force deliberately.",
   ];
   const failure = new SddError("Managed installation refresh stopped with preserved partial state.", {
     code: "MUTATION_RECOVERY_FAILED",
@@ -298,8 +303,10 @@ async function managedRefreshFailure(
     : error;
   failure.retainedPaths = [
     ...(workflowState.retained ? [workflowPlan.target] : []),
+    ...(skillState?.retainedPaths ?? []),
     lockPath,
   ];
+  failure.recordedSkillPaths = skillState?.recordedSkillPaths ?? [];
   return failure;
 }
 

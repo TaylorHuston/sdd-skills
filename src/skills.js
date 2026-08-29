@@ -300,7 +300,12 @@ function partialSkillFailure(error, state) {
     ...state.pending.map(({ skillName, action }) =>
       `Residual managed skill action: ${skillName} (${action}).`),
     ...state.retainedPaths.map((path) => `Retained path requiring inspection: ${path}`),
-    "Installation evidence was not advanced. Inspect retained state, retry the same setup or update command when it is intended, use --force only to replace deliberate local content, or recover the named path manually.",
+    ...state.recordedSkillPaths.map((path) =>
+      `Managed skill path recorded before registry-owner drift (do not follow its current pathname): ${path}`),
+    ...(state.recordedSkillPaths.length === 0 ? [] : [
+      "Inspect the displaced original managed skills directory for the recorded basenames; do not follow the current registry pathname.",
+    ]),
+    "Installation evidence was not advanced. Inspect verified retained state or the displaced original registry for recorded names, retry the same setup or update command when it is intended, and use --force only to replace deliberate local content.",
   ];
   const failure = new SddError("Managed skill refresh stopped with preserved partial state.", {
     code: "MUTATION_RECOVERY_FAILED",
@@ -309,6 +314,7 @@ function partialSkillFailure(error, state) {
   failure.cause = error;
   failure.skillState = state;
   failure.retainedPaths = state.retainedPaths;
+  failure.recordedSkillPaths = state.recordedSkillPaths;
   return failure;
 }
 
@@ -337,6 +343,7 @@ export async function applySkillSync(
     failed: null,
     pending: candidates.map(({ skillName, action }) => ({ skillName, action })),
     retainedPaths: [],
+    recordedSkillPaths: [],
   };
   let assertRegistry = null;
   if (candidates.length > 0) {
@@ -366,6 +373,7 @@ export async function applySkillSync(
         state.failed = { skillName: entry.skillName, action: entry.action };
       }
       state.retainedPaths.push(...(error?.retainedPaths ?? []));
+      state.recordedSkillPaths.push(...(error?.recordedSkillPaths ?? []));
       throw partialSkillFailure(error, state);
     }
   }

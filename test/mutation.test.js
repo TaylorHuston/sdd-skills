@@ -42,11 +42,18 @@ function mutationLockPath(root) {
   return join(root, ".sdd", "mutation.lock");
 }
 
-async function createSkill(root, skillName, source) {
-  const path = join(root, "source", skillName);
+async function createSkill(root, skillName, source, directory = "source") {
+  const path = join(root, directory, skillName);
   await mkdir(path, { recursive: true });
   await writeFile(join(path, "SKILL.md"), source);
   return { path, hash: await hashDirectory(path) };
+}
+
+async function prepareSkillReplacement(t, suffix) {
+  const root = await mkdtemp(join(tmpdir(), `sdd-skill-${suffix}-`));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const [source, target] = await Promise.all([createSkill(root, "sdd-example", "packaged skill\n"), createSkill(root, "sdd-example", "previous skill\n", "skills")]);
+  return { root, source, target: target.path, targetHash: target.hash };
 }
 
 const PUBLICATIONS = [
@@ -400,40 +407,42 @@ test("managed skill refresh preserves completed work and reports residual action
 });
 
 test("skill replacement preserves a newer target as named residual state", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-skill-newer-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const source = await createSkill(root, "sdd-example", "packaged skill\n");
-  const skillsDirectory = join(root, "skills");
-  const target = join(skillsDirectory, "sdd-example");
-  await mkdir(target, { recursive: true });
-  await writeFile(join(target, "SKILL.md"), "previous skill\n");
-  const targetHash = await hashDirectory(target);
-  let retained;
-
-  await assert.rejects(
-    () => applySkillSync(root, {
-      skillsDirectory,
-      actions: [{
-        skillName: "sdd-example",
-        action: "update",
-        source: source.path,
-        target,
-        sourceHash: source.hash,
-        targetHash,
-      }],
-    }, {
-      beforeSkillPublication: async ({ phase }) => {
-        if (phase === "preserve-target") {
-          await writeFile(join(target, "SKILL.md"), "concurrent skill\n");
-        }
-      },
-    }),
-    (error) => {
-      retained = error.retainedPaths.find((path) => path.includes("sdd-preserved"));
-      return error.code === "MUTATION_RECOVERY_FAILED" && typeof retained === "string";
-    },
-  );
-  assert.equal(await readFile(join(retained, "SKILL.md"), "utf8"), "concurrent skill\n");
+  const cases = [
+    ["target replacement before preservation", "preserve-target", "update", async (path) => writeFile(join(path, "SKILL.md"), "concurrent skill\n"), false],
+    ["cleanup replacement after update", "cleanup-preserved", "update", async (path) => {
+      await rm(path, { recursive: true });
+      await mkdir(path);
+      await writeFile(join(path, "SKILL.md"), "concurrent skill\n");
+    }, true],
+    ["cleanup modification after retirement", "cleanup-preserved", "remove", async (path) => writeFile(join(path, "SKILL.md"), "concurrent skill\n"), false],
+  ];
+  for (const [name, injectedPhase, action, inject, targetPublished] of cases) {
+    await t.test(name, async (t) => {
+      const { root, source, target, targetHash } = await prepareSkillReplacement(t, name);
+      let retained;
+      await assert.rejects(() => applySkillSync(root, {
+        skillsDirectory: dirname(target),
+        actions: [{
+          skillName: "sdd-example",
+          action,
+          source: action === "remove" ? null : source.path,
+          target,
+          sourceHash: action === "remove" ? null : source.hash,
+          targetHash,
+        }],
+      }, {
+        beforeSkillPublication: async ({ phase, path }) => phase === injectedPhase && inject(path),
+      }), (error) => {
+        retained = error.retainedPaths.find((path) => path.includes("sdd-preserved"));
+        return error.code === "MUTATION_RECOVERY_FAILED" && typeof retained === "string"
+          && error.recordedSkillPaths.length === 0
+          && error.details.some((detail) => detail.includes("Inspect verified retained state"));
+      });
+      assert.equal(await readFile(join(retained, "SKILL.md"), "utf8"), "concurrent skill\n");
+      assert.equal(await pathExists(target), targetPublished);
+      if (targetPublished) assert.equal(await readFile(join(target, "SKILL.md"), "utf8"), "packaged skill\n");
+    });
+  }
 });
 
 test("managed skill publication preserves nested modes", async (t) => {
@@ -466,38 +475,38 @@ test("managed skill publication preserves nested modes", async (t) => {
   assert.equal((await stat(join(target, "assets", "reference.md"))).mode & 0o777, 0o400);
 });
 
-test("managed skill registry staging rejects an external symlink replacement", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "sdd-skill-registry-"));
-  const external = await mkdtemp(join(tmpdir(), "sdd-skill-registry-external-"));
-  const displaced = join(root, ".agents.displaced");
-  t.after(async () => {
-    await rm(root, { recursive: true, force: true });
-    await rm(external, { recursive: true, force: true });
-  });
-  const source = await createSkill(root, "sdd-example", "packaged skill\n");
-  await mkdir(join(root, ".agents"));
-  await assert.rejects(
-    () => applySkillSync(root, {
-      skillsDirectory: join(root, ".agents", "skills"),
-      actions: [{
-        skillName: "sdd-example",
-        action: "install",
-        source: source.path,
-        target: join(root, ".agents", "skills", "sdd-example"),
-        sourceHash: source.hash,
-        targetHash: null,
-      }],
-    }, {
-      beforeSkillPublication: async ({ phase }) => {
-        if (phase !== "registry") return;
-        await rename(join(root, ".agents"), displaced);
-        await symlink(external, join(root, ".agents"), "dir");
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes("Residual managed skill action")),
-  );
-  assert.deepEqual(await readdir(external), []);
+test("managed skill registry staging rejects an external symlink replacement; managed skill cleanup never follows a replaced registry ancestor", async (t) => {
+  const { root, source, target, targetHash } = await prepareSkillReplacement(t, "cleanup-owner");
+  const external = await mkdtemp(join(tmpdir(), "sdd-skill-cleanup-external-"));
+  const displaced = join(root, "skills-displaced");
+  await mkdir(join(root, ".sdd"));
+  t.after(() => rm(external, { recursive: true, force: true }));
+  const skillPlan = {
+    skillsDirectory: dirname(target),
+    actions: [{ skillName: "sdd-example", action: "update", source: source.path, target, sourceHash: source.hash, targetHash }],
+    lock: { version: 3, packageVersion: "test", schemaVersion: "sdd-v3", skillsDirectory: "skills", managedSkills: { "sdd-example": source.hash } },
+  };
+  let preservedPath;
+  let failure;
+  await assert.rejects(() => applyManagedInstallation(root, { skillPlan, skillOptions: {
+    beforeSkillPublication: async ({ phase, path }) => {
+      if (phase !== "cleanup-preserved-remove") return;
+      preservedPath = path;
+      await rename(dirname(path), displaced);
+      await mkdir(join(external, basename(path)));
+      await writeFile(join(external, basename(path), "external.txt"), "must survive\n");
+      await symlink(external, dirname(path), "dir");
+    },
+  } }), (error) => (failure = error, error.code === "MUTATION_RECOVERY_FAILED"));
+  assert.deepEqual(failure.recordedSkillPaths, [preservedPath, target]);
+  assert.deepEqual(failure.cause.skillState.recordedSkillPaths, [preservedPath, target]);
+  assert.deepEqual(failure.cause.skillState.retainedPaths, []);
+  assert.equal([preservedPath, target].some((path) => failure.retainedPaths.includes(path)), false);
+  assert.equal(failure.details.some((detail) => detail.includes("Inspect the displaced original managed skills directory")), true);
+  assert.equal([preservedPath, target].some((path) => failure.details.some((detail) => detail === `Managed skill retained path: ${path}`)), false);
+  assert.equal(await readFile(join(external, basename(preservedPath), "external.txt"), "utf8"), "must survive\n");
+  assert.equal(await readFile(join(displaced, basename(preservedPath), "SKILL.md"), "utf8"), "previous skill\n");
+  assert.equal(await readFile(join(displaced, "sdd-example", "SKILL.md"), "utf8"), "packaged skill\n");
 });
 
 test("managed writer rejects a selected workspace replacement before lock-directory creation", async (t) => {
