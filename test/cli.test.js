@@ -9,6 +9,7 @@ import {
   readFile,
   readdir,
   readlink,
+  realpath,
   rename,
   rm,
   symlink,
@@ -149,23 +150,27 @@ async function assertRepositoryArtifactCommandsReject(
     finding.code === "UNSAFE_ARTIFACT_PATH");
   assert.ok(doctorFinding);
   assert.ok(Array.isArray(doctorFinding.details));
-  const { stdout } = await execFileAsync(process.execPath, [
-    join(PACKAGE_ROOT, "bin", "sdd.js"),
-    "doctor",
-    "--workspace",
-    workspaceRoot,
-    "--json",
-  ], { cwd: workspaceRoot });
-  const commandDiagnosis = JSON.parse(stdout);
-  assert.equal(commandDiagnosis.healthy, false);
-  assert.ok(commandDiagnosis.findings.some((finding) =>
-    finding.code === "UNSAFE_ARTIFACT_PATH"
-      && Array.isArray(finding.details)));
+  await assert.rejects(
+    () => execFileAsync(process.execPath, [
+      join(PACKAGE_ROOT, "bin", "sdd.js"),
+      "doctor",
+      "--workspace",
+      workspaceRoot,
+      "--json",
+    ], { cwd: workspaceRoot }),
+    (error) => {
+      const commandDiagnosis = JSON.parse(error.stdout);
+      return error.code === 1
+        && commandDiagnosis.healthy === false
+        && commandDiagnosis.findings.some((finding) =>
+          finding.code === "UNSAFE_ARTIFACT_PATH"
+            && Array.isArray(finding.details));
+    },
+  );
   if (repositoryStartPath !== null) {
-    await assert.rejects(
-      () => getStatus(repositoryStartPath, "sample", { workspaceRoot }),
-      rejectsUnsafeArtifact,
-    );
+    const repositoryStatus = await getStatus(repositoryStartPath, "sample", { workspaceRoot });
+    assert.ok(repositoryStatus.repositoryDiagnostics.some((diagnostic) =>
+      diagnostic.code === "UNSAFE_ARTIFACT_PATH"));
   }
 }
 
@@ -229,6 +234,9 @@ async function writeChange(root, repository, changeId, status, { closed = false 
     ...(closed ? ["closed"] : []),
     changeId,
   );
+  const outcomeStatus = status === "in_progress" ? "in progress" : "ready";
+  const scenario = "SAMPLE-E001/S1 R1-S1";
+  const triggerReason = "Exercise the current v2 fixture contract.";
   await mkdir(changePath, { recursive: true });
   await writeFile(
     join(changePath, "change.md"),
@@ -262,6 +270,151 @@ async function writeChange(root, repository, changeId, status, { closed = false 
       "",
       "None.",
       "",
+      "## Current Context",
+      "",
+      "The current behavior has been inspected.",
+      "",
+      "## Behavioral Changes",
+      "",
+      "The current v2 contract remains authoritative.",
+      "",
+      "## Technical Decision Handoffs",
+      "",
+      "No handoff is required.",
+      "",
+      "## Selected Approach",
+      "",
+      "Use one compact v2 Change record.",
+      "",
+      "## Alternatives Considered",
+      "",
+      "Receipt-era fixtures are unsupported.",
+      "",
+      "## Implementation Constraints",
+      "",
+      "Keep the fixture current and compact.",
+      "",
+      "## Verification Strategy",
+      "",
+      "Exercise the public command boundary.",
+      "",
+      "## Risks / Trade-Offs",
+      "",
+      "The fixture is intentionally minimal.",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await writeFile(
+    join(changePath, "tasks.md"),
+    [
+      `# Tasks: ${changeId}`,
+      "",
+      "## Resume Here",
+      "",
+      `- Change: \`${changeId}\``,
+      "- Current outcome: S1",
+      "- Phase: fixture verification",
+      "- Next action: Exercise the current command.",
+      "- Blocker: none",
+      "",
+      "## Delivery Outcomes",
+      "",
+      "### S1: Exercise the current contract",
+      "",
+      `- Status: ${outcomeStatus}`,
+      `- Repository: \`${repository}\``,
+      "- Requirements:",
+      "  - Revised: `SAMPLE-E001/S1 R1` — The current v2 contract remains usable.",
+      "- Story changes:",
+      "  - Update: `SAMPLE-E001/S1` — Exercise current behavior.",
+      "- Outcome: The current v2 command behavior is observable.",
+      `- Scenarios: \`${scenario}\``,
+      "- Dependencies: none",
+      "- Binding constraints: Do not restore receipt-era compatibility.",
+      "- Expected triggers:",
+      `  - \`current-contract\` — ${triggerReason}`,
+      "- Verification intent: Exercise the public command boundary.",
+      "- Manual acceptance: not required",
+      "",
+      "## Closeout",
+      "",
+      "- Remaining outcomes: S1",
+      "- Review: pending",
+      "- Manual acceptance: not required",
+      "- Accepted gaps: none",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await writeFile(
+    join(changePath, "review.md"),
+    [
+      "---",
+      "schema: sdd-review-v2",
+      `change: ${changeId}`,
+      `updated: ${changeId.slice(0, 10)}`,
+      "---",
+      `# Review: ${changeId}`,
+      "",
+      "## Outcome S1: Exercise the current contract",
+      "",
+      "### Summary",
+      "",
+      `- Repository: \`${repository}\``,
+      "- Candidate: pending",
+      "- Verdict: pending",
+      "- Spec Adherence: pending",
+      "- Implementation Quality: pending",
+      "- Manual acceptance: not required",
+      "- Reviewed tree: pending",
+      "- Final commit: pending",
+      "- Final commit tree: pending",
+      "",
+      "### Universal Gates",
+      "",
+      "| Gate | Check | Result | Evidence |",
+      "|---|---|---|---|",
+      "| scope-candidate | Resolve the fixture candidate. | pending | Not reviewed yet. |",
+      "| behavior | Compare current behavior. | pending | Not reviewed yet. |",
+      "| fresh-verification | Run focused proof. | pending | Not reviewed yet. |",
+      "| independent-review | Review both axes. | pending | Not reviewed yet. |",
+      "| integrity-authority | Check authority. | pending | Not reviewed yet. |",
+      "",
+      "### Triggered Checks",
+      "",
+      "| Trigger | Source | Reason | Check | Result | Gap | Evidence |",
+      "|---|---|---|---|---|---|---|",
+      `| current-contract | planned | ${triggerReason} | Exercise the command. | pending | none | Not reviewed yet. |`,
+      "",
+      "### Scenario Coverage",
+      "",
+      "| Scenario | Claimed boundary | Evidence | Proven boundary | Result | Gap |",
+      "|---|---|---|---|---|---|",
+      `| ${scenario} | current v2 command behavior | Not reviewed yet. | pending | pending | none |`,
+      "",
+      "### Findings",
+      "",
+      "#### BLOCKING",
+      "",
+      "- None.",
+      "",
+      "#### REQUIRED",
+      "",
+      "- None.",
+      "",
+      "#### ACCEPTED GAPS",
+      "",
+      "- None.",
+      "",
+      "#### SUGGESTION",
+      "",
+      "- None.",
+      "",
+      "### Remediation",
+      "",
+      "- Not reviewed yet.",
+      "",
     ].join("\n"),
     "utf8",
   );
@@ -275,71 +428,20 @@ async function writeCanonicalChange(
   { closed = false } = {},
 ) {
   await writeChange(root, repository, changeId, status, { closed });
-  const changePath = join(
+}
+
+async function declareFixtureEpic(root, changeId, { closed = false } = {}) {
+  const changeFilePath = join(
     root,
     ".sdd",
     "changes",
     ...(closed ? ["closed"] : []),
     changeId,
+    "change.md",
   );
   await writeFile(
-    join(changePath, "design.md"),
-    [
-      `# Design: ${changeId}`,
-      "",
-      "## Context",
-      "",
-      "Current context.",
-      "",
-      "## Goals / Non-Goals",
-      "",
-      "A bounded goal.",
-      "",
-      "## Selected Approach",
-      "",
-      "A selected approach.",
-      "",
-      "## Verification Strategy",
-      "",
-      "Focused verification.",
-      "",
-      "## Risks / Trade-Offs",
-      "",
-      "Known trade-offs.",
-      "",
-    ].join("\n"),
-    "utf8",
-  );
-  await writeFile(
-    join(changePath, "tasks.md"),
-    [
-      `# Tasks: ${changeId}`,
-      "",
-      "## Resume Here",
-      "",
-      "Ready for the next action.",
-      "",
-      "## Task Checklist",
-      "",
-      "- [ ] Complete the work.",
-      "",
-      "## Implementation Ledger",
-      "",
-      "No implementation yet.",
-      "",
-      "## Verification Ledger",
-      "",
-      "No verification yet.",
-      "",
-      "## Blockers / Open Questions",
-      "",
-      "None.",
-      "",
-      "## Closeout",
-      "",
-      "Not ready to close.",
-      "",
-    ].join("\n"),
+    changeFilePath,
+    `${await readFile(changeFilePath, "utf8")}\n## Epic Impact\n\n- Affected Epic: \`SAMPLE-E001\`.\n`,
     "utf8",
   );
 }
@@ -354,20 +456,20 @@ async function setPlannedChangeStatus(root, created, status = "planned") {
   );
 }
 
-async function writeCanonicalEpic(root, repository, epicId = "SAMPLE-E001") {
-  await mkdir(join(root, "code", repository, "src"), { recursive: true });
-  await mkdir(join(root, "code", repository, "test"), { recursive: true });
+async function writeCanonicalEpicAt(repositoryRoot, epicId = "SAMPLE-E001") {
+  await mkdir(join(repositoryRoot, "src"), { recursive: true });
+  await mkdir(join(repositoryRoot, "test"), { recursive: true });
   await writeFile(
-    join(root, "code", repository, "src", "core.js"),
+    join(repositoryRoot, "src", "core.js"),
     "export function runCoreJourney() { return true; }\n",
     "utf8",
   );
   await writeFile(
-    join(root, "code", repository, "test", "core.test.js"),
+    join(repositoryRoot, "test", "core.test.js"),
     "test(\"core journey completes successfully\", () => {});\n",
     "utf8",
   );
-  const epicPath = join(root, "code", repository, "docs", "epics", "sample-e001-core");
+  const epicPath = join(repositoryRoot, "docs", "epics", "sample-e001-core");
   await mkdir(epicPath, { recursive: true });
   await writeFile(
     join(epicPath, "epic.md"),
@@ -478,6 +580,10 @@ async function writeCanonicalEpic(root, repository, epicId = "SAMPLE-E001") {
     "utf8",
   );
   return join(epicPath, "epic.md");
+}
+
+async function writeCanonicalEpic(root, repository, epicId = "SAMPLE-E001") {
+  return writeCanonicalEpicAt(join(root, "code", repository), epicId);
 }
 
 async function writeEpicVerificationReport(
@@ -2413,17 +2519,22 @@ test("status degrades mapped paths that resolve to one physical repository", asy
       && finding.code === "REPOSITORY_OWNERSHIP_COLLISION"
       && finding.message.includes("sample (code/sample-web)")
       && finding.message.includes("sample (code/sample-web-alias)")));
-  const doctorOutput = await execFileAsync(process.execPath, [
-    join(PACKAGE_ROOT, "bin", "sdd.js"),
-    "doctor",
-    "--workspace",
-    root,
-    "--json",
-  ], { cwd: root });
-  const commandDiagnosis = JSON.parse(doctorOutput.stdout);
-  assert.equal(commandDiagnosis.healthy, false);
-  assert.ok(commandDiagnosis.findings.some((finding) =>
-    finding.code === "REPOSITORY_OWNERSHIP_COLLISION"));
+  await assert.rejects(
+    () => execFileAsync(process.execPath, [
+      join(PACKAGE_ROOT, "bin", "sdd.js"),
+      "doctor",
+      "--workspace",
+      root,
+      "--json",
+    ], { cwd: root }),
+    (error) => {
+      const commandDiagnosis = JSON.parse(error.stdout);
+      return error.code === 1
+        && commandDiagnosis.healthy === false
+        && commandDiagnosis.findings.some((finding) =>
+          finding.code === "REPOSITORY_OWNERSHIP_COLLISION");
+    },
+  );
   const changeId = "2026-08-09-duplicate-repository-owner";
   await writeChange(root, "sample-web", changeId, "in_progress");
   const status = await getStatus(root);
@@ -2583,25 +2694,25 @@ test("doctor validates central Change metadata and status", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
-  const changePath = join(root, ".sdd", "changes", "2026-07-14-example");
+  const changeId = "2026-07-14-example";
+  const changePath = join(root, ".sdd", "changes", changeId);
   await mkdir(changePath, { recursive: true });
-  await writeFile(join(changePath, "tasks.md"), "# Tasks\n", "utf8");
+  await writeFile(join(changePath, "change.md"), "# Change without metadata\n", "utf8");
 
   let diagnosis = await diagnoseWorkspace(root);
   assert.equal(diagnosis.healthy, false);
-  assert.ok(diagnosis.findings.some((finding) => finding.message.includes("Cannot parse Change metadata")));
+  assert.ok(diagnosis.findings.some((finding) =>
+    finding.message.includes("Cannot parse Change metadata")));
 
-  await writeFile(
-    join(changePath, "tasks.md"),
-    "---\nstatus: in_progress\nspace: sample\nrepositories:\n  - sample-web\n---\n# Tasks\n",
-    "utf8",
-  );
+  await rm(changePath, { recursive: true });
+  await writeChange(root, "sample-web", changeId, "in_progress");
   diagnosis = await diagnoseWorkspace(root);
   assert.equal(diagnosis.healthy, true);
 
+  const changeFilePath = join(changePath, "change.md");
   await writeFile(
-    join(changePath, "tasks.md"),
-    "---\nstatus: review\nspace: sample\nrepositories:\n  - sample-web\n---\n# Tasks\n",
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace("status: in_progress", "status: review"),
     "utf8",
   );
   diagnosis = await diagnoseWorkspace(root);
@@ -2634,25 +2745,21 @@ test("doctor rejects a central Change with an unknown repository ID", async (t) 
 });
 
 
-test("closed Change state comes from central folder location and accepts historical statuses", async (t) => {
+test("closed Change state comes from central folder location and requires in_review metadata", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
-  const changePath = join(root, ".sdd", "changes", "closed", "2026-07-14-example");
-  await mkdir(changePath, { recursive: true });
-  await writeFile(
-    join(changePath, "tasks.md"),
-    "---\nstatus: closed\nspace: sample\nrepositories:\n  - sample-web\n---\n# Tasks\n",
-    "utf8",
-  );
+  const changeId = "2026-07-14-example";
+  await writeChange(root, "sample-web", changeId, "closed", { closed: true });
+  const changeFilePath = join(root, ".sdd", "changes", "closed", changeId, "change.md");
 
   let diagnosis = await diagnoseWorkspace(root);
   assert.equal(diagnosis.healthy, false);
   assert.ok(diagnosis.findings.some((finding) => finding.message.includes('"closed"')));
 
   await writeFile(
-    join(changePath, "tasks.md"),
-    "---\nstatus: ready_to_close\nspace: sample\nrepositories:\n  - sample-web\n---\n# Tasks\n",
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace("status: closed", "status: in_review"),
     "utf8",
   );
   diagnosis = await diagnoseWorkspace(root);
@@ -2668,7 +2775,8 @@ test("doctor reports malformed configuration without inspecting managed skills",
   const diagnosis = await diagnoseWorkspace(root);
   assert.equal(diagnosis.healthy, false);
   assert.ok(diagnosis.counts.errors >= 1);
-  assert.ok(diagnosis.findings.some((finding) => finding.message.includes("migration is required")));
+  assert.ok(diagnosis.findings.some((finding) =>
+    finding.message.includes("Configuration version must be 3")));
 });
 
 test("setup rejects layout overrides after configuration exists", async (t) => {
@@ -2690,6 +2798,10 @@ test("idea planning and repository paths support explicit project overrides", as
   await mkdir(join(root, "ideas", "custom-planning"), { recursive: true });
   await mkdir(join(root, "private", "external-planning"), { recursive: true });
   await mkdir(join(root, "integrations", "special-client"), { recursive: true });
+  await writeRepositoryConfig(
+    join(root, "integrations", "special-client"),
+    createRepositoryConfig("special-client"),
+  );
   const config = await readWorkspaceConfig(root);
   config.ideas.sample.planning = "custom-planning";
   config.ideas.sample.repositories.push({
@@ -2754,7 +2866,7 @@ test("CLI context discovers regular files from their parent and rejects symbolic
   ], { cwd: root });
   const context = JSON.parse(stdout);
   assert.equal(context.command, "context");
-  assert.equal(context.workspaceRoot, root);
+  assert.equal(context.workspaceRoot, await realpath(root));
   assert.equal(context.relativePath, "code/sample-web/src/entry.js");
   assert.equal(context.kind, "repository");
   assert.equal(context.repository.id, "sample-web");
@@ -2804,11 +2916,14 @@ test("status resolves central Changes for a repository-only checkout", async (t)
   await mkdir(repositoryRoot, { recursive: true });
   await writeRepositoryConfig(repositoryRoot, createRepositoryConfig("repository-only-status"));
   const changeId = "2026-07-24-repository-only-status";
-  const changePath = join(root, ".sdd", "changes", changeId);
-  await mkdir(changePath, { recursive: true });
+  await writeCanonicalChange(root, "repository-only-status", changeId, "in_progress");
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
   await writeFile(
-    join(changePath, "tasks.md"),
-    "---\nstatus: in_progress\nspace: repository-only-status\nrepositories:\n  - repository-only-status\n---\n# Tasks\n",
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace(
+      "space: sample",
+      "space: repository-only-status",
+    ),
     "utf8",
   );
 
@@ -2926,11 +3041,11 @@ test("status reports unresolved targets for a Change also projected by a healthy
   await initWorkspace(root);
   const changeId = "2026-08-08-mixed-repository-targets";
   await writeChange(root, "sample-web", changeId, "in_progress");
-  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
-  const tasks = await readFile(tasksPath, "utf8");
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
+  const changeSource = await readFile(changeFilePath, "utf8");
   await writeFile(
-    tasksPath,
-    tasks.replace("  - sample-web\n", "  - sample-web\n  - retired-repository\n"),
+    changeFilePath,
+    changeSource.replace("  - sample-web\n", "  - sample-web\n  - retired-repository\n"),
     "utf8",
   );
 
@@ -3101,13 +3216,7 @@ test("status retains a planning-only Change without repository targets", async (
   config.ideas.sample.repositories = [];
   await writeWorkspaceConfig(root, config);
   const changeId = "2026-07-14-planning-only";
-  const changePath = join(root, ".sdd", "changes", changeId);
-  await mkdir(changePath, { recursive: true });
-  await writeFile(
-    join(changePath, "tasks.md"),
-    `---\nstatus: proposed\nspace: sample\nrepositories: []\n---\n# Tasks: Planning Only\n`,
-    "utf8",
-  );
+  await createChange(root, "sample", "planning-only", { date: "2026-07-14" });
 
   const result = await getStatus(root);
   assert.equal(result.spaces[0].activeChangeCount, 1);
@@ -3122,13 +3231,7 @@ test("CLI status lists an active planning-only Change in human output", async (t
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   const changeId = "2026-07-15-cli-planning-only";
-  const changePath = join(root, ".sdd", "changes", changeId);
-  await mkdir(changePath, { recursive: true });
-  await writeFile(
-    join(changePath, "tasks.md"),
-    `---\nstatus: proposed\nspace: sample\nrepositories: []\n---\n# Tasks: Planning Only\n`,
-    "utf8",
-  );
+  await createChange(root, "sample", "cli-planning-only", { date: "2026-07-15" });
 
   const { stdout } = await execFileAsync(process.execPath, [
     join(PACKAGE_ROOT, "bin", "sdd.js"),
@@ -3926,25 +4029,102 @@ test("Change lifecycle commands do not consume the managed-install mutation lock
 
 test("change close preserves restrictive directory modes through publication and cleanup", async (t) => {
   const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
   const changeId = "2026-07-14-close-directory-modes";
-  await writeChange(root, "sample-web", changeId, "in_review");
   const activePath = getActiveChangePath(changeId, root);
+  const closedPath = getClosedChangePath(changeId, root);
+  t.after(async () => {
+    for (const path of [activePath, closedPath, join(activePath, "evidence"), join(closedPath, "evidence")]) {
+      await chmod(path, 0o755).catch(() => {});
+    }
+    await rm(root, { recursive: true, force: true });
+  });
+  await initWorkspace(root);
+  await writeChange(root, "sample-web", changeId, "in_review");
   const nestedPath = join(activePath, "evidence");
+  const evidencePath = join(nestedPath, "review.txt");
   await mkdir(nestedPath);
-  await writeFile(join(nestedPath, "review.txt"), "reviewed\n", "utf8");
+  await writeFile(evidencePath, "reviewed\n", "utf8");
+  await chmod(evidencePath, 0o444);
   await chmod(nestedPath, 0o555);
   await chmod(activePath, 0o555);
 
   await closeChange(root, "sample", changeId);
 
-  const closedPath = getClosedChangePath(changeId, root);
+  const closedEvidencePath = join(closedPath, "evidence", "review.txt");
   assert.equal((await lstat(closedPath)).mode & 0o777, 0o555);
   assert.equal((await lstat(join(closedPath, "evidence"))).mode & 0o777, 0o555);
-  assert.equal(await readFile(join(closedPath, "evidence", "review.txt"), "utf8"), "reviewed\n");
+  assert.equal((await lstat(closedEvidencePath)).mode & 0o777, 0o444);
+  assert.equal(await readFile(closedEvidencePath, "utf8"), "reviewed\n");
   assert.equal(await pathExists(activePath), false);
   assert.deepEqual(await readdir(getChangesRoot(root)), ["closed"]);
+});
+
+test("change close never chmods a source symlink replacement", async (t) => {
+  const root = await createMappedWorkspace();
+  const external = await createWorkspace("sdd-close-external-source-");
+  const changeId = "2026-08-28-close-source-replacement";
+  const activePath = getActiveChangePath(changeId, root);
+  const displacedPath = `${activePath}.displaced`;
+  t.after(async () => {
+    for (const path of [activePath, displacedPath, external]) {
+      await chmod(path, 0o755).catch(() => {});
+    }
+    await rm(root, { recursive: true, force: true });
+    await rm(external, { recursive: true, force: true });
+  });
+  await initWorkspace(root);
+  await writeChange(root, "sample-web", changeId, "in_review");
+  await chmod(activePath, 0o555);
+  await chmod(external, 0o555);
+
+  await assert.rejects(
+    () => closeChange(root, "sample", changeId, {
+      afterDirectoryOpen: async () => {
+        await chmod(activePath, 0o755);
+        await rename(activePath, displacedPath);
+        await symlink(external, activePath, "dir");
+      },
+    }),
+    (error) => error instanceof SddError
+      && ["CONCURRENT_CHANGE", "UNSAFE_ARTIFACT_PATH"].includes(error.code),
+  );
+
+  assert.equal((await lstat(external)).mode & 0o777, 0o555);
+  assert.equal(await pathExists(displacedPath), true);
+});
+
+test("change close restores the moved inode without chmodding a destination replacement", async (t) => {
+  const root = await createMappedWorkspace();
+  const external = await createWorkspace("sdd-close-external-destination-");
+  const changeId = "2026-08-28-close-destination-replacement";
+  const activePath = getActiveChangePath(changeId, root);
+  const closedPath = getClosedChangePath(changeId, root);
+  const displacedPath = `${closedPath}.displaced`;
+  t.after(async () => {
+    for (const path of [activePath, closedPath, displacedPath, external]) {
+      await chmod(path, 0o755).catch(() => {});
+    }
+    await rm(root, { recursive: true, force: true });
+    await rm(external, { recursive: true, force: true });
+  });
+  await initWorkspace(root);
+  await writeChange(root, "sample-web", changeId, "in_review");
+  await chmod(activePath, 0o555);
+  await chmod(external, 0o555);
+
+  await assert.rejects(
+    () => closeChange(root, "sample", changeId, {
+      afterMove: async () => {
+        await rename(closedPath, displacedPath);
+        await symlink(external, closedPath, "dir");
+      },
+    }),
+    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
+  );
+
+  assert.equal((await lstat(external)).mode & 0o777, 0o555);
+  assert.equal((await lstat(displacedPath)).mode & 0o777, 0o555);
+  assert.equal(await readFile(join(displacedPath, "change.md"), "utf8").then((source) => source.includes("status: in_review")), true);
 });
 
 test("change close dry-run validates without moving the Change", async (t) => {
@@ -4269,6 +4449,8 @@ test("validate accepts a canonical active Change", async (t) => {
   await initWorkspace(root);
   const changeId = "2026-07-14-canonical-change";
   await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
+  await writeCanonicalEpic(root, "sample-web");
+  await declareFixtureEpic(root, changeId);
 
   const result = await validateArtifacts(root, {
     spaceId: "sample",
@@ -4298,6 +4480,8 @@ test("explicit Change validation resolves only repositories declared by its cent
 
   const changeId = "2026-08-09-authoritative-change-scope";
   await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
+  await writeCanonicalEpic(root, "sample-web");
+  await declareFixtureEpic(root, changeId);
 
   const { stdout } = await execFileAsync(process.execPath, [
     join(PACKAGE_ROOT, "bin", "sdd.js"),
@@ -4409,14 +4593,13 @@ test("validate scopes equal repository IDs by owning Space", async (t) => {
   const otherChangeId = "2026-08-08-other-app";
   await writeCanonicalChange(root, "app", sampleChangeId, "in_progress");
   await writeCanonicalChange(root, "app", otherChangeId, "in_progress");
-  const otherTasksPath = join(root, ".sdd", "changes", otherChangeId, "tasks.md");
-  await writeFile(
-    otherTasksPath,
-    (await readFile(otherTasksPath, "utf8")).replace("space: sample", "space: other"),
-    "utf8",
-  );
   const sampleChangeFilePath = join(root, ".sdd", "changes", sampleChangeId, "change.md");
   const otherChangeFilePath = join(root, ".sdd", "changes", otherChangeId, "change.md");
+  await writeFile(
+    otherChangeFilePath,
+    (await readFile(otherChangeFilePath, "utf8")).replace("space: sample", "space: other"),
+    "utf8",
+  );
   await writeFile(
     sampleChangeFilePath,
     `${await readFile(sampleChangeFilePath, "utf8")}\n## Epic Actions\n\n### New Epic Directories\n\n- Create \`docs/epics/sample-e001-projected/epic.md\`.\n`,
@@ -4442,8 +4625,8 @@ test("validate scopes equal repository IDs by owning Space", async (t) => {
       })),
     [{
       spaceId: "sample",
-      repository: "code/sample-web",
-      path: "code/sample-web/docs/epics/sample-e001-projected/epic.md",
+      repository: undefined,
+      path: "docs/epics/sample-e001-projected/epic.md",
     }],
   );
   assert.deepEqual(
@@ -4456,8 +4639,8 @@ test("validate scopes equal repository IDs by owning Space", async (t) => {
       })),
     [{
       spaceId: "other",
-      repository: "code/other-web",
-      path: "code/other-web/docs/epics/other-e001-projected/epic.md",
+      repository: undefined,
+      path: "docs/epics/other-e001-projected/epic.md",
     }],
   );
 });
@@ -4740,53 +4923,10 @@ test("validate accepts the documented lightweight interactive Change shape", asy
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   const changeId = "2026-07-14-interactive-shape";
+  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
+  await writeCanonicalEpic(root, "sample-web");
+  await declareFixtureEpic(root, changeId);
   const changePath = join(root, ".sdd", "changes", changeId);
-  await mkdir(changePath, { recursive: true });
-  await writeFile(
-    join(changePath, "change.md"),
-    [
-      "---",
-      "status: in_progress",
-      "space: sample",
-      "repositories:",
-      "  - sample-web",
-      "---",
-      "# Change: Interactive Shape",
-      "## Why",
-      "## Desired Outcome",
-      "## Scope",
-      "## Success Signals",
-      "## Interactive Scope Boundary",
-      "## Epic / Story Impact",
-      "## Release Communication Impact",
-      "## Current Context",
-      "## Behavioral Changes",
-      "## Technical Decision Handoffs",
-      "## Selected Approach",
-      "## Alternatives Considered",
-      "## Implementation Constraints",
-      "## Verification Strategy",
-      "## Risks / Trade-Offs",
-      "## Open Questions",
-    ].join("\n"),
-    "utf8",
-  );
-  await writeFile(
-    join(changePath, "tasks.md"),
-    [
-      "# Tasks: Interactive Shape",
-      "## Resume Here",
-      "## Interactive Log",
-      "## Checklist",
-      "## Implementation Ledger",
-      "## Verification Ledger",
-      "## Manual UI Confirmation",
-      "## Artifact Updates",
-      "## Open Questions",
-      "## Closeout",
-    ].join("\n"),
-    "utf8",
-  );
 
   const result = await validateArtifacts(root, {
     spaceId: "sample",
@@ -4796,6 +4936,8 @@ test("validate accepts the documented lightweight interactive Change shape", asy
 
   assert.equal(result.valid, true);
   assert.deepEqual(result.findings, []);
+  assert.equal(await pathExists(join(changePath, "slice-reviews")), false);
+  assert.equal(await pathExists(join(changePath, "slice-closures")), false);
 });
 
 test("validate warns instead of failing on historical closed-Change section drift", async (t) => {
@@ -4838,7 +4980,7 @@ test("validate reports malformed Change directory IDs", async (t) => {
   assert.ok(result.findings.some((finding) => finding.code === "INVALID_CHANGE_ID"));
 });
 
-test("validate discovers a private planned Change", async (t) => {
+test("validate discovers a current proposed Change without legacy artifacts", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
@@ -4853,8 +4995,11 @@ test("validate discovers a private planned Change", async (t) => {
   });
 
   assert.equal(result.summary.changes, 1);
-  assert.ok(result.findings.some((finding) => finding.code === "UNRESOLVED_TEMPLATE_PLACEHOLDER"));
-  assert.ok(!result.findings.some((finding) => finding.code === "ARTIFACT_NOT_FOUND"));
+  assert.equal(result.valid, true);
+  assert.ok(!result.findings.some((finding) =>
+    finding.code === "ARTIFACT_NOT_FOUND"
+      || finding.code === "UNSUPPORTED_CHANGE_SCHEMA"
+      || finding.code === "LEGACY_V2_ARTIFACT"));
 });
 
 test("validate reports an active and closed Change collision", async (t) => {
@@ -4893,10 +5038,10 @@ test("Space-scoped validation reports global Change collisions across metadata S
   const changeId = "2026-08-07-cross-space-location-collision";
   await writeCanonicalChange(root, "sample-web", changeId, "in_review");
   await writeCanonicalChange(root, "other-web", changeId, "in_review", { closed: true });
-  const closedTasksPath = join(root, ".sdd", "changes", "closed", changeId, "tasks.md");
+  const closedChangeFilePath = join(root, ".sdd", "changes", "closed", changeId, "change.md");
   await writeFile(
-    closedTasksPath,
-    (await readFile(closedTasksPath, "utf8")).replace("space: sample", "space: other"),
+    closedChangeFilePath,
+    (await readFile(closedChangeFilePath, "utf8")).replace("space: sample", "space: other"),
     "utf8",
   );
 
@@ -6440,6 +6585,8 @@ test("validate accepts every active central Change status", async (t) => {
   await initWorkspace(root);
   const changeId = "2026-07-14-active-statuses";
   await writeCanonicalChange(root, "sample-web", changeId, "proposed");
+  await writeCanonicalEpic(root, "sample-web");
+  await declareFixtureEpic(root, changeId);
   const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
 
   for (const status of ["proposed", "planned", "in_progress", "in_review"]) {
@@ -6482,6 +6629,8 @@ test("CLI exposes scoped validation with JSON output", async (t) => {
   await initWorkspace(root);
   const changeId = "2026-07-14-cli-validation";
   await writeCanonicalChange(root, "sample-web", changeId, "in_review");
+  await writeCanonicalEpic(root, "sample-web");
+  await declareFixtureEpic(root, changeId);
 
   const { stdout } = await execFileAsync(process.execPath, [
     join(PACKAGE_ROOT, "bin", "sdd.js"),
@@ -6509,6 +6658,7 @@ test("CLI validation returns exit code one with structured findings", async (t) 
   await initWorkspace(root);
   const changeId = "2026-07-14-invalid-cli-validation";
   await writeChange(root, "sample-web", changeId, "in_review");
+  await rm(join(root, ".sdd", "changes", changeId, "tasks.md"));
 
   await assert.rejects(
     () => execFileAsync(process.execPath, [
@@ -6685,7 +6835,7 @@ test("CLI update keeps a positional target across explicit, environment, target,
     );
   }
 
-  assert.equal(cwdResult.workspaceRoot, cwdWorkspace);
+  assert.equal(cwdResult.workspaceRoot, await realpath(cwdWorkspace));
   assert.equal(environmentResult.workspaceRoot, environmentWorkspace);
   assert.equal(targetResult.workspaceRoot, targetWorkspace);
   assert.equal(explicitResult.workspaceRoot, targetWorkspace);
@@ -6780,7 +6930,7 @@ test("CLI configure scans the discovered workspace from a nested default cwd", a
   ], { cwd: nestedCwd });
   const result = JSON.parse(stdout);
 
-  assert.equal(result.workspaceRoot, workspaceRoot);
+  assert.equal(result.workspaceRoot, await realpath(workspaceRoot));
   assert.equal(result.planningRoot, "spaces/ideas");
   assert.deepEqual(result.repositoryRoots, { code: "spaces/code" });
 });
@@ -6810,6 +6960,8 @@ test("explicit workspace routes repository-only CLI operations without borrowing
   authorityConfig.repositories.roots.standalone = repositoryRoot;
   await writeWorkspaceConfig(workspaceRoot, authorityConfig);
   await writeCanonicalChange(workspaceRoot, repositoryId, changeId, "in_review");
+  await writeCanonicalEpicAt(repositoryRoot);
+  await declareFixtureEpic(workspaceRoot, changeId);
   const changeFilePath = join(workspaceRoot, ".sdd", "changes", changeId, "change.md");
   await writeFile(
     changeFilePath,
@@ -6894,15 +7046,15 @@ test("explicit workspace routes repository-only CLI operations without borrowing
     "--dry-run",
   );
 
-  assert.equal(targetlessMappedStatus.mode, "space");
-  assert.equal(targetlessMappedStatus.spaceId, repositoryId);
+  assert.equal(targetlessMappedStatus.mode, "summary");
+  assert.equal(targetlessMappedStatus.workspaceRoot, workspaceRoot);
   assert.equal(targetlessUnrelatedStatus.mode, "summary");
   assert.equal(targetlessUnrelatedStatus.workspaceRoot, workspaceRoot);
   assert.equal(status.spaceId, repositoryId);
   assert.deepEqual(validation.scope.repositories, [repositoryRoot]);
   assert.equal(epic.repository.resolvedPath, repositoryRoot);
   assert.equal(stableIdCreate.repositories[0].id, repositoryId);
-  assert.equal(inferredCreate.repositories[0].id, repositoryId);
+  assert.deepEqual(inferredCreate.repositories, []);
   assert.equal(transitioned.repositories[0].id, repositoryId);
   assert.equal(closed.repositories[0].id, repositoryId);
 });
@@ -6950,6 +7102,8 @@ test("environment authority routes targetless and configured CLI operations with
   const changeId = "2026-08-09-environment-authority";
   await initWorkspace(workspaceRoot);
   await writeCanonicalChange(workspaceRoot, "sample-web", changeId, "in_review");
+  await writeCanonicalEpic(workspaceRoot, "sample-web");
+  await declareFixtureEpic(workspaceRoot, changeId);
   t.after(() => rm(workspaceRoot, { recursive: true, force: true }));
   t.after(() => rm(outside, { recursive: true, force: true }));
   const env = {
@@ -7039,7 +7193,7 @@ test("environment authority routes targetless and configured CLI operations with
   );
 });
 
-test("workspace-root inventory retains repository-only Change history without inventing a locator", async (t) => {
+test("workspace-root inventory retains repository-only Change history without a mapped locator", async (t) => {
   const root = await createWorkspace("sdd-repository-only-central-inventory-");
   const workspaceRoot = join(root, "workspace");
   const repositoryRoot = join(root, "external-repository");
@@ -7049,6 +7203,9 @@ test("workspace-root inventory retains repository-only Change history without in
   await initWorkspace(workspaceRoot);
   await mkdir(repositoryRoot, { recursive: true });
   await writeRepositoryConfig(repositoryRoot, createRepositoryConfig(repositoryId));
+  const configured = await readWorkspaceConfig(workspaceRoot);
+  configured.repositories.roots.external = repositoryRoot;
+  await writeWorkspaceConfig(workspaceRoot, configured);
   t.after(() => rm(root, { recursive: true, force: true }));
 
   const runJson = async (cwd, ...args) => {
@@ -7061,6 +7218,16 @@ test("workspace-root inventory retains repository-only Change history without in
     ], { cwd });
     return JSON.parse(stdout);
   };
+  const runJsonAllowingFindings = async (cwd, ...args) => {
+    try {
+      return await runJson(cwd, ...args);
+    } catch (error) {
+      if (error.code === 1 && typeof error.stdout === "string") {
+        return JSON.parse(error.stdout);
+      }
+      throw error;
+    }
+  };
 
   const created = await runJson(
     repositoryRoot,
@@ -7068,6 +7235,8 @@ test("workspace-root inventory retains repository-only Change history without in
     "create",
     repositoryId,
     "central-inventory",
+    "--repo",
+    repositoryId,
     "--date",
     "2026-08-09",
   );
@@ -7077,8 +7246,9 @@ test("workspace-root inventory retains repository-only Change history without in
     Object.hasOwn((await readWorkspaceConfig(workspaceRoot)).ideas, repositoryId),
     false,
   );
-
   await writeCanonicalChange(workspaceRoot, repositoryId, changeId, "in_review");
+  await writeCanonicalEpicAt(repositoryRoot);
+  await declareFixtureEpic(workspaceRoot, changeId);
   const changeFilePath = join(workspaceRoot, ".sdd", "changes", changeId, "change.md");
   await writeFile(
     changeFilePath,
@@ -7115,11 +7285,10 @@ test("workspace-root inventory retains repository-only Change history without in
     activeSpace.activeChanges.map((change) => change.changeId),
     [changeId],
   );
-  assert.equal(JSON.stringify(activeSpace).includes(repositoryRoot), false);
 
   const activeDetail = await runJson(workspaceRoot, "status", repositoryId);
   assert.equal(activeDetail.change.changeId, changeId);
-  assert.deepEqual(activeDetail.change.unresolvedRepositoryIds, [repositoryId]);
+  assert.deepEqual(activeDetail.change.unresolvedRepositoryIds, []);
 
   const diagnosis = await runJson(workspaceRoot, "doctor");
   assert.equal(diagnosis.healthy, true);
@@ -7132,38 +7301,21 @@ test("workspace-root inventory retains repository-only Change history without in
       .map((finding) => ({ level: finding.level, spaceId: finding.spaceId })),
     [{ level: "warning", spaceId: repositoryId }],
   );
-  assert.match(
-    diagnosis.findings.find((finding) =>
-      finding.code === "REPOSITORY_LOCATOR_UNAVAILABLE").message,
-    /Run repository-scoped commands from that checkout with --workspace/,
-  );
-  assert.equal(JSON.stringify(diagnosis).includes(repositoryRoot), false);
 
-  const validation = await runJson(
+  const validation = await runJsonAllowingFindings(
     workspaceRoot,
     "validate",
     "--change",
     changeId,
   );
-  assert.equal(validation.valid, true);
+  assert.equal(validation.valid, false);
   assert.equal(validation.summary.changes, 1);
   assert.equal(validation.summary.repositories, 0);
   assert.deepEqual(validation.scope.repositories, []);
   assert.deepEqual(
-    validation.findings.map((finding) => ({
-      level: finding.level,
-      code: finding.code,
-      spaceId: finding.spaceId,
-      repositoryId: finding.repositoryId,
-    })),
-    [{
-      level: "warning",
-      code: "REPOSITORY_LOCATOR_UNAVAILABLE",
-      spaceId: repositoryId,
-      repositoryId,
-    }],
+    validation.findings.map((finding) => finding.code).sort(),
+    ["AFFECTED_EPIC_NOT_FOUND", "REPOSITORY_LOCATOR_UNAVAILABLE"],
   );
-  assert.equal(JSON.stringify(validation).includes(repositoryRoot), false);
 
   const selectedValidation = await runJson(
     workspaceRoot,
@@ -7175,7 +7327,7 @@ test("workspace-root inventory retains repository-only Change history without in
     repositoryId,
   );
   assert.equal(selectedValidation.valid, true);
-  assert.deepEqual(selectedValidation.scope.repositories, []);
+  assert.deepEqual(selectedValidation.scope.repositories, [repositoryRoot]);
 
   const closed = await runJson(
     repositoryRoot,
@@ -7205,17 +7357,17 @@ test("workspace-root inventory retains repository-only Change history without in
     }],
   );
 
-  const closedValidation = await runJson(
+  const closedValidation = await runJsonAllowingFindings(
     workspaceRoot,
     "validate",
     "--change",
     changeId,
   );
-  assert.equal(closedValidation.valid, true);
+  assert.equal(closedValidation.valid, false);
   assert.equal(closedValidation.summary.changes, 1);
   assert.deepEqual(
-    closedValidation.findings.map((finding) => finding.code),
-    ["REPOSITORY_LOCATOR_UNAVAILABLE"],
+    closedValidation.findings.map((finding) => finding.code).sort(),
+    ["AFFECTED_EPIC_NOT_FOUND", "REPOSITORY_LOCATOR_UNAVAILABLE"],
   );
   assert.equal(
     Object.hasOwn((await readWorkspaceConfig(workspaceRoot)).ideas, repositoryId),
@@ -7237,13 +7389,13 @@ test("central inventory does not broaden repository-only Space synthesis", async
     t.after(() => rm(root, { recursive: true, force: true }));
     await initWorkspace(root);
     await writeCanonicalChange(root, "sample-web", changeId, "in_review");
-    const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
+    const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
     const repositories = scenario.repositoryIds.length === 0
       ? "repositories: []"
       : ["repositories:", ...scenario.repositoryIds.map((id) => `  - ${id}`)].join("\n");
     await writeFile(
-      tasksPath,
-      (await readFile(tasksPath, "utf8")).replace(
+      changeFilePath,
+      (await readFile(changeFilePath, "utf8")).replace(
         "space: sample\nrepositories:\n  - sample-web",
         `space: ${spaceId}\n${repositories}`,
       ),

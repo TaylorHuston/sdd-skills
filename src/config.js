@@ -721,7 +721,7 @@ export function validateConfig(config) {
     }
     return true;
   };
-
+  const validRepositoryRoots = new Set();
 
   if (!config || typeof config !== "object" || Array.isArray(config)) {
     return [{ level: "error", message: "Configuration must be a YAML mapping." }];
@@ -754,7 +754,9 @@ export function validateConfig(config) {
       if (!rootId || containsNullByte(rootId)) {
         error("repositories.roots keys must be non-empty and must not contain NUL bytes.");
       }
-      validatePath(`repositories.roots.${rootId}`, path);
+      if (validatePath(`repositories.roots.${rootId}`, path)) {
+        validRepositoryRoots.add(rootId);
+      }
     }
   }
   if (
@@ -836,7 +838,7 @@ export function validateConfig(config) {
           || containsNullByte(repository.root)
           || (
             repository.root !== undefined
-            && typeof config.repositories?.roots?.[repository.root] !== "string"
+            && !validRepositoryRoots.has(repository.root)
           )
         ) continue;
         const resolvedRepository =

@@ -1,4 +1,5 @@
-import { mkdir, rename } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
+import { lstat, mkdir, open, rename } from "node:fs/promises";
 
 import { assertValidChangeId } from "../change-id.js";
 import {
@@ -18,7 +19,7 @@ import {
 import { CHANGE_SCHEMA_V2, parseChangeMetadata } from "../change-status.js";
 import { assertValidConfig, resolveWorkspaceStatus } from "../config.js";
 import { SddError } from "../errors.js";
-import { isDirectory } from "../fs.js";
+import { isDirectory, isPathInside, resolvePhysicalPath } from "../fs.js";
 import {
   assertOperationConfigurationCurrent,
   resolveOperationConfiguration,
@@ -32,6 +33,8 @@ export async function closeChange(
     dryRun = false,
     beforeCommit = null,
     beforeMove = null,
+    afterDirectoryOpen = null,
+    afterMove = null,
     workspaceRoot: requestedWorkspaceRoot = null,
   } = {},
 ) {
@@ -151,16 +154,101 @@ export async function closeChange(
     });
     await assertCloseCurrent();
 
+    const physicalWorkspaceRoot = await resolvePhysicalPath(workspaceRoot);
+    const physicalSourcePath = await resolvePhysicalPath(sourceAbsolutePath);
+    if (!isPathInside(physicalWorkspaceRoot, physicalSourcePath)) {
+      throw new SddError(`Active Change resolves outside its workspace owner: ${sourcePath}`, {
+        code: "UNSAFE_ARTIFACT_PATH",
+      });
+    }
+
+    let sourceHandle;
+    let sourceMode;
+    let needsOwnerWrite = false;
     try {
-      await rename(sourceAbsolutePath, destinationAbsolutePath);
-    } catch (error) {
-      if (["EEXIST", "ENOTEMPTY", "ENOENT", "ENOTDIR"].includes(error?.code)) {
-        throw new SddError(`Change moved or closed concurrently: ${destinationPath}`, {
+      sourceHandle = await open(
+        physicalSourcePath,
+        fsConstants.O_RDONLY
+          | (fsConstants.O_DIRECTORY ?? 0)
+          | (fsConstants.O_NOFOLLOW ?? 0),
+      );
+      const opened = await sourceHandle.stat({ bigint: true });
+      if (!opened.isDirectory()) {
+        throw new SddError(`Active Change is not a directory: ${sourcePath}`, {
           code: "CONCURRENT_CHANGE",
-          details: [error.message],
         });
       }
-      throw error;
+      await afterDirectoryOpen?.({
+        sourcePath: sourceAbsolutePath,
+        destinationPath: destinationAbsolutePath,
+      });
+      await assertCloseCurrent();
+      const current = await lstat(sourceAbsolutePath, { bigint: true });
+      if (
+        current.isSymbolicLink()
+        || !current.isDirectory()
+        || current.dev !== opened.dev
+        || current.ino !== opened.ino
+      ) {
+        throw new SddError(`Active Change changed before close: ${sourcePath}`, {
+          code: "CONCURRENT_CHANGE",
+        });
+      }
+      sourceMode = Number(opened.mode & 0o7777n);
+      needsOwnerWrite = (sourceMode & 0o200) === 0;
+      if (needsOwnerWrite) {
+        await sourceHandle.chmod(sourceMode | 0o200);
+      }
+
+      try {
+        await rename(sourceAbsolutePath, destinationAbsolutePath);
+      } catch (error) {
+        if (needsOwnerWrite) {
+          try {
+            await sourceHandle.chmod(sourceMode);
+          } catch (restoreError) {
+            throw new SddError(`Change close failed and the source directory mode could not be restored: ${sourcePath}`, {
+              code: "MUTATION_RECOVERY_FAILED",
+              details: [error.message, restoreError.message, `Restore mode ${sourceMode.toString(8)} before retrying.`],
+            });
+          }
+        }
+        if (["EEXIST", "ENOTEMPTY", "ENOENT", "ENOTDIR"].includes(error?.code)) {
+          throw new SddError(`Change moved or closed concurrently: ${destinationPath}`, {
+            code: "CONCURRENT_CHANGE",
+            details: [error.message],
+          });
+        }
+        throw error;
+      }
+
+      await afterMove?.({
+        sourcePath: sourceAbsolutePath,
+        destinationPath: destinationAbsolutePath,
+      });
+      if (needsOwnerWrite) {
+        try {
+          await sourceHandle.chmod(sourceMode);
+        } catch (error) {
+          throw new SddError(`Change closed but its directory mode could not be restored: ${destinationPath}`, {
+            code: "MUTATION_RECOVERY_FAILED",
+            details: [error.message, `Restore mode ${sourceMode.toString(8)} before continuing.`],
+          });
+        }
+      }
+      const published = await lstat(destinationAbsolutePath, { bigint: true });
+      if (
+        published.isSymbolicLink()
+        || !published.isDirectory()
+        || published.dev !== opened.dev
+        || published.ino !== opened.ino
+      ) {
+        throw new SddError(`Closed Change changed after the move: ${destinationPath}`, {
+          code: "CONCURRENT_CHANGE",
+        });
+      }
+    } finally {
+      await sourceHandle?.close().catch(() => {});
     }
   }
 
