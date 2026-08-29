@@ -153,6 +153,31 @@ test("supporting workflows preserve central ownership and independent capability
   assert.doesNotMatch(release, /update the one central `tasks\.md` with repository-keyed release, PR, merge, acceptance/);
 });
 
+test("active release and guide acceptance truth match current v2", async () => {
+  const [changelog, guideVerification, epic] = await Promise.all([
+    source("CHANGELOG.md"),
+    source("docs", "verification", "s3-risk-triggered-guide.md"),
+    source("docs", "epics", "sdd-e001-reliable-cli-operations", "epic.md"),
+  ]);
+  const unreleased = changelog.slice(
+    changelog.indexOf("## [Unreleased]"),
+    changelog.indexOf("## [0.12.0]"),
+  );
+
+  assert.match(unreleased, /central `review\.md` owns exact candidates, five universal gates/);
+  assert.match(unreleased, /receipt-based records are unsupported pre-1\.0 history/);
+  assert.match(unreleased, /Removed generated Implementation and Gate ledgers/);
+  assert.doesNotMatch(
+    unreleased,
+    /sdd-slice-review-v1|sdd-slice-closure-v2|slice-reviews\/|slice-closures\/|Closure receipt: required|remain compatible|minimal v2 receipt|Commit column to the Implementation Ledger/,
+  );
+  assert.match(guideVerification, /Technical result: pass\./);
+  assert.match(guideVerification, /Manual product acceptance: user confirmed 2026-08-18\./);
+  assert.match(epic, /owner product acceptance was separately confirmed on 2026-08-18/);
+  assert.match(epic, /Owner manual confirmation of the current guide was `user confirmed` on 2026-08-18/);
+  assert.doesNotMatch(epic, /Owner manual confirmation of the current guide remains `pending user`/);
+});
+
 test("public doctrine describes one supported current workflow", async () => {
   const [readme, doctrine, templatesReadme, design, historicalGuideEvidence] = await Promise.all([
     source("README.md"),

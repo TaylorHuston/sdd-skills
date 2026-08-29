@@ -3,7 +3,7 @@ schema: sdd-epic-v2
 id: SDD-E001
 status: active
 created: 2026-07-20
-modified: 2026-08-28
+modified: 2026-08-29
 last_verified: 2026-08-28
 stories:
   - S1
@@ -64,7 +64,7 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
 | S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-23 | Reports are versioned; PR/release paths are classified and rechecked; Git baselines are immutable and bounded. |
 | S6 | implemented | verified | Carry one progressive central Change through focused planning, risk-triggered Review, conditional Epic reconciliation, and a content-identical local outcome commit. | 2026-08-28 | The one supported current workflow is v2; current fixtures, unsupported-history rejection, and the repository-required package gate now pass without an aggregate gap. |
-| S7 | implemented | verified | Explain the portable method and package through accessible responsive documentation. | 2026-08-18 | Current guide and durable desktop/mobile evidence explain and prove the v2 workflow; owner product acceptance remains separately pending. |
+| S7 | implemented | verified | Explain the portable method and package through accessible responsive documentation. | 2026-08-18 | Current guide and durable desktop/mobile evidence explain and prove the v2 workflow; owner product acceptance was separately confirmed on 2026-08-18. |
 
 ## Stories
 
@@ -1006,6 +1006,7 @@ The CLI SHALL create new work with explicit `schema: sdd-change-v2`, SHALL use t
 | S6/R11-S4 | `skills/sdd-apply/SKILL.md#Commit And Record` | primary | Selectively seals the reviewed tree in one local commit and records it centrally. |
 | S6/R11-S4 | `src/commands/validate.js#validateV2ReviewRepositoryState` | support | Enforces reachable single-parent commit and reviewed/final tree equality. |
 | S6/R11-S5, S6/R14-S2 | `src/commands/validate.js#validateChange` | primary | Reports schema-less Changes as unsupported and never selects their task/Review/receipt contract. |
+| S6/R11-S3, S6/R11-S5, S6/R14-S2 | `CHANGELOG.md#Unreleased` | support | Communicates one central v2 Review authority and unsupported receipt-era history without claiming publication or compatibility. |
 | S6/R12 | `skills/sdd-explore/SKILL.md#Choose The Record Destination` | primary | Places durable exploration by authority and ownership. |
 | S6/R12-S2 | `skills/sdd-explore/SKILL.md#Route Mature Outcomes` | primary | Routes mature conclusions without duplicating canonical truth. |
 | S6/R13 | `skills/sdd-prd/SKILL.md#SDD Relationship` | primary | Keeps PRDs directional unless explicit authority says otherwise. |
@@ -1033,6 +1034,7 @@ The CLI SHALL create new work with explicit `schema: sdd-change-v2`, SHALL use t
 | S6/R11-S1, S6/R11-S2 | Automated tests `test/workflow-contracts.test.js#Apply delivers one reviewed outcome without legacy closure machinery` and `test/workflow-contracts.test.js#Review uses five universal gates and concrete planned or discovered triggers` | Apply permits one remediation batch and Review blocks unaccepted required gaps while keeping manual acceptance separate. | Passing 2026-08-17 |
 | S6/R11-S3, S6/R11-S4, S6/R14-S1 | Automated tests `test/change-review.test.js#done v2 outcomes require final commit and tree equality`, `test/change-contract.test.js#done v2 outcomes require a reachable content-identical review seal`, and `test/workflow-contracts.test.js#supporting workflows preserve central ownership and independent capability boundaries` | Done outcomes require a committed candidate, reachable single-parent commit, reviewed/final tree equality, and downstream consumers preserve central Review authority. | Passing 2026-08-17 |
 | S6/R11-S5, S6/R14-S2 | Automated test `test/change-contract.test.js#schema-less Changes are unsupported history` | Current validation and lifecycle mutation reject schema-less records without conversion or compatibility parsing. | Passing 2026-08-17 |
+| S6/R11-S3, S6/R11-S5, S6/R14-S2 | Automated test `test/workflow-contracts.test.js#active release and guide acceptance truth match current v2` | Active Unreleased communication names the central v2 Review authority, classifies receipt-era records as unsupported history, and contains no superseded compatibility promise or publication claim. | Passing 2026-08-29 |
 | S6/R12-S1, S6/R12-S2, S6/R13-S1 | Automated test `test/workflow-contracts.test.js#supporting workflows preserve central ownership and independent capability boundaries` | Explore routes durable records by authority and PRDs remain directional rather than delivery gates. | Passing 2026-08-17 |
 | S6/R14-S1 | Automated tests `test/change-contract.test.js#v2 creation and planning use compact current records`, `test/change-tasks-v2.test.js#v2 tasks parse a compact delivery queue without legacy ledgers`, `test/change-review.test.js#v2 review validates one ready exact-candidate outcome without a receipt`, `test/cli.test.js#validate accepts a canonical active Change`, `test/cli.test.js#validate accepts the documented lightweight interactive Change shape`, and `test/package.test.js#package dry run includes the current workflow without legacy closure templates` | Creation, lifecycle, ordinary and interactive fixtures, Review, and package inventory use the compact v2 contract without retired closure artifacts. | Passing 2026-08-28 |
 #### Verification Gaps
@@ -1043,14 +1045,14 @@ The CLI SHALL create new work with explicit `schema: sdd-change-v2`, SHALL use t
 
 - Instruction source is executable package behavior for agent workflows; semantic contract tests should prove complete operative clauses rather than isolated strings.
 - The former aggregate `Change consumers still report a stable missing required file` failure was a deterministic status/inspection regression, not a race; S1 now restores status-aware `tasks.md` checks while preserving concurrent move retries.
-- Owner feedback on 2026-08-17 rejects full slow aggregate suites as a universal per-slice gate; v2 verification selects behavior-derived checks and reserves broad suites for a material breadth, repository-policy, or release trigger. S11 executed the repository-required package gate after current-fixture reconciliation: all 384 tests passed with no skips or cancellations on 2026-08-28.
+- Owner feedback on 2026-08-17 rejects full slow aggregate suites as a universal per-outcome gate; v2 verification selects behavior-derived checks and reserves broad suites for a material breadth, repository-policy, or release trigger. S11 executed the repository-required package gate after current-fixture reconciliation: all 386 tests passed with no failures, skips, cancellations, or todos on 2026-08-28.
 
 ### Story S7: Accessible Public Methodology Reference
 
 Implementation: implemented
 Verification: verified
 Created: 2026-07-23
-Modified: 2026-08-18
+Modified: 2026-08-29
 Last verified: 2026-08-18
 
 As a developer or coding agent, I want one readable public guide to explain the SDD problem, durable behavior model, general workflow, and package implementation, so that I can understand the method and find the correct entry point without reverse-engineering the repository.
@@ -1153,6 +1155,7 @@ The public package documentation SHALL distinguish one progressive workspace-lev
 | S7/R4-S1 | Rendered verification `docs/verification/s3-risk-triggered-guide.md#S3 Risk-Triggered Guide Verification` | Current reduced-motion rendering uses auto scrolling and negligible transition duration while Steel navigation feedback remains functional and readable. | Passing 2026-08-18 |
 | S7/R5-S2 | Automated tests `test/site.test.js#public guide presents Change as coherent outcome planning`, `test/site.test.js#public guide presents Apply as one focused reviewed outcome`, and `test/site.test.js#public guide distinguishes deterministic v2 validation from independent judgment` | Current guide source explains the three artifacts, five gates, concrete triggers, bounded Review, gap and acceptance separation, conditional Epic timing, selective commit, and authority limits without current receipt closure. | Passing 2026-08-18 |
 | S7/R5-S2 | Rendered verification `docs/verification/s3-risk-triggered-guide.md#S3 Risk-Triggered Guide Verification` | The current v2 workflow copy remains readable and contained on desktop and minimum-width mobile renders. | Passing 2026-08-18 |
+| S7/R2-S1, S7/R3-S1, S7/R4-S1, S7/R5-S2 | Owner manual acceptance recorded in the workspace-central Review for `2026-08-17-replace-default-sdd-workflow` and `docs/verification/s3-risk-triggered-guide.md#Status` | The owner separately confirmed the technically passing current guide candidate on 2026-08-18 without replacing rendered, interaction, accessibility, or reduced-motion proof. | User confirmed 2026-08-18 |
 | S7/R2-S1 | Historical rendered verification `docs/verification/s1-progressive-workflow.md#Rendered Guide Evidence` | The 2026-08-16 Steel candidate retained reachable responsive navigation and zero page overflow; this is a visual baseline, not current workflow-copy proof. | Historical passing evidence 2026-08-16; not current-source proof |
 | S7/R3-S1 | Historical rendered verification `docs/verification/s1-progressive-workflow.md#Rendered Guide Evidence` | The 2026-08-16 candidate retained a working skip link, 44px mobile controls, keyboard-reachable code regions, and selectable clipboard fallback. | Historical passing evidence 2026-08-16; not current-source proof |
 | S7/R4-S1 | Historical rendered verification `docs/verification/s1-progressive-workflow.md#Rendered Guide Evidence` | The 2026-08-16 candidate retained Steel colors, zero axe violations, reduced motion, and no page overflow at both primary viewports. | Historical passing evidence 2026-08-16; not current-source proof |
@@ -1164,7 +1167,7 @@ The public package documentation SHALL distinguish one progressive workspace-lev
 #### Story Notes
 
 - README and changelog entries communicate S7; they do not own or prove the public-guide behavior.
-- Owner manual confirmation of the current guide remains `pending user` and is tracked separately from technical verification.
+- Owner manual confirmation of the current guide was `user confirmed` on 2026-08-18 and remains separate from the technically passing rendered, interaction, accessibility, and reduced-motion evidence.
 - Current source-bound rendered evidence is retained under `docs/verification/artifacts/s3/2026-08-18/` and described by `docs/verification/s3-risk-triggered-guide.md`.
 - Historical responsive, accessibility, and Steel-presentation evidence remains under `docs/verification/artifacts/s1/reseal-2026-08-16/`; its workflow copy is superseded.
 

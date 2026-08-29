@@ -4,7 +4,7 @@
 
 - Captured: 2026-08-18.
 - Technical result: pass.
-- Manual product acceptance: pending owner.
+- Manual product acceptance: user confirmed 2026-08-18.
 - Baseline commit: `8c33da8f4f4f173c3dbee240bf8e6fa15b026d05`.
 - Rendered source SHA-256:
   - `site/index.html`: `5cc0ea7fa6da1ebadfe27abc824930d6f14fd8128ac43d73ace3ea4f777921cf`
