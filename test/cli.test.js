@@ -4742,6 +4742,8 @@ test("validate rejects a central Change owned by an unknown Space", async (t) =>
     "utf8",
   );
 
+  const scoped = await validateArtifacts(root, { spaceId: "sample" });
+  assert.deepEqual([scoped.valid, scoped.summary.changes, scoped.findings.some((finding) => finding.spaceId === "deleted-space")], [true, 0, false]);
   const result = await validateArtifacts(root);
   assert.equal(result.valid, false);
   assert.equal(result.summary.changes, 1);

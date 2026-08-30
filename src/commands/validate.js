@@ -138,6 +138,7 @@ const IMPLEMENTATION_KINDS = Object.freeze([
   "support",
 ]);
 const execFile = promisify(execFileCallback);
+const REVIEW_GIT_TIMEOUT_MS = 10_000;
 
 const TEMPLATE_PLACEHOLDERS = Object.freeze([
   "CHANGE TITLE",
@@ -208,12 +209,18 @@ function finding(level, code, path, message, context = {}) {
   return { level, code, path: normalizePath(path), message, ...context };
 }
 
-async function gitOutput(repositoryRoot, args) {
+async function gitOutput(
+  repositoryRoot,
+  args,
+  { command = "git", timeoutMs = REVIEW_GIT_TIMEOUT_MS } = {},
+) {
   try {
-    const result = await execFile("git", args, {
+    const result = await execFile(command, args, {
       cwd: repositoryRoot,
       encoding: "utf8",
       maxBuffer: 16 * 1024 * 1024,
+      timeout: timeoutMs,
+      killSignal: "SIGTERM",
     });
     return { ok: true, stdout: result.stdout.trim(), raw: result.stdout };
   } catch (error) {
@@ -1491,6 +1498,7 @@ async function validateV2ReviewRepositoryState({
   record,
   outcome,
   epicRecords,
+  gitOptions,
 }) {
   const review = record.v2Review?.outcomes.find((entry) => entry.id === outcome.id);
   if (!review || record.v2Review.issues.some((entry) => entry.outcomeId === outcome.id)) return [];
@@ -1534,9 +1542,9 @@ async function validateV2ReviewRepositoryState({
         ));
       }
     } else if (committedCandidate) {
-      const resolved = await gitOutput(repositoryPath, ["rev-parse", "--verify", `${committedCandidate[1]}^{commit}`]);
-      const tree = await gitOutput(repositoryPath, ["rev-parse", "--verify", `${committedCandidate[1]}^{tree}`]);
-      const reachable = await gitOutput(repositoryPath, ["merge-base", "--is-ancestor", committedCandidate[1], "HEAD"]);
+      const resolved = await gitOutput(repositoryPath, ["rev-parse", "--verify", `${committedCandidate[1]}^{commit}`], gitOptions);
+      const tree = await gitOutput(repositoryPath, ["rev-parse", "--verify", `${committedCandidate[1]}^{tree}`], gitOptions);
+      const reachable = await gitOutput(repositoryPath, ["merge-base", "--is-ancestor", committedCandidate[1], "HEAD"], gitOptions);
       if (!resolved.ok || !tree.ok || !reachable.ok || tree.stdout !== review.reviewedTree) {
         findings.push(finding(
           level,
@@ -1549,9 +1557,9 @@ async function validateV2ReviewRepositoryState({
     }
   } else {
     const commit = review.finalCommit;
-    const resolvedCommit = await gitOutput(repositoryPath, ["rev-parse", "--verify", `${commit}^{commit}`]);
-    const tree = await gitOutput(repositoryPath, ["rev-parse", "--verify", `${commit}^{tree}`]);
-    const reachable = await gitOutput(repositoryPath, ["merge-base", "--is-ancestor", commit, "HEAD"]);
+    const resolvedCommit = await gitOutput(repositoryPath, ["rev-parse", "--verify", `${commit}^{commit}`], gitOptions);
+    const tree = await gitOutput(repositoryPath, ["rev-parse", "--verify", `${commit}^{tree}`], gitOptions);
+    const reachable = await gitOutput(repositoryPath, ["merge-base", "--is-ancestor", commit, "HEAD"], gitOptions);
     if (
       !resolvedCommit.ok
       || resolvedCommit.stdout !== commit
@@ -1568,7 +1576,7 @@ async function validateV2ReviewRepositoryState({
         context,
       ));
     }
-    const parents = await gitOutput(repositoryPath, ["rev-list", "--parents", "-n", "1", commit]);
+    const parents = await gitOutput(repositoryPath, ["rev-list", "--parents", "-n", "1", commit], gitOptions);
     const parentParts = parents.stdout.split(/\s+/).filter(Boolean);
     if (!parents.ok || parentParts.length !== 2 || committedCandidate?.[1] !== commit) {
       findings.push(finding(
@@ -1639,6 +1647,7 @@ async function validateRepository(
     epicDirectory,
     changedFrom,
     affectedEpicDirectories: resolvedAffectedEpicDirectories = null,
+    gitOptions,
   } = {},
 ) {
   const findings = [];
@@ -1829,6 +1838,7 @@ async function validateRepository(
         record,
         outcome,
         epicRecords,
+        gitOptions,
       }));
     }
   }
@@ -1915,6 +1925,13 @@ async function validateCentralRecords(
       metadataSpace && !configuredSpace && repositoryOnlyMetadata,
     );
     if (
+      selectedSpaceIds
+      && result.metadata?.space
+      && !selectedSpaceIds.has(result.metadata.space)
+    ) {
+      continue;
+    }
+    if (
       metadataSpace
       && (!configuredSpace || repositoryOnlyContext)
       && !repositoryOnlyMetadata
@@ -1943,13 +1960,6 @@ async function validateCentralRecords(
           repositoryId: result.metadata.space,
         },
       ));
-    }
-    if (
-      selectedSpaceIds
-      && result.metadata?.space
-      && !selectedSpaceIds.has(result.metadata.space)
-    ) {
-      continue;
     }
     findings.push(...result.findings);
     changes.push({
@@ -2122,6 +2132,8 @@ export async function validateArtifacts(
     afterChangeFileRead = null,
     afterClosedChangeInventory = null,
     afterStoredChangesInventory = null,
+    gitCommand = "git",
+    gitTimeoutMs = REVIEW_GIT_TIMEOUT_MS,
   } = {},
 ) {
   const { workspaceRoot, config } = await resolveOperationConfiguration(
@@ -2269,6 +2281,7 @@ export async function validateArtifacts(
       affectedEpicDirectories: changeId
         ? affectedEpics.assignments.get(repositoryProjectionKey(repository)) ?? new Set()
         : null,
+      gitOptions: { command: gitCommand, timeoutMs: gitTimeoutMs },
     });
     findings.push(...result.findings);
     epics += result.epics;

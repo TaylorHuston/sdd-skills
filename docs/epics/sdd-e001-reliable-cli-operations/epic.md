@@ -3,8 +3,8 @@ schema: sdd-epic-v2
 id: SDD-E001
 status: active
 created: 2026-07-20
-modified: 2026-08-29
-last_verified: 2026-08-29
+modified: 2026-08-30
+last_verified: 2026-08-30
 stories:
   - S1
   - S2
@@ -60,8 +60,8 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 |---|---|---|---|---|---|
 | S1 | implemented | verified | Validate navigable behavior and real evidence. | 2026-07-23 | Structure, anchors, evidence, report integrity, metadata, and focused reads fail closed with current proof. |
 | S2 | partial | partial | Mutate only inside physical owner boundaries and preserve concurrent state safely. | 2026-08-29 | Configuration, Epic creation, Change lifecycle, managed workflow, installation evidence, and per-skill synchronization use bounded current-consumer primitives; managed-skill cleanup reports detectable drift and cannot follow a replaced registry ancestor, while the dated accepted local-filesystem gaps remain explicit. |
-| S3 | partial | partial | Route one workspace-unique central Change across portable repository targets. | 2026-08-28 | Current configuration validation rejects malformed path values before resolution; lifecycle commands preserve every tested pre-syscall conflict while exact final path-based races remain dated accepted gaps. |
-| S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
+| S3 | partial | partial | Route one workspace-unique central Change across portable repository targets. | 2026-08-30 | Selected-Space validation isolates ownership diagnostics while current lifecycle commands preserve every tested pre-syscall conflict and the exact final path-based races remain dated accepted gaps. |
+| S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-08-30 | Guidance is affirmative-only; status and Review-seal Git children are bounded. |
 | S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-23 | Reports are versioned; PR/release paths are classified and rechecked; Git baselines are immutable and bounded. |
 | S6 | implemented | verified | Carry one progressive central Change through focused planning, risk-triggered Review, conditional Epic reconciliation, and a content-identical local outcome commit. | 2026-08-29 | The one supported current workflow is v2; Review parsing preserves escaped evidence cells, and `ready` rejects unresolved evidence or findings before candidate closure. |
 | S7 | implemented | verified | Explain the portable method and package through accessible responsive documentation. | 2026-08-18 | Current guide and durable desktop/mobile evidence explain and prove the v2 workflow; owner product acceptance was separately confirmed on 2026-08-18. |
@@ -448,8 +448,8 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 Implementation: partial
 Verification: partial
 Created: 2026-07-20
-Modified: 2026-08-28
-Last verified: 2026-08-28
+Modified: 2026-08-30
+Last verified: 2026-08-30
 
 As a developer, I want one workspace-unique Change record with explicit portable repository targets, so that lifecycle commands cannot invent ownership, split status across copies, or mutate outside the selected workspace.
 
@@ -490,8 +490,8 @@ The CLI SHALL reject unknown configuration keys, duplicate physical repository o
 
 ###### Scenario R2-S4: Stale Change Target
 
-- WHEN a central Change names a repository ID that is absent from or owned by another Space
-- THEN validation rejects that ownership while Space status keeps the Change visible and identifies each unresolved target.
+- WHEN a selected Space owns a stale repository target or another central Change names an unselected unknown Space
+- THEN selected-Space validation reports the selected ownership defect without unrelated record-specific diagnostics, whole-workspace validation still reports the unknown Space, and status keeps selected work visible.
 
 ##### Requirement R3: Workspace-Unique Change Identity And Lifecycle
 
@@ -540,7 +540,7 @@ The CLI SHALL resolve an explicit command workspace first, then `SDD_WORKSPACE_R
 | S3/R3 | `src/change-store.js#listStoredChanges` | support | Enumerates the active and closed workspace inventory without assigning uniqueness-enforcement responsibility to the inventory helper. |
 | S3/R3-S2 | `src/commands/change-transition.js#transitionChange` | primary | Applies a mode-preserving compare-and-set status replacement after final workspace, repository, and file snapshot checks. |
 | S3/R3-S3 | `src/commands/change-close.js#closeChange` | primary | Rechecks current authority and destination absence, then moves one `in_review` central Change into closed history while restoring restrictive directory mode through the verified source handle. |
-| S3/R2-S4, S3/R3-S1 | `src/commands/validate.js#validateCentralChanges` | primary | Rejects missing and cross-Space repository metadata and reports an active/closed ID collision for every central Change. |
+| S3/R2-S4, S3/R3-S1 | `src/commands/validate.js#validateCentralRecords` | primary | Applies selected-Space ownership before record-specific diagnostics, rejects missing or cross-Space selected repository metadata, and retains workspace-wide active/closed identity collisions. |
 | S3/R2-S4 | `src/commands/status.js#buildSpace` | support | Keeps Space-owned Changes visible and reports unresolved target IDs when mappings drift. |
 | S3/R3-S1 | `src/commands/status.js#readCentralChanges` | support | Refuses to project an active/closed duplicate as two independent status records. |
 | S3/R3-S1 | `src/change-status.js#inspectChangeStatuses` | support | Reports active/closed duplicate identity through workspace diagnostics. |
@@ -562,7 +562,7 @@ The CLI SHALL resolve an explicit command workspace first, then `SDD_WORKSPACE_R
 | S3/R3-S2 | Automated tests `test/change-contract.test.js#planning completes the same Change before lifecycle work continues`, `test/cli.test.js#change transition updates an active Change with compare-and-set semantics`, and `test/cli.test.js#change transition preserves an edit made at the final replacement boundary` | One central `change.md` transitions with preserved mode, while stale or injected pre-rename content remains canonical. | Passing 2026-08-21 |
 | S3/R3-S3 | Automated tests `test/change-contract.test.js#planning completes the same Change before lifecycle work continues`, `test/cli.test.js#change close rechecks status at commit time`, `test/cli.test.js#change close preserves a destination that appears before the final move`, `test/cli.test.js#change close preserves restrictive directory modes through publication and cleanup`, `test/cli.test.js#change close never chmods a source symlink replacement`, and `test/cli.test.js#change close restores the moved inode without chmodding a destination replacement` | Close moves a current `in_review` record, preserves reopened active or nonempty closed state observed by the final explicit recheck, restores restrictive mode on the moved inode, and never follows injected source/destination symlink replacements for permission changes. | Passing 2026-08-28 |
 | S3/R3-S1, S3/R3-S2, S3/R3-S3 | Automated test `test/cli.test.js#Change lifecycle commands do not consume the managed-install mutation lock` | Create, transition, and close complete through their narrow boundaries while the separate managed-install lock remains present and unchanged. | Passing 2026-08-21 |
-| S3/R2-S4 | Automated tests `test/cli.test.js#validate rejects absent and cross-Space Change repository IDs deterministically` and `test/cli.test.js#status retains Space-owned Changes whose repository IDs no longer resolve` | Invalid ownership fails validation without hiding the Space-owned work from status. | Passing 2026-08-07 |
+| S3/R2-S4 | Automated tests `test/cli.test.js#validate rejects absent and cross-Space Change repository IDs deterministically`, `test/cli.test.js#validate rejects a central Change owned by an unknown Space`, and `test/cli.test.js#status retains Space-owned Changes whose repository IDs no longer resolve` | Selected ownership defects fail without hiding Space-owned work, unselected unknown-Space records do not contaminate scoped results, and whole-workspace validation still reports them. | Passing 2026-08-30 |
 | S3/R5-S1 | Automated tests `test/workspace-config.test.js#workspace discovery honors explicit, environment, target, and cwd precedence`, `test/workspace-config.test.js#cwd workspace resolves a physically mapped external repository`, and `test/cli.test.js#CLI context keeps cwd as the target when --workspace supplies external ownership` | Discovery selects the deterministic workspace owner while the explicit workspace option remains authority and never replaces the command's cwd target. | Passing 2026-08-07 |
 | S3/R5-S2 | Automated tests `test/workspace-config.test.js#an unmapped external target cannot borrow the cwd workspace` and `test/workspace-config.test.js#workspace discovery never falls back to HOME or SDD_USER_HOME` | Unmapped external targets fail without borrowing cwd or home authority. | Passing 2026-08-07 |
 
@@ -582,8 +582,8 @@ The CLI SHALL resolve an explicit command workspace first, then `SDD_WORKSPACE_R
 Implementation: implemented
 Verification: verified
 Created: 2026-07-20
-Modified: 2026-07-20
-Last verified: 2026-07-20
+Modified: 2026-08-30
+Last verified: 2026-08-30
 
 As a developer, I want diagnostics to finish within a bound and distinguish obsolete instructions from discussion, so that health checks remain actionable.
 
@@ -598,14 +598,14 @@ The CLI SHALL report affirmative obsolete workflow instructions without treating
 - WHEN recognized guidance says not to use an obsolete path/command or discusses it historically
 - THEN doctor does not report that mention as an active instruction.
 
-##### Requirement R2: Bounded Repository Status
+##### Requirement R2: Bounded Repository Git Diagnostics
 
-The CLI SHALL time out a stalled Git status process, return degraded metadata for that repository, and continue reporting other repositories.
+The CLI SHALL time out stalled Git children used by repository status or Review-candidate seal validation and return deterministic degraded metadata or non-passing findings.
 
 ###### Scenario R2-S1: Hung Git Child
 
-- WHEN one repository's Git status exceeds the configured internal bound
-- THEN status completes with a timeout result for that repository.
+- WHEN a repository status or Review-candidate Git child exceeds the configured internal bound
+- THEN the command terminates that child and completes with degraded status metadata or a deterministic non-passing validation finding.
 
 #### Implemented By
 
@@ -614,8 +614,9 @@ The CLI SHALL time out a stalled Git status process, return degraded metadata fo
 | S4/R1 | `src/guidance.js#findObsoleteGuidanceReferences` | primary | Classifies only affirmative obsolete instructions outside ignored prose contexts. |
 | S4/R1 | `src/commands/doctor.js#diagnoseWorkspace` | support | Integrates guidance classification into repository health findings. |
 | S4/R1 | `src/cli.js#HELP` | support | Exposes guidance validation as part of the doctor contract. |
-| S4/R2 | `src/commands/status.js#readGitStatus` | primary | Applies the Git child timeout and structured degraded result. |
+| S4/R2 | `src/commands/status.js#readGitStatus` | primary | Applies the status Git-child timeout and structured degraded result. |
 | S4/R2 | `src/commands/status.js#mapWithConcurrency` | support | Caps concurrent repository Git processes while preserving result order. |
+| S4/R2 | `src/commands/validate.js#validateV2ReviewRepositoryState` | primary | Bounds Review-candidate reachability and tree Git children and converts timeout or ordinary failure into existing non-passing seal findings. |
 
 #### Implementation Gaps
 
@@ -627,7 +628,7 @@ The CLI SHALL time out a stalled Git status process, return degraded metadata fo
 |---|---|---|---|
 | S4/R1-S1 | Automated test `test/diagnostics.test.js#guidance diagnostics ignore negated historical and quoted obsolete references` | Negated, historical, blockquoted, and fenced examples do not become findings. | Passing 2026-07-20 |
 | S4/R1-S1 | Automated test `test/diagnostics.test.js#guidance diagnostics still report affirmative obsolete instructions` | Affirmative obsolete instructions remain actionable findings. | Passing 2026-07-20 |
-| S4/R2-S1 | Automated test `test/cli.test.js#status degrades one stalled Git repository without blocking its siblings` | One timed-out repository degrades while its sibling returns branch state. | Passing 2026-07-20 |
+| S4/R2-S1 | Automated tests `test/cli.test.js#status degrades one stalled Git repository without blocking its siblings` and `test/change-contract.test.js#done v2 outcomes require a reachable content-identical review seal` | Status degrades one stalled repository without blocking its sibling; stalled Review-seal Git children terminate within the injected bound, leave no child process, and return a deterministic non-passing finding while ordinary valid and invalid seals retain their contract. | Passing 2026-08-30 |
 
 #### Verification Gaps
 

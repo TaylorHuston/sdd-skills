@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile as execFileCallback } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -468,6 +468,15 @@ test("done v2 outcomes require a reachable content-identical review seal", async
   );
   await transitionChange(root, "sample", result.changeId, { from: "proposed", to: "planned" });
   await transitionChange(root, "sample", result.changeId, { from: "planned", to: "in_progress" });
+  const reviewPath = join(changePath, "review.md");
+  const validateReview = async (review, options = {}) => {
+    await writeFile(reviewPath, v2Review(review));
+    return validateArtifacts(root, { changeId: result.changeId, ...options });
+  };
+  const expectReviewFinding = async (review, code, options = {}) => {
+    const validation = await validateReview(review, options);
+    assert.ok(!validation.valid && validation.findings.some((finding) => finding.code === code));
+  };
 
   await writeFile(join(repository, "v2.txt"), "v2 behavior\n");
   await execFileAsync("git", ["-C", repository, "add", "v2.txt"]);
@@ -478,69 +487,59 @@ test("done v2 outcomes require a reachable content-identical review seal", async
   });
   const { stdout: stagedTreeOutput } = await execFileAsync("git", ["-C", repository, "write-tree"]);
   const stagedTree = stagedTreeOutput.trim();
-  await writeFile(join(changePath, "review.md"), v2Review({
-    candidate: envelope.candidate.watermark,
-    reviewedTree: stagedTree,
-  }));
-  const precommit = await validateArtifacts(root, { changeId: result.changeId });
+  const precommit = await validateReview({ candidate: envelope.candidate.watermark, reviewedTree: stagedTree });
   assert.deepEqual(precommit.findings.filter((finding) => finding.artifactType === "change"), []);
 
   const tasksPath = join(changePath, "tasks.md");
   const validTasks = await readFile(tasksPath, "utf8");
   await writeFile(tasksPath, validTasks.replaceAll("SAMPLE-E001/S1 R1-S1", "SAMPLE-E001/S1 R1-S9"));
-  await writeFile(join(changePath, "review.md"), v2Review({
+  await expectReviewFinding({
     candidate: envelope.candidate.watermark,
     reviewedTree: stagedTree,
     scenario: "SAMPLE-E001/S1 R1-S9",
-  }));
-  const nonexistentScenario = await validateArtifacts(root, { changeId: result.changeId });
-  assert.ok(nonexistentScenario.findings.some((finding) => finding.code === "V2_REVIEW_SCENARIO_NOT_FOUND"));
+  }, "V2_REVIEW_SCENARIO_NOT_FOUND");
   await writeFile(tasksPath, validTasks);
-
-  await writeFile(join(changePath, "review.md"), v2Review({
+  await expectReviewFinding({
     candidate: envelope.candidate.watermark,
     reviewedTree: stagedTree,
     evidence: "`test/core.test.js#fabricated proof`",
-  }));
-  const fabricatedEvidence = await validateArtifacts(root, { changeId: result.changeId });
-  assert.ok(fabricatedEvidence.findings.some((finding) => finding.code === "V2_REVIEW_EVIDENCE_MISMATCH"));
-
-  await writeFile(join(changePath, "review.md"), v2Review({
+  }, "V2_REVIEW_EVIDENCE_MISMATCH");
+  await expectReviewFinding({
     candidate: `working-tree:${base}:sha256:${"b".repeat(64)}`,
     reviewedTree: stagedTree,
-  }));
-  const tamperedCandidate = await validateArtifacts(root, { changeId: result.changeId });
-  assert.ok(tamperedCandidate.findings.some((finding) => finding.code === "V2_REVIEW_CANDIDATE_MISMATCH"));
+  }, "V2_REVIEW_CANDIDATE_MISMATCH");
 
   await execFileAsync("git", ["-C", repository, "commit", "-m", "add v2 behavior"]);
   const { stdout: commitOutput } = await execFileAsync("git", ["-C", repository, "rev-parse", "HEAD"]);
   const { stdout: treeOutput } = await execFileAsync("git", ["-C", repository, "rev-parse", "HEAD^{tree}"]);
   const commit = commitOutput.trim();
   const tree = treeOutput.trim();
+  const committedReview = { candidate: commit, reviewedTree: tree, finalCommit: commit, finalCommitTree: tree };
   await writeFile(
     tasksPath,
     (await readFile(tasksPath, "utf8"))
       .replace("- Status: ready", "- Status: done")
       .replace("- Current outcome: S1", "- Current outcome: none"),
   );
-  await writeFile(join(changePath, "review.md"), v2Review({
-    candidate: commit,
-    reviewedTree: tree,
-    finalCommit: commit,
-    finalCommitTree: tree,
-  }));
-
-  const valid = await validateArtifacts(root, { changeId: result.changeId });
+  const valid = await validateReview(committedReview);
   assert.deepEqual(valid.findings.filter((finding) => finding.artifactType === "change"), []);
 
-  await writeFile(join(changePath, "review.md"), v2Review({
+  const [fakeGit, pidPath] = ["fake-git", "git-pids"].map((name) => join(root, name));
+  await writeFile(fakeGit, `#!/bin/sh\nprintf '%s\\n' "$$" >> ${JSON.stringify(pidPath)}\nexec sleep 5\n`);
+  await chmod(fakeGit, 0o755);
+  const started = Date.now();
+  await expectReviewFinding(committedReview, "INVALID_V2_REVIEW_SEAL", { gitCommand: fakeGit, gitTimeoutMs: 100 });
+  assert.ok(Date.now() - started < 2_000);
+  for (const pid of (await readFile(pidPath, "utf8")).trim().split("\n").map(Number)) {
+    assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
+  }
+
+  await expectReviewFinding({
     candidate: commit,
     reviewedTree: "f".repeat(40),
     finalCommit: commit,
     finalCommitTree: "f".repeat(40),
-  }));
-  const invalid = await validateArtifacts(root, { changeId: result.changeId });
-  assert.ok(invalid.findings.some((finding) => finding.code === "INVALID_V2_REVIEW_SEAL"));
+  }, "INVALID_V2_REVIEW_SEAL");
 });
 
 test("planning completes the same Change before lifecycle work continues", async (t) => {
