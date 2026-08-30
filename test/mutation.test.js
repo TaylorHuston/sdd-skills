@@ -723,22 +723,22 @@ test("workflow refresh preserves a concurrent complete replacement", async (t) =
 test("workflow refresh writes one complete file and preserves its mode", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "sdd-workflow-complete-"));
   t.after(() => rm(root, { recursive: true, force: true }));
-  const source = join(root, "source.md");
-  const target = join(root, "target.md");
+  const [source, target] = ["source.md", "target.md"].map((name) => join(root, name));
   const packaged = `# Packaged workflow\n\n${"complete line\n".repeat(500)}`;
-  await writeFile(source, packaged);
-  await writeFile(target, "previous workflow\n", { mode: 0o640 });
+  await Promise.all([writeFile(source, packaged), writeFile(target, "previous workflow\n", { mode: 0o640 })]);
   await chmod(target, 0o640);
-  await applyWorkflowSync({
-    workspaceRoot: root,
-    action: "update",
-    source,
-    target,
-    sourceHash: await hashFile(source),
-    targetHash: await hashFile(target),
-  });
-  assert.equal(await readFile(target, "utf8"), packaged);
-  assert.equal((await stat(target)).mode & 0o777, 0o640);
+  const previousUmask = process.umask(0o077);
+  try {
+    await applyWorkflowSync({
+      workspaceRoot: root,
+      action: "update",
+      source,
+      target,
+      sourceHash: await hashFile(source),
+      targetHash: await hashFile(target),
+    });
+  } finally { process.umask(previousUmask); }
+  await assertFile(target, packaged);
 });
 
 test("workflow refresh reports packaged partial state without rolling back", async (t) => {
@@ -822,29 +822,29 @@ test("managed installation preserves completed skills and prior evidence on lock
   assert.deepEqual(JSON.parse(await readFile(lockPath, "utf8")), priorLock);
 });
 
-test("managed installation preserves a concurrent complete installation-evidence winner", async (t) => {
+test("managed installation preserves evidence conflicts and restrictive modes", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "sdd-install-evidence-winner-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const lockPath = join(root, ".sdd", "install-lock.json");
   await mkdir(join(root, ".sdd"), { recursive: true });
-  const priorLock = { managedSkills: {} };
-  const winner = {
-    managedSkills: {},
-    managedWorkflow: { path: ".sdd/story-driven-development.md", hash: `sha256:${"a".repeat(64)}` },
-  };
-  await writeFile(lockPath, `${JSON.stringify(priorLock, null, 2)}\n`);
+  const winner = { managedSkills: {}, managedWorkflow: { path: ".sdd/story-driven-development.md", hash: `sha256:${"a".repeat(64)}` } };
+  const skillPlan = { skillsDirectory: join(root, ".agents", "skills"), actions: [], lock: { managedSkills: {} } };
+  await writeFile(lockPath, serializeManagedInstallationLock(skillPlan));
   await assert.rejects(
-    () => applyManagedInstallation(root, {
-      skillPlan: { skillsDirectory: join(root, ".agents", "skills"), actions: [], lock: priorLock },
-      writeLock: async (path, source, options) => {
-        await writeFile(path, `${JSON.stringify(winner, null, 2)}\n`);
-        return publishManagedFile(root, path, source, { ...options, label: "Installation evidence" });
-      },
-    }),
-    (error) => error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes("previous complete lock preserved")),
+    () => applyManagedInstallation(root, { skillPlan, writeLock: async (path, source, options) => {
+      await writeFile(path, `${JSON.stringify(winner, null, 2)}\n`);
+      return publishManagedFile(root, path, source, { ...options, label: "Installation evidence" });
+    } }),
+    (error) => error.code === "MUTATION_RECOVERY_FAILED" && error.details.some((detail) => detail.includes("previous complete lock preserved")),
   );
   assert.deepEqual(JSON.parse(await readFile(lockPath, "utf8")), winner);
+  await chmod(lockPath, 0o440);
+  skillPlan.lock = { managedSkills: {}, packageVersion: "requested" };
+  const previousUmask = process.umask(0o077);
+  try { await applyManagedInstallation(root, { skillPlan }); }
+  finally { process.umask(previousUmask); }
+  assert.equal(await readFile(lockPath, "utf8"), serializeManagedInstallationLock(skillPlan));
+  assert.deepEqual([process.umask(), (await stat(lockPath)).mode & 0o777], [previousUmask, 0o440]);
 });
 
 test("managed installation preserves a workflow replacement at the final success boundary", async (t) => {

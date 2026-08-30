@@ -257,12 +257,13 @@ export async function publishConfigFile(
   try {
     handle = await open(temporary, "wx", mode);
     stagingPathCreated = true;
+    await handle.chmod(mode);
     const temporaryState = await handle.stat({ bigint: true });
     staged = {
       source,
       bytes: Buffer.from(source, "utf8"),
       identity: identity(temporaryState),
-      mode,
+      mode: Number(temporaryState.mode & 0o777n),
     };
     await handle.writeFile(source, "utf8");
     await handle.sync();

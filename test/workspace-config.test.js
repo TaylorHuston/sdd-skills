@@ -999,18 +999,18 @@ test("configuration replacement preserves winners after displacement and publica
 });
 
 test("configuration publication writes complete YAML and preserves file mode", async (t) => {
-  const root = await temporaryRoot(t, "sdd-config-complete-mode-");
-  const workspaceRoot = join(root, "workspace");
+  const root = await temporaryRoot(t, "sdd-config-complete-mode-"), workspaceRoot = join(root, "workspace");
   await mkdir(workspaceRoot, { recursive: true });
   const original = workspaceConfig();
   await writeWorkspaceConfig(workspaceRoot, original);
   const configPath = getWorkspaceConfigPath(workspaceRoot);
   await chmod(configPath, 0o640);
-  const snapshot = await readWorkspaceConfigSnapshot(workspaceRoot);
-  const updated = structuredClone(original);
+  const [snapshot, updated] = [await readWorkspaceConfigSnapshot(workspaceRoot), structuredClone(original)];
   updated.planning.root = "updated-planning";
 
-  await writeWorkspaceConfig(workspaceRoot, updated, { expected: snapshot });
+  const previousUmask = process.umask(0o077);
+  try { await writeWorkspaceConfig(workspaceRoot, updated, { expected: snapshot }); }
+  finally { process.umask(previousUmask); }
 
   assert.deepEqual(await readWorkspaceConfig(workspaceRoot), updated);
   assert.equal(Number((await lstat(configPath, { bigint: true })).mode & 0o777n), 0o640);
