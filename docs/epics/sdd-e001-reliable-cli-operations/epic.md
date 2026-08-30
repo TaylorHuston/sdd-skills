@@ -4,7 +4,7 @@ id: SDD-E001
 status: active
 created: 2026-07-20
 modified: 2026-08-29
-last_verified: 2026-08-28
+last_verified: 2026-08-29
 stories:
   - S1
   - S2
@@ -63,7 +63,7 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 | S3 | partial | partial | Route one workspace-unique central Change across portable repository targets. | 2026-08-28 | Current configuration validation rejects malformed path values before resolution; lifecycle commands preserve every tested pre-syscall conflict while exact final path-based races remain dated accepted gaps. |
 | S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
 | S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-23 | Reports are versioned; PR/release paths are classified and rechecked; Git baselines are immutable and bounded. |
-| S6 | implemented | verified | Carry one progressive central Change through focused planning, risk-triggered Review, conditional Epic reconciliation, and a content-identical local outcome commit. | 2026-08-28 | The one supported current workflow is v2; current fixtures, unsupported-history rejection, and the repository-required package gate now pass without an aggregate gap. |
+| S6 | implemented | verified | Carry one progressive central Change through focused planning, risk-triggered Review, conditional Epic reconciliation, and a content-identical local outcome commit. | 2026-08-29 | The one supported current workflow is v2; Review parsing preserves escaped evidence cells, and `ready` rejects unresolved evidence or findings before candidate closure. |
 | S7 | implemented | verified | Explain the portable method and package through accessible responsive documentation. | 2026-08-18 | Current guide and durable desktop/mobile evidence explain and prove the v2 workflow; owner product acceptance was separately confirmed on 2026-08-18. |
 
 ## Stories
@@ -751,8 +751,8 @@ The published package SHALL include the orphan-audit source and universal bundle
 Implementation: implemented
 Verification: verified
 Created: 2026-07-23
-Modified: 2026-08-28
-Last verified: 2026-08-28
+Modified: 2026-08-29
+Last verified: 2026-08-29
 
 As a developer, I want SDD planning, implementation, and review workflows to carry work through a complete evidence-backed handoff, so that an agent does not stop at a partial task, a green command, or the first finding.
 
@@ -1008,7 +1008,7 @@ The CLI SHALL create new work with explicit `schema: sdd-change-v2`, SHALL use t
 | S6/R10 | `skills/sdd-changelog/SKILL.md#Decide Whether An Entry Is Warranted` | primary | Owns one candidate-specific native release entry or evidence-based no-op. |
 | S6/R11 | `skills/sdd-apply/SKILL.md#Independent Review` | primary | Composes independent central Review and one bounded remediation batch. |
 | S6/R11-S2 | `skills/sdd-review/SKILL.md#Findings And Verdict` | primary | Keeps required technical gaps non-passing and product acceptance separate. |
-| S6/R11-S3 | `src/change-review.js#validateV2ChangeReviewSource` | primary | Validates exact candidate, five gates, triggers, Scenarios, gaps, acceptance, and completion fields. |
+| S6/R3-S3, S6/R5-S2, S6/R11-S3 | `src/change-review.js#validateV2ChangeReviewSource` | primary | Parses canonical Review tables without splitting escaped pipes and prevents `ready` closure while passing or accepted evidence is unresolved or BLOCKING/REQUIRED findings remain. |
 | S6/R11-S3 | `skills/sdd-pr/SKILL.md#Initial Setup`, `skills/sdd-release/SKILL.md#Operating Sequence`, `skills/sdd-space-status/SKILL.md#Workflow` | support | Keep candidate/acceptance truth in `review.md`, queue/Resume truth in `tasks.md`, and remote handoff telemetry in provider-native records. |
 | S6/R11-S4 | `skills/sdd-apply/SKILL.md#Commit And Record` | primary | Selectively seals the reviewed tree in one local commit and records it centrally. |
 | S6/R11-S4 | `src/commands/validate.js#validateV2ReviewRepositoryState` | support | Enforces reachable single-parent commit and reviewed/final tree equality. |
@@ -1033,6 +1033,7 @@ The CLI SHALL create new work with explicit `schema: sdd-change-v2`, SHALL use t
 | S6/R1-S3, S6/R1-S4 | Automated tests `test/change-tasks-v2.test.js#v2 tasks parse a compact delivery queue without legacy ledgers`, `test/change-tasks-v2.test.js#v2 tasks reject legacy ledgers and closure markers`, and `test/workflow-contracts.test.js#current Change templates use one v2 three-artifact contract` | Compact outcomes retain references, dependencies, Resume, triggers, and implementation-agnostic wording without closure state. | Passing 2026-08-17 |
 | S6/R2-S1, S6/R2-S2, S6/R2-S3 | Automated test `test/workflow-contracts.test.js#Apply delivers one reviewed outcome without legacy closure machinery` | Apply selects one outcome, follows guidance, verifies proportionally, independently reviews, selectively commits, and stops. | Passing 2026-08-17 |
 | S6/R3-S1, S6/R3-S2, S6/R3-S3, S6/R4-S1, S6/R5-S1, S6/R5-S2 | Automated test `test/workflow-contracts.test.js#Review uses five universal gates and concrete planned or discovered triggers` | Review completes safe relevant inspection after findings/yields, uses five gates, executes concrete triggers including UI risk, and separates Spec/Quality judgments. | Passing 2026-08-28 |
+| S6/R3-S3, S6/R5-S2, S6/R11-S3 | Automated tests `test/change-review.test.js#v2 review preserves escaped pipes without accepting malformed rows`, `test/change-review.test.js#v2 ready verdict requires current evidence and resolved findings`, and `test/change-review.test.js#v2 review keeps pending templates authorable` | Canonical tables preserve escaped cells, passing and accepted rows reject normalized pending evidence, ready rejects unresolved BLOCKING/REQUIRED findings, and pending templates remain valid. | Passing 2026-08-29 |
 | S6/R5-S2 | Automated test `test/workflow-contracts.test.js#final candidate retains accepted architecture reductions` | The repository-required gate measures the exact final runtime, test, S9 runtime-seam, and mutation-test surfaces against the accepted ADR baselines, so a later candidate cannot retain an intermediate budget result silently. | Passing 2026-08-28 |
 | S6/R6-S1 | Automated test `test/workflow-contracts.test.js#Interactive reuses normal v2 records and Apply` | Interactive has no second log, ledger, template family, or closure mechanism. | Passing 2026-08-17 |
 | S6/R7-S1, S6/R8-S1, S6/R10-S1, S6/R10-S2 | Automated test `test/workflow-contracts.test.js#supporting workflows preserve central ownership and independent capability boundaries` | Context, Changelog, PR, Release, and Status retain central ownership and independent mutation boundaries. | Passing 2026-08-17 |

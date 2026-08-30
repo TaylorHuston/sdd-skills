@@ -81,6 +81,22 @@ function childSection(block, heading) {
   return block.lines.slice(start + 1, end);
 }
 
+function findingSections(lines, heading) {
+  const marker = `#### ${heading}`;
+  const starts = (lines ?? []).flatMap((line, index) => line.trim() === marker ? [index] : []);
+  return starts.map((start) => {
+    const offset = lines.slice(start + 1).findIndex((line) => /^#{1,4}\s+/.test(line));
+    return lines.slice(start + 1, offset < 0 ? lines.length : start + 1 + offset);
+  });
+}
+
+function hasFinding(sections) {
+  return sections.length !== 1 || sections[0].some((line) => {
+    const value = line.trim();
+    return value.length > 0 && !/^-\s+None\.(?:\s|$)/i.test(value);
+  });
+}
+
 function parseInlineCode(value) {
   const trimmed = value.trim();
   return /^`([^`]+)`$/.exec(trimmed)?.[1] ?? trimmed;
@@ -99,8 +115,21 @@ function parseSummary(lines) {
 }
 
 function splitTableRow(line) {
-  if (!line.trim().startsWith("|") || !line.trim().endsWith("|")) return null;
-  return line.trim().slice(1, -1).split("|").map((cell) => cell.trim());
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("|") || !trimmed.endsWith("|")) return null;
+  const content = trimmed.slice(1, -1);
+  const cells = [];
+  let start = 0;
+  for (let index = 0; index < content.length; index += 1) {
+    if (content[index] !== "|") continue;
+    let escapes = 0;
+    for (let cursor = index - 1; cursor >= 0 && content[cursor] === "\\"; cursor -= 1) escapes += 1;
+    if (escapes % 2 === 1) continue;
+    cells.push(content.slice(start, index).trim());
+    start = index + 1;
+  }
+  cells.push(content.slice(start).trim());
+  return cells;
 }
 
 function parseTable(lines, expectedHeader) {
@@ -146,6 +175,10 @@ function resultGapCoherent(result, gap) {
   if (result === "accepted-gap") return gap.startsWith("user-accepted:");
   if (result === "pass") return gap === "none" || gap === "manual-acceptance" || gap.startsWith("optional-confidence:");
   return true;
+}
+
+function hasUnresolvedEvidence(result, evidence) {
+  return ["pass", "accepted-gap"].includes(result) && parseInlineCode(evidence).trim().toLowerCase() === "pending";
 }
 
 function parseFrontmatter(source) {
@@ -239,7 +272,12 @@ export function validateV2ChangeReviewSource(source, { changeId, outcomes = [] }
       issues.push(issue("V2_REVIEW_GATE_SET_MISMATCH", `${outcomeId} must contain each universal gate exactly once.`, { outcomeId }));
     }
     for (const row of universalGates) {
-      if (!GATE_RESULTS.has(row.Result) || row.Check.length === 0 || row.Evidence.length === 0) {
+      if (
+        !GATE_RESULTS.has(row.Result)
+        || row.Check.length === 0
+        || row.Evidence.length === 0
+        || hasUnresolvedEvidence(row.Result, row.Evidence)
+      ) {
         issues.push(issue("INVALID_V2_REVIEW_GATES", `${outcomeId} has an invalid universal gate row for ${row.Gate || "(unknown)"}.`, { outcomeId }));
       }
     }
@@ -265,6 +303,7 @@ export function validateV2ChangeReviewSource(source, { changeId, outcomes = [] }
         || !GATE_RESULTS.has(row.Result)
         || !validGap(row.Gap)
         || !resultGapCoherent(row.Result, row.Gap)
+        || hasUnresolvedEvidence(row.Result, row.Evidence)
       ) {
         issues.push(issue("INVALID_V2_REVIEW_TRIGGERS", `${outcomeId} has an invalid trigger row for ${row.Trigger || "(unknown)"}.`, { outcomeId }));
       }
@@ -286,6 +325,7 @@ export function validateV2ChangeReviewSource(source, { changeId, outcomes = [] }
         || !validGap(row.Gap)
         || !resultGapCoherent(row.Result, row.Gap)
         || (row.Result === "pass" && row["Claimed boundary"] !== row["Proven boundary"])
+        || hasUnresolvedEvidence(row.Result, row.Evidence)
       ) {
         issues.push(issue("INVALID_V2_REVIEW_SCENARIOS", `${outcomeId} has an invalid Scenario row for ${row.Scenario || "(unknown)"}.`, { outcomeId }));
       }
@@ -294,6 +334,12 @@ export function validateV2ChangeReviewSource(source, { changeId, outcomes = [] }
     for (const heading of ["Findings", "Remediation"]) {
       if (!childSection(block, heading)) issues.push(issue("INVALID_V2_REVIEW", `${outcomeId} must contain a ### ${heading} section.`, { outcomeId }));
     }
+    const findings = childSection(block, "Findings");
+    const hasUnresolvedFindings = hasFinding(findingSections(findings, "BLOCKING"))
+      || hasFinding(findingSections(findings, "REQUIRED"));
+    if (verdict === "ready" && hasUnresolvedFindings) {
+      issues.push(issue("INVALID_V2_REVIEW_FINDINGS", `Ready outcome ${outcomeId} cannot retain BLOCKING or REQUIRED findings.`, { outcomeId }));
+    }
 
     if (verdict === "ready") {
       if (
@@ -301,9 +347,10 @@ export function validateV2ChangeReviewSource(source, { changeId, outcomes = [] }
         || reviewedTree === "pending"
         || specAdherence !== "pass"
         || implementationQuality !== "pass"
-        || universalGates.some((row) => row.Result !== "pass")
-        || triggers.some((row) => !["pass", "accepted-gap"].includes(row.Result) || row.Gap === "required" || !resultGapCoherent(row.Result, row.Gap))
-        || scenarios.some((row) => !["pass", "accepted-gap"].includes(row.Result) || row.Gap === "required" || !resultGapCoherent(row.Result, row.Gap))
+        || universalGates.some((row) => row.Result !== "pass" || hasUnresolvedEvidence(row.Result, row.Evidence))
+        || triggers.some((row) => !["pass", "accepted-gap"].includes(row.Result) || row.Gap === "required" || !resultGapCoherent(row.Result, row.Gap) || hasUnresolvedEvidence(row.Result, row.Evidence))
+        || scenarios.some((row) => !["pass", "accepted-gap"].includes(row.Result) || row.Gap === "required" || !resultGapCoherent(row.Result, row.Gap) || hasUnresolvedEvidence(row.Result, row.Evidence))
+        || hasUnresolvedFindings
       ) {
         issues.push(issue("INVALID_V2_REVIEW_VERDICT", `Ready outcome ${outcomeId} requires an exact candidate, reviewed tree, passing independent results and universal gates, and no unresolved trigger or Scenario finding.`, { outcomeId }));
       }

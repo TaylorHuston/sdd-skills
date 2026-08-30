@@ -63,7 +63,13 @@ function reviewSource() {
     "",
     "### Findings",
     "",
+    "#### BLOCKING",
+    "",
     "- None.",
+    "",
+    "#### REQUIRED",
+    "",
+    "- None. Prior findings are resolved.",
     "",
     "### Remediation",
     "",
@@ -86,6 +92,58 @@ test("v2 review validates one ready exact-candidate outcome without a receipt", 
   assert.equal(result.outcomes[0].candidate, candidate);
   assert.equal(result.outcomes[0].universalGates.length, 5);
   assert.equal(result.outcomes[0].finalCommit, "pending");
+});
+
+test("v2 review preserves escaped pipes without accepting malformed rows", () => {
+  const escaped = reviewSource()
+    .replace(/(scope-candidate .* \| pass \| )[^|]+( \|)/, "$1proof \\| universal$2")
+    .replace(/(contract-compatibility .* \| pass \| none \| )[^|]+( \|)/, "$1proof \\| trigger$2")
+    .replace(/(SAMPLE-E001\/S1 R1-S1 \| backend\/data \| )[^|]+( \|)/, "$1proof \\| scenario$2");
+  const valid = validateV2ChangeReviewSource(escaped, { changeId: "2026-08-17-sample", outcomes: [outcome] });
+  assert.deepEqual(valid.issues, []);
+  assert.equal(valid.outcomes[0].universalGates[0].Evidence, "proof \\| universal");
+  assert.equal(valid.outcomes[0].triggers[0].Evidence, "proof \\| trigger");
+  assert.equal(valid.outcomes[0].scenarios[0].Evidence, "proof \\| scenario");
+
+  const malformed = validateV2ChangeReviewSource(
+    reviewSource().replace("Check scope-candidate.", "Check scope | candidate."),
+    { changeId: "2026-08-17-sample", outcomes: [outcome] },
+  );
+  assert.ok(codes(malformed).includes("INVALID_V2_REVIEW_GATES"));
+});
+
+test("v2 ready verdict requires current evidence and resolved findings", () => {
+  const cases = [
+    [reviewSource().replace(/(scope-candidate .* \| pass \| )[^|]+( \|)/, "$1` PENDING `$2"), false],
+    [reviewSource().replace(/(contract-compatibility .* \| )pass \| none \| [^|]+( \|)/, "$1accepted-gap | user-accepted:2026-08-29 | ` PENDING `$2"), false],
+    [reviewSource().replace(/(SAMPLE-E001\/S1 R1-S1 .* \| pass \| none \|)/, (row) => row.replace(/`[^`]+`/, "` PENDING `")), false],
+    [reviewSource().replace("#### BLOCKING\n\n- None.", "#### BLOCKING\n\n- Broken contract."), true],
+    [reviewSource().replace("#### REQUIRED\n\n- None.", "#### REQUIRED\n\n- Missing proof."), true],
+    [reviewSource().replace("#### BLOCKING\n\n- None.\n\n", ""), true],
+    [reviewSource().replace("#### REQUIRED\n\n- None. Prior findings are resolved.\n\n", ""), true],
+    [reviewSource().replace("#### BLOCKING\n\n- None.", "#### BLOCKING\n\n- None.\n\n#### BLOCKING\n\n- None."), true],
+    [reviewSource().replace("#### REQUIRED\n\n- None.", "#### REQUIRED\n\n- None.\n\n#### REQUIRED\n\n- None."), true],
+  ];
+  for (const [source, findingSection] of cases) {
+    const resultCodes = codes(validateV2ChangeReviewSource(source, { changeId: "2026-08-17-sample", outcomes: [outcome] }));
+    assert.ok(resultCodes.includes("INVALID_V2_REVIEW_VERDICT"));
+    if (findingSection) assert.ok(resultCodes.includes("INVALID_V2_REVIEW_FINDINGS"));
+  }
+});
+
+test("v2 review keeps pending templates authorable", () => {
+  const pending = reviewSource()
+    .replace(`- Candidate: ${candidate}`, "- Candidate: pending")
+    .replace("- Verdict: ready", "- Verdict: pending")
+    .replace("- Spec Adherence: pass", "- Spec Adherence: pending")
+    .replace("- Implementation Quality: pass", "- Implementation Quality: pending")
+    .replace(`- Reviewed tree: ${reviewedTree}`, "- Reviewed tree: pending")
+    .replaceAll(" | pass |", " | pending |")
+    .replaceAll("`test/change-review.test.js#valid review`", "pending");
+  const result = validateV2ChangeReviewSource(pending, {
+    changeId: "2026-08-17-sample", outcomes: [outcome],
+  });
+  assert.deepEqual(result.issues, []);
 });
 
 test("v2 review requires all universal gates and every planned trigger", () => {
