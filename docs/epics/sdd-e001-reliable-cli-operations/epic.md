@@ -3,7 +3,7 @@ schema: sdd-epic-v2
 id: SDD-E001
 status: active
 created: 2026-07-20
-modified: 2026-08-30
+modified: 2026-09-01
 last_verified: 2026-08-30
 stories:
   - S1
@@ -278,7 +278,7 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 Implementation: partial
 Verification: partial
 Created: 2026-07-20
-Modified: 2026-08-30
+Modified: 2026-09-01
 Last verified: 2026-08-30
 
 As a developer, I want filesystem mutations to stay inside their physical repository or selected workspace owner and preserve concurrent work, so that setup and lifecycle commands cannot silently damage unrelated data.
@@ -342,6 +342,11 @@ The CLI SHALL publish individual durable files atomically, refuse unexpected rep
 - WHEN cleanup detects replacement or modification of preserved skill state or the prepared registry owner changes
 - THEN the CLI preserves every detectable drift, reports the retained or recorded state plus a safe manual-recovery action, and does not follow a replaced registry ancestor into an external path.
 
+###### Scenario R3-S6: Read-Only Preserved Skill Cleanup
+
+- WHEN cleanup verifies that the exact preserved managed-skill tree is unchanged but its directories are non-writable
+- THEN the CLI removes that verified owner-bound tree without broadening permissions on a replacement or external path and completes the requested refresh.
+
 ##### Requirement R4: Workspace-Owned Managed Installation
 
 The CLI SHALL keep workspace configuration, Change storage, recovery state, and installation evidence under `<workspace>/.sdd/`; install managed skills under `<workspace>/.agents/skills/` by default; and reject any configured managed-skill path whose physical target escapes the workspace.
@@ -369,7 +374,7 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 | S2/R3-S1 | `src/config-publication.js#publishConfigFile` | primary | Publishes complete configuration YAML, restores accepted mode on the staged inode before publication, verifies the actual staged mode, preserves unexpected targets outside the dated final-unlink gap, and reports bounded retained or recorded recovery state. |
 | S2/R3-S1, S2/R3-S3, S2/R4-S2 | `src/managed-file-publication.js#publishManagedFile` | primary | Publishes complete managed workflow and installation-evidence files, restores accepted mode on the staged inode before publication, verifies the actual staged mode, preserves concurrent targets outside the dated final-unlink gap, and checks selected-workspace authority at mutation boundaries. |
 | S2/R3-S2 | `src/commands/epic-create.js#publishEpicScaffold` | primary | Exclusively creates one owner-contained Epic directory and fsynced `epic.md`, preserves collisions or incomplete state for inspection, and reports a typed retry/manual-recovery action without journal replay. |
-| S2/R3-S4, S2/R3-S5, S2/R4-S1 | `src/managed-skill-publication.js#publishManagedSkill` | primary | Publishes or retires one confined managed-skill tree, preserves target and detectable cleanup drift under a named retained path, binds recursive cleanup to the prepared registry owner, retains source modes, and never rolls another skill back; cleanup of a valid non-writable preserved tree can stop with typed retained-state recovery within the dated gap. |
+| S2/R3-S4, S2/R3-S5, S2/R3-S6, S2/R4-S1 | `src/managed-skill-publication.js#publishManagedSkill` | primary | Publishes or retires one confined managed-skill tree, preserves target and detectable cleanup drift under a named retained path, binds recursive cleanup to the prepared registry owner, retains source modes, and never rolls another skill back; cleanup of a valid non-writable preserved tree can stop with typed retained-state recovery within the dated R3-S6 gap. |
 | S2/R3-S3, S2/R3-S4, S2/R4-S2 | `src/mutation.js#withWorkspaceMutationLock` | support | Exclusively admits one current setup/update writer, preserves a lock replacement during guarded release, and supplies immutable selected-workspace authority checks; retained state requires explicit inspection rather than dead-owner replay. |
 | S2/R3-S3, S2/R3-S4 | `src/installation.js#applyManagedInstallation` | primary | Coordinates bounded workflow, per-skill, and installation-evidence publication while preserving complete partial state and reporting exact completed/residual retry or manual actions without global rollback. |
 | S2/R3-S1, S2/R3-S3, S2/R3-S4 | `src/commands/init-installation.js#setupInstallation` | support | Preserves successfully published workspace configuration and managed artifacts with retry guidance when the remaining installation cannot complete. |
@@ -382,7 +387,7 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 #### Implementation Gaps
 
 - `S2/R2-S1`, `S2/R2-S4`: plain Node path APIs cannot atomically bind the final observed Change file/source directory and absent destination to the subsequent replacement or move syscall; a same-user actor can change those paths after the last explicit recheck.
-- `S2/R3-S4`, `S2/R3-S5`: [user accepted 2026-08-30; `PR-R9-READONLY-CLEANUP-01`] Owner-bound recursive cleanup does not temporarily restore write/search permission on a valid preserved tree, so non-writable directories can produce `EACCES` after publication and leave typed retained state for manual recovery. Acceptance is limited to this exact safe-failure boundary; it permits no silent deletion, overwrite, boundary escape, or false success.
+- `S2/R3-S6`: [user accepted 2026-08-30; `PR-R9-READONLY-CLEANUP-01`] Owner-bound recursive cleanup does not temporarily restore write/search permission on a valid preserved tree, so non-writable directories can produce `EACCES` after publication and leave typed retained state for manual recovery instead of completing the refresh. Acceptance is limited to this exact safe-failure boundary; it permits no silent deletion, overwrite, boundary escape, or false success.
 
 #### Verified By
 
@@ -435,6 +440,7 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 - `S2/R3-S1`, `S2/R3-S3`: [user accepted 2026-08-24] After a successful displacement and before the bound recovery read, a same-user actor can move an owner ancestor. Portable path APIs cannot discover the displaced file's new current path; the CLI reports the recovery name recorded before drift and preserves honest manual guidance, while focused proof confirms complete bytes and mode remain under the moved owner. Acceptance is limited to the owner-operated local CLI and does not permit overwrite, incomplete state, hidden staging residue, or a global rollback claim.
 - `S2/R3-S1`, `S2/R3-S3`: [user accepted 2026-08-28] In the final cleanup syscall window, a same-user actor can replace an owned configuration, workflow, or installation-evidence recovery/staging pathname after its inode identity is observed and before path-based `rm()` executes. Portable Node provides no inode-bound unlink primitive, so that replacement may be deleted. Acceptance is limited to this exact owner-operated local CLI window and does not cover earlier drift, incomplete files, unreported residue outside the window, cross-artifact rollback, or external attackers.
 - `S2/R3-S5`: [user accepted 2026-08-29] After the exact preserved managed-skill tree is last observed, a same-user actor can replace or add content beneath its unique hidden cleanup path before owner-bound path-based recursive removal completes, and that content may be deleted. Acceptance is limited to this exact owner-operated local setup/update window and does not cover detectable earlier drift, a replaced registry ancestor or external path, target overwrite, unreported residue, or cross-skill rollback.
+- `S2/R3-S6`: [user accepted 2026-08-30; `PR-R9-READONLY-CLEANUP-01`] No focused test proves successful removal of an unchanged non-writable preserved skill tree because current cleanup stops safely with typed `EACCES` recovery. This accepted verification gap is limited to that exact implementation limit.
 
 #### Story Notes
 
@@ -449,7 +455,7 @@ The CLI SHALL keep workspace configuration, Change storage, recovery state, and 
 Implementation: partial
 Verification: partial
 Created: 2026-07-20
-Modified: 2026-08-30
+Modified: 2026-09-01
 Last verified: 2026-08-30
 
 As a developer, I want one workspace-unique Change record with explicit portable repository targets, so that lifecycle commands cannot invent ownership, split status across copies, or mutate outside the selected workspace.
@@ -491,8 +497,13 @@ The CLI SHALL reject unknown configuration keys, duplicate physical repository o
 
 ###### Scenario R2-S4: Stale Change Target
 
-- WHEN a selected Space owns a stale repository target or another central Change names an unselected unknown Space
-- THEN selected-Space validation reports the selected ownership defect without unrelated record-specific diagnostics, whole-workspace validation still reports the unknown Space, and status keeps selected work visible.
+- WHEN a selected Space owns a stale repository target
+- THEN selected-Space validation reports that ownership defect and status keeps the selected work visible.
+
+###### Scenario R2-S5: Unselected Unknown Space Isolation
+
+- WHEN another central Change names an unselected unknown Space
+- THEN selected-Space validation and status keep the selected Space's work visible while whole-workspace validation still reports the unknown Space.
 
 ##### Requirement R3: Workspace-Unique Change Identity And Lifecycle
 
@@ -512,6 +523,11 @@ The CLI SHALL enforce unique dated Change IDs across active and closed central s
 
 - WHEN `change close` receives an `in_review` Change
 - THEN it moves the one record to `<workspace>/.sdd/changes/closed/<change-id>/` without writing a synthetic `closed` status.
+
+###### Scenario R3-S4: Transition Mode Preservation
+
+- WHEN `change transition` replaces a `change.md` that has an accepted restrictive file mode
+- THEN the replacement retains that exact mode without broadening or narrowing it under the process umask.
 
 ##### Requirement R5: Deterministic Workspace Discovery
 
@@ -539,10 +555,10 @@ The CLI SHALL resolve an explicit command workspace first, then `SDD_WORKSPACE_R
 | S3/R2 | `src/workspace.js#resolveWorkspaceContext` | primary | Rejects duplicate physical repositories and ambiguous portable identities while retaining valid repository-only context. |
 | S3/R2-S3 | `src/change-store.js#assertChangeStoreConfinement` | primary | Confines active and closed central paths to the selected workspace. |
 | S3/R3 | `src/change-store.js#listStoredChanges` | support | Enumerates the active and closed workspace inventory without assigning uniqueness-enforcement responsibility to the inventory helper. |
-| S3/R3-S2 | `src/commands/change-transition.js#transitionChange` | primary | Applies a compare-and-set status replacement after final workspace, repository, and file snapshot checks; it requests the accepted prior mode but can narrow it within the dated restrictive-umask gap. |
+| S3/R3-S2, S3/R3-S4 | `src/commands/change-transition.js#transitionChange` | primary | Applies a compare-and-set status replacement after final workspace, repository, and file snapshot checks; it requests the accepted prior mode but can narrow it within the dated R3-S4 restrictive-umask gap. |
 | S3/R3-S3 | `src/commands/change-close.js#closeChange` | primary | Rechecks current authority and destination absence, then moves one `in_review` central Change into closed history while restoring restrictive directory mode through the verified source handle. |
-| S3/R2-S4, S3/R3-S1 | `src/commands/validate.js#validateCentralRecords` | primary | Applies selected-Space ownership before record-specific diagnostics, rejects missing or cross-Space selected repository metadata, and retains workspace-wide active/closed identity collisions. |
-| S3/R2-S4 | `src/commands/status.js#getStatus` | primary | Reads the central workspace inventory before projecting one selected Space, so the dated unrelated unknown-Space record gap can block selected read-only status. |
+| S3/R2-S4, S3/R2-S5, S3/R3-S1 | `src/commands/validate.js#validateCentralRecords` | primary | Applies selected-Space ownership before record-specific diagnostics, rejects missing or cross-Space selected repository metadata, reports unknown Space ownership at workspace scope, and retains workspace-wide active/closed identity collisions. |
+| S3/R2-S5 | `src/commands/status.js#getStatus` | primary | Reads the central workspace inventory before projecting one selected Space, so the dated R2-S5 unrelated unknown-Space record gap can block selected read-only status. |
 | S3/R2-S4 | `src/commands/status.js#buildSpace` | support | Keeps a selected Space's own stale repository targets visible when central inventory succeeds. |
 | S3/R3-S1 | `src/commands/status.js#readCentralChanges` | support | Refuses to project an active/closed duplicate as two independent status records. |
 | S3/R3-S1 | `src/change-status.js#inspectChangeStatuses` | support | Reports active/closed duplicate identity through workspace diagnostics. |
@@ -551,8 +567,8 @@ The CLI SHALL resolve an explicit command workspace first, then `SDD_WORKSPACE_R
 #### Implementation Gaps
 
 - `S3/R3-S1`, `S3/R3-S2`, `S3/R3-S3`: lifecycle commands preserve tested current-writer conflicts without the generalized lock, but portable path-based creation/replacement/move cannot atomically bind the last observed active/closed identity across the final syscall.
-- `S3/R3-S2`: [user accepted 2026-08-30; `PR-R8-TRANSITION-UMASK-01`] Transition staging requests the prior file mode through `writeFile`, but does not restore the requested mode after creation, so a restrictive process umask can narrow `0640` to `0600`. Bytes remain complete, permissions are never broadened, and acceptance is limited to this exact pre-1.0 mode-restoration omission.
-- `S3/R2-S4`: [user accepted 2026-08-30; `PR-R10-SCOPED-STATUS-01`] Selected status reads and resolves every central Change before selected-Space projection, so an unrelated record naming an unknown Space can return `SPACE_NOT_FOUND` and abort the scoped read-only result until that record is corrected. Acceptance is limited to this exact read-only inventory-ordering state and permits no workspace mutation.
+- `S3/R3-S4`: [user accepted 2026-08-30; `PR-R8-TRANSITION-UMASK-01`] Transition staging requests the prior file mode through `writeFile`, but does not restore the requested mode after creation, so a restrictive process umask can narrow `0640` to `0600`. Bytes remain complete, permissions are never broadened, and acceptance is limited to this exact pre-1.0 mode-restoration omission.
+- `S3/R2-S5`: [user accepted 2026-08-30; `PR-R10-SCOPED-STATUS-01`] Selected status reads and resolves every central Change before selected-Space projection, so an unrelated record naming an unknown Space can return `SPACE_NOT_FOUND` and abort the scoped read-only result until that record is corrected. Acceptance is limited to this exact read-only inventory-ordering state and permits no workspace mutation.
 
 #### Verified By
 
@@ -563,10 +579,10 @@ The CLI SHALL resolve an explicit command workspace first, then `SDD_WORKSPACE_R
 | S3/R2-S2 | Automated test `test/cli.test.js#context rejects a repository-only ID that collides with an existing Idea` | A duplicate portable ID cannot silently claim another owner. | Passing 2026-08-07 |
 | S3/R2-S3 | Automated tests `test/cli.test.js#validation rejects a central Change store symlinked outside its owner` and `test/cli.test.js#change transition rejects an active Change through an external symlink ancestor` | Workspace-owned Change paths cannot traverse a physical owner boundary. | Passing 2026-08-07 |
 | S3/R3-S1 | Automated tests `test/cli.test.js#Change creation treats a dangling closed-history entry as an identity collision`, `test/cli.test.js#concurrent Change creation preserves one complete central winner`, and `test/cli.test.js#Change creation preserves a replacement after exclusive directory creation` | Pre-existing active/closed entries, concurrent same-ID creation, and a replacement injected after exclusive directory creation remain canonical through the tested rechecks. | Passing 2026-08-21 |
-| S3/R3-S2 | Automated tests `test/change-contract.test.js#planning completes the same Change before lifecycle work continues`, `test/cli.test.js#change transition updates an active Change with compare-and-set semantics`, and `test/cli.test.js#change transition preserves an edit made at the final replacement boundary` | One central `change.md` transitions with the prior mode under the exercised ordinary umask, while stale or injected pre-rename content remains canonical; restrictive-umask mode restoration is not proved. | Passing 2026-08-21 |
+| S3/R3-S2 | Automated tests `test/change-contract.test.js#planning completes the same Change before lifecycle work continues`, `test/cli.test.js#change transition updates an active Change with compare-and-set semantics`, and `test/cli.test.js#change transition preserves an edit made at the final replacement boundary` | One central `change.md` transitions when the expected status is current, while stale or injected pre-rename content remains canonical. | Passing 2026-08-21 |
 | S3/R3-S3 | Automated tests `test/change-contract.test.js#planning completes the same Change before lifecycle work continues`, `test/cli.test.js#change close rechecks status at commit time`, `test/cli.test.js#change close preserves a destination that appears before the final move`, `test/cli.test.js#change close preserves restrictive directory modes through publication and cleanup`, `test/cli.test.js#change close never chmods a source symlink replacement`, and `test/cli.test.js#change close restores the moved inode without chmodding a destination replacement` | Close moves a current `in_review` record, preserves reopened active or nonempty closed state observed by the final explicit recheck, restores restrictive mode on the moved inode, and never follows injected source/destination symlink replacements for permission changes. | Passing 2026-08-28 |
 | S3/R3-S1, S3/R3-S2, S3/R3-S3 | Automated test `test/cli.test.js#Change lifecycle commands do not consume the managed-install mutation lock` | Create, transition, and close complete through their narrow boundaries while the separate managed-install lock remains present and unchanged. | Passing 2026-08-21 |
-| S3/R2-S4 | Automated tests `test/cli.test.js#validate rejects absent and cross-Space Change repository IDs deterministically`, `test/cli.test.js#validate rejects a central Change owned by an unknown Space`, and `test/cli.test.js#status retains Space-owned Changes whose repository IDs no longer resolve` | Selected validation rejects its own ownership defects without unrelated record-specific diagnostics, whole-workspace validation reports an unknown Space, and status retains a selected Space's own stale repository target; selected status isolation from an unrelated unknown-Space record is not proved. | Passing 2026-08-30 |
+| S3/R2-S4 | Automated tests `test/cli.test.js#validate rejects absent and cross-Space Change repository IDs deterministically` and `test/cli.test.js#status retains Space-owned Changes whose repository IDs no longer resolve` | Selected validation reports its own stale repository ownership defect, and status retains that selected Space's work. | Passing 2026-08-30 |
 | S3/R5-S1 | Automated tests `test/workspace-config.test.js#workspace discovery honors explicit, environment, target, and cwd precedence`, `test/workspace-config.test.js#cwd workspace resolves a physically mapped external repository`, and `test/cli.test.js#CLI context keeps cwd as the target when --workspace supplies external ownership` | Discovery selects the deterministic workspace owner while the explicit workspace option remains authority and never replaces the command's cwd target. | Passing 2026-08-07 |
 | S3/R5-S2 | Automated tests `test/workspace-config.test.js#an unmapped external target cannot borrow the cwd workspace` and `test/workspace-config.test.js#workspace discovery never falls back to HOME or SDD_USER_HOME` | Unmapped external targets fail without borrowing cwd or home authority. | Passing 2026-08-07 |
 
@@ -575,6 +591,8 @@ The CLI SHALL resolve an explicit command workspace first, then `SDD_WORKSPACE_R
 - `S3/R3-S1`: [user accepted 2026-08-21] Portable Node cannot bind successful creation to the exact active/closed identity across the final `change.md` write and post-publication checks; a same-user final-window replacement or active/closed duplicate remains possible. Acceptance is limited to the owner-operated local CLI and does not claim final publication identity binding.
 - `S3/R3-S2`: [user accepted 2026-08-21] Portable Node ordinary `rename` is not a final compare-and-set primitive; a same-user replacement after the last snapshot check can be overwritten. Acceptance is limited to the owner-operated local CLI and does not claim atomic compare-and-set.
 - `S3/R3-S3`: [user accepted 2026-08-21] Portable Node ordinary directory `rename` cannot atomically require both the exact active source and an absent destination; a same-user final-window reopen or empty destination remains possible. Acceptance is limited to the owner-operated local CLI and does not claim atomic move-if-current.
+- `S3/R3-S4`: [user accepted 2026-08-30; `PR-R8-TRANSITION-UMASK-01`] Restrictive-umask mode preservation is not proved because current transition staging can narrow the accepted prior mode. This accepted verification gap is limited to the exact implementation limit and does not apply to R3-S2 compare-and-set behavior.
+- `S3/R2-S5`: [user accepted 2026-08-30; `PR-R10-SCOPED-STATUS-01`] Whole-workspace validation of an unknown Space is covered, but selected status isolation from that unrelated record is not proved because current inventory resolution aborts first. This accepted verification gap is limited to the exact read-only status-ordering behavior.
 
 #### Story Notes
 
