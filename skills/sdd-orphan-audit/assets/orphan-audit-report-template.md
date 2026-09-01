@@ -8,11 +8,13 @@ audit written | check complete | blocked | no SDD evidence found
 
 - App root:
 - Git root:
+- Stable repository ID:
 - Audit date:
 - Mode:
 - Epic scope:
 - Changed-from scope:
 - Commands run:
+- Central Change records inspected through repository status/metadata:
 
 ## Summary
 

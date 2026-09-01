@@ -3,8 +3,8 @@ schema: sdd-epic-v2
 id: SDD-E001
 status: active
 created: 2026-07-20
-modified: 2026-07-24
-last_verified: 2026-07-24
+modified: 2026-09-01
+last_verified: 2026-08-30
 stories:
   - S1
   - S2
@@ -21,22 +21,23 @@ stories:
 
 - PRD: not applicable; this is a repository-only toolchain package.
 - Related docs: `README.md`, `docs/story-driven-development.md`, `docs/audits/2026-07-20-code-audit.md`
-- Related ADRs: none.
+- Related ADRs: `docs/adrs/2026-08-07-centralize-change-storage.md`, `docs/adrs/2026-08-07-workspace-scoped-installation.md`, `docs/adrs/2026-08-10-progressive-change-record.md`, `docs/adrs/2026-08-17-use-risk-triggered-delivery.md`, `docs/adrs/2026-08-19-use-current-consumer-cli-primitives.md`.
 
 Developers and agents rely on the CLI and packaged skills as one toolchain. Deterministic results must be trustworthy, mutations must remain inside declared ownership, audit reports must distinguish current from historical state, and review/release handoffs must contain only classified scope.
 
 ## Outcome
 
-Developers can validate SDD artifacts, mutate lifecycle state, resolve topology, audit Epics, and prepare review/release handoffs with explicit evidence, physical containment, recoverable transitions, current-state reporting, exact diff scope, and bounded diagnostics.
+Developers can validate SDD artifacts, mutate lifecycle state, resolve topology, audit Epics, and prepare review/release handoffs with explicit evidence, physical containment, bounded preserved-state recovery, current-state reporting, exact diff scope, and bounded diagnostics.
 
 ## Current Scope
 
 - Trustworthy v2 Epic structure and evidence validation.
-- Physically contained and recoverable local filesystem mutation.
+- Physically contained local filesystem mutation with no silent overwrite, parseable durable files, exclusive creation where required, and actionable preserved-state recovery.
 - Unambiguous configuration, topology, and Change lifecycle routing.
 - Bounded, context-aware `doctor` and `status` diagnostics.
 - Current-state Epic audit reports and exact-diff PR/release handoffs.
 - Persistent evidence-backed planning, implementation, review, design, and interactive workflows.
+- Shared same-session minimum context acquisition for exploration, ADR, and Change planning.
 - An accessible public methodology reference with restrained Steel documentation presentation.
 
 ## Deferred Scope
@@ -58,12 +59,12 @@ Candidate Stories are planning signals only. They are not accepted Epic/Story tr
 | Story | Implementation | Verification | Capability | Last Verified | Notes |
 |---|---|---|---|---|---|
 | S1 | implemented | verified | Validate navigable behavior and real evidence. | 2026-07-23 | Structure, anchors, evidence, report integrity, metadata, and focused reads fail closed with current proof. |
-| S2 | implemented | verified | Mutate only inside physical owner boundaries and recover safely. | 2026-07-23 | Physical boundaries, recovery, and first-initialization contention now fail closed. |
-| S3 | implemented | verified | Reject ambiguous topology and lifecycle routing. | 2026-07-23 | Synthetic-ID collisions and lexical/physical planned-path escapes now fail closed. |
-| S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-07-20 | Guidance is affirmative-only and Git work is bounded. |
+| S2 | partial | partial | Mutate only inside physical owner boundaries and preserve concurrent state safely. | 2026-08-30 | Configuration, Epic creation, Change lifecycle, managed workflow, installation evidence, and per-skill synchronization use bounded current-consumer primitives; managed-skill cleanup reports detectable drift and cannot follow a replaced registry ancestor, while dated accepted cleanup and local-filesystem gaps remain explicit. |
+| S3 | partial | partial | Route one workspace-unique central Change across portable repository targets. | 2026-08-30 | Selected-Space validation isolates ownership diagnostics; lifecycle commands preserve tested pre-syscall conflicts, while exact final path races, restrictive-umask mode narrowing, and unrelated unknown-Space status blocking remain dated accepted gaps. |
+| S4 | implemented | verified | Complete diagnostics within a bound without prose false positives. | 2026-08-30 | Guidance is affirmative-only; status and Review-seal Git children are bounded. |
 | S5 | implemented | verified | Preserve current audit truth and exact publication scope. | 2026-07-23 | Reports are versioned; PR/release paths are classified and rechecked; Git baselines are immutable and bounded. |
-| S6 | implemented | verified | Carry workflow work through a complete evidence-backed handoff. | 2026-07-23 | Shipped workflow contracts and their mirrored records have exact semantic package-contract proof. |
-| S7 | implemented | verified | Explain the portable method and package through accessible responsive documentation. | 2026-07-23 | Exact source contracts and current-commit rendered evidence pass; owner preference confirmation remains separately pending. |
+| S6 | implemented | verified | Carry one progressive central Change through focused planning, risk-triggered Review, conditional Epic reconciliation, and a content-identical local outcome commit. | 2026-08-29 | The one supported current workflow is v2; Review parsing preserves escaped evidence cells, and `ready` rejects unresolved evidence or findings before candidate closure. |
+| S7 | implemented | verified | Explain the portable method and package through accessible responsive documentation. | 2026-08-18 | Current guide and durable desktop/mobile evidence explain and prove the v2 workflow; owner product acceptance was separately confirmed on 2026-08-18. |
 
 ## Stories
 
@@ -274,13 +275,13 @@ For automated evidence, use `path#exact test title or stable test anchor` and na
 
 ### Story S2: Safe And Recoverable Mutation
 
-Implementation: implemented
-Verification: verified
+Implementation: partial
+Verification: partial
 Created: 2026-07-20
-Modified: 2026-07-23
-Last verified: 2026-07-23
+Modified: 2026-09-01
+Last verified: 2026-08-30
 
-As a developer, I want filesystem mutations to stay inside their physical owner and preserve concurrent work, so that setup and lifecycle commands cannot silently damage unrelated data.
+As a developer, I want filesystem mutations to stay inside their physical repository or selected workspace owner and preserve concurrent work, so that setup and lifecycle commands cannot silently damage unrelated data.
 
 #### Requirements And Scenarios
 
@@ -299,18 +300,8 @@ The CLI SHALL compare the commit-time Change state with the state it prepared an
 
 ###### Scenario R2-S1: Concurrent Transition Edit
 
-- WHEN `tasks.md` changes after transition preflight but before replacement
-- THEN the transition restores the current content and reports concurrent modification.
-
-###### Scenario R2-S2: Concurrent Promotion Edit
-
-- WHEN a planned draft changes while promotion copies are staged
-- THEN promotion aborts, removes staged destinations, and restores the latest draft.
-
-###### Scenario R2-S3: Post-Commit Edit During Multi-Target Recovery
-
-- WHEN a writer edits an already committed target before a later target fails
-- THEN rollback preserves that newer target content and reports the retained recovery state.
+- WHEN `change.md` changes after transition preflight but before replacement
+- THEN the transition preserves the current content and reports concurrent modification.
 
 ###### Scenario R2-S4: Close-Time Status Drift
 
@@ -322,193 +313,299 @@ The CLI SHALL compare the commit-time Change state with the state it prepared an
 - WHEN two processes initialize the same repository before either portable contract exists
 - THEN at most one initialization succeeds and the other reports the conflict without losing either writer's accepted durable state.
 
-##### Requirement R3: Atomic Durable State And Recovery Reporting
+##### Requirement R3: Bounded Durable Mutation And Recovery Reporting
 
-The CLI SHALL atomically replace configuration and installation-lock files, serialize managed updates, and report rollback failures with the resulting state.
+The CLI SHALL publish individual durable files atomically, refuse unexpected replacement, use exclusive creation where a new directory must not replace an existing target, serialize only current one-writer operations, and report preserved state plus an actionable retry or manual-recovery step when a mutation cannot complete. It does not guarantee replay, arbitrary partial-cleanup continuation, or cross-artifact rollback to a prior global state.
 
-###### Scenario R3-S1: Interrupted Or Failed Mutation
+###### Scenario R3-S1: Individual Durable File Conflict Or Failure
 
-- WHEN an update or multi-repository lifecycle step fails
-- THEN prior durable files remain parseable and the error identifies any recovery action that did not complete.
+- WHEN configuration or installation evidence changes after preparation, or its publication cannot complete
+- THEN the CLI does not overwrite newer content, leaves each resulting durable file complete and parseable, and identifies preserved state plus the next safe action.
+
+###### Scenario R3-S2: Epic Scaffold Collision Or Interruption
+
+- WHEN an Epic target appears during creation or scaffolding cannot complete
+- THEN the CLI does not replace an existing target, preserves any target or residue needed for inspection, and reports a typed retry or manual-recovery action without requiring journal replay.
+
+###### Scenario R3-S3: Partial Managed Workflow Refresh
+
+- WHEN managed workflow or installation-evidence refresh cannot complete
+- THEN the CLI preserves newer content, leaves individual durable files complete and parseable, and identifies the resulting state plus the next safe action without promising global rollback.
+
+###### Scenario R3-S4: Partial Managed Skill Refresh
+
+- WHEN a managed skill conflicts or a multi-skill refresh cannot complete
+- THEN the CLI preserves locally modified or newer targets, identifies completed and residual state, and reports the safe retry, force, or manual-recovery action without promising aggregate rollback.
+
+###### Scenario R3-S5: Managed Skill Cleanup Drift
+
+- WHEN cleanup detects replacement or modification of preserved skill state or the prepared registry owner changes
+- THEN the CLI preserves every detectable drift, reports the retained or recorded state plus a safe manual-recovery action, and does not follow a replaced registry ancestor into an external path.
+
+###### Scenario R3-S6: Read-Only Preserved Skill Cleanup
+
+- WHEN cleanup verifies that the exact preserved managed-skill tree is unchanged but its directories are non-writable
+- THEN the CLI removes that verified owner-bound tree without broadening permissions on a replacement or external path and completes the requested refresh.
+
+##### Requirement R4: Workspace-Owned Managed Installation
+
+The CLI SHALL keep workspace configuration, Change storage, recovery state, and installation evidence under `<workspace>/.sdd/`; install managed skills under `<workspace>/.agents/skills/` by default; and reject any configured managed-skill path whose physical target escapes the workspace.
+
+###### Scenario R4-S1: Managed Skill Escape
+
+- WHEN setup resolves a configured managed-skill directory outside the selected workspace through an absolute path, `..`, or symlink ancestry
+- THEN it fails before writing the directory, workflow, configuration, or installation evidence.
+
+###### Scenario R4-S2: No Home Mutation
+
+- WHEN setup, update, or lifecycle mutation runs for an explicit disposable workspace
+- THEN every SDD-owned write stays under that workspace or an explicitly targeted repository and no home-scoped SDD state is read or written.
 
 #### Implemented By
 
 | Requirement / Scenario | Location / Anchor | Kind | Responsibility |
 |---|---|---|---|
 | S2/R1 | `src/fs.js#isPathPhysicallyInside` | primary | Resolves existing ancestors before authorizing a child path. |
-| S2/R1 | `src/skills.js#applySkillSync` | support | Rechecks every managed-skill target immediately before mutation. |
-| S2/R1 | `src/config.js#writeConfig` | support | Refuses a configuration file below a symlinked external `.sdd` directory. |
-| S2/R1 | `src/commands/change-promote.js#assertNoSymlinks` | support | Prevents private or external draft content from entering a repository through nested symlinks. |
-| S2/R2 | `src/commands/change-transition.js#transitionChange` | primary | Compares staged `tasks.md` with commit-time content and preserves concurrent edits. |
-| S2/R2 | `src/commands/change-promote.js#promotePlannedChange` | primary | Holds and hashes the draft while staging and committing promotion. |
-| S2/R2 | `src/commands/change-close.js#closeChange` | primary | Rechecks status and ownership at commit time and reports incomplete multi-target recovery. |
-| S2/R2-S5 | `src/commands/init-installation.js#initRepository` | primary | Serializes first repository-contract publication under the physical repository owner lock. |
-| S2/R2-S5 | `src/mutation.js#withWorkspaceMutationLock` | support | Exclusively reserves the repository mutation boundary and returns an actionable contention error. |
-| S2/R3 | `src/fs.js#writeFileAtomically` | primary | Durably replaces configuration and JSON lock state through a synced temporary file. |
-| S2/R3 | `src/fs.js#replaceFileAtomically` | primary | Publishes managed files with no-replace semantics and retains recovery state on a concurrent recreation. |
-| S2/R3 | `src/fs.js#replaceDirectoryAtomically` | primary | Exclusively reserves managed directories before publishing their staged contents. |
-| S2/R3 | `src/mutation.js#withWorkspaceMutationLock` | support | Serializes managed setup and update operations. |
-| S2/R3 | `src/installation.js#applyManagedInstallation` | support | Treats workflow, skill, and install-lock updates as one recoverable unit. |
-| S2/R3 | `src/commands/init.js#initWorkspace` | support | Restores the exact pre-migration configuration or reports retained migrated state when recovery fails. |
-| S2/R3 | `src/commands/init-installation.js#setupInstallation` | support | Runs first-time user setup under the managed transaction and removes newly created durable state on failure. |
-| S2/R3 | `src/commands/update.js#updateWorkspace` | support | Serializes user and legacy updates through the shared managed-install transaction. |
-| S2/R3 | `src/workflow.js#applyWorkflowSync` | support | Applies, verifies, rolls back, and finalizes managed workflow replacement. |
-| S2/R3 | `src/commands/change-transition.js#MUTATION_RECOVERY_FAILED` | support | Reports original and recovery failures with affected paths. |
+| S2/R1, S2/R4 | `src/managed-skill-publication.js#ensureManagedSkillRegistry` | support | Rejects lexical or physical registry escape and binds per-skill publication to the selected workspace and exact managed registry. |
+| S2/R1 | `src/config.js#writeWorkspaceConfig` | support | Refuses a configuration file below a symlinked external `.sdd` directory. |
+| S2/R2 | `src/commands/change-transition.js#transitionChange` | primary | Rechecks the bounded `change.md`, workspace, and repository snapshots after staging and immediately before atomic replacement; it requests the accepted prior mode but can narrow it within the dated restrictive-umask gap. |
+| S2/R2 | `src/commands/change-close.js#closeChange` | primary | Rechecks status, ownership, destination absence, and a physically contained non-symlink directory handle before the active-to-closed rename; restrictive mode restoration stays bound to that handle. |
+| S2/R2-S5 | `src/commands/init-installation.js#initRepository` | primary | Publishes the first portable repository contract through the exclusive no-replace configuration boundary so one concurrent writer wins without a generalized workspace lock. |
+| S2/R3-S1 | `src/config-publication.js#publishConfigFile` | primary | Publishes complete configuration YAML, restores accepted mode on the staged inode before publication, verifies the actual staged mode, preserves unexpected targets outside the dated final-unlink gap, and reports bounded retained or recorded recovery state. |
+| S2/R3-S1, S2/R3-S3, S2/R4-S2 | `src/managed-file-publication.js#publishManagedFile` | primary | Publishes complete managed workflow and installation-evidence files, restores accepted mode on the staged inode before publication, verifies the actual staged mode, preserves concurrent targets outside the dated final-unlink gap, and checks selected-workspace authority at mutation boundaries. |
+| S2/R3-S2 | `src/commands/epic-create.js#publishEpicScaffold` | primary | Exclusively creates one owner-contained Epic directory and fsynced `epic.md`, preserves collisions or incomplete state for inspection, and reports a typed retry/manual-recovery action without journal replay. |
+| S2/R3-S4, S2/R3-S5, S2/R3-S6, S2/R4-S1 | `src/managed-skill-publication.js#publishManagedSkill` | primary | Publishes or retires one confined managed-skill tree, preserves target and detectable cleanup drift under a named retained path, binds recursive cleanup to the prepared registry owner, retains source modes, and never rolls another skill back; cleanup of a valid non-writable preserved tree can stop with typed retained-state recovery within the dated R3-S6 gap. |
+| S2/R3-S3, S2/R3-S4, S2/R4-S2 | `src/mutation.js#withWorkspaceMutationLock` | support | Exclusively admits one current setup/update writer, preserves a lock replacement during guarded release, and supplies immutable selected-workspace authority checks; retained state requires explicit inspection rather than dead-owner replay. |
+| S2/R3-S3, S2/R3-S4 | `src/installation.js#applyManagedInstallation` | primary | Coordinates bounded workflow, per-skill, and installation-evidence publication while preserving complete partial state and reporting exact completed/residual retry or manual actions without global rollback. |
+| S2/R3-S1, S2/R3-S3, S2/R3-S4 | `src/commands/init-installation.js#setupInstallation` | support | Preserves successfully published workspace configuration and managed artifacts with retry guidance when the remaining installation cannot complete. |
+| S2/R3-S3, S2/R3-S4 | `src/commands/update.js#updateWorkspace` | support | Refreshes current workspace-managed artifacts. |
+| S2/R3-S3 | `src/workflow.js#applyWorkflowSync` | support | Applies and verifies complete workflow publication while preserving a local or concurrent winner. |
+| S2/R3-S4 | `src/skills.js#applySkillSync` | primary | Applies mutating skills sequentially, preserves completed work, records failed and residual actions, and advances installation evidence only after every requested skill remains current. |
+| S2/R4 | `src/commands/init-installation.js#setupInstallation` | primary | Creates or reconciles the selected workspace's configuration, workflow, install lock, and contained managed-skill registry while carrying the lock-bound workspace identity through each mutation boundary. |
+| S2/R4 | `src/config.js#resolveWorkspaceSkillsDirectory` | support | Rejects lexical or physical managed-skill paths outside the workspace owner. |
 
 #### Implementation Gaps
 
-- None.
+- `S2/R2-S1`, `S2/R2-S4`: plain Node path APIs cannot atomically bind the final observed Change file/source directory and absent destination to the subsequent replacement or move syscall; a same-user actor can change those paths after the last explicit recheck.
+- `S2/R3-S6`: [user accepted 2026-08-30; `PR-R9-READONLY-CLEANUP-01`] Owner-bound recursive cleanup does not temporarily restore write/search permission on a valid preserved tree, so non-writable directories can produce `EACCES` after publication and leave typed retained state for manual recovery instead of completing the refresh. Acceptance is limited to this exact safe-failure boundary; it permits no silent deletion, overwrite, boundary escape, or false success.
 
 #### Verified By
 
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
-| S2/R1-S1 | Automated test `test/cli.test.js#init rejects a managed skills path through an external symlink ancestor` | Install planning refuses an external symlink ancestor before writing. | Passing 2026-07-20 |
+| S2/R1-S1 | Automated test `test/cli.test.js#setup rejects a managed skills path through an external symlink ancestor` | Install planning refuses an external symlink ancestor before writing. | Passing 2026-08-07 |
+| S2/R1-S1 | Automated tests `test/cli.test.js#Epic create allows a selected mapping without portable config and confines custom roots physically`, `test/cli.test.js#Epic create never mutates a same-content external ancestor replacement`, and `test/cli.test.js#Epic creation rechecks authority before creating a missing artifact parent` | Epic scaffolding rejects configured and commit-window physical-owner escapes before writing the external target, and authority drift cannot create a missing artifact parent. | Passing 2026-08-19 |
 | S2/R1-S1 | Automated test `test/cli.test.js#change transition rejects an active Change through an external symlink ancestor` | Lifecycle mutation refuses an external artifact root and preserves its contents. | Passing 2026-07-20 |
 | S2/R1-S1 | Automated test `test/cli.test.js#validate rejects implementation and test evidence that resolve outside the repository` | Evidence acceptance uses the same physical ownership rule. | Passing 2026-07-20 |
-| S2/R1-S1 | Automated test `test/mutation.test.js#fixed SDD mutation paths reject a symlinked config directory` | Workflow, configuration, and lock paths cannot escape through `.sdd`. | Passing 2026-07-20 |
-| S2/R1-S1 | Automated test `test/cli.test.js#change promote rejects symbolic links anywhere in the planned draft` | Promotion refuses nested links before copying private external content. | Passing 2026-07-20 |
-| S2/R2-S1 | Automated test `test/cli.test.js#change transition preserves a concurrent tasks edit` | Commit-time drift aborts and restores the latest `tasks.md`. | Passing 2026-07-20 |
-| S2/R2-S2 | Automated test `test/cli.test.js#change promote preserves a concurrent replacement of the planned draft` | Promotion aborts without a destination and retains the replacement draft. | Passing 2026-07-20 |
-| S2/R2-S3 | Automated test `test/cli.test.js#change transition preserves an edit made after an earlier repository commit` | A later failure does not erase newer content in an earlier repository. | Passing 2026-07-20 |
-| S2/R2-S3 | Automated test `test/cli.test.js#change promote preserves a destination edited after commit when a later destination fails` | Promotion recovery preserves an edited committed destination. | Passing 2026-07-20 |
-| S2/R2-S4 | Automated test `test/cli.test.js#change close rechecks status at commit time` | Close refuses a Change reopened after preflight. | Passing 2026-07-20 |
-| S2/R2-S5 | Automated test `test/cli.test.js#repository init rejects concurrent first initialization without losing the winner` | One initial repository contract wins; the concurrent caller receives `OPERATION_IN_PROGRESS`, and no mutation lock remains. | Passing 2026-07-23 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#atomic JSON writes leave one complete parseable document` | Competing lock writes leave one whole parseable document. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#atomic JSON writes preserve the existing file mode` | Atomic replacement retains existing permissions. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#workspace mutation lock recovers a stale dead-owner lock` | A crashed owner does not permanently block managed mutation. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#managed installation rolls back workflow and skills when lock persistence fails` | Workflow and skills roll back if the installation lock cannot commit. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#managed installation removes workflow recovery backups after update rollback` | Update rollback restores the old workflow without leaking hidden recovery artifacts. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#workflow sync restores the old target when replacement commits then throws` | A post-commit helper failure does not escape workflow recovery. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#skill sync restores the old target when replacement commits then throws` | A post-commit helper failure does not escape skill recovery. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#managed installation refuses adopt drift before committing its lock` | No-op/adopt targets are rechecked before their hashes enter the lock. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#managed installation refuses workflow adopt drift before committing its lock` | Adopted workflow content is rechecked before its hash enters the lock. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#managed installation rolls back its lock when adopt drifts during lock persistence` | Targets are rechecked after lock persistence and a newly stale lock is removed. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#mutation lock cleans up a failed acquisition write` | Failed lock initialization does not leave a permanent lock or handle. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#mutation lock preserves a replacement owned by another operation` | Lock release removes only the caller's token. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#first-time setup removes its new config when managed installation fails` | A failed initial setup remains retryable with no partial config or installed skill state. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#first-time setup does not follow a dangling gitignore symlink` | Setup cannot create external content through a dangling fixed-child symlink. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#first-time legacy init removes new durable state when installation fails` | Failed legacy initialization leaves no partial config, workflow, lock, or skill state. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#workflow replacement preserves an edit made inside the replacement window` | File replacement compares the moved target with the expected hash and preserves newer content. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#skill replacement preserves an edit made inside the replacement window` | Directory replacement compares the moved target with the expected hash and preserves newer content. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#file replacement preserves a target recreated at publish time` | Exclusive file publication cannot overwrite a target recreated after the original is moved. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#directory replacement preserves a target recreated at publish time` | Exclusive directory reservation cannot overwrite a target recreated after the original is moved. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#failed installation after v1 migration restores the original config` | Installation failure restores the exact pre-migration configuration bytes. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/mutation.test.js#failed v1 config restoration reports incomplete recovery` | A failed config restore reports the retained migrated path and recovery failure. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/cli.test.js#update refuses to overlap another managed mutation` | A held operation lock blocks updates without altering durable install state. | Passing 2026-07-20 |
-| S2/R3-S1 | Automated test `test/cli.test.js#change transition reports incomplete rollback with the affected path` | Recovery failure returns an explicit code and affected repository path. | Passing 2026-07-20 |
+| S2/R1-S1 | Automated test `test/mutation.test.js#fixed SDD mutation paths reject a symlinked config directory` | Workflow, configuration, and lock paths cannot escape through `.sdd`. | Passing 2026-08-23 |
+| S2/R2-S1 | Automated tests `test/change-contract.test.js#planning completes the same Change before lifecycle work continues` and `test/cli.test.js#change transition preserves an edit made at the final replacement boundary` | Edits injected before the last snapshot recheck abort with `CONCURRENT_CHANGE`, preserve current content, and remove staged replacement residue. | Passing 2026-08-21 |
+| S2/R2-S4 | Automated tests `test/cli.test.js#change close rechecks status at commit time` and `test/cli.test.js#change close preserves a destination that appears before the final move` | A reopen or nonempty destination injected before the last move recheck remains canonical. | Passing 2026-08-21 |
+| S2/R2-S5 | Automated test `test/cli.test.js#repository init rejects concurrent first initialization without losing the winner` | Two overlapping initializers leave one complete accepted repository contract; the prepared loser receives an actionable `CONCURRENT_CHANGE`, and no publication residue remains. | Passing 2026-08-19 |
+| S2/R3-S1 | Automated tests `test/workspace-config.test.js#expected-absent config publication preserves a file that appears before publish` and `test/workspace-config.test.js#expected-absent repository config publication preserves a file that appears before publish` | Exclusive first publication preserves a complete concurrent workspace or repository winner. | Passing 2026-08-19 |
+| S2/R3-S1 | Automated test `test/workspace-config.test.js#configuration publication writes complete YAML and preserves file mode` | Under restrictive process umask, configuration replacement remains parseable, restores the exact accepted prior mode, and completes without false recovery. | Passing 2026-08-29 |
+| S2/R3-S1 | Automated test `test/workspace-config.test.js#config publication rejects an owner-local ancestor replacement` | Publication remains bound to the prepared physical owner-local ancestor chain, preserves the current configuration, and reports the staged name when cleanup cannot be verified after ancestor drift. | Passing 2026-08-24 |
+| S2/R3-S1 | Automated test `test/workspace-config.test.js#configuration replacement preserves winners after displacement and publication` | A winner appearing after displacement or after staged publication remains canonical; retained original/requested files stay parseable and the error identifies safe recovery. | Passing 2026-08-19 |
+| S2/R3-S1 | Automated test `test/mutation.test.js#config publication reports recovery path when displacement read fails` | Failure injected after successful rename and before displaced-file acceptance reports the recorded recovery name, keeps the original complete bytes and mode, removes the staged file, and leaves retry/manual recovery explicit. | Passing 2026-08-24 |
+| S2/R3-S1 | Automated test `test/mutation.test.js#config publication reports recorded recovery name after owner-parent movement` | Owner-parent movement after displacement produces honest recorded recovery and staging names, accounts for every file under the moved owner, preserves complete original and staged bytes/modes, and demonstrates the dated current-path discovery limit. | Passing 2026-08-24 |
+| S2/R3-S1 | Automated test `test/mutation.test.js#config publication reports staging movement during final cleanup` | A staging-name move after successful publication cannot return success silently: the complete published target remains canonical and typed recovery reports the unverified staging name. | Passing 2026-08-24 |
+| S2/R3-S1 | Automated tests `test/mutation.test.js#config publication reports recovery movement during final cleanup` and `test/mutation.test.js#config publication combines retained recovery and unverified staging cleanup` | Recovery disappearance after verified publication is reported rather than treated as deletion, and a changed recovery plus moved staging name is returned as one complete typed recovery result without overwriting the published target. | Passing 2026-08-24 |
+| S2/R3-S1 | Automated test `test/cli.test.js#configure preserves a config that replaces its preflight snapshot before publish` | Configuration publication preserves a newer concurrent target and reports the conflict. | Passing 2026-08-19 |
+| S2/R3-S1 | Automated test `test/mutation.test.js#first setup preserves complete config and reports bounded retry state` | A later managed-install failure retains parseable workspace configuration and workflow state and identifies the same setup command as the safe retry. | Passing 2026-08-23 |
+| S2/R3-S1, S2/R3-S3 | Automated tests `test/mutation.test.js#managed installation preserves completed skills and prior evidence on lock failure`, `test/mutation.test.js#managed installation preserves evidence conflicts and restrictive modes`, `test/mutation.test.js#managed installation preserves a workflow replacement at the final success boundary`, and `test/mutation.test.js#managed installation preserves an installation-evidence replacement at the final success boundary` | Installation failure preserves complete prior or concurrent durable files and safe retry state; the default installation-evidence publisher also replaces complete JSON under restrictive umask while restoring an accepted read-only mode. | Passing 2026-08-29 |
+| S2/R3-S2 | Automated test `test/cli.test.js#epic create refuses ambiguous repositories, collisions, and dry-run writes` | Epic creation refuses a colliding target and leaves it unchanged. | Passing 2026-08-19 |
+| S2/R3-S2 | Automated test `test/cli.test.js#epic create scaffolds and validates a canonical Epic in one repository` | A successful exclusive scaffold publishes one structurally valid Epic. | Passing 2026-08-19 |
+| S2/R3-S2 | Automated test `test/cli.test.js#CLI exposes epic create with JSON output` | Epic creation preserves current JSON fields and human dry-run output without mutation. | Passing 2026-08-19 |
+| S2/R3-S2 | Automated test `test/cli.test.js#Epic creation preserves every destination type that appears before exclusive creation` | A raced file, directory, symlink, or nonempty directory remains the canonical target; retry succeeds only after explicit removal. | Passing 2026-08-19 |
+| S2/R3-S2 | Automated test `test/cli.test.js#Epic creation rejects a target replacement after exclusive directory creation` | The freshly created directory is identity-bound before payload write; a replacement is preserved empty and reported instead of being adopted. | Passing 2026-08-19 |
+| S2/R3-S2 | Automated test `test/cli.test.js#Epic validation failure retains complete inspectable state and reports manual recovery` | Failed structural validation retains complete inspectable scaffold state, reports `MUTATION_RECOVERY_FAILED`, names the retained path, and provides manual retry guidance. | Passing 2026-08-19 |
+| S2/R3-S2 | Automated test `test/cli.test.js#Epic validation recovery preserves a replacement and the displaced scaffold` | A target replacement after failed validation remains untouched while the displaced complete scaffold remains inspectable. | Passing 2026-08-19 |
+| S2/R3-S3 | Automated tests `test/mutation.test.js#workflow refresh preserves a concurrent complete replacement`, `test/mutation.test.js#workflow refresh writes one complete file and preserves its mode`, and `test/mutation.test.js#workflow refresh reports packaged partial state without rolling back` | Workflow refresh preserves a newer target, publishes complete bytes with the exact prior mode under restrictive process umask, and reports packaged partial state without restoring a prior global installation. | Passing 2026-08-29 |
+| S2/R3-S1, S2/R3-S3 | Automated test `test/mutation.test.js#managed file publication reports recovery path when displacement read fails` | Failure injected after managed workflow or installation-evidence displacement reports the recorded recovery name, keeps the original complete bytes and mode, removes the staged file, and leaves retry/manual recovery explicit. | Passing 2026-08-24 |
+| S2/R3-S1, S2/R3-S3 | Automated test `test/mutation.test.js#managed file publication reports recorded recovery name after owner-parent movement` | Owner-parent movement after displacement produces honest recorded recovery and staging names, accounts for every file under the moved owner, preserves complete original and staged bytes/modes, and demonstrates the dated current-path discovery limit. | Passing 2026-08-24 |
+| S2/R3-S1, S2/R3-S3 | Automated test `test/mutation.test.js#managed file publication reports staging movement during final cleanup` | A staging-name move after successful managed-file publication cannot return success silently: the complete published target remains canonical and typed recovery reports the unverified staging name. | Passing 2026-08-24 |
+| S2/R3-S1, S2/R3-S3 | Automated test `test/mutation.test.js#managed file publication reports recovery movement during final cleanup` | Recovery disappearance after verified managed-file publication is reported as an unverified recorded name while the complete published target remains canonical and staged cleanup is proved complete. | Passing 2026-08-24 |
+| S2/R3-S3 | Automated tests `test/mutation.test.js#managed setup and update serialize one current writer`, `test/mutation.test.js#managed writer release preserves a replacement lock`, and `test/cli.test.js#update refuses to overlap another managed mutation` | One setup/update writer owns the bounded refresh; overlapping attempts and a release-boundary replacement preserve the current lock and return actionable retained state. | Passing 2026-08-23 |
+| S2/R3-S4 | Automated test `test/mutation.test.js#managed skill refresh preserves completed work and reports residual actions without rollback` | A three-skill refresh preserves the completed first publication, names the failed second and pending third actions, withholds installation evidence, and succeeds on safe retry without aggregate rollback. | Passing 2026-08-24 |
+| S2/R3-S4 | Automated tests `test/mutation.test.js#skill replacement preserves a newer target as named residual state` and `test/mutation.test.js#managed skill publication preserves nested modes` | Per-skill publication retains a replacement-window edit under an explicit inspection path and reproduces packaged file and directory modes. | Passing 2026-08-24 |
+| S2/R3-S5 | Automated tests `test/mutation.test.js#skill replacement preserves a newer target as named residual state` and `test/mutation.test.js#managed skill cleanup never follows a replaced registry ancestor` | Cleanup replacement after update and cleanup modification after retirement return typed recovery with retained state; owner-bound removal preserves both the displaced managed state and matching external content when the registry ancestor changes after the last tree observation. | Passing 2026-08-29 |
+| S2/R3-S4 | Automated tests `test/cli.test.js#update refuses to overwrite locally modified managed skills`, `test/cli.test.js#forced update restores a conflicting managed skill`, `test/cli.test.js#CLI setup adopts a matching skill already inside the workspace registry`, and `test/cli.test.js#update removes a retired skill only when it matches its managed hash` | Skill refresh preserves local modifications by default and retains explicit force, adoption, retired-skill ownership, Doctor reporting, and result actions. | Passing 2026-08-24 |
+| S2/R4-S1 | Automated tests `test/workspace-config.test.js#managed skill directory is lexically and physically workspace-contained`, `test/cli.test.js#setup rejects a managed skills path through an external symlink ancestor`, and `test/mutation.test.js#managed skill registry staging rejects an external symlink replacement` | Setup rejects absolute, traversal, existing-symlink, and publication-boundary registry escapes before installation writes external content. | Passing 2026-08-24 |
+| S2/R4-S2 | Automated tests `test/mutation.test.js#managed writer rejects a selected workspace replacement before lock-directory creation`, `test/mutation.test.js#setup rejects a selected workspace root replacement before managed writes`, `test/mutation.test.js#managed-file staging rejects a selected workspace root replacement`, `test/mutation.test.js#managed skill staging rejects a selected workspace root replacement`, `test/cli.test.js#CLI setup owns only the explicit workspace and exposes workspace output fields`, `test/cli.test.js#CLI update with an explicit workspace leaves a populated decoy home unchanged`, and `test/workspace-config.test.js#workspace discovery never falls back to HOME or SDD_USER_HOME` | Lock acquisition, setup directories, managed-file staging, and retained managed-skill staging reject replacement of the originally selected workspace before writing the replacement target; setup, update, and discovery ignore decoy home installations. | Passing 2026-08-23 |
 
 #### Verification Gaps
 
-- None.
+- `S2/R2-S1`: [user accepted 2026-08-21] Portable Node cannot atomically condition final `change.md` replacement on the exact snapshot observed immediately before `rename`; a concurrent same-user path replacement in that final window can be overwritten. Acceptance is limited to the owner-operated local CLI and does not claim atomic compare-and-set.
+- `S2/R2-S4`: [user accepted 2026-08-21] Portable Node cannot atomically condition the active-to-closed directory move on the exact status/source/destination state observed immediately before `rename`; a final-window reopen or empty destination can be moved or replaced. Acceptance is limited to the owner-operated local CLI and does not claim atomic move-if-current.
+- `S2/R3-S2`: [user accepted 2026-08-19] Portable Node path APIs cannot bind the later `epic.md` creation to the exact empty directory inode returned by `mkdir`; a concurrent same-user process can replace that directory between syscalls. This accepted technical gap is limited to the owner-operated local CLI boundary and does not claim protection from that exact interleaving.
+- `S2/R3-S1`, `S2/R3-S3`: [user accepted 2026-08-24] After a successful displacement and before the bound recovery read, a same-user actor can move an owner ancestor. Portable path APIs cannot discover the displaced file's new current path; the CLI reports the recovery name recorded before drift and preserves honest manual guidance, while focused proof confirms complete bytes and mode remain under the moved owner. Acceptance is limited to the owner-operated local CLI and does not permit overwrite, incomplete state, hidden staging residue, or a global rollback claim.
+- `S2/R3-S1`, `S2/R3-S3`: [user accepted 2026-08-28] In the final cleanup syscall window, a same-user actor can replace an owned configuration, workflow, or installation-evidence recovery/staging pathname after its inode identity is observed and before path-based `rm()` executes. Portable Node provides no inode-bound unlink primitive, so that replacement may be deleted. Acceptance is limited to this exact owner-operated local CLI window and does not cover earlier drift, incomplete files, unreported residue outside the window, cross-artifact rollback, or external attackers.
+- `S2/R3-S5`: [user accepted 2026-08-29] After the exact preserved managed-skill tree is last observed, a same-user actor can replace or add content beneath its unique hidden cleanup path before owner-bound path-based recursive removal completes, and that content may be deleted. Acceptance is limited to this exact owner-operated local setup/update window and does not cover detectable earlier drift, a replaced registry ancestor or external path, target overwrite, unreported residue, or cross-skill rollback.
+- `S2/R3-S6`: [user accepted 2026-08-30; `PR-R9-READONLY-CLEANUP-01`] No focused test proves successful removal of an unchanged non-writable preserved skill tree because current cleanup stops safely with typed `EACCES` recovery. This accepted verification gap is limited to that exact implementation limit.
 
 #### Story Notes
 
 - Physical ownership is evaluated after resolving existing symlink ancestors; it is stronger than lexical `..` rejection.
-- Dead-owner mutation locks are reclaimed from a matching ownership record. An alive or unknown PID is conservative: the CLI reports PID and creation time for manual inspection because PID reuse cannot be distinguished portably without platform-specific process-start identity.
+- The accepted recovery boundary is recorded in `docs/adrs/2026-08-19-use-current-consumer-cli-primitives.md`. Physical containment, no silent overwrite, complete individual durable files, required exclusive creation, and actionable preserved-state reporting remain required; migration-grade replay and cross-artifact rollback are not accepted guarantees.
+- Remaining managed-skill seams may temporarily provide stronger recovery while S9 replaces aggregate directory rollback around the final current consumer.
+- Epic creation now uses exclusive owner-contained target creation and actionable preserved-state recovery; the generalized directory journal/replay implementation has no current consumer and was removed.
+- First repository configuration and central Change lifecycle commands use their narrow no-overwrite boundaries. Setup/update retain only a bounded one-writer lock, complete managed-file publication, and actionable partial-state reporting; dead-owner replay, workflow rollback, and cross-artifact installation rollback are no longer current guarantees.
 
 ### Story S3: Unambiguous Topology And Lifecycle Routing
 
-Implementation: implemented
-Verification: verified
+Implementation: partial
+Verification: partial
 Created: 2026-07-20
-Modified: 2026-07-23
-Last verified: 2026-07-23
+Modified: 2026-09-01
+Last verified: 2026-08-30
 
-As a developer, I want invalid or unmapped topology rejected before artifact creation, so that commands cannot invent ownership or leave duplicate Change truth.
+As a developer, I want one workspace-unique Change record with explicit portable repository targets, so that lifecycle commands cannot invent ownership, split status across copies, or mutate outside the selected workspace.
 
 #### Requirements And Scenarios
 
-##### Requirement R1: Repository-Only Planning Refusal
+##### Requirement R1: Portable Central Change Creation
 
-The CLI SHALL refuse idea-owned Change creation and promotion when repository context has no configured Idea/planning mapping.
+The CLI SHALL create one proposed central `change.md` under `<workspace>/.sdd/changes/<change-id>/`, record its owning Space there, allow repository ownership to remain empty until planning, and use stable repository IDs when targets are selected.
 
-###### Scenario R1-S1: Unmapped Change Create
+###### Scenario R1-S1: Repository-Only Change Create
 
-- WHEN `change create` targets a repository-only synthetic Space
-- THEN it returns a mapping-required error and writes nothing.
+- WHEN `change create` targets a repository-only synthetic Space with a valid `.sdd/config.yaml` repository ID
+- THEN it creates one central Change with that Space and repository ID and writes no repository-local Change folder.
 
-###### Scenario R1-S2: Unmapped Change Promotion
+###### Scenario R1-S2: Deferred Repository Selection
 
-- WHEN `change promote` targets the same repository-only synthetic Space
-- THEN it returns the same mapping-required error before looking for or moving a private draft.
+- WHEN a Space maps to multiple eligible repositories and no target set is supplied
+- THEN creation writes one proposed Change with an empty repository list instead of guessing.
 
-##### Requirement R2: Strict Physical Configuration
+##### Requirement R2: Strict Physical Configuration And Storage
 
-The CLI SHALL reject unknown configuration keys, duplicate physical repository ownership, and artifact paths whose relationships are equal or invalidly overlap.
+The CLI SHALL reject unknown configuration keys, duplicate physical repository ownership, ambiguous repository IDs, and central Change paths that resolve outside the selected workspace.
 
 ###### Scenario R2-S1: Alias Or Shape Ambiguity
 
-- WHEN different configured spellings resolve to one repository, an unknown key is present, or artifact roles overlap invalidly
+- WHEN different configured spellings resolve to one repository or an unknown configuration key is present
 - THEN configuration validation reports the exact invariant before operational commands continue.
 
-###### Scenario R2-S2: Synthetic Repository ID Collision
+###### Scenario R2-S2: Portable Repository ID Collision
 
-- WHEN repository-only context derives an ID already owned by an Idea or another configured entry
-- THEN context resolution rejects the collision instead of replacing global artifact ownership with synthetic repository defaults.
+- WHEN a repository contract ID is already claimed by another mapped repository
+- THEN context resolution rejects the collision instead of inventing another owner.
 
-###### Scenario R2-S3: Planned Path Escapes Its Owner
+###### Scenario R2-S3: Central Store Escapes Its Owner
 
-- WHEN `plannedChangesDirectory` is absolute, traverses upward, or resolves physically outside its planning owner
-- THEN configuration and artifact reads reject it before inspecting or mutating the external path.
+- WHEN `<workspace>/.sdd/changes` or a Change ancestor is symlinked outside the workspace
+- THEN validation and lifecycle mutation reject the path before reading or writing the external target.
 
-##### Requirement R3: Cross-Location Change Collision
+###### Scenario R2-S4: Stale Change Target
 
-The CLI SHALL refuse a planned Change ID that already exists in any selected repository's active or closed roots.
+- WHEN a selected Space owns a stale repository target
+- THEN selected-Space validation reports that ownership defect and status keeps the selected work visible.
+
+###### Scenario R2-S5: Unselected Unknown Space Isolation
+
+- WHEN another central Change names an unselected unknown Space
+- THEN selected-Space validation and status keep the selected Space's work visible while whole-workspace validation still reports the unknown Space.
+
+##### Requirement R3: Workspace-Unique Change Identity And Lifecycle
+
+The CLI SHALL enforce unique dated Change IDs across active and closed central storage within one workspace and SHALL mutate one status or folder location for the complete target set.
 
 ###### Scenario R3-S1: Existing Active Or Closed ID
 
-- WHEN `change create` would duplicate an active or closed Change ID
+- WHEN `change create` would duplicate an active or closed central Change ID
 - THEN normal and dry-run commands report the collision and write nothing.
+
+###### Scenario R3-S2: Compare-And-Set Transition
+
+- WHEN `change transition` receives the expected current status
+- THEN it updates the one central `change.md`; a stale expected status or concurrent edit leaves the record unchanged.
+
+###### Scenario R3-S3: Central Close
+
+- WHEN `change close` receives an `in_review` Change
+- THEN it moves the one record to `<workspace>/.sdd/changes/closed/<change-id>/` without writing a synthetic `closed` status.
+
+###### Scenario R3-S4: Transition Mode Preservation
+
+- WHEN `change transition` replaces a `change.md` that has an accepted restrictive file mode
+- THEN the replacement retains that exact mode without broadening or narrowing it under the process umask.
+
+##### Requirement R5: Deterministic Workspace Discovery
+
+The CLI SHALL resolve an explicit command workspace first, then `SDD_WORKSPACE_ROOT`, then the nearest workspace ancestor of the target, and only for a mapped external target the nearest workspace ancestor of the current directory; it SHALL never infer ownership from the operating-system home directory.
+
+###### Scenario R5-S1: Contained Repository Discovery
+
+- WHEN a target repository is physically contained by exactly one valid workspace ancestor
+- THEN operational commands select that nearest workspace without a separate flag.
+
+###### Scenario R5-S2: External Repository Requires Selection
+
+- WHEN a target repository is outside every workspace ancestor and no explicit or environment workspace maps it
+- THEN the command fails with workspace-selection guidance and performs no home-directory fallback or mutation.
 
 #### Implemented By
 
 | Requirement / Scenario | Location / Anchor | Kind | Responsibility |
 |---|---|---|---|
-| S3/R1 | `src/commands/change-create.js#createPlannedChange` | primary | Refuses planned Change creation without Idea planning ownership. |
-| S3/R1 | `src/commands/change-promote.js#promotePlannedChange` | support | Refuses promotion without the same planning ownership. |
-| S3/R2 | `src/config.js#validateConfig` | primary | Enforces schema-shape parity, artifact relationships, and owner-relative planned Changes paths. |
-| S3/R2-S3 | `schemas/user.schema.json#plannedChangesDirectory` | support | Publishes the user configuration contract that rejects non-owner-relative planned Changes paths. |
-| S3/R2-S3 | `schemas/workspace.schema.json#plannedChangesDirectory` | support | Publishes the workspace configuration contract that rejects non-owner-relative planned Changes paths. |
-| S3/R2 | `src/workspace.js#resolveWorkspaceContext` | primary | Rejects duplicate physical repository ownership, artifact ambiguity, and synthetic IDs that would collide with an existing Idea while retaining repository-only configuration as a valid local context. |
-| S3/R2-S2 | `src/change-repositories.js#resolvedActiveRepositories` and `src/commands/validate.js#configuredRepositories` | support | Preserve repository-local artifact roots without mutating global defaults while synthetic context is resolved. |
-| S3/R2-S2 | `src/commands/status.js#resolvedRepositories` | support | Preserves repository-only artifact roots while building status results. |
-| S3/R2-S3 | `src/commands/validate.js#validatePlannedChanges` | primary | Rechecks physical containment before enumerating planned Changes. |
-| S3/R3 | `src/commands/change-create.js#createPlannedChange` | primary | Preflights selected repositories' active and closed roots. |
+| S3/R1, S3/R3-S1 | `src/commands/change-create.js#createChange` | primary | Exclusively creates one proposed central Change, preserves a concurrent or replaced target, and rejects active or closed identity collisions without a workspace mutation lock. |
+| S3/R1 | `src/change-repositories.js#resolveRepositoryTargets` | support | Resolves stable mapped or repository-only target IDs without inventing repository-local Change ownership. |
+| S3/R2 | `src/config.js#validateConfig` | primary | Enforces current config shape, portable repository IDs, and physical ownership invariants. |
+| S3/R2 | `schemas/workspace.schema.json#sdd-v3` | support | Publishes the checked workspace configuration contract. |
+| S3/R2 | `schemas/repository.schema.json#sdd-repository-v2` | support | Publishes the checked portable repository contract. |
+| S3/R2 | `src/workspace.js#resolveWorkspaceContext` | primary | Rejects duplicate physical repositories and ambiguous portable identities while retaining valid repository-only context. |
+| S3/R2-S3 | `src/change-store.js#assertChangeStoreConfinement` | primary | Confines active and closed central paths to the selected workspace. |
+| S3/R3 | `src/change-store.js#listStoredChanges` | support | Enumerates the active and closed workspace inventory without assigning uniqueness-enforcement responsibility to the inventory helper. |
+| S3/R3-S2, S3/R3-S4 | `src/commands/change-transition.js#transitionChange` | primary | Applies a compare-and-set status replacement after final workspace, repository, and file snapshot checks; it requests the accepted prior mode but can narrow it within the dated R3-S4 restrictive-umask gap. |
+| S3/R3-S3 | `src/commands/change-close.js#closeChange` | primary | Rechecks current authority and destination absence, then moves one `in_review` central Change into closed history while restoring restrictive directory mode through the verified source handle. |
+| S3/R2-S4, S3/R2-S5, S3/R3-S1 | `src/commands/validate.js#validateCentralRecords` | primary | Applies selected-Space ownership before record-specific diagnostics, rejects missing or cross-Space selected repository metadata, reports unknown Space ownership at workspace scope, and retains workspace-wide active/closed identity collisions. |
+| S3/R2-S5 | `src/commands/status.js#getStatus` | primary | Reads the central workspace inventory before projecting one selected Space, so the dated R2-S5 unrelated unknown-Space record gap can block selected read-only status. |
+| S3/R2-S4 | `src/commands/status.js#buildSpace` | support | Keeps a selected Space's own stale repository targets visible when central inventory succeeds. |
+| S3/R3-S1 | `src/commands/status.js#readCentralChanges` | support | Refuses to project an active/closed duplicate as two independent status records. |
+| S3/R3-S1 | `src/change-status.js#inspectChangeStatuses` | support | Reports active/closed duplicate identity through workspace diagnostics. |
+| S3/R5 | `src/config.js#findWorkspaceRoot` | primary | Applies explicit, environment, target-ancestor, and mapped-current-workspace precedence with no home fallback. |
 
 #### Implementation Gaps
 
-- None.
+- `S3/R3-S1`, `S3/R3-S2`, `S3/R3-S3`: lifecycle commands preserve tested current-writer conflicts without the generalized lock, but portable path-based creation/replacement/move cannot atomically bind the last observed active/closed identity across the final syscall.
+- `S3/R3-S4`: [user accepted 2026-08-30; `PR-R8-TRANSITION-UMASK-01`] Transition staging requests the prior file mode through `writeFile`, but does not restore the requested mode after creation, so a restrictive process umask can narrow `0640` to `0600`. Bytes remain complete, permissions are never broadened, and acceptance is limited to this exact pre-1.0 mode-restoration omission.
+- `S3/R2-S5`: [user accepted 2026-08-30; `PR-R10-SCOPED-STATUS-01`] Selected status reads and resolves every central Change before selected-Space projection, so an unrelated record naming an unknown Space can return `SPACE_NOT_FOUND` and abort the scoped read-only result until that record is corrected. Acceptance is limited to this exact read-only inventory-ordering state and permits no workspace mutation.
 
 #### Verified By
 
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
-| S3/R1-S1 | Automated test `test/cli.test.js#CLI init requires setup and creates only a portable repository contract` | Repository-only `change create --dry-run` returns `PLANNING_MAPPING_REQUIRED`. | Passing 2026-07-20 |
-| S3/R1-S2 | Automated test `test/cli.test.js#CLI init requires setup and creates only a portable repository contract` | Repository-only `change promote --dry-run` returns `PLANNING_MAPPING_REQUIRED`. | Passing 2026-07-20 |
-| S3/R2-S1 | Automated test `test/cli.test.js#runtime config validation rejects unknown keys and ambiguous artifact roots` | Runtime validation matches strict shapes and rejects overlap. | Passing 2026-07-20 |
-| S3/R2-S1 | Automated test `test/cli.test.js#context rejects physical aliases claimed as different repositories` | Two configured paths cannot claim one physical repository. | Passing 2026-07-20 |
-| S3/R2-S2 | Automated test `test/cli.test.js#context rejects a repository-only ID that collides with an existing Idea` | A same-ID repository-only contract is rejected without changing existing configuration ownership. | Passing 2026-07-23 |
-| S3/R2-S2 | Automated test `test/cli.test.js#status honors committed artifact paths for a repository-only checkout` | Repository-only status respects the committed artifact layout and reports its active Change. | Passing 2026-07-24 |
-| S3/R2-S3 | Automated test `test/cli.test.js#runtime config validation confines planned Change directories to their owner` | Absolute, leading-separator, home-relative, and parent-traversing planned Changes paths fail validation; nested owner-relative paths remain valid. | Passing 2026-07-23 |
-| S3/R2-S3 | Automated test `test/cli.test.js#validation rejects a planned Changes directory symlinked outside its owner` | Artifact validation refuses an external symlink before enumerating its Change directories. | Passing 2026-07-23 |
-| S3/R3-S1 | Automated test `test/cli.test.js#change create refuses IDs already active or closed in a selected repository` | Active and closed collisions fail even in dry-run before planning writes. | Passing 2026-07-20 |
+| S3/R1-S1, S3/R1-S2 | Automated test `test/change-contract.test.js#change create captures proposed intent in one central change.md` | Creation writes only one metadata-bearing proposed `change.md`, permits deferred repository selection, and creates no repository-local lifecycle copy. | Passing 2026-08-16 |
+| S3/R2-S1 | Automated tests `test/cli.test.js#runtime config validation rejects unknown keys`, `test/cli.test.js#runtime config validation rejects NUL path values without filesystem errors`, `test/cli.test.js#context rejects physical aliases claimed as different repositories`, and `test/schema-contracts.test.js#workspace and repository schemas reuse the runtime lexical path contract` | Runtime validation returns typed findings for malformed path values before resolution, while runtime and published schemas reject unknown or unsafe shape and duplicate physical ownership consistently. | Passing 2026-08-28 |
+| S3/R2-S2 | Automated test `test/cli.test.js#context rejects a repository-only ID that collides with an existing Idea` | A duplicate portable ID cannot silently claim another owner. | Passing 2026-08-07 |
+| S3/R2-S3 | Automated tests `test/cli.test.js#validation rejects a central Change store symlinked outside its owner` and `test/cli.test.js#change transition rejects an active Change through an external symlink ancestor` | Workspace-owned Change paths cannot traverse a physical owner boundary. | Passing 2026-08-07 |
+| S3/R3-S1 | Automated tests `test/cli.test.js#Change creation treats a dangling closed-history entry as an identity collision`, `test/cli.test.js#concurrent Change creation preserves one complete central winner`, and `test/cli.test.js#Change creation preserves a replacement after exclusive directory creation` | Pre-existing active/closed entries, concurrent same-ID creation, and a replacement injected after exclusive directory creation remain canonical through the tested rechecks. | Passing 2026-08-21 |
+| S3/R3-S2 | Automated tests `test/change-contract.test.js#planning completes the same Change before lifecycle work continues`, `test/cli.test.js#change transition updates an active Change with compare-and-set semantics`, and `test/cli.test.js#change transition preserves an edit made at the final replacement boundary` | One central `change.md` transitions when the expected status is current, while stale or injected pre-rename content remains canonical. | Passing 2026-08-21 |
+| S3/R3-S3 | Automated tests `test/change-contract.test.js#planning completes the same Change before lifecycle work continues`, `test/cli.test.js#change close rechecks status at commit time`, `test/cli.test.js#change close preserves a destination that appears before the final move`, `test/cli.test.js#change close preserves restrictive directory modes through publication and cleanup`, `test/cli.test.js#change close never chmods a source symlink replacement`, and `test/cli.test.js#change close restores the moved inode without chmodding a destination replacement` | Close moves a current `in_review` record, preserves reopened active or nonempty closed state observed by the final explicit recheck, restores restrictive mode on the moved inode, and never follows injected source/destination symlink replacements for permission changes. | Passing 2026-08-28 |
+| S3/R3-S1, S3/R3-S2, S3/R3-S3 | Automated test `test/cli.test.js#Change lifecycle commands do not consume the managed-install mutation lock` | Create, transition, and close complete through their narrow boundaries while the separate managed-install lock remains present and unchanged. | Passing 2026-08-21 |
+| S3/R2-S4 | Automated tests `test/cli.test.js#validate rejects absent and cross-Space Change repository IDs deterministically` and `test/cli.test.js#status retains Space-owned Changes whose repository IDs no longer resolve` | Selected validation reports its own stale repository ownership defect, and status retains that selected Space's work. | Passing 2026-08-30 |
+| S3/R5-S1 | Automated tests `test/workspace-config.test.js#workspace discovery honors explicit, environment, target, and cwd precedence`, `test/workspace-config.test.js#cwd workspace resolves a physically mapped external repository`, and `test/cli.test.js#CLI context keeps cwd as the target when --workspace supplies external ownership` | Discovery selects the deterministic workspace owner while the explicit workspace option remains authority and never replaces the command's cwd target. | Passing 2026-08-07 |
+| S3/R5-S2 | Automated tests `test/workspace-config.test.js#an unmapped external target cannot borrow the cwd workspace` and `test/workspace-config.test.js#workspace discovery never falls back to HOME or SDD_USER_HOME` | Unmapped external targets fail without borrowing cwd or home authority. | Passing 2026-08-07 |
 
 #### Verification Gaps
 
-- None.
+- `S3/R3-S1`: [user accepted 2026-08-21] Portable Node cannot bind successful creation to the exact active/closed identity across the final `change.md` write and post-publication checks; a same-user final-window replacement or active/closed duplicate remains possible. Acceptance is limited to the owner-operated local CLI and does not claim final publication identity binding.
+- `S3/R3-S2`: [user accepted 2026-08-21] Portable Node ordinary `rename` is not a final compare-and-set primitive; a same-user replacement after the last snapshot check can be overwritten. Acceptance is limited to the owner-operated local CLI and does not claim atomic compare-and-set.
+- `S3/R3-S3`: [user accepted 2026-08-21] Portable Node ordinary directory `rename` cannot atomically require both the exact active source and an absent destination; a same-user final-window reopen or empty destination remains possible. Acceptance is limited to the owner-operated local CLI and does not claim atomic move-if-current.
+- `S3/R3-S4`: [user accepted 2026-08-30; `PR-R8-TRANSITION-UMASK-01`] Restrictive-umask mode preservation is not proved because current transition staging can narrow the accepted prior mode. This accepted verification gap is limited to the exact implementation limit and does not apply to R3-S2 compare-and-set behavior.
+- `S3/R2-S5`: [user accepted 2026-08-30; `PR-R10-SCOPED-STATUS-01`] Whole-workspace validation of an unknown Space is covered, but selected status isolation from that unrelated record is not proved because current inventory resolution aborts first. This accepted verification gap is limited to the exact read-only status-ordering behavior.
 
 #### Story Notes
 
-- Repository-only context remains valid for repository-local Epic, validation, status, and active Change operations.
+- The focused progressive lifecycle contract passes through every explicit recheck; the exact final path-based syscall windows are user-accepted 2026-08-21 rather than claimed atomicity. A clean aggregate package run remains a Change-level release gate rather than missing Scenario evidence.
+- Repository-only context remains portable through its stable repository ID, but an external repository selects a workspace only through an explicit command root, `SDD_WORKSPACE_ROOT`, or an enclosing current-directory workspace that maps it.
 
 ### Story S4: Bounded And Context-Aware Diagnostics
 
 Implementation: implemented
 Verification: verified
 Created: 2026-07-20
-Modified: 2026-07-20
-Last verified: 2026-07-20
+Modified: 2026-08-30
+Last verified: 2026-08-30
 
 As a developer, I want diagnostics to finish within a bound and distinguish obsolete instructions from discussion, so that health checks remain actionable.
 
@@ -523,14 +620,14 @@ The CLI SHALL report affirmative obsolete workflow instructions without treating
 - WHEN recognized guidance says not to use an obsolete path/command or discusses it historically
 - THEN doctor does not report that mention as an active instruction.
 
-##### Requirement R2: Bounded Repository Status
+##### Requirement R2: Bounded Repository Git Diagnostics
 
-The CLI SHALL time out a stalled Git status process, return degraded metadata for that repository, and continue reporting other repositories.
+The CLI SHALL time out stalled Git children used by repository status or Review-candidate seal validation and return deterministic degraded metadata or non-passing findings.
 
 ###### Scenario R2-S1: Hung Git Child
 
-- WHEN one repository's Git status exceeds the configured internal bound
-- THEN status completes with a timeout result for that repository.
+- WHEN a repository status or Review-candidate Git child exceeds the configured internal bound
+- THEN the command terminates that child and completes with degraded status metadata or a deterministic non-passing validation finding.
 
 #### Implemented By
 
@@ -539,8 +636,9 @@ The CLI SHALL time out a stalled Git status process, return degraded metadata fo
 | S4/R1 | `src/guidance.js#findObsoleteGuidanceReferences` | primary | Classifies only affirmative obsolete instructions outside ignored prose contexts. |
 | S4/R1 | `src/commands/doctor.js#diagnoseWorkspace` | support | Integrates guidance classification into repository health findings. |
 | S4/R1 | `src/cli.js#HELP` | support | Exposes guidance validation as part of the doctor contract. |
-| S4/R2 | `src/commands/status.js#readGitStatus` | primary | Applies the Git child timeout and structured degraded result. |
+| S4/R2 | `src/commands/status.js#readGitStatus` | primary | Applies the status Git-child timeout and structured degraded result. |
 | S4/R2 | `src/commands/status.js#mapWithConcurrency` | support | Caps concurrent repository Git processes while preserving result order. |
+| S4/R2 | `src/commands/validate.js#validateV2ReviewRepositoryState` | primary | Bounds Review-candidate reachability and tree Git children and converts timeout or ordinary failure into existing non-passing seal findings. |
 
 #### Implementation Gaps
 
@@ -552,7 +650,7 @@ The CLI SHALL time out a stalled Git status process, return degraded metadata fo
 |---|---|---|---|
 | S4/R1-S1 | Automated test `test/diagnostics.test.js#guidance diagnostics ignore negated historical and quoted obsolete references` | Negated, historical, blockquoted, and fenced examples do not become findings. | Passing 2026-07-20 |
 | S4/R1-S1 | Automated test `test/diagnostics.test.js#guidance diagnostics still report affirmative obsolete instructions` | Affirmative obsolete instructions remain actionable findings. | Passing 2026-07-20 |
-| S4/R2-S1 | Automated test `test/cli.test.js#status degrades one stalled Git repository without blocking its siblings` | One timed-out repository degrades while its sibling returns branch state. | Passing 2026-07-20 |
+| S4/R2-S1 | Automated tests `test/cli.test.js#status degrades one stalled Git repository without blocking its siblings` and `test/change-contract.test.js#done v2 outcomes require a reachable content-identical review seal` | Status degrades one stalled repository without blocking its sibling; stalled Review-seal Git children terminate within the injected bound, leave no child process, and return a deterministic non-passing finding while ordinary valid and invalid seals retain their contract. | Passing 2026-08-30 |
 
 #### Verification Gaps
 
@@ -655,9 +753,9 @@ The published package SHALL include the orphan-audit source and universal bundle
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
 | S5/R1-S1, S5/R1-S2 | Automated test `test/cli.test.js#packaged audit and handoff skills preserve current-state and file-scope gates` | The packaged Epic verification skill retains immutable/current-state and successor requirements. | Passing 2026-07-22 |
-| S5/R1-S1 | Automated test `test/cli.test.js#packaged workflow templates preserve boundary, transition, and evidence-integrity contracts` | The canonical report template is versioned, defaults blocked, exposes current findings, and matches the skill asset. | Passing 2026-07-22 |
+| S5/R1-S1 | Automated test `test/cli.test.js#packaged audit and handoff skills preserve current-state and file-scope gates` | The canonical report template is versioned and matches the skill asset. | Passing 2026-08-17 |
 | S5/R2-S1, S5/R2-S2 | Automated test `test/cli.test.js#packaged audit and handoff skills preserve current-state and file-scope gates` | Both handoff skills retain exact diff inventory gates and the PR skill has no separate `--fix` mode. | Passing 2026-07-22 |
-| S5/R2-S2 | Automated test `test/cli.test.js#packaged workflow templates preserve boundary, transition, and evidence-integrity contracts` | The release template mirrors its skill asset and includes file-scope plus SDD-integrity sections. | Passing 2026-07-22 |
+| S5/R2-S2 | Automated test `test/cli.test.js#packaged audit and handoff skills preserve current-state and file-scope gates` | The release template mirrors its skill asset and includes file-scope plus SDD-integrity sections. | Passing 2026-08-17 |
 | S5/R3-S1 | Automated test `test/orphan-audit.test.js#orphan audit rejects option-like changed-from input without Git side effects` | Option-like baselines are rejected before diffing and cannot create an external output file. | Passing 2026-07-23 |
 | S5/R3-S2 | Automated test `test/orphan-audit.test.js#orphan audit fails promptly with an actionable Git timeout` | A stalled Git child is bounded and returns deterministic recovery guidance. | Passing 2026-07-23 |
 | S5/R3-S3 | Automated test `test/orphan-audit.test.js#orphan audit fails closed when any changed-surface Git command fails` | Baseline, unstaged, staged, and untracked query failures cannot silently erase changed-surface evidence. | Passing 2026-07-23 |
@@ -676,34 +774,59 @@ The published package SHALL include the orphan-audit source and universal bundle
 Implementation: implemented
 Verification: verified
 Created: 2026-07-23
-Modified: 2026-07-23
-Last verified: 2026-07-23
+Modified: 2026-08-29
+Last verified: 2026-08-29
 
 As a developer, I want SDD planning, implementation, and review workflows to carry work through a complete evidence-backed handoff, so that an agent does not stop at a partial task, a green command, or the first finding.
 
 #### Requirements And Scenarios
 
-##### Requirement R1: Adaptive Planning And Handoff Records
+##### Requirement R1: Progressive Planning And Handoff Records
 
-The packaged planning workflow SHALL define accepted end-state behavior and seed risk, decision fan-out, verification-environment, visual-verification, and candidate-scope obligations without freezing a file-by-file implementation sequence.
+The packaged planning workflow SHALL create or resume one workspace-central `change.md`, capture durable intent before technical planning, ask whether the user wants to continue, progressively add the technical plan to the same record, and create `tasks.md` only when planning proceeds. A v2 plan SHALL use the smallest coherent vertical outcomes that can be implemented, freshly verified, independently reviewed, and committed in one fresh session; one Requirement is a default rather than a universal constraint. Each outcome SHALL identify new or revised Requirements, affected Stories, authoritative Scenarios, observable results, dependencies, binding constraints, expected risk triggers, focused verification, and manual-acceptance needs without predicting implementation mechanics. `tasks.md` SHALL own only the delivery queue, dependencies, current status, and one replaceable Resume checkpoint; it SHALL NOT duplicate candidate verdicts, gap disposition, or commit facts in Implementation and Gate ledgers.
 
-###### Scenario R1-S1: Replanning After Review
+###### Scenario R1-S1: Deferred Technical Planning
+
+- WHEN the user captures a desired outcome but does not want to plan implementation yet
+- THEN `/sdd-change` leaves one central `proposed` Change containing `change.md` and can resume it later without repeating intake.
+
+###### Scenario R1-S2: Replanning After Review
 
 - WHEN review invalidates Story ownership or verification scope
-- THEN `/sdd-change --replan` returns the Change to a coherent planned state with a dated planning update and exact Apply restart point.
+- THEN `/sdd-change` returns the same Change to a coherent planned state with reconciled vertical outcomes and an exact Apply restart point.
 
-##### Requirement R2: Persistent Verified Implementation
+###### Scenario R1-S3: Adaptive Vertical Outcomes
 
-Default/full Apply SHALL continue through safe implementation and self-remediation until the Change is ready for independent review or reaches a genuine stop condition, and SHALL commit completed verified slices when policy and isolation permit.
+- WHEN technical planning makes the affected behavioral truth implementation-ready
+- THEN `/sdd-change` creates independently understandable outcomes that identify new or revised Requirements, affected Stories, authoritative Scenarios, observable results, behavioral dependencies, and expected risk triggers without predicting files, modules, framework techniques, or implementation order.
 
-###### Scenario R2-S1: Long Multi-Slice Change
+###### Scenario R1-S4: Minimal V2 Planning State
 
-- WHEN one Requirement finishes while more accepted work remains
-- THEN Apply reconciles and commits the green slice before continuing instead of reporting the Change ready early.
+- WHEN a `schema: sdd-change-v2` Change becomes planned
+- THEN its current planning state is carried by `change.md` and a queue-and-Resume `tasks.md` without closure markers, duplicate ledgers, per-slice Review files, receipts, digests, or repository verification descriptors.
+
+##### Requirement R2: Guidance-Driven Outcome Application
+
+Apply SHALL select exactly one coherent vertical outcome from a planned or in-progress central Change, defaulting to the next dependency-ready outcome while accepting an explicit ID, SHALL state a concise transient Scenario proof sketch before coding without persisting another matrix or treating it as Review authority, SHALL defer implementation method to applicable workspace and repository guidance, SHALL freshly verify and independently review the exact candidate, and SHALL create at most one selectively staged content-identical local commit before stopping.
+
+###### Scenario R2-S1: Default Next Outcome
+
+- WHEN the user invokes `/sdd-apply` without an outcome ID
+- THEN Apply selects one `in progress` or `ready` dependency-satisfied outcome using `Resume Here` before queue order, updates its current status, and does not continue into another outcome in the same invocation.
+
+###### Scenario R2-S2: Explicit Outcome
+
+- WHEN the user invokes `/sdd-apply` with a valid actionable outcome ID
+- THEN Apply selects that exact outcome instead of silently substituting another.
+
+###### Scenario R2-S3: Branch Policy Mismatch
+
+- WHEN the selected repository's current branch does not satisfy its applicable `AGENTS.md` branch policy
+- THEN Apply warns with the repository, current branch, required branch or branch class, and guidance path, and does not automatically switch or create a branch.
 
 ##### Requirement R3: Comprehensive Independent Review
 
-Review SHALL complete every applicable discovery and verification gate before one consolidated verdict, SHALL treat yielded or long-running commands as continuation points, and SHALL give `--until-ready` the same full final-report contract with a default maximum of five remediation iterations.
+Review SHALL record one exact candidate in the central `review.md`, complete the five universal scope/candidate, behavior, fresh-verification, independent Spec/Quality, and integrity/authority gates plus every declared or independently discovered triggered check before one consolidated verdict, and keep detailed candidate verdict, gap, acceptance, remediation, and final commit/tree facts in that one authority. It SHALL treat yielded or long-running commands as continuation points, admit BLOCKING or REQUIRED findings only for explicit accepted-contract, material-safety, project-policy, false-closure, or deterministic-gate grounds, classify remediation as product defect or closure repair, and bound one invocation to one discovery Review, one consolidated remediation batch, and one fresh final Review. Another pre-existing issue in the final Review SHALL return `needs-user`; only a regression introduced by the remediation batch receives one narrow correction.
 
 ###### Scenario R3-S1: Early Blocking Finding
 
@@ -715,9 +838,14 @@ Review SHALL complete every applicable discovery and verification gate before on
 - WHEN a required command yields a resumable session or runs longer than a progress interval
 - THEN review reports progress, resumes the command, and does not mistake the yield for completion.
 
+###### Scenario R3-S3: Risk-Triggered Review Record
+
+- WHEN an outcome reaches Review
+- THEN `review.md` records all five universal gates, both independent review axes, every planned trigger, any additional discovered trigger, concrete falsifiable checks, one exact candidate, and one coherent verdict without fixed not-applicable rows or a second Review authority.
+
 ##### Requirement R4: Rendered UI Verification
 
-UI-bearing planning SHALL define a proportional Visual Verification Matrix, and Apply/Review SHALL render current source, exercise changed interactions, inspect representative desktop/mobile states and console/network results, and keep owner manual confirmation separate.
+UI-bearing behavior SHALL trigger proportional rendered and accessibility checks named during planning or added by independent Review. Repository guidance SHALL determine implementation-time technique, while Review SHALL independently render current source, exercise changed interactions, inspect representative desktop/mobile states and console/network results, and keep owner manual confirmation separate.
 
 ###### Scenario R4-S1: Source-Only UI Confidence
 
@@ -726,49 +854,196 @@ UI-bearing planning SHALL define a proportional Visual Verification Matrix, and 
 
 ##### Requirement R5: Risk-Shaped Evidence Closure
 
-Apply and Review SHALL trigger pattern-parity, boundary-contract, stateful-transition, capability-authority, provenance/budget, filesystem-confinement, aggregate-candidate, and evidence-falsification checks when those boundaries intersect the Change.
+Planning SHALL declare expected checks when behavior intersects UI/accessibility, security/privacy, persistence/migrations/contracts, concurrency/recovery/provider behavior, multi-repository integration, manual acceptance, or release. Review SHALL execute every declared trigger, add material independently discovered triggers, and record each trigger's reason, concrete falsifiable check, result, and evidence. Behavior closure SHALL map every affected Scenario to sufficient proof, compare claimed and proven boundaries where risk makes that distinction material, and prevent required technical gaps from passing as manual acceptance or an unaccepted partial state.
 
 ###### Scenario R5-S1: Aggregate Green With Weak Scenario Proof
 
 - WHEN a broad gate passes but a high-risk Scenario citation does not assert the claimed boundary
 - THEN the workflow keeps the Scenario unverified and records the exact proof gap.
 
+###### Scenario R5-S2: Trigger Coverage Changes During Review
+
+- WHEN a declared trigger lacks a concrete result or independent Review discovers another material boundary
+- THEN Review cannot return ready until the missing check is executed or the exact technical gap is explicitly accepted with a date.
+
 ##### Requirement R6: Lightweight Tracked Sessions
 
-The Interactive workflow SHALL create the minimum shared Change artifacts, apply the narrow behavior change immediately, reconcile durable Epic truth, and preserve the same verification and closeout invariants without creating an independent template family.
+The Interactive workflow SHALL use the same v2 `change.md`, queue-and-Resume `tasks.md`, and central `review.md` contract, apply one narrow coherent behavior change immediately, and preserve the same verification, independent Review, risk-trigger, gap, integrity, and authority invariants without creating an independent template family.
 
 ###### Scenario R6-S1: Small Durable Behavior Change
 
 - WHEN a narrow change deserves a durable record but not a full planning pass
-- THEN `/sdd-interactive` creates the trimmed shared artifacts, applies and verifies the work, and routes broader scope back to `/sdd-change --plan`.
+- THEN `/sdd-interactive` creates the trimmed shared v2 records, applies and independently reviews the work, and routes broader scope back to `/sdd-change`.
+
+##### Requirement R7: One Central Multi-Repository Workflow
+
+Planning, Apply, Review, PR, Release, and Space Status SHALL select one workspace-unique central Change, derive its full stable repository target set from `change.md`, keep repository-owned Epics/code/tests distinct, and perform lifecycle transition or close exactly once after every target passes its gate.
+
+###### Scenario R7-S1: Coordinated Multi-Repository Delivery
+
+- WHEN one Change targets multiple repositories
+- THEN every workflow uses the same central artifacts and repository-keyed evidence, never creates or selects a repository-local copy, and never treats one target's completion as global completion.
+
+##### Requirement R8: Shared Minimum Context
+
+Explore, ADR, and Change SHALL invoke one read-only same-session context workflow with a focused question, SHALL read or explicitly mark missing the action-specific planning and repository minimum, and SHALL surface authority/freshness conflicts and gaps before making substantive claims.
+
+###### Scenario R8-S1: Planning Begins With Partial Context
+
+- WHEN the current session has read only part of the evidence required for an exploration, ADR, or Change
+- THEN the shared context workflow reuses current reads, opens the missing minimum, and returns an evidence-linked sufficiency result without creating another artifact or context boundary.
+
+##### Requirement R9: Candidate-Bound Epic Reconciliation
+
+Epic Update SHALL accept one exact committed or working-tree diff envelope with or without active Change or Apply history, derive affected behavior from actual implementation, mutate only repository-owned Epic truth and directly owned generated indexes, and remain idempotent for the same candidate. Apply SHALL reconcile immediately when the candidate changes accepted behavior, completes a Story, or changes a contract or gap consumed by later work; otherwise the Change SHALL defer reconciliation until final completion rather than require a per-outcome Epic and post-Epic Review cycle.
+
+###### Scenario R9-S1: Reviewed Or Manual Candidate Needs Traceability
+
+- WHEN reviewed or manual implementation changes affect behavior ownership or durable proof
+- THEN `/sdd-epic-update` reconciles Stories, Requirements, Scenarios, implementation maps, gaps, and verification maps from inspected candidate evidence without fabricating Apply history or changing code, Change lifecycle, changelog content, or Git history.
+
+###### Scenario R9-S2: Deterministic Working-Tree Envelope
+
+- WHEN Epic Update targets a dirty working tree
+- THEN `sdd epic update-input` resolves an immutable baseline and HEAD, inventories staged, unstaged, and non-ignored untracked paths, returns a content-sensitive candidate watermark, and performs no artifact mutation.
+
+###### Scenario R9-S3: Same Candidate Repeated
+
+- WHEN Epic Update runs again after repository-owned truth already matches the same candidate
+- THEN it returns `no-op` without rewriting the Epic.
+
+###### Scenario R9-S4: Reconciliation Is Deferred
+
+- WHEN a reviewed outcome changes no accepted behavior, completed Story, consumed contract, or consumed gap
+- THEN Apply records that Epic reconciliation is deferred and does not create an otherwise unnecessary post-Epic Review cycle.
+
+##### Requirement R10: Candidate-Bound Release Communication
+
+Changelog SHALL accept one exact reviewed committed or working-tree candidate with current Epic reconciliation when behavior or traceability changed, SHALL follow the repository's native release-record policy, SHALL create or update one user-visible or operator-relevant entry only when warranted, and SHALL preserve the reviewed implementation projection while stopping before versioning or Git/release handoff mutations.
+
+###### Scenario R10-S1: Reviewed Candidate Needs One Entry
+
+- WHEN a reviewed candidate has a current Epic Update result and changes user-visible or operator-relevant behavior
+- THEN `/sdd-changelog` creates or corrects exactly one native unreleased or per-change entry aligned with the reviewed outcome and accepted gaps.
+
+###### Scenario R10-S2: Internal Or Existing Entry
+
+- WHEN policy does not record the internal-only result or an accurate entry already exists for the same candidate
+- THEN Changelog returns `no-op` without manufacturing public release communication.
+
+###### Scenario R10-S3: Shared Read-Only Candidate Envelope
+
+- WHEN Epic Update or Changelog targets committed or dirty work
+- THEN `sdd candidate resolve` returns one immutable, content-sensitive, read-only diff envelope while `sdd epic update-input` preserves its Epic-specific validation contract.
+
+##### Requirement R11: Candidate-Bound Outcome Closure
+
+Apply and Review SHALL keep one canonical current closure record in central `review.md`: exact candidate, five universal gate results, behavior/Scenario coverage, executed triggered checks, findings, technical gaps and dated acceptance, separate manual product acceptance, bounded remediation, and the final local commit/tree. A v2 outcome SHALL NOT require Implementation or Gate ledgers, fixed 14-gate manifests, per-slice Reviews, Review digests, closure receipts, repository verification descriptors, or closure-only reseal commits. Completion SHALL require fresh evidence, independent Spec Adherence and Implementation Quality passes, no unaccepted required gap, selective staging, and equality between the reviewed content tree and the final commit tree.
+
+###### Scenario R11-S1: Bounded Remediation Reaches Ready
+
+- WHEN the discovery Review returns one or more admitted safe in-scope findings
+- THEN Apply remediates the complete set in one batch, reruns affected verification, and obtains one fresh final independent Review across the complete outcome before any commit without beginning another broad cycle.
+
+###### Scenario R11-S2: Required Technical Evidence Is Missing
+
+- WHEN rendered interaction, live multi-context/realtime, provider/production, or other required technical proof is absent
+- THEN Review returns findings, blocked, or cannot-verify and the outcome cannot become done unless the user explicitly accepts the named gap with a date.
+
+###### Scenario R11-S3: V2 Completion Uses One Review Authority
+
+- WHEN a v2 outcome claims `done`
+- THEN `review.md` contains its exact candidate, universal and triggered gate results, Scenario coverage, independent verdicts, gaps and acceptance state, and final commit/tree while `tasks.md` contains only the matching outcome status and Resume state.
+
+###### Scenario R11-S4: Reviewed Content Equals The Final Commit
+
+- WHEN Apply creates the authorized local outcome commit
+- THEN unrelated paths are excluded, the final commit is single-parent and reachable, and its tree equals the tree independently reviewed before commit without requiring a self-referential repository seal.
+
+###### Scenario R11-S5: Historical Closure Is Not Current
+
+- WHEN current validation or lifecycle mutation encounters a schema-less or receipt-based Change
+- THEN it reports the record as unsupported history and does not migrate it, generate replacement closure artifacts, or treat it as a second current workflow.
+
+##### Requirement R12: Durable Exploration Placement And Handoff
+
+Explore SHALL preserve a substantial discussion requested for durable retention as one synthesized record, SHALL choose its destination by artifact authority and ownership before writing, SHALL default to the owning idea's plural `explorations/` directory when the final artifact is unsettled, and SHALL route mature outcomes to their owning workflow without creating duplicate canonical truth.
+
+###### Scenario R12-S1: Discussion Needs A Durable Home
+
+- WHEN the user asks to preserve a substantial discussion and no stronger artifact already owns its conclusions
+- THEN `/sdd-explore` creates or resumes one synthesized record in an authority-appropriate location, defaulting to the owning idea's `explorations/` directory when its final artifact remains unsettled.
+
+###### Scenario R12-S2: Exploration Reaches A Mature Outcome
+
+- WHEN an exploration reaches a product, architecture, delivery, or other conclusion with a stronger owning workflow
+- THEN Explore offers or invokes that workflow with user authorization and links the result without treating the exploration as competing canonical truth.
+
+##### Requirement R13: Directional Product Planning
+
+PRDs SHALL remain directional product-planning inputs rather than continuously synchronized implementation truth unless the current Change or project guidance explicitly grants them stronger authority. Ordinary PRD drift SHALL be advisory and SHALL NOT by itself block Apply, Review, integration, or closeout.
+
+###### Scenario R13-S1: Accepted Change Differs From PRD Phasing
+
+- WHEN an accepted Change and current Epic truth intentionally phase behavior differently from an older or broader PRD
+- THEN delivery continues from the accepted Change, Review may suggest a deliberate PRD revisit, and ordinary drift does not produce a blocking verdict.
+
+##### Requirement R14: One Current Change Contract
+
+The CLI SHALL create new work with explicit `schema: sdd-change-v2`, SHALL use the compact v2 task and central Review contract for current lifecycle and validation, and SHALL treat schema-less or receipt-based Changes as unsupported history without a migration or backward-compatibility promise.
+
+###### Scenario R14-S1: V2 Is The Default
+
+- WHEN the CLI creates and plans a current Change
+- THEN it emits and validates the three-artifact v2 contract with universal gates, declared triggers, candidate relationships, gaps, and final tree equality without legacy closure files.
+
+###### Scenario R14-S2: Unsupported Historical Record
+
+- WHEN current lifecycle mutation or validation encounters a schema-less historical Change
+- THEN it reports `UNSUPPORTED_CHANGE_SCHEMA` and does not convert the record or invoke its task, Review, or receipt contract.
 
 #### Implemented By
 
 | Requirement / Scenario | Location / Anchor | Kind | Responsibility |
 |---|---|---|---|
-| S6/R1 | `skills/sdd-change/SKILL.md#Replan Mode` | primary | Governs review-driven replanning, guarded lifecycle transitions, dated planning updates, and the exact Apply restart. |
-| S6/R1 | `docs/templates/tasks.md#Decision Fan-Out Ledger` | support | Carries planning decisions and their affected surfaces into delivery. |
-| S6/R1 | `docs/templates/tasks.md#Verification Environment` | support | Records required setups and safety boundaries before evidence is claimed. |
-| S6/R1 | `docs/templates/tasks.md#Verification Scope Decision` | support | Records aggregate and prospective-integration candidate obligations. |
-| S6/R1 | `docs/templates/tasks.md#Visual Verification Matrix` | support | Records proportional rendered states and interactions for UI-bearing work. |
-| S6/R1 | `docs/templates/tasks.md#Review Handoff Candidate` | support | Carries immutable candidate identity and remaining obligations into review. |
-| S6/R2 | `skills/sdd-apply/SKILL.md#Persistence invariant` | primary | Defines full Apply as an outcome request that continues until review readiness or a genuine stop. |
-| S6/R2-S1 | `skills/sdd-apply/SKILL.md#Commit cadence invariant` | primary | Makes a verified artifact-reconciled phase commit part of each completed slice. |
-| S6/R2 | `skills/sdd-apply/references/risk-closure.md#Phase Commit` | support | Defines coherent green phase boundaries and immutable handoff behavior. |
-| S6/R3 | `skills/sdd-review/SKILL.md#Full-review invariant` | primary | Requires complete applicable discovery despite early findings. |
-| S6/R3-S2 | `skills/sdd-review/SKILL.md#Execution-continuity invariant` | primary | Requires yielded and long-running commands to be resumed through completion. |
-| S6/R4 | `skills/sdd-design/SKILL.md#Define The Visual Verification Matrix` | primary | Defines proportional rendered states, interactions, viewports, and evidence before implementation. |
-| S6/R4 | `skills/sdd-apply/SKILL.md#Apply Loop` | primary | Requires direct rendered inspection of current UI source during implementation. |
-| S6/R4 | `skills/sdd-review/SKILL.md#Review Gates` | primary | Keeps deterministic rendered verification distinct from owner manual confirmation. |
-| S6/R5 | `skills/sdd-apply/SKILL.md#Verification And Implementation Self-Check` | primary | Runs risk-shaped implementation closure and evidence reconciliation. |
-| S6/R5 | `skills/sdd-apply/references/risk-closure.md#Pattern Parity` | support | Requires sibling implementations to preserve shared policy and lifecycle shape. |
-| S6/R5 | `skills/sdd-apply/references/risk-closure.md#Boundary Contracts` | support | Requires exact boundary, adapter, failure, and retry mapping. |
-| S6/R5 | `skills/sdd-apply/references/risk-closure.md#Stateful Transitions` | support | Requires concurrent and durable state interleavings to be proved. |
-| S6/R5 | `skills/sdd-apply/references/risk-closure.md#Authority, Budget, And Mutation Safety` | support | Requires authority, provenance, budget, and filesystem mutation invariants. |
-| S6/R5 | `skills/sdd-apply/references/risk-closure.md#Evidence Claim Integrity` | support | Requires exact claimed-boundary evidence to survive falsification. |
-| S6/R5 | `skills/sdd-review/SKILL.md#Systematic Review Search` | primary | Independently falsifies claimed behavior and evidence across the candidate. |
-| S6/R6 | `skills/sdd-interactive/SKILL.md#Workflow` | primary | Implements a trimmed shared-artifact session with immediate Apply-style execution and routing for broader scope. |
-
+| S6/R1 | `skills/sdd-change/SKILL.md#Plan Delivery` | primary | Defines proportional intent capture, coherent outcomes, expected triggers, and implementation-agnostic planning. |
+| S6/R1-S1 | `src/commands/change-create.js#createChange` | primary | Creates one workspace-central proposed Change from the current v2 template. |
+| S6/R1-S2 | `skills/sdd-change/SKILL.md#Revising Remaining Work` | primary | Preserves completed facts while revising incoherent remaining work. |
+| S6/R1-S3, S6/R1-S4 | `docs/templates/tasks.md#Delivery Outcomes` | primary | Defines compact v2 outcomes and excludes duplicate closure state. |
+| S6/R2 | `skills/sdd-apply/SKILL.md#Inputs And Selection` | primary | Selects exactly one explicit or dependency-ready outcome. |
+| S6/R2 | `skills/sdd-apply/SKILL.md#Behavioral Brief` | primary | States what must become true without predicting implementation method. |
+| S6/R2-S3 | `skills/sdd-apply/SKILL.md#Preflight` | primary | Enforces branch/dirty-state attribution without automatic branch mutation. |
+| S6/R3 | `skills/sdd-review/SKILL.md#Review Work` | primary | Performs independent complete-candidate inspection and continues safe checks after findings or command yields. |
+| S6/R3-S3 | `skills/sdd-review/SKILL.md#Five Universal Gates` | primary | Defines the five-gate current Review contract. |
+| S6/R4 | `skills/sdd-review/SKILL.md#Triggered Checks` | primary | Requires current-source rendered and accessibility checks when UI risk triggers them. |
+| S6/R4 | `skills/sdd-design/SKILL.md#Define The Visual Verification Matrix` | support | Records proportional expected rendered behavior when design planning is needed. |
+| S6/R5 | `skills/sdd-change/SKILL.md#Risk And Verification Policy` | primary | Declares behavior-derived triggers and focused verification as the planning default. |
+| S6/R5 | `skills/sdd-review/SKILL.md#Triggered Checks` | primary | Executes every planned trigger and adds material discovered risks with concrete proof. |
+| S6/R6 | `skills/sdd-interactive/SKILL.md#Create The Minimal Current Records` | primary | Reuses the same v2 records and one Apply outcome without a second template family. |
+| S6/R7 | `skills/sdd-review/SKILL.md#Resolve The Candidate` | primary | Resolves every target repository from one central Change and keeps separate candidate envelopes. |
+| S6/R7 | `skills/sdd-pr/SKILL.md#Authority And Project Profile` | support | Stewards repository handoffs without duplicating Change lifecycle ownership. |
+| S6/R7 | `skills/sdd-release/SKILL.md#Operating Sequence` | support | Aggregates production handoff readiness from the central Change target set. |
+| S6/R8 | `skills/sdd-gather-context/SKILL.md#Common Minimum` | primary | Defines the shared read-only same-session planning context contract. |
+| S6/R8-S1 | `skills/sdd-gather-context/SKILL.md#Completion Criterion` | primary | Returns evidence-linked sufficiency without creating an artifact. |
+| S6/R9 | `skills/sdd-epic-update/SKILL.md#When To Run` | primary | Makes reconciliation immediate only when durable behavior or consumed contracts/gaps changed. |
+| S6/R9-S1, S6/R9-S3 | `skills/sdd-epic-update/SKILL.md#Determine Affected Truth` | primary | Derives affected behavior from the exact candidate and returns idempotent results. |
+| S6/R9-S2, S6/R10-S3 | `src/commands/candidate-resolve.js#resolveCandidateEnvelope` | primary | Resolves immutable content-sensitive committed or working-tree envelopes. |
+| S6/R10 | `skills/sdd-changelog/SKILL.md#Decide Whether An Entry Is Warranted` | primary | Owns one candidate-specific native release entry or evidence-based no-op. |
+| S6/R11 | `skills/sdd-apply/SKILL.md#Independent Review` | primary | Composes independent central Review and one bounded remediation batch. |
+| S6/R11-S2 | `skills/sdd-review/SKILL.md#Findings And Verdict` | primary | Keeps required technical gaps non-passing and product acceptance separate. |
+| S6/R3-S3, S6/R5-S2, S6/R11-S3 | `src/change-review.js#validateV2ChangeReviewSource` | primary | Parses canonical Review tables without splitting escaped pipes and prevents `ready` closure while passing or accepted evidence is unresolved or BLOCKING/REQUIRED findings remain. |
+| S6/R11-S3 | `skills/sdd-pr/SKILL.md#Initial Setup`, `skills/sdd-release/SKILL.md#Operating Sequence`, `skills/sdd-space-status/SKILL.md#Workflow` | support | Keep candidate/acceptance truth in `review.md`, queue/Resume truth in `tasks.md`, and remote handoff telemetry in provider-native records. |
+| S6/R11-S4 | `skills/sdd-apply/SKILL.md#Commit And Record` | primary | Selectively seals the reviewed tree in one local commit and records it centrally. |
+| S6/R11-S4 | `src/commands/validate.js#validateV2ReviewRepositoryState` | support | Enforces reachable single-parent commit and reviewed/final tree equality. |
+| S6/R11-S5, S6/R14-S2 | `src/commands/validate.js#validateChange` | primary | Reports schema-less Changes as unsupported and never selects their task/Review/receipt contract. |
+| S6/R11-S3, S6/R11-S5, S6/R14-S2 | `CHANGELOG.md#Unreleased` | support | Communicates one central v2 Review authority and unsupported receipt-era history without claiming publication or compatibility. |
+| S6/R12 | `skills/sdd-explore/SKILL.md#Choose The Record Destination` | primary | Places durable exploration by authority and ownership. |
+| S6/R12-S2 | `skills/sdd-explore/SKILL.md#Route Mature Outcomes` | primary | Routes mature conclusions without duplicating canonical truth. |
+| S6/R13 | `skills/sdd-prd/SKILL.md#SDD Relationship` | primary | Keeps PRDs directional unless explicit authority says otherwise. |
+| S6/R14-S1 | `skills/sdd-change/assets/change-template.md#sdd-change-v2` | primary | Makes v2 the default creation contract. |
+| S6/R14-S1 | `src/change-tasks-v2.js#parseV2ChangeTasks` | primary | Validates compact outcomes, dependencies, Resume, and planned triggers. |
+| S6/R14-S1 | `src/commands/change-transition.js#assertPlanningComplete` | support | Uses only the current v2 task parser for planning transitions. |
+| S6/R14-S2 | `src/commands/change-close.js#closeChange` | support | Rejects schema-less closeout as unsupported history. |
 #### Implementation Gaps
 
 - None.
@@ -777,20 +1052,23 @@ The Interactive workflow SHALL create the minimum shared Change artifacts, apply
 
 | Requirement / Scenario | Evidence | Proves | Status |
 |---|---|---|---|
-| S6/R1-S1 | Semantic source inspection of `skills/sdd-change/SKILL.md#Replan Mode` and `docs/templates/tasks.md#Planning Updates` | The shipped planning workflow and ledger define guarded replan state, dated discovery, and an exact restart. | Passing 2026-07-23 |
-| S6/R2-S1 | Semantic source inspection of `skills/sdd-apply/SKILL.md#Persistence invariant` and `skills/sdd-apply/SKILL.md#Commit cadence invariant` | Apply continues beyond a green slice and commits an isolated reconciled phase before later work. | Passing 2026-07-23 |
-| S6/R3-S1, S6/R3-S2 | Semantic source inspection of `skills/sdd-review/SKILL.md#Full-review invariant` and `skills/sdd-review/SKILL.md#Execution-continuity invariant` | Review retains early findings while completing discovery and resumes yielded commands. | Passing 2026-07-23 |
-| S6/R4-S1 | Semantic source inspection of `skills/sdd-design/SKILL.md#Define The Visual Verification Matrix`, `skills/sdd-apply/SKILL.md#Apply Loop`, and `skills/sdd-review/SKILL.md#Review Gates` | Design, Apply, and Review jointly reject source-only UI confidence. | Passing 2026-07-23 |
-| S6/R5-S1 | Semantic source inspection of `skills/sdd-apply/references/risk-closure.md#Evidence Claim Integrity` and `skills/sdd-review/SKILL.md#Review Gates` | Aggregate success cannot substitute for exact high-risk Scenario proof. | Passing 2026-07-23 |
-| S6/R6-S1 | Semantic source inspection of `skills/sdd-interactive/SKILL.md#Workflow` and `skills/sdd-interactive/SKILL.md#Artifact Shape` | Interactive uses trimmed shared artifacts, immediate execution, durable Epic reconciliation, and broader-scope routing. | Passing 2026-07-23 |
-| S6/R1-S1 | Automated test `test/workflow-contracts.test.js#packaged change replan preserves a coherent planned handoff and exact Apply restart` | Replan preserves guarded state, complete planning ledgers, template parity, and an exact Apply restart. | Passing 2026-07-23 |
-| S6/R2-S1 | Automated test `test/workflow-contracts.test.js#packaged Apply continues after a verified slice and commits the phase before later work` | Full Apply persists beyond one slice and commits each isolated verified artifact-reconciled phase. | Passing 2026-07-23 |
-| S6/R3-S1 | Automated test `test/workflow-contracts.test.js#packaged Review completes every applicable gate after an early blocking finding` | Review retains early findings while completing all applicable discovery and scorecard gates. | Passing 2026-07-23 |
-| S6/R3-S2 | Automated test `test/workflow-contracts.test.js#packaged Review resumes yielded commands and preserves the full until-ready report contract` | Yielded work resumes, the default cap remains five, and every mode returns the same complete report. | Passing 2026-07-23 |
-| S6/R4-S1 | Automated test `test/workflow-contracts.test.js#packaged UI workflows reject source-only confidence without rendered current-source evidence` | Design, Apply, Review, templates, and doctrine consistently require current-source rendered evidence. | Passing 2026-07-23 |
-| S6/R5-S1 | Automated test `test/workflow-contracts.test.js#packaged evidence closure keeps high-risk Scenarios unverified when only an aggregate gate passes` | Risk closure and review require exact claimed-boundary proof beyond an aggregate green result. | Passing 2026-07-23 |
-| S6/R6-S1 | Automated test `test/workflow-contracts.test.js#packaged Interactive workflow tracks one lightweight request through an honest review handoff` | Interactive keeps trimmed shared artifacts, immediate tracked execution, validation, and honest handoff semantics. | Passing 2026-07-23 |
-
+| S6/R1-S1, S6/R1-S2 | Automated tests `test/change-contract.test.js#change create captures proposed intent in one central change.md` and `test/change-contract.test.js#planning completes the same Change before lifecycle work continues` | Current creation is workspace-central v2; planning remains guarded and resumable. | Passing 2026-08-17 |
+| S6/R1-S3, S6/R1-S4 | Automated tests `test/change-tasks-v2.test.js#v2 tasks parse a compact delivery queue without legacy ledgers`, `test/change-tasks-v2.test.js#v2 tasks reject legacy ledgers and closure markers`, and `test/workflow-contracts.test.js#current Change templates use one v2 three-artifact contract` | Compact outcomes retain references, dependencies, Resume, triggers, and implementation-agnostic wording without closure state. | Passing 2026-08-17 |
+| S6/R2-S1, S6/R2-S2, S6/R2-S3 | Automated test `test/workflow-contracts.test.js#Apply delivers one reviewed outcome without legacy closure machinery` | Apply selects one outcome, follows guidance, verifies proportionally, independently reviews, selectively commits, and stops. | Passing 2026-08-17 |
+| S6/R3-S1, S6/R3-S2, S6/R3-S3, S6/R4-S1, S6/R5-S1, S6/R5-S2 | Automated test `test/workflow-contracts.test.js#Review uses five universal gates and concrete planned or discovered triggers` | Review completes safe relevant inspection after findings/yields, uses five gates, executes concrete triggers including UI risk, and separates Spec/Quality judgments. | Passing 2026-08-28 |
+| S6/R3-S3, S6/R5-S2, S6/R11-S3 | Automated tests `test/change-review.test.js#v2 review preserves escaped pipes without accepting malformed rows`, `test/change-review.test.js#v2 ready verdict requires current evidence and resolved findings`, and `test/change-review.test.js#v2 review keeps pending templates authorable` | Canonical tables preserve escaped cells, passing and accepted rows reject normalized pending evidence, ready rejects unresolved BLOCKING/REQUIRED findings, and pending templates remain valid. | Passing 2026-08-29 |
+| S6/R5-S2 | Automated test `test/workflow-contracts.test.js#final candidate retains accepted architecture reductions` | The repository-required gate measures the exact final runtime, test, S9 runtime-seam, and mutation-test surfaces against the accepted ADR baselines, so a later candidate cannot retain an intermediate budget result silently. | Passing 2026-08-28 |
+| S6/R6-S1 | Automated test `test/workflow-contracts.test.js#Interactive reuses normal v2 records and Apply` | Interactive has no second log, ledger, template family, or closure mechanism. | Passing 2026-08-17 |
+| S6/R7-S1, S6/R8-S1, S6/R10-S1, S6/R10-S2 | Automated test `test/workflow-contracts.test.js#supporting workflows preserve central ownership and independent capability boundaries` | Context, Changelog, PR, Release, and Status retain central ownership and independent mutation boundaries. | Passing 2026-08-17 |
+| S6/R9-S1, S6/R9-S3 | Automated test `test/workflow-contracts.test.js#Epic Update is conditional and records current truth rather than implementation method` | Epic Update reconciles only when durable truth changed and otherwise returns evidence-based no-op. | Passing 2026-08-17 |
+| S6/R9-S2, S6/R10-S3 | Automated tests `test/candidate-resolve.test.js#candidate resolve resolves an immutable committed candidate and changed paths`, `test/candidate-resolve.test.js#candidate resolve inventories staged, unstaged, and untracked working-tree state`, and `test/epic-update-input.test.js#epic update input resolves an immutable committed candidate and changed paths` | Candidate helpers remain immutable, content-sensitive, and read-only. | Passing 2026-08-13 |
+| S6/R9-S4 | Semantic source inspection of `skills/sdd-epic-update/SKILL.md#When To Run` and `skills/sdd-apply/SKILL.md#Epic Reconciliation` | Apply defers reconciliation when no accepted behavior, Story completion, consumed contract/gap, or stale map requires it. | Passing 2026-08-17 |
+| S6/R11-S1, S6/R11-S2 | Automated tests `test/workflow-contracts.test.js#Apply delivers one reviewed outcome without legacy closure machinery` and `test/workflow-contracts.test.js#Review uses five universal gates and concrete planned or discovered triggers` | Apply permits one remediation batch and Review blocks unaccepted required gaps while keeping manual acceptance separate. | Passing 2026-08-17 |
+| S6/R11-S3, S6/R11-S4, S6/R14-S1 | Automated tests `test/change-review.test.js#done v2 outcomes require final commit and tree equality`, `test/change-contract.test.js#done v2 outcomes require a reachable content-identical review seal`, and `test/workflow-contracts.test.js#supporting workflows preserve central ownership and independent capability boundaries` | Done outcomes require a committed candidate, reachable single-parent commit, reviewed/final tree equality, and downstream consumers preserve central Review authority. | Passing 2026-08-17 |
+| S6/R11-S5, S6/R14-S2 | Automated test `test/change-contract.test.js#schema-less Changes are unsupported history` | Current validation and lifecycle mutation reject schema-less records without conversion or compatibility parsing. | Passing 2026-08-17 |
+| S6/R11-S3, S6/R11-S5, S6/R14-S2 | Automated test `test/workflow-contracts.test.js#active release and guide acceptance truth match current v2` | Active Unreleased communication names the central v2 Review authority, classifies receipt-era records as unsupported history, and contains no superseded compatibility promise or publication claim. | Passing 2026-08-29 |
+| S6/R12-S1, S6/R12-S2, S6/R13-S1 | Automated test `test/workflow-contracts.test.js#supporting workflows preserve central ownership and independent capability boundaries` | Explore routes durable records by authority and PRDs remain directional rather than delivery gates. | Passing 2026-08-17 |
+| S6/R14-S1 | Automated tests `test/change-contract.test.js#v2 creation and planning use compact current records`, `test/change-tasks-v2.test.js#v2 tasks parse a compact delivery queue without legacy ledgers`, `test/change-review.test.js#v2 review validates one ready exact-candidate outcome without a receipt`, `test/cli.test.js#validate accepts a canonical active Change`, `test/cli.test.js#validate accepts the documented lightweight interactive Change shape`, and `test/package.test.js#package dry run includes the current workflow without legacy closure templates` | Creation, lifecycle, ordinary and interactive fixtures, Review, and package inventory use the compact v2 contract without retired closure artifacts. | Passing 2026-08-28 |
 #### Verification Gaps
 
 - None.
@@ -798,14 +1076,16 @@ The Interactive workflow SHALL create the minimum shared Change artifacts, apply
 #### Story Notes
 
 - Instruction source is executable package behavior for agent workflows; semantic contract tests should prove complete operative clauses rather than isolated strings.
+- The former aggregate `Change consumers still report a stable missing required file` failure was a deterministic status/inspection regression, not a race; S1 now restores status-aware `tasks.md` checks while preserving concurrent move retries.
+- Owner feedback on 2026-08-17 rejects full slow aggregate suites as a universal per-outcome gate; v2 verification selects behavior-derived checks and reserves broad suites for a material breadth, repository-policy, or release trigger. S11 executed the repository-required package gate after current-fixture reconciliation: all 386 tests passed with no failures, skips, cancellations, or todos on 2026-08-28.
 
 ### Story S7: Accessible Public Methodology Reference
 
 Implementation: implemented
 Verification: verified
 Created: 2026-07-23
-Modified: 2026-07-23
-Last verified: 2026-07-23
+Modified: 2026-08-29
+Last verified: 2026-08-18
 
 As a developer or coding agent, I want one readable public guide to explain the SDD problem, durable behavior model, general workflow, and package implementation, so that I can understand the method and find the correct entry point without reverse-engineering the repository.
 
@@ -847,6 +1127,21 @@ The guide SHALL use the shared Steel semantic identity as restrained documentati
 - WHEN the user prefers reduced motion
 - THEN smooth scrolling and nonessential transition duration are reduced without breaking navigation feedback.
 
+##### Requirement R5: Canonical Change Lifecycle Documentation
+
+The public package documentation SHALL distinguish one progressive workspace-level central Change record from repository-local Epic/code/test truth, explain repository projections and workspace-wide lifecycle commands, document current setup and deterministic workspace discovery, and state that pre-1.0 installation and Change formats are unsupported history without a migration or backward-compatibility promise. It SHALL explain the v2 three-artifact default, five universal gates, behavior-derived triggered checks, exact-candidate independent Review, bounded remediation, technical-gap and manual-acceptance separation, and selective local commit authority without presenting the former receipt protocol as a second current profile.
+
+###### Scenario R5-S1: Unsupported Alpha Format
+
+- WHEN a developer encounters a pre-1.0 installation or Change record
+- THEN the guide identifies it as unsupported alpha data, directs the developer to recreate current workspace and repository contracts, and reserves `sdd update` for managed doctrine and skill reconciliation.
+
+###### Scenario R5-S2: Risk-Triggered Default
+
+- WHEN a developer reads the package workflow guidance
+- THEN the three current artifacts, five universal gates, concrete behavior-derived triggers, independent Review, bounded remediation, gap honesty, selective commit, and authority limits are explained without requiring or advertising receipt-based closure for new work.
+
+
 #### Implemented By
 
 | Requirement / Scenario | Location / Anchor | Kind | Responsibility |
@@ -860,6 +1155,10 @@ The guide SHALL use the shared Steel semantic identity as restrained documentati
 | S7/R3 | `site/styles.css#:focus-visible` | support | Provides visible focus and touch-sized interactive treatment. |
 | S7/R4 | `site/styles.css#UI Foundations: Steel identity profile` | primary | Implements the Steel semantic palette and restrained documentation composition. |
 | S7/R4-S1 | `site/styles.css#@media (prefers-reduced-motion: reduce)` | primary | Reduces smooth scrolling and transition duration while preserving state. |
+| S7/R5-S1 | `README.md#Quick Start` | primary | Explains the current three-artifact outcome workflow, focused verification, independent Review, and selective local commit boundary. |
+| S7/R5-S1 | `docs/story-driven-development.md#Change Workflow` | primary | Defines one current v2 contract, five universal gates, behavior-derived triggers, unsupported history, and authority limits. |
+| S7/R5-S1 | `docs/templates/README.md#Canonical Template Examples` | support | Exposes only current Change, outcome queue, and central Review templates. |
+| S7/R5-S2 | `site/index.html#Planning, project truth, and Changes have distinct owners.` | primary | Presents the three-artifact, five-gate, risk-triggered v2 workflow and its gap, acceptance, commit, and authority boundaries. |
 
 #### Implementation Gaps
 
@@ -875,9 +1174,23 @@ The guide SHALL use the shared Steel semantic identity as restrained documentati
 | S7/R1-S1 | Automated test `test/site.test.js#public guide separates portable methodology from package implementation and preserves durable Story semantics` | Portable method sections and a canonical durable Story example precede package-specific implementation. | Passing 2026-07-23 |
 | S7/R2-S1 | Automated test `test/site.test.js#public guide has unique fragment targets and sequential navigable sections` | IDs are unique, same-page fragments resolve, and skip/document navigation targets exist. | Passing 2026-07-23 |
 | S7/R3-S1, S7/R4-S1 | Automated test `test/site.test.js#public guide preserves clipboard fallback feedback and reduced-motion behavior` | Source retains selectable announced clipboard fallback when its DOM and selection APIs exist, announces a safe failure otherwise, and preserves focus and reduced-motion rules. | Passing 2026-07-23 |
-| S7/R2-S1 | Deterministic rendered inspection of committed candidate `666de8f` at 1440×900, 768×1024, 375×812, 320×812, and 812×375 | Navigation remains reachable, mobile controls measure 44px, long content is contained, and every viewport has equal document scroll/client width. | Passing 2026-07-23 |
+| S7/R2-S1 | Historical deterministic rendered inspection of committed candidate `666de8f` at 1440×900, 768×1024, 375×812, 320×812, and 812×375 | The prior candidate kept navigation reachable, mobile controls at 44px, long content contained, and document scroll/client width equal at every viewport. | Historical passing evidence 2026-07-23; not current-source proof |
 | S7/R3-S1 | Deterministic browser interaction on `site/site.js` clipboard-fallback remediation with clipboard denial, missing command text, and keyboard skip-link interaction | Clipboard denial selects the full command and announces `Selected` when selection is available; missing command text announces `Copy failed` without a runtime error; the visible skip link moves focus to `main-content`. | Passing 2026-07-23 |
-| S7/R4-S1 | Deterministic rendered inspection of committed candidate `666de8f` with reduced-motion emulation and direct screenshot review | Scroll behavior becomes `auto`, transitions reduce to `0.00001s`, active navigation remains intact, and the restrained Steel composition remains readable. | Passing 2026-07-23 |
+| S7/R4-S1 | Historical deterministic rendered inspection of committed candidate `666de8f` with reduced-motion emulation and direct screenshot review | The prior candidate used `auto` scrolling, reduced transitions to `0.00001s`, retained active navigation, and kept the Steel composition readable. | Historical passing evidence 2026-07-23; not current-source proof |
+| S7/R5-S1 | Automated tests `test/workflow-contracts.test.js#public doctrine describes one supported current workflow`, `test/cli.test.js#packaged templates define compact v2 outcomes and one central Review`, and `test/package.test.js#package dry run includes the current workflow without legacy closure templates` | README, doctrine, templates, skills, and package inventory expose one v2 three-artifact workflow without current legacy closure assets. | Passing 2026-08-17 |
+| S7/R5-S1 | Prior current-source browser inspection at 1280px with full-page screenshot and WCAG 2 A/AA axe scan | The earlier rendered guide had no layout breakage and axe reported zero violations, but its lifecycle copy is now superseded. | Historical; superseded by current evidence |
+| S7/R2-S1 | Automated test `test/site.test.js#public guide has unique fragment targets and sequential navigable sections` | Current source has unique reachable navigation and skip targets. | Passing 2026-08-18 |
+| S7/R2-S1 | Rendered verification `docs/verification/s3-risk-triggered-guide.md#S3 Risk-Triggered Guide Verification` | Desktop and 320px renders retain reachable 44px mobile controls, contained long surfaces, and no page-level overflow. | Passing 2026-08-18 |
+| S7/R3-S1 | Automated test `test/site.test.js#public guide preserves clipboard fallback feedback and reduced-motion behavior` | Current source retains skip-link focus, selectable fallback, and announced feedback. | Passing 2026-08-18 |
+| S7/R3-S1 | Rendered verification `docs/verification/s3-risk-triggered-guide.md#S3 Risk-Triggered Guide Verification` | Deterministic browser interaction proves visible skip-link focus and announced full-command selection when clipboard access is unavailable. | Passing 2026-08-18 |
+| S7/R4-S1 | Automated test `test/site.test.js#public guide preserves clipboard fallback feedback and reduced-motion behavior` | Current source retains reduced-motion and focus treatment. | Passing 2026-08-18 |
+| S7/R4-S1 | Rendered verification `docs/verification/s3-risk-triggered-guide.md#S3 Risk-Triggered Guide Verification` | Current reduced-motion rendering uses auto scrolling and negligible transition duration while Steel navigation feedback remains functional and readable. | Passing 2026-08-18 |
+| S7/R5-S2 | Automated tests `test/site.test.js#public guide presents Change as coherent outcome planning`, `test/site.test.js#public guide presents Apply as one focused reviewed outcome`, and `test/site.test.js#public guide distinguishes deterministic v2 validation from independent judgment` | Current guide source explains the three artifacts, five gates, concrete triggers, bounded Review, gap and acceptance separation, conditional Epic timing, selective commit, and authority limits without current receipt closure. | Passing 2026-08-18 |
+| S7/R5-S2 | Rendered verification `docs/verification/s3-risk-triggered-guide.md#S3 Risk-Triggered Guide Verification` | The current v2 workflow copy remains readable and contained on desktop and minimum-width mobile renders. | Passing 2026-08-18 |
+| S7/R2-S1, S7/R3-S1, S7/R4-S1, S7/R5-S2 | Owner manual acceptance recorded in the workspace-central Review for `2026-08-17-replace-default-sdd-workflow` and `docs/verification/s3-risk-triggered-guide.md#Status` | The owner separately confirmed the technically passing current guide candidate on 2026-08-18 without replacing rendered, interaction, accessibility, or reduced-motion proof. | User confirmed 2026-08-18 |
+| S7/R2-S1 | Historical rendered verification `docs/verification/s1-progressive-workflow.md#Rendered Guide Evidence` | The 2026-08-16 Steel candidate retained reachable responsive navigation and zero page overflow; this is a visual baseline, not current workflow-copy proof. | Historical passing evidence 2026-08-16; not current-source proof |
+| S7/R3-S1 | Historical rendered verification `docs/verification/s1-progressive-workflow.md#Rendered Guide Evidence` | The 2026-08-16 candidate retained a working skip link, 44px mobile controls, keyboard-reachable code regions, and selectable clipboard fallback. | Historical passing evidence 2026-08-16; not current-source proof |
+| S7/R4-S1 | Historical rendered verification `docs/verification/s1-progressive-workflow.md#Rendered Guide Evidence` | The 2026-08-16 candidate retained Steel colors, zero axe violations, reduced motion, and no page overflow at both primary viewports. | Historical passing evidence 2026-08-16; not current-source proof |
 
 #### Verification Gaps
 
@@ -886,7 +1199,9 @@ The guide SHALL use the shared Steel semantic identity as restrained documentati
 #### Story Notes
 
 - README and changelog entries communicate S7; they do not own or prove the public-guide behavior.
-- Owner preference confirmation of the exact final Steel candidate remains `pending user` and is tracked separately from deterministic Story verification.
+- Owner manual confirmation of the current guide was `user confirmed` on 2026-08-18 and remains separate from the technically passing rendered, interaction, accessibility, and reduced-motion evidence.
+- Current source-bound rendered evidence is retained under `docs/verification/artifacts/s3/2026-08-18/` and described by `docs/verification/s3-risk-triggered-guide.md`.
+- Historical responsive, accessibility, and Steel-presentation evidence remains under `docs/verification/artifacts/s1/reseal-2026-08-16/`; its workflow copy is superseded.
 
 ## Cross-Story Concerns
 
@@ -913,4 +1228,4 @@ This Epic is healthy when:
 
 ## Notes
 
-- Active implementation records are `docs/changes/2026-07-20-harden-cli-trust-boundaries/` and `docs/changes/2026-07-22-harden-audit-report-integrity/`.
+- Active and closed implementation records live in the selected workspace's central Change store. Pre-1.0 home-scoped, older-schema, and repository-local Change state is unsupported historical data; Epics, ADRs, implementation, tests, and supporting docs remain repository-owned.

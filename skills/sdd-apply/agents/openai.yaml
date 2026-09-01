@@ -1,4 +1,4 @@
 interface:
   display_name: "SDD Apply"
-  short_description: "Promote and apply SDD changes with available guidance"
-  default_prompt: "Use $sdd-apply to promote a selected private Planned Change when needed, then implement it with relevant available skills, delegated Requirement slices, verification, and durable Epic reconciliation. Stop if the selected private Change is not planned."
+  short_description: "Deliver one reviewed v2 outcome"
+  default_prompt: "Use $sdd-apply to deliver exactly one ready or explicitly named v2 outcome. Protect unrelated work, follow repository guidance and specialist workflows for implementation method, run focused behavior-derived verification, obtain independent five-gate Review in the one central review.md, reconcile Epic truth only when durable behavior or consumed contracts/gaps changed, selectively create one content-identical local commit, record its SHA/tree centrally, mark the outcome done, and stop before another outcome, final Review, push, PR, release, deployment, or closeout."

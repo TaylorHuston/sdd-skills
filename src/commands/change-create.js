@@ -1,30 +1,34 @@
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
 import {
-  assertValidConfig,
-  relativeWorkspacePath,
-  resolveIdeaPlanningPath,
-  resolveRepositoryArtifacts,
-  resolveWorkspaceStatus,
-  resolveWorkspacePath,
-} from "../config.js";
-import { resolveOperationConfiguration } from "../workspace.js";
-import { resolvedActiveRepositories, selectRepositories } from "../change-repositories.js";
+  assertChangeStoreConfinement,
+  changeStoreEntryExists,
+  getActiveChangePath,
+  getChangesRoot,
+  getClosedChangePath,
+  relativeChangeStorePath,
+} from "../change-store.js";
+import {
+  assertSelectedRepositorySnapshotsCurrent,
+  selectRepositoryTargetsForCreate,
+} from "../change-repositories.js";
+import { setChangeMetadata } from "../change-status.js";
+import { assertValidConfig, resolveWorkspaceStatus } from "../config.js";
 import { PACKAGE_ROOT } from "../constants.js";
 import { SddError } from "../errors.js";
-import { isPathPhysicallyInside, pathExists } from "../fs.js";
+import {
+  assertOperationConfigurationCurrent,
+  resolveOperationConfiguration,
+} from "../workspace.js";
 
-const TEMPLATE_FILES = Object.freeze([
-  ["proposal.md", join(PACKAGE_ROOT, "skills", "sdd-change", "assets", "proposal-template.md")],
-  ["design.md", join(PACKAGE_ROOT, "skills", "sdd-change", "assets", "design-template.md")],
-  ["tasks.md", join(PACKAGE_ROOT, "skills", "sdd-change", "assets", "tasks-template.md")],
-]);
-
-function normalizePath(value) {
-  return value.split("\\").join("/");
-}
-
+const CHANGE_TEMPLATE = join(
+  PACKAGE_ROOT,
+  "skills",
+  "sdd-change",
+  "assets",
+  "change-template.md",
+);
 function changeTitle(slug) {
   return slug
     .split("-")
@@ -39,50 +43,86 @@ function isValidDate(value) {
   const month = Number(match[2]);
   const day = Number(match[3]);
   const date = new Date(Date.UTC(year, month - 1, day));
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
+  return date.getUTCFullYear() === year
+    && date.getUTCMonth() === month - 1
+    && date.getUTCDate() === day;
+}
+
+function localDate() {
+  const now = new Date();
+  return [now.getFullYear(), now.getMonth() + 1, now.getDate()]
+    .map((value, index) => String(value).padStart(index === 0 ? 4 : 2, "0"))
+    .join("-");
+}
+
+function concurrentCreate(changeId, path, detail) {
+  return new SddError(`Change creation conflicted with current state: ${changeId}`, {
+    code: "CONCURRENT_CHANGE",
+    details: [
+      detail,
+      `Preserved Change path: ${path}`,
+      "Inspect the preserved state and retry with a different ID or after resolving the collision.",
+    ],
+  });
+}
+
+function createRecoveryFailure(changeId, path, error) {
+  const failure = new SddError(`Change creation requires manual recovery: ${changeId}`, {
+    code: "MUTATION_RECOVERY_FAILED",
+    details: [
+      `Original error: ${error?.code ? `${error.code}: ` : ""}${error?.message ?? String(error)}`,
+      `Retained Change path requiring inspection: ${path}`,
+      "Preserve the intended complete Change or remove only the confirmed incomplete residue, then retry.",
+    ],
+  });
+  failure.cause = error;
+  failure.errors = [error];
+  failure.retainedPaths = [path];
+  return failure;
+}
+
+function renderChange(source, { title, spaceId, repositories }) {
+  const withTitle = source.replaceAll("CHANGE TITLE", title);
+  const withMetadata = setChangeMetadata(withTitle, {
+    space: spaceId,
+    repositories: repositories.map((repository) => repository.id),
+  });
+  if (withMetadata === null) {
+    throw new SddError("Bundled change template has invalid metadata.", {
+      code: "INVALID_CHANGE_TEMPLATE",
+    });
+  }
+  const repositoryLines = repositories.length === 0
+    ? "- None selected yet."
+    : repositories.map((repository) =>
+      `- \`${repository.id}\` — \`${repository.resolvedPath}\`${repository.role ? ` (${repository.role})` : ""}`,
+    ).join("\n");
+  return withMetadata.replace(
+    /## Target Repositories\n\n- None selected yet\./,
+    `## Target Repositories\n\n${repositoryLines}`,
   );
 }
 
-function renderTemplate(source, { title, changeId, plannedPath, repositories }) {
-  const repositoryLines = repositories.length > 0
-    ? repositories.map(
-      (repository) => `- \`${repository.resolvedPath}\`${repository.role ? ` (${repository.role})` : ""}`,
-    )
-    : ["- None selected; this Space has no mapped implementation repository yet."];
-  let rendered = source
-    .replaceAll("CHANGE TITLE", title)
-    .replaceAll("yyyy-mm-dd-change-name", changeId);
-
-  if (rendered.startsWith("# Proposal:")) {
-    rendered = rendered.replace(
-      "## Target Repositories\n\n- TBD.",
-      `## Target Repositories\n\n${repositoryLines.join("\n")}`,
-    );
-    rendered = rendered.replace(
-      "- Planned location: not applicable",
-      `- Planned location: \`${plannedPath}\``,
-    );
-  }
-  if (rendered.startsWith("---\nstatus: proposed\n---")) {
-    rendered = rendered.replace(
-      /- Expected dirty files: `[^`]+`/,
-      `- Expected dirty files: \`${plannedPath}/\``,
-    );
-  }
-  return rendered;
-}
-
-export async function createPlannedChange(
+export async function createChange(
   startPath,
   spaceId,
   slug,
-  { date = null, repositories = [], dryRun = false } = {},
+  {
+    date = null,
+    repositories = [],
+    dryRun = false,
+    workspaceRoot: requestedWorkspaceRoot = null,
+    beforePublish = null,
+    afterDirectoryCreate = null,
+  } = {},
 ) {
-  const { workspaceRoot, config, context } = await resolveOperationConfiguration(startPath);
-  assertValidConfig(config, "create a planned Change");
+  const operation = await resolveOperationConfiguration(
+    startPath,
+    requestedWorkspaceRoot ? { workspaceRoot: requestedWorkspaceRoot } : {},
+  );
+  const { workspaceRoot, config } = operation;
+
+  assertValidConfig(config, "create a Change");
   const space = config.ideas[spaceId];
   if (!space) {
     throw new SddError(`Unknown Space ID: ${spaceId}`, {
@@ -90,106 +130,124 @@ export async function createPlannedChange(
       details: Object.keys(config.ideas).sort().map((id) => `Available Space ID: ${id}`),
     });
   }
-  if (space._repositoryOnly === true || (
-    context.kind === "repository" && context.spaceId === spaceId && context.planningPath === null
-  )) {
-    throw new SddError(
-      `Space ${spaceId} has no configured Idea planning mapping for a planned Change.`,
-      { code: "PLANNING_MAPPING_REQUIRED" },
-    );
-  }
   if (resolveWorkspaceStatus(space.status) !== "active") {
-    throw new SddError(`Space ${spaceId} is not active. Update its .sdd status before creating work.`, {
-      code: "SPACE_NOT_ACTIVE",
-    });
+    throw new SddError(`Space ${spaceId} is not active.`, { code: "SPACE_NOT_ACTIVE" });
   }
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
-    throw new SddError("Change slug must contain lowercase letters, numbers, and single hyphens.", {
-      code: "INVALID_CHANGE_SLUG",
-    });
+    throw new SddError(
+      "Change slug must contain lowercase letters, numbers, and single hyphens.",
+      { code: "INVALID_CHANGE_SLUG" },
+    );
   }
 
-  const now = new Date();
-  const localDate = [now.getFullYear(), now.getMonth() + 1, now.getDate()]
-    .map((value, index) => String(value).padStart(index === 0 ? 4 : 2, "0"))
-    .join("-");
-  const selectedDate = date ?? localDate;
+  const selectedDate = date ?? localDate();
   if (!isValidDate(selectedDate)) {
-    throw new SddError("Change date must use YYYY-MM-DD.", { code: "INVALID_CHANGE_DATE" });
-  }
-
-  const changeId = `${selectedDate}-${slug}`;
-  const selectedRepositories = selectRepositories(
-    resolvedActiveRepositories(config, space),
-    repositories,
-  );
-  const planningPath = resolveIdeaPlanningPath(config, spaceId, space);
-  const plannedPath = normalizePath(
-    join(planningPath, config.planning.plannedChangesDirectory, changeId),
-  );
-  const absolutePath = resolveWorkspacePath(workspaceRoot, plannedPath);
-  const ideaPlanningRoot = resolveWorkspacePath(workspaceRoot, planningPath);
-  if (!(await isPathPhysicallyInside(ideaPlanningRoot, absolutePath))) {
-    throw new SddError(`Planned Change resolves outside its configured Idea planning root: ${plannedPath}`, {
-      code: "UNSAFE_ARTIFACT_PATH",
+    throw new SddError("Change date must use YYYY-MM-DD.", {
+      code: "INVALID_CHANGE_DATE",
     });
   }
-  if (await pathExists(absolutePath)) {
-    throw new SddError(`Planned Change already exists: ${plannedPath}`, { code: "CHANGE_EXISTS" });
-  }
-  for (const repository of selectedRepositories) {
-    const repositoryPath = resolveWorkspacePath(workspaceRoot, repository.resolvedPath);
-    const artifacts = resolveRepositoryArtifacts(config, repository);
-    for (const [location, root] of [
-      ["active", artifacts.activeChanges],
-      ["closed", artifacts.closedChanges],
-    ]) {
-      const collisionPath = join(repositoryPath, root, changeId);
-      if (await pathExists(collisionPath)) {
-        throw new SddError(
-          `Change already exists in ${location} repository history: ${normalizePath(join(repository.resolvedPath, root, changeId))}`,
-          { code: "CHANGE_EXISTS" },
-        );
-      }
-    }
-  }
-  const title = changeTitle(slug);
-  const files = TEMPLATE_FILES.map(([name]) => name);
 
-  if (!dryRun) {
-    const parent = dirname(absolutePath);
-    const temporaryPath = join(parent, `.${changeId}.sdd-new-${process.pid}-${Date.now()}`);
-    await mkdir(parent, { recursive: true });
-    await mkdir(temporaryPath);
-    try {
-      for (const [name, templatePath] of TEMPLATE_FILES) {
-        const source = await readFile(templatePath, "utf8");
-        await writeFile(
-          join(temporaryPath, name),
-          renderTemplate(source, {
-            title,
-            changeId,
-            plannedPath,
-            repositories: selectedRepositories,
-          }),
-          "utf8",
-        );
-      }
-      if (!(await isPathPhysicallyInside(ideaPlanningRoot, absolutePath))) {
-        throw new SddError(`Planned Change resolves outside its configured Idea planning root: ${plannedPath}`, {
-          code: "UNSAFE_ARTIFACT_PATH",
-        });
-      }
-      if (await pathExists(absolutePath)) {
-        throw new SddError(`Planned Change appeared during creation: ${plannedPath}`, {
-          code: "CONCURRENT_CHANGE",
-        });
-      }
-      await rename(temporaryPath, absolutePath);
-    } catch (error) {
-      await rm(temporaryPath, { recursive: true, force: true });
-      throw error;
+  // Repository ownership is optional while a Change is proposed. Resolve only
+  // explicit selections; planning must settle ownership before `planned`.
+  const selectedRepositories = repositories.length === 0
+    ? []
+    : await selectRepositoryTargetsForCreate(
+        workspaceRoot,
+        config,
+        space,
+        repositories,
+        { requireIdentity: true },
+      );
+  const changeId = `${selectedDate}-${slug}`;
+  const absolutePath = getActiveChangePath(changeId, workspaceRoot);
+  const closedPath = getClosedChangePath(changeId, workspaceRoot);
+  const displayPath = relativeChangeStorePath(absolutePath, workspaceRoot);
+  const title = changeTitle(slug);
+  const files = ["change.md"];
+
+  if (await changeStoreEntryExists(absolutePath) || await changeStoreEntryExists(closedPath)) {
+    throw new SddError(
+      `Change ID already exists in central active or closed history: ${changeId}`,
+      { code: "CHANGE_EXISTS" },
+    );
+  }
+  if (dryRun) {
+    return {
+      command: "change-create",
+      workspaceRoot,
+      dryRun,
+      spaceId,
+      changeId,
+      title,
+      path: displayPath,
+      repositories: selectedRepositories,
+      files,
+    };
+  }
+
+  const source = renderChange(await readFile(CHANGE_TEMPLATE, "utf8"), {
+    title,
+    spaceId,
+    repositories: selectedRepositories,
+  });
+  await beforePublish?.({ targetPath: absolutePath, closedPath });
+  await assertOperationConfigurationCurrent(operation);
+  await assertSelectedRepositorySnapshotsCurrent(
+    workspaceRoot,
+    config,
+    space,
+    selectedRepositories,
+  );
+  const changesRoot = getChangesRoot(workspaceRoot);
+  await assertChangeStoreConfinement(changesRoot, workspaceRoot);
+  await mkdir(changesRoot, { recursive: true });
+  await assertChangeStoreConfinement(changesRoot, workspaceRoot);
+  try {
+    await mkdir(absolutePath);
+  } catch (error) {
+    if (error?.code === "EEXIST") {
+      throw new SddError(`Change ID already exists: ${changeId}`, {
+        code: "CHANGE_EXISTS",
+      });
     }
+    throw error;
+  }
+
+  const createdState = await lstat(absolutePath, { bigint: true });
+  try {
+    await afterDirectoryCreate?.({ targetPath: absolutePath, closedPath });
+    await assertChangeStoreConfinement(absolutePath, workspaceRoot);
+    const visibleState = await lstat(absolutePath, { bigint: true });
+    if (
+      !visibleState.isDirectory()
+      || visibleState.isSymbolicLink()
+      || visibleState.dev !== createdState.dev
+      || visibleState.ino !== createdState.ino
+    ) {
+      throw concurrentCreate(
+        changeId,
+        absolutePath,
+        "The exclusively created Change directory was replaced before change.md publication.",
+      );
+    }
+    await writeFile(join(absolutePath, "change.md"), source, { flag: "wx" });
+    await assertOperationConfigurationCurrent(operation);
+    await assertSelectedRepositorySnapshotsCurrent(
+      workspaceRoot,
+      config,
+      space,
+      selectedRepositories,
+    );
+    if (await changeStoreEntryExists(closedPath)) {
+      throw concurrentCreate(
+        changeId,
+        absolutePath,
+        `Closed history appeared during creation: ${closedPath}`,
+      );
+    }
+  } catch (error) {
+    if (["CONCURRENT_CHANGE", "UNSAFE_ARTIFACT_PATH"].includes(error?.code)) throw error;
+    throw createRecoveryFailure(changeId, absolutePath, error);
   }
 
   return {
@@ -199,7 +257,7 @@ export async function createPlannedChange(
     spaceId,
     changeId,
     title,
-    path: relativeWorkspacePath(workspaceRoot, absolutePath),
+    path: displayPath,
     repositories: selectedRepositories,
     files,
   };

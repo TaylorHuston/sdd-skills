@@ -1,167 +1,254 @@
-import { mkdir, readFile, rename } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { constants as fsConstants } from "node:fs";
+import { lstat, mkdir, open, rename } from "node:fs/promises";
 
 import { assertValidChangeId } from "../change-id.js";
-import { resolvedActiveRepositories, selectRepositories } from "../change-repositories.js";
-import { parseChangeStatus } from "../change-status.js";
 import {
-  assertValidConfig,
-  resolveRepositoryArtifacts,
-  resolveWorkspacePath,
-  resolveWorkspaceStatus,
-} from "../config.js";
-import { resolveOperationConfiguration } from "../workspace.js";
+  assertChangeStoreConfinement,
+  assertRequiredChangeFileSnapshotCurrent,
+  changeStoreEntryExists,
+  getActiveChangePath,
+  getClosedChangePath,
+  getClosedChangesRoot,
+  readRequiredChangeFileSnapshot,
+  relativeChangeStorePath,
+} from "../change-store.js";
+import {
+  assertSelectedRepositorySnapshotsCurrent,
+  resolveRepositoriesForMetadata,
+} from "../change-repositories.js";
+import { CHANGE_SCHEMA_V2, parseChangeMetadata } from "../change-status.js";
+import { assertValidConfig, resolveWorkspaceStatus } from "../config.js";
 import { SddError } from "../errors.js";
-import { isDirectory, isPathPhysicallyInside, pathExists } from "../fs.js";
-
-function normalizePath(value) {
-  return value.split("\\").join("/");
-}
-
-async function assertInReview(sourcePath, displayPath) {
-  const tasksPath = join(sourcePath, "tasks.md");
-  if (!(await pathExists(tasksPath))) {
-    throw new SddError(`Active Change is missing tasks.md: ${displayPath}`, {
-      code: "INCOMPLETE_CHANGE",
-    });
-  }
-
-  const source = await readFile(tasksPath, "utf8");
-  const { status, error } = parseChangeStatus(source);
-  if (error) {
-    throw new SddError(`Cannot parse Change status in ${displayPath}/tasks.md: ${error}`, {
-      code: "INVALID_CHANGE_STATUS",
-    });
-  }
-  if (status !== "in_review") {
-    throw new SddError("Only a Change with status in_review can be closed.", {
-      code: "CHANGE_NOT_IN_REVIEW",
-      details: [`Current status: ${status ?? "missing"}`],
-    });
-  }
-  return source;
-}
+import { isDirectory, isPathInside, resolvePhysicalPath } from "../fs.js";
+import {
+  assertOperationConfigurationCurrent,
+  resolveOperationConfiguration,
+} from "../workspace.js";
 
 export async function closeChange(
   startPath,
   spaceId,
   changeId,
-  { repositories = [], dryRun = false, beforeRepositoryCommit = null } = {},
+  {
+    dryRun = false,
+    beforeCommit = null,
+    beforeMove = null,
+    afterDirectoryOpen = null,
+    afterMove = null,
+    workspaceRoot: requestedWorkspaceRoot = null,
+  } = {},
 ) {
   assertValidChangeId(changeId);
-  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath);
+  const operation = await resolveOperationConfiguration(
+    startPath,
+    requestedWorkspaceRoot ? { workspaceRoot: requestedWorkspaceRoot } : {},
+  );
+  const { workspaceRoot, config } = operation;
+
   assertValidConfig(config, "close a Change");
   const space = config.ideas[spaceId];
   if (!space) {
     throw new SddError(`Unknown Space ID: ${spaceId}`, {
       code: "SPACE_NOT_FOUND",
-      details: Object.keys(config.ideas).sort().map((id) => `Available Space ID: ${id}`),
     });
   }
   if (resolveWorkspaceStatus(space.status) !== "active") {
-    throw new SddError(`Space ${spaceId} is not active. Update its .sdd status before closing work.`, {
+    throw new SddError(`Space ${spaceId} is not active.`, {
       code: "SPACE_NOT_ACTIVE",
     });
   }
 
-  const selected = selectRepositories(
-    resolvedActiveRepositories(config, space),
-    repositories,
-    { allowNone: false },
-  );
-  const transitions = [];
-  for (const repository of selected) {
-    const artifacts = resolveRepositoryArtifacts(config, repository);
-    const repositoryPath = resolveWorkspacePath(workspaceRoot, repository.resolvedPath);
-    if (!(await isDirectory(repositoryPath))) {
-      throw new SddError(`Configured repository does not exist: ${repository.resolvedPath}`, {
-        code: "REPOSITORY_NOT_FOUND",
-      });
-    }
+  const sourceAbsolutePath = getActiveChangePath(changeId, workspaceRoot);
+  const destinationAbsolutePath = getClosedChangePath(changeId, workspaceRoot);
+  const sourcePath = relativeChangeStorePath(sourceAbsolutePath, workspaceRoot);
+  const destinationPath = relativeChangeStorePath(destinationAbsolutePath, workspaceRoot);
+  await assertChangeStoreConfinement(sourceAbsolutePath, workspaceRoot);
+  await assertChangeStoreConfinement(destinationAbsolutePath, workspaceRoot);
 
-    const activePath = normalizePath(join(artifacts.activeChanges, changeId));
-    const closedPath = normalizePath(join(artifacts.closedChanges, changeId));
-    const sourceAbsolutePath = join(repositoryPath, activePath);
-    const destinationAbsolutePath = join(repositoryPath, closedPath);
-    const sourcePath = normalizePath(join(repository.resolvedPath, activePath));
-    const destinationPath = normalizePath(join(repository.resolvedPath, closedPath));
-
-    if (await pathExists(destinationAbsolutePath)) {
-      throw new SddError(`Closed Change already exists: ${destinationPath}`, {
-        code: "CHANGE_ALREADY_CLOSED",
-      });
-    }
-    if (!(await isDirectory(sourceAbsolutePath))) {
-      throw new SddError(`Active Change does not exist: ${sourcePath}`, {
-        code: "CHANGE_NOT_FOUND",
-      });
-    }
-    const tasksSource = await assertInReview(sourceAbsolutePath, sourcePath);
-    transitions.push({
-      ...repository,
-      repositoryPath,
-      sourcePath,
-      path: destinationPath,
-      sourceAbsolutePath,
-      destinationAbsolutePath,
-      tasksSource,
+  if (await changeStoreEntryExists(destinationAbsolutePath)) {
+    throw new SddError(`Closed Change already exists: ${destinationPath}`, {
+      code: await isDirectory(sourceAbsolutePath)
+        ? "CHANGE_LOCATION_COLLISION"
+        : "CHANGE_ALREADY_CLOSED",
+    });
+  }
+  if (!(await isDirectory(sourceAbsolutePath))) {
+    throw new SddError(`Active Change does not exist: ${sourcePath}`, {
+      code: "CHANGE_NOT_FOUND",
     });
   }
 
+  const snapshot = await readRequiredChangeFileSnapshot(
+    sourceAbsolutePath,
+    "change.md",
+    workspaceRoot,
+  );
+  if (snapshot === null) {
+    throw new SddError(`Active Change is missing change.md: ${sourcePath}`, {
+      code: "INCOMPLETE_CHANGE",
+    });
+  }
+  const metadata = parseChangeMetadata(snapshot.source);
+  if (metadata.error) {
+    throw new SddError(`Cannot parse Change metadata in ${sourcePath}/change.md: ${metadata.error}`, {
+      code: "INVALID_CHANGE_METADATA",
+    });
+  }
+  if (metadata.schema !== CHANGE_SCHEMA_V2) {
+    throw new SddError("Current Change closeout requires schema: sdd-change-v2; schema-less Changes are unsupported history.", {
+      code: "UNSUPPORTED_CHANGE_SCHEMA",
+    });
+  }
+  if (metadata.space !== spaceId) {
+    throw new SddError(`Change belongs to Space ${metadata.space}, not ${spaceId}.`, {
+      code: "CHANGE_SPACE_MISMATCH",
+    });
+  }
+  if (metadata.status !== "in_review") {
+    throw new SddError("Only a Change with status in_review can be closed.", {
+      code: "CHANGE_NOT_IN_REVIEW",
+      details: [`Current status: ${metadata.status}`],
+    });
+  }
+  const selectedRepositories = await resolveRepositoriesForMetadata(
+    workspaceRoot,
+    config,
+    space,
+    metadata.repositories,
+  );
+
   if (!dryRun) {
-    const moved = [];
-    try {
-      for (const [index, transition] of transitions.entries()) {
-        if (beforeRepositoryCommit) {
-          await beforeRepositoryCommit({ transition, index, transitions });
-        }
-        if (!(await isPathPhysicallyInside(transition.repositoryPath, transition.sourceAbsolutePath))
-          || !(await isPathPhysicallyInside(transition.repositoryPath, transition.destinationAbsolutePath))) {
-          throw new SddError(`Change close path resolves outside its repository: ${transition.sourcePath}`, {
-            code: "UNSAFE_ARTIFACT_PATH",
-          });
-        }
-        if (await readFile(join(transition.sourceAbsolutePath, "tasks.md"), "utf8") !== transition.tasksSource) {
-          throw new SddError(`Change changed during close: ${transition.sourcePath}`, {
-            code: "CONCURRENT_CHANGE",
-          });
-        }
-        await mkdir(dirname(transition.destinationAbsolutePath), { recursive: true });
-        if (await pathExists(transition.destinationAbsolutePath)) {
-          throw new SddError(`Closed Change appeared during close: ${transition.path}`, {
-            code: "CONCURRENT_CHANGE",
-          });
-        }
-        await rename(transition.sourceAbsolutePath, transition.destinationAbsolutePath);
-        moved.push(transition);
-        if (await readFile(join(transition.destinationAbsolutePath, "tasks.md"), "utf8") !== transition.tasksSource) {
-          throw new SddError(`Change changed during close: ${transition.sourcePath}`, {
-            code: "CONCURRENT_CHANGE",
-          });
-        }
-      }
-    } catch (error) {
-      const recoveryFailures = [];
-      for (const transition of moved.reverse()) {
-        try {
-          if (await pathExists(transition.sourceAbsolutePath)) {
-            recoveryFailures.push(
-              `${transition.sourcePath}: concurrent source preserved; moved Change retained at ${transition.path}.`,
-            );
-            continue;
-          }
-          await rename(transition.destinationAbsolutePath, transition.sourceAbsolutePath);
-        } catch (recoveryError) {
-          recoveryFailures.push(`${transition.path}: ${recoveryError.message}`);
-        }
-      }
-      if (recoveryFailures.length > 0) {
-        throw new SddError("Change close failed and recovery was incomplete.", {
-          code: "MUTATION_RECOVERY_FAILED",
-          details: [`Original error: ${error.message}`, ...recoveryFailures],
+    const assertCloseCurrent = async () => {
+      await assertOperationConfigurationCurrent(operation);
+      await assertSelectedRepositorySnapshotsCurrent(
+        workspaceRoot,
+        config,
+        space,
+        selectedRepositories,
+      );
+      await assertRequiredChangeFileSnapshotCurrent(
+        sourceAbsolutePath,
+        "change.md",
+        workspaceRoot,
+        snapshot,
+      );
+      if (await changeStoreEntryExists(destinationAbsolutePath)) {
+        throw new SddError(`Closed Change appeared before close: ${destinationPath}`, {
+          code: "CONCURRENT_CHANGE",
         });
       }
-      throw error;
+    };
+
+    await beforeCommit?.({
+      sourcePath: sourceAbsolutePath,
+      destinationPath: destinationAbsolutePath,
+    });
+    await assertCloseCurrent();
+    const closedRoot = getClosedChangesRoot(workspaceRoot);
+    await assertChangeStoreConfinement(closedRoot, workspaceRoot);
+    await mkdir(closedRoot, { recursive: true });
+    await assertChangeStoreConfinement(closedRoot, workspaceRoot);
+    await beforeMove?.({
+      sourcePath: sourceAbsolutePath,
+      destinationPath: destinationAbsolutePath,
+    });
+    await assertCloseCurrent();
+
+    const physicalWorkspaceRoot = await resolvePhysicalPath(workspaceRoot);
+    const physicalSourcePath = await resolvePhysicalPath(sourceAbsolutePath);
+    if (!isPathInside(physicalWorkspaceRoot, physicalSourcePath)) {
+      throw new SddError(`Active Change resolves outside its workspace owner: ${sourcePath}`, {
+        code: "UNSAFE_ARTIFACT_PATH",
+      });
+    }
+
+    let sourceHandle;
+    let sourceMode;
+    let needsOwnerWrite = false;
+    try {
+      sourceHandle = await open(
+        physicalSourcePath,
+        fsConstants.O_RDONLY
+          | (fsConstants.O_DIRECTORY ?? 0)
+          | (fsConstants.O_NOFOLLOW ?? 0),
+      );
+      const opened = await sourceHandle.stat({ bigint: true });
+      if (!opened.isDirectory()) {
+        throw new SddError(`Active Change is not a directory: ${sourcePath}`, {
+          code: "CONCURRENT_CHANGE",
+        });
+      }
+      await afterDirectoryOpen?.({
+        sourcePath: sourceAbsolutePath,
+        destinationPath: destinationAbsolutePath,
+      });
+      await assertCloseCurrent();
+      const current = await lstat(sourceAbsolutePath, { bigint: true });
+      if (
+        current.isSymbolicLink()
+        || !current.isDirectory()
+        || current.dev !== opened.dev
+        || current.ino !== opened.ino
+      ) {
+        throw new SddError(`Active Change changed before close: ${sourcePath}`, {
+          code: "CONCURRENT_CHANGE",
+        });
+      }
+      sourceMode = Number(opened.mode & 0o7777n);
+      needsOwnerWrite = (sourceMode & 0o200) === 0;
+      if (needsOwnerWrite) {
+        await sourceHandle.chmod(sourceMode | 0o200);
+      }
+
+      try {
+        await rename(sourceAbsolutePath, destinationAbsolutePath);
+      } catch (error) {
+        if (needsOwnerWrite) {
+          try {
+            await sourceHandle.chmod(sourceMode);
+          } catch (restoreError) {
+            throw new SddError(`Change close failed and the source directory mode could not be restored: ${sourcePath}`, {
+              code: "MUTATION_RECOVERY_FAILED",
+              details: [error.message, restoreError.message, `Restore mode ${sourceMode.toString(8)} before retrying.`],
+            });
+          }
+        }
+        if (["EEXIST", "ENOTEMPTY", "ENOENT", "ENOTDIR"].includes(error?.code)) {
+          throw new SddError(`Change moved or closed concurrently: ${destinationPath}`, {
+            code: "CONCURRENT_CHANGE",
+            details: [error.message],
+          });
+        }
+        throw error;
+      }
+
+      await afterMove?.({
+        sourcePath: sourceAbsolutePath,
+        destinationPath: destinationAbsolutePath,
+      });
+      if (needsOwnerWrite) {
+        try {
+          await sourceHandle.chmod(sourceMode);
+        } catch (error) {
+          throw new SddError(`Change closed but its directory mode could not be restored: ${destinationPath}`, {
+            code: "MUTATION_RECOVERY_FAILED",
+            details: [error.message, `Restore mode ${sourceMode.toString(8)} before continuing.`],
+          });
+        }
+      }
+      const published = await lstat(destinationAbsolutePath, { bigint: true });
+      if (
+        published.isSymbolicLink()
+        || !published.isDirectory()
+        || published.dev !== opened.dev
+        || published.ino !== opened.ino
+      ) {
+        throw new SddError(`Closed Change changed after the move: ${destinationPath}`, {
+          code: "CONCURRENT_CHANGE",
+        });
+      }
+    } finally {
+      await sourceHandle?.close().catch(() => {});
     }
   }
 
@@ -171,8 +258,8 @@ export async function closeChange(
     dryRun,
     spaceId,
     changeId,
-    repositories: transitions.map(
-      ({ sourceAbsolutePath, destinationAbsolutePath, repositoryPath, tasksSource, ...transition }) => transition,
-    ),
+    sourcePath,
+    path: destinationPath,
+    repositories: selectedRepositories,
   };
 }

@@ -6,6 +6,7 @@ Status: audit complete | no material findings | blocked
 
 - Audit date:
 - Repository:
+- Stable repository ID:
 - Scope:
 - Exclusions:
 - Branch:
@@ -51,6 +52,7 @@ Status: audit complete | no material findings | blocked
 - Result: aligned | gaps found | not applicable | not assessed
 - Epic and evidence observations:
 - Orphan-audit evidence used:
+- Central Change records inspected through repository status/metadata:
 
 ## Challenged Or Unresolved Claims
 
@@ -67,8 +69,8 @@ Status: audit complete | no material findings | blocked
 
 - Recommendation:
 - Why first:
-- Suggested next workflow: discuss | `/sdd-change --brief` | `/sdd-change --plan` | dedicated security response
+- Suggested next workflow: discuss | `/sdd-change` | dedicated security response
 
 ## Guardrail
 
-This is a point-in-time advisory report for the snapshot above. Accepted behavior and implementation truth belong in the relevant Epics and Changes. No application code was modified by this audit.
+This is a point-in-time advisory report for the snapshot above. Accepted behavior and implementation truth belong in the relevant repository-local Epics and central Changes. No application code was modified by this audit.

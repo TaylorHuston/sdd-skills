@@ -1,25 +1,52 @@
-import { readFile, readdir } from "node:fs/promises";
+import { execFile as execFileCallback } from "node:child_process";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { promisify } from "node:util";
 import { parseDocument } from "yaml";
 
 import {
+  CHANGE_SCHEMA_V2,
   CHANGE_STATUSES,
   LEGACY_CHANGE_STATUSES,
-  parseChangeStatus,
+  isRepositoryOnlyChangeMetadata,
+  parseChangeMetadata,
 } from "../change-status.js";
 import { isValidChangeId } from "../change-id.js";
+import { resolveCandidateEnvelope } from "./candidate-resolve.js";
+import { parseV2ChangeTasks } from "../change-tasks-v2.js";
+import { validateV2ChangeReviewSource } from "../change-review.js";
+import {
+  readStoredChangesSnapshot,
+  readRequiredChangeFileSnapshot,
+  relativeChangeStorePath,
+  REQUIRED_CHANGE_FILES,
+  PLANNED_CHANGE_FILES,
+  OPTIONAL_CHANGE_FILES,
+  missingPlannedChangeSections,
+} from "../change-store.js";
+import {
+  inspectRepositoryIdentity,
+  repositoryMatchesSelector,
+  resolvedRepositories,
+  resolveRepositoriesForMetadata,
+  resolveRepositoryTargets,
+} from "../change-repositories.js";
 import {
   assertValidConfig,
-  resolveIdeaPlanningPath,
   resolveRepositoryArtifacts,
   resolveRepositoryPath,
   resolveWorkspacePath,
 } from "../config.js";
-import { resolveOperationConfiguration } from "../workspace.js";
+import {
+  isMetadataOnlyRepositorySpace,
+  resolveOperationConfiguration,
+  synthesizeRepositoryOnlySpaceFromChangeMetadata,
+} from "../workspace.js";
 import { SddError } from "../errors.js";
-import { isDirectory, isPathPhysicallyInside, pathExists } from "../fs.js";
+import { isDirectory, isPathPhysicallyInside, pathExists, readBoundRegularFile } from "../fs.js";
 import {
   behaviorReferences,
+  durableProofReferences,
   implementationLocationPaths,
   orderedValuesEqual,
   readRegularText,
@@ -28,25 +55,24 @@ import {
 import { resolveChangedFrom, validateEpicHistory } from "../epic-history.js";
 import { validateEpicVerifyReports } from "../epic-verify-report.js";
 
+const V2_TASK_SECTIONS = Object.freeze([
+  ["Resume Here"],
+  ["Delivery Outcomes"],
+  ["Closeout"],
+]);
+
 const CHANGE_FILES = Object.freeze({
-  "proposal.md": [
+  "change.md": [
     ["Why"],
-    ["What Changes", "Interactive Scope Boundary"],
-    ["Impact", "Epic / Story Impact"],
+    ["Desired Outcome"],
+    ["Scope"],
+    ["Success Signals"],
     ["Open Questions"],
   ],
   "design.md": [
     ["Context", "Current Understanding"],
     ["Selected Approach", "Technical Approach"],
     ["Risks / Trade-Offs", "Alternatives / Deferred"],
-  ],
-  "tasks.md": [
-    ["Resume Here"],
-    ["Task Checklist", "Checklist"],
-    ["Implementation Ledger"],
-    ["Verification Ledger"],
-    ["Blockers / Open Questions", "Open Questions"],
-    ["Closeout"],
   ],
 });
 
@@ -111,6 +137,9 @@ const IMPLEMENTATION_KINDS = Object.freeze([
   "migration",
   "support",
 ]);
+const execFile = promisify(execFileCallback);
+const REVIEW_GIT_TIMEOUT_MS = 10_000;
+
 const TEMPLATE_PLACEHOLDERS = Object.freeze([
   "CHANGE TITLE",
   "EPIC TITLE",
@@ -125,21 +154,135 @@ function normalizePath(value) {
   return value.split("\\").join("/");
 }
 
-function declaredEpicDirectories(source, epicsDirectory) {
-  const prefix = `${normalizePath(epicsDirectory).replace(/\/$/, "")}/`;
-  const directories = new Set();
-  const epicActions = headingSection(source.split(/\r?\n/), 2, "Epic Actions").join("\n");
+function repositoryProjectionKey(repository) {
+  return JSON.stringify([repository.spaceId, repository.id]);
+}
+
+function changeProjectsToRepository(record, repository) {
+  return record.metadata?.space === repository.spaceId
+    && Array.isArray(record.metadata.repositories)
+    && record.metadata.repositories.includes(repository.id);
+}
+
+function epicImpactSource(source) {
+  const lines = source.split(/\r?\n/);
+  return ["Epic Impact", "Epic Actions"]
+    .map((heading) => headingSection(lines, 2, heading).join("\n"))
+    .find((section) => section.length > 0) ?? "";
+}
+
+function declaredEpicPaths(source) {
+  const paths = new Set();
+  const epicActions = epicImpactSource(source);
   for (const match of epicActions.matchAll(/`([^`]+)`/g)) {
     const path = normalizePath(match[1]).replace(/^\.\//, "");
-    if (!path.startsWith(prefix) || !path.endsWith("/epic.md")) continue;
-    const relativePath = path.slice(prefix.length, -"/epic.md".length);
-    if (relativePath && !relativePath.includes("/")) directories.add(relativePath);
+    if (path.endsWith("/epic.md")) paths.add(path);
   }
-  return directories;
+  return paths;
+}
+
+function declaredEpicIds(source) {
+  const ids = new Set();
+  const epicActions = epicImpactSource(source);
+  for (const match of epicActions.matchAll(/`([^`]+)`/g)) {
+    if (/^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*$/.test(match[1])) ids.add(match[1]);
+  }
+  return ids;
+}
+
+function declaredEpicDirectory(path, epicsDirectory) {
+  const prefix = `${normalizePath(epicsDirectory).replace(/\/$/, "")}/`;
+  if (!path.startsWith(prefix) || !path.endsWith("/epic.md")) return null;
+  const relativePath = path.slice(prefix.length, -"/epic.md".length);
+  return relativePath && !relativePath.includes("/") ? relativePath : null;
+}
+
+function declaredEpicDirectories(source, epicsDirectory) {
+  return new Set(
+    [...declaredEpicPaths(source)]
+      .map((path) => declaredEpicDirectory(path, epicsDirectory))
+      .filter(Boolean),
+  );
 }
 
 function finding(level, code, path, message, context = {}) {
   return { level, code, path: normalizePath(path), message, ...context };
+}
+
+async function gitOutput(
+  repositoryRoot,
+  args,
+  { command = "git", timeoutMs = REVIEW_GIT_TIMEOUT_MS } = {},
+) {
+  try {
+    const result = await execFile(command, args, {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      maxBuffer: 16 * 1024 * 1024,
+      timeout: timeoutMs,
+      killSignal: "SIGTERM",
+    });
+    return { ok: true, stdout: result.stdout.trim(), raw: result.stdout };
+  } catch (error) {
+    return { ok: false, stdout: "", raw: "", error };
+  }
+}
+
+function parseFullScenarioReference(reference) {
+  const match = /^([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*)\/(S[1-9]\d*) (R[1-9]\d*-S[1-9]\d*)$/.exec(reference);
+  return match ? { epicId: match[1], story: match[2], scenario: match[3] } : null;
+}
+
+function epicVerificationGapClassification(epicSource, storyLabel, scenarioId) {
+  const stories = splitStoryBlocks(epicSource.split(/\r?\n/));
+  const story = stories.find((entry) => entry.label === storyLabel);
+  if (!story) return null;
+  const lines = sectionLines(story.lines, "Verification Gaps");
+  const escaped = `${storyLabel}/${scenarioId}`.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const matchingLines = lines.filter((entry) => new RegExp(`^\\s*- \\x60${escaped}\\x60:`).test(entry));
+  if (matchingLines.length === 0) return null;
+  if (matchingLines.length > 1) return { classification: "duplicate", date: null, line: matchingLines.join("\n") };
+  const [line] = matchingLines;
+  const accepted = /\[user accepted (\d{4}-\d{2}-\d{2})\]/.exec(line);
+  if (accepted) return { classification: "user-accepted", date: accepted[1], line };
+  if (/\[required\]/.test(line)) return { classification: "required", date: null, line };
+  if (/\[manual acceptance\]/.test(line)) return { classification: "manual-acceptance", date: null, line };
+  const optional = /\[optional confidence(?::\s*([^\]]+))?\]/.exec(line);
+  if (optional) return { classification: "optional-confidence", date: null, policy: optional[1]?.trim() ?? "", line };
+  return { classification: "unclassified", date: null, line };
+}
+
+function reviewGapClassification(value) {
+  if (value === "none" || value === "required" || value === "manual-acceptance") {
+    return { classification: value, date: null, policy: "" };
+  }
+  if (value.startsWith("user-accepted:")) {
+    return { classification: "user-accepted", date: value.slice("user-accepted:".length), policy: "" };
+  }
+  if (value.startsWith("optional-confidence:")) {
+    return { classification: "optional-confidence", date: null, policy: value.slice("optional-confidence:".length).trim() };
+  }
+  return { classification: "unclassified", date: null, policy: "" };
+}
+
+function resolveReviewScenario(epicRecords, reference) {
+  const full = parseFullScenarioReference(reference);
+  if (full) {
+    const matches = epicRecords.filter((epic) => (
+      epic.epicId === full.epicId
+      && epic.scenarios.some((entry) => entry.story === full.story && entry.scenario === full.scenario)
+    ));
+    return matches.length === 1
+      ? { epic: matches[0], story: full.story, scenario: full.scenario }
+      : null;
+  }
+  const legacy = /^([A-Z][A-Z0-9]*-\d+) (R[1-9]\d*-S[1-9]\d*)$/.exec(reference);
+  if (!legacy) return null;
+  const matches = epicRecords.filter((epic) =>
+    epic.scenarios.some((entry) => entry.story === legacy[1] && entry.scenario === legacy[2]));
+  return matches.length === 1
+    ? { epic: matches[0], story: legacy[1], scenario: legacy[2] }
+    : null;
 }
 
 function headingsAtLevel(source, level) {
@@ -276,6 +419,8 @@ function epicContext(repository, epicId) {
 async function validateEpic(repository, epicPath, repositoryRoot, artifactRoots, displayPath) {
   const source = await readFile(epicPath, "utf8");
   const findings = [];
+  const scenarioInventory = [];
+  const evidenceByScenario = new Map();
   const { data: frontmatter, error } = parseFrontmatter(source);
   const epicId = frontmatter?.id ?? basename(dirname(epicPath));
   const context = epicContext(repository, epicId);
@@ -401,6 +546,9 @@ async function validateEpic(repository, epicPath, repositoryRoot, artifactRoots,
       const match = line.match(/^###### Scenario (R\d+-S\d+):\s+.+$/);
       return match ? [match[1]] : [];
     });
+    for (const scenarioId of scenarioIds) {
+      scenarioInventory.push({ story: story.label, scenario: scenarioId });
+    }
     if (isV2 && requirementIds.length === 0) {
       findings.push(finding(
         "error",
@@ -673,7 +821,15 @@ async function validateEpic(repository, epicPath, repositoryRoot, artifactRoots,
       });
       findings.push(...result.findings);
       for (const behavior of result.verifiedBehaviors) verifiedReferences.add(behavior);
-      for (const behavior of result.passingBehaviors) passingEvidenceReferences.add(behavior);
+      for (const behavior of result.passingBehaviors) {
+        passingEvidenceReferences.add(behavior);
+        if (/-S\d+$/.test(behavior)) {
+          const key = `${story.label}/${behavior}`;
+          const evidence = evidenceByScenario.get(key) ?? new Set();
+          evidence.add(row[1] ?? "");
+          evidenceByScenario.set(key, evidence);
+        }
+      }
     }
     if (isV2) {
       const verificationGapReferences = new Set();
@@ -772,7 +928,16 @@ async function validateEpic(repository, epicPath, repositoryRoot, artifactRoots,
     artifactRoots,
     context,
   ));
-  return { epicId, storyLabels: actualStories, displayPath, findings };
+  return {
+    epicId,
+    declaredEpicId: frontmatter?.id,
+    storyLabels: actualStories,
+    scenarios: scenarioInventory,
+    evidenceByScenario,
+    displayPath,
+    source,
+    findings,
+  };
 }
 
 async function listDirectories(path, { exclude = [] } = {}) {
@@ -784,52 +949,208 @@ async function listDirectories(path, { exclude = [] } = {}) {
     .sort();
 }
 
-function configuredRepositories(config, selectedSpaces, requested) {
-  const available = selectedSpaces.flatMap(([spaceId, space]) =>
-    (space.repositories ?? []).map((repository) => ({
-      ...repository,
-      ...(repository.id ? { id: repository.id } : {}),
-      ...(repository.artifacts ? { artifacts: repository.artifacts } : {}),
-      spaceId,
-      resolvedPath: normalizePath(resolveRepositoryPath(config, repository)),
-    })),
-  );
-
-  if (requested.length === 0) {
-    return [...new Map(available.map((repository) => [repository.resolvedPath, repository])).values()];
-  }
+async function selectConfiguredRepositories(workspaceRoot, available, requested) {
+  const unique = [
+    ...new Map(available.map((repository) => [repositoryProjectionKey(repository), repository])).values(),
+  ];
+  if (requested.length === 0) return unique;
 
   const selected = new Map();
   for (const value of requested) {
-    const matches = available.filter(
-      (repository) => repository.path === value || repository.resolvedPath === value,
+    const matchFlags = await Promise.all(
+      unique.map((repository) =>
+        repositoryMatchesSelector(workspaceRoot, repository, value)),
     );
+    const matches = unique.filter((_, index) => matchFlags[index]);
     if (matches.length !== 1) {
       throw new SddError(`Unknown repository for validation: ${value}`, {
         code: "REPOSITORY_NOT_FOUND",
-        details: available.map((repository) => `Available repository: ${repository.resolvedPath}`),
+        details: unique.map((repository) =>
+          `Available repository: ${repository.id ? `${repository.id} (${repository.resolvedPath})` : repository.resolvedPath}`),
       });
     }
-    selected.set(matches[0].resolvedPath, matches[0]);
+    selected.set(repositoryProjectionKey(matches[0]), matches[0]);
   }
   return [...selected.values()];
 }
 
+async function directlyConfiguredRepositories(
+  workspaceRoot,
+  config,
+  selectedSpaces,
+  requested,
+) {
+  if (requested.length === 0) return null;
+  const mapped = selectedSpaces.flatMap(([spaceId, space]) =>
+    resolvedRepositories(config, space).map((repository) => ({ ...repository, spaceId })));
+  const mappingKey = (repository) =>
+    JSON.stringify([repository.spaceId, repository.resolvedPath]);
+  const directMatches = new Map();
+  const mappingsToHydrate = new Map();
+
+  for (const value of requested) {
+    const matchFlags = await Promise.all(
+      mapped.map((repository) =>
+        repositoryMatchesSelector(workspaceRoot, repository, value)),
+    );
+    const matches = mapped.filter((_, index) => matchFlags[index]);
+    if (matches.length > 1) {
+      throw new SddError(`Unknown repository for validation: ${value}`, {
+        code: "REPOSITORY_NOT_FOUND",
+        details: mapped.map((repository) =>
+          `Available repository: ${repository.resolvedPath}`),
+      });
+    }
+    if (matches.length === 1) {
+      directMatches.set(value, matches[0]);
+      mappingsToHydrate.set(mappingKey(matches[0]), matches[0]);
+    }
+  }
+
+  for (const repository of mapped) {
+    mappingsToHydrate.set(mappingKey(repository), repository);
+  }
+  const directMappingKeys = new Set(
+    [...directMatches.values()].map((repository) => mappingKey(repository)),
+  );
+
+  const hydrated = new Map();
+  const failures = [];
+  for (const repository of mappingsToHydrate.values()) {
+    const inspection = await inspectRepositoryIdentity(
+      workspaceRoot,
+      config,
+      repository,
+    );
+    if (inspection.error) {
+      if (directMappingKeys.has(mappingKey(repository))) throw inspection.error;
+      failures.push({
+        claimedId: inspection.claimedId,
+        spaceId: repository.spaceId,
+        resolvedPath: repository.resolvedPath,
+        code: inspection.error instanceof SddError
+          ? inspection.error.code
+          : (inspection.error?.code ?? "REPOSITORY_CONFIG_UNAVAILABLE"),
+      });
+      continue;
+    }
+    hydrated.set(mappingKey(repository), inspection.target);
+  }
+
+  const selected = new Map();
+  for (const value of requested) {
+    const direct = directMatches.get(value);
+    const matches = direct
+      ? [hydrated.get(mappingKey(direct))].filter(Boolean)
+      : [...hydrated.values()].filter((repository) => repository.id === value);
+    if (matches.length === 1) {
+      const [target] = matches;
+      const healthyClaims = [...hydrated.values()].filter((repository) =>
+        repository.id === target.id
+        && (!direct || repository.spaceId === target.spaceId));
+      const failedClaims = failures.filter((failure) =>
+        failure.claimedId === target.id
+        && (!direct || failure.spaceId === target.spaceId));
+      const claims = [
+        ...healthyClaims.map((repository) => repository.resolvedPath),
+        ...failedClaims.map((failure) => failure.resolvedPath),
+      ];
+      const sameSpaceClaims = [
+        ...healthyClaims.filter((repository) => repository.spaceId === target.spaceId),
+        ...failedClaims.filter((failure) => failure.spaceId === target.spaceId),
+      ];
+      if (sameSpaceClaims.length > 1) {
+        throw new SddError(`Repository ID ${target.id} is claimed by multiple mapped repositories.`, {
+          code: "REPOSITORY_ID_COLLISION",
+          details: claims,
+        });
+      }
+      if (!direct && claims.length > 1) {
+        throw new SddError(`Unknown repository for validation: ${value}`, {
+          code: "REPOSITORY_NOT_FOUND",
+          details: claims.map((path) => `Matched repository: ${path}`),
+        });
+      }
+      selected.set(repositoryProjectionKey(target), target);
+      continue;
+    }
+    if (matches.length > 1) {
+      const sameSpace = matches.find((repository, index) =>
+        matches.some((candidate, candidateIndex) =>
+          candidateIndex !== index && candidate.spaceId === repository.spaceId));
+      if (sameSpace) {
+        throw new SddError(`Repository ID ${value} is claimed by multiple mapped repositories.`, {
+          code: "REPOSITORY_ID_COLLISION",
+          details: matches
+            .filter((repository) => repository.spaceId === sameSpace.spaceId)
+            .map((repository) => repository.resolvedPath),
+        });
+      }
+      throw new SddError(`Unknown repository for validation: ${value}`, {
+        code: "REPOSITORY_NOT_FOUND",
+        details: matches.map((repository) =>
+          `Available repository: ${repository.id} (${repository.resolvedPath})`),
+      });
+    }
+    if (failures.length > 0) {
+      throw new SddError(`Repository selector cannot be resolved while mapped identities are unavailable: ${value}`, {
+        code: "REPOSITORY_ID_REQUIRED",
+        details: failures.map((failure) =>
+          `${failure.resolvedPath}: ${failure.code}`),
+      });
+    }
+    throw new SddError(`Unknown repository for validation: ${value}`, {
+      code: "REPOSITORY_NOT_FOUND",
+      details: [...hydrated.values()].map((repository) =>
+        `Available repository: ${repository.id} (${repository.resolvedPath})`),
+    });
+  }
+  return { available: [...selected.values()], selected: [...selected.values()] };
+}
+
+async function configuredRepositories(
+  workspaceRoot,
+  config,
+  selectedSpaces,
+  requested,
+  { isolateDirectSelection = false } = {},
+) {
+  const direct = isolateDirectSelection
+    ? await directlyConfiguredRepositories(
+        workspaceRoot,
+        config,
+        selectedSpaces,
+        requested,
+      )
+    : null;
+  if (direct) return direct;
+
+  const available = [];
+  for (const [spaceId, space] of selectedSpaces) {
+    for (const repository of await resolveRepositoryTargets(workspaceRoot, config, space)) {
+      available.push({ ...repository, spaceId });
+    }
+  }
+  return {
+    available,
+    selected: await selectConfiguredRepositories(workspaceRoot, available, requested),
+  };
+}
+
 async function validateChange({
-  spaceId,
-  repository = null,
+  workspaceRoot,
   changeId,
   displayRoot,
   changePath,
-  planned = false,
   historical = false,
-  repositoryRoot = null,
-  artifactRoots = [],
+  afterChangeFileRead = null,
 }) {
   const findings = [];
+  let metadata = null;
+  const requiredFiles = {};
+  let structuredTasks = null;
+  let v2Review = null;
   const context = {
-    spaceId,
-    ...(repository ? { repository } : {}),
     artifactType: "change",
     artifactId: changeId,
   };
@@ -843,19 +1164,73 @@ async function validateChange({
       context,
     ));
   }
-  for (const [fileName, requiredHeadingGroups] of Object.entries(CHANGE_FILES)) {
-    const absolutePath = join(changePath, fileName);
+  const filesToValidate = [...REQUIRED_CHANGE_FILES];
+  for (let fileIndex = 0; fileIndex < filesToValidate.length; fileIndex += 1) {
+    const fileName = filesToValidate[fileIndex];
+    const requiredHeadingGroups = fileName === "tasks.md" && metadata?.schema === CHANGE_SCHEMA_V2
+      ? V2_TASK_SECTIONS
+      : CHANGE_FILES[fileName];
     const displayPath = normalizePath(join(displayRoot, fileName));
-    if (!(await pathExists(absolutePath))) {
+    let snapshot;
+    try {
+      snapshot = await readRequiredChangeFileSnapshot(
+        changePath,
+        fileName,
+        workspaceRoot,
+        {
+          afterRead: afterChangeFileRead
+            ? (observation) => afterChangeFileRead({
+                changeId,
+                historical,
+                fileName,
+                ...observation,
+              })
+            : null,
+        },
+      );
+    } catch (error) {
+      if (
+        error instanceof SddError
+        && ["UNSAFE_ARTIFACT_PATH", "CONCURRENT_CHANGE"].includes(error.code)
+      ) {
+        requiredFiles[fileName] = {
+          snapshot: null,
+          source: null,
+          error: { code: error.code, message: error.message },
+        };
+        findings.push(finding(
+          "error",
+          error.code,
+          displayPath,
+          error.code === "UNSAFE_ARTIFACT_PATH"
+            ? `Change required file ${fileName} must be an owner-confined regular file.`
+            : `Change required file ${fileName} changed while validation was reading it.`,
+          context,
+        ));
+        continue;
+      }
+      throw error;
+    }
+    requiredFiles[fileName] = snapshot === null
+      ? {
+          snapshot: null,
+          source: null,
+          error: {
+            code: "MISSING_CHANGE_FILE",
+            message: `Change is missing ${fileName}.`,
+          },
+        }
+      : { snapshot, source: snapshot.source, error: null };
+    if (snapshot === null) {
       findings.push(finding("error", "MISSING_CHANGE_FILE", displayPath, `Change is missing ${fileName}.`, context));
       continue;
     }
 
-    const source = await readFile(absolutePath, "utf8");
+    const source = snapshot.source;
     const unresolved = TEMPLATE_PLACEHOLDERS.filter((placeholder) => source.includes(placeholder));
     if (unresolved.length > 0) {
       findings.push(finding(
-        planned || historical ? "warning" : "error",
+        historical ? "warning" : "error",
         "UNRESOLVED_TEMPLATE_PLACEHOLDER",
         displayPath,
         `Unresolved template placeholders: ${unresolved.join(", ")}.`,
@@ -863,8 +1238,8 @@ async function validateChange({
       ));
     }
     const h1 = headingsAtLevel(source, 1);
-    const expectedPrefix = fileName === "proposal.md"
-      ? "Proposal:"
+    const expectedPrefix = fileName === "change.md"
+      ? "Change:"
       : fileName === "design.md"
         ? "Design:"
         : "Tasks:";
@@ -881,32 +1256,381 @@ async function validateChange({
     }
 
     if (fileName === "tasks.md") {
-      const { status, error } = parseChangeStatus(source);
-      if (error) {
-        findings.push(finding("error", "INVALID_CHANGE_STATUS", displayPath, `Cannot parse Change status: ${error}`, context));
-      } else if (historical && LEGACY_CHANGE_STATUSES.includes(status)) {
-        // Closed history keeps the status vocabulary that was valid when it closed.
-      } else if (!CHANGE_STATUSES.includes(status)) {
-        findings.push(finding("error", "INVALID_CHANGE_STATUS", displayPath, `Expected one of: ${CHANGE_STATUSES.join(", ")}.`, context));
-      } else if (planned && !["proposed", "planned"].includes(status)) {
+      const taskResult = metadata?.schema === CHANGE_SCHEMA_V2
+        ? parseV2ChangeTasks(source, {
+            changeId,
+            repositoryIds: metadata?.repositories ?? [],
+          })
+        : { structured: false, issues: [] };
+      structuredTasks = taskResult;
+      for (const taskIssue of taskResult.issues) {
+        findings.push(finding(
+          shapeLevel,
+          taskIssue.code,
+          displayPath,
+          taskIssue.message,
+          { ...context, ...(taskIssue.sliceId ? { sliceId: taskIssue.sliceId } : {}) },
+        ));
+      }
+    }
+
+    if (fileName === "change.md") {
+      metadata = parseChangeMetadata(source);
+      if (metadata.error) {
         findings.push(finding(
           "error",
-          "CHANGE_STATUS_LOCATION_MISMATCH",
+          "INVALID_CHANGE_METADATA",
           displayPath,
-          `Private planned Changes must use status proposed or planned, found ${status}.`,
+          `Cannot parse Change metadata: ${metadata.error}`,
+          context,
+        ));
+      } else if (historical && LEGACY_CHANGE_STATUSES.includes(metadata.status)) {
+        // Closed history keeps the status vocabulary that was valid when it closed.
+      } else if (!CHANGE_STATUSES.includes(metadata.status)) {
+        findings.push(finding(
+          "error",
+          "INVALID_CHANGE_STATUS",
+          displayPath,
+          `Expected one of: ${CHANGE_STATUSES.join(", ")}.`,
+          { ...context, spaceId: metadata.space },
+        ));
+      }
+      if (!metadata.error) {
+        if (metadata.schema !== CHANGE_SCHEMA_V2) {
+          findings.push(finding(
+            historical ? "warning" : "error",
+            "UNSUPPORTED_CHANGE_SCHEMA",
+            displayPath,
+            "Current Change validation requires schema: sdd-change-v2; schema-less Changes are unsupported history.",
+            context,
+          ));
+          continue;
+        }
+        if (metadata.status !== "proposed") {
+          const hasCompatibleDesign = await pathExists(join(changePath, "design.md"));
+          const missingPlanningSections = hasCompatibleDesign
+            ? []
+            : missingPlannedChangeSections(source);
+          if (missingPlanningSections.length > 0) {
+            findings.push(finding(
+              shapeLevel,
+              "MISSING_ARTIFACT_SECTION",
+              displayPath,
+              `Planned Change is missing technical planning sections: ${missingPlanningSections.join(", ")}.`,
+              context,
+            ));
+          }
+          filesToValidate.push(...PLANNED_CHANGE_FILES);
+        } else {
+          for (const plannedFile of PLANNED_CHANGE_FILES) {
+            if (await pathExists(join(changePath, plannedFile))) {
+              filesToValidate.push(plannedFile);
+            }
+          }
+        }
+        for (const optionalFile of OPTIONAL_CHANGE_FILES) {
+          if (await pathExists(join(changePath, optionalFile))) {
+            filesToValidate.push(optionalFile);
+          }
+        }
+      }
+    }
+  }
+
+  if (metadata?.schema === CHANGE_SCHEMA_V2 && structuredTasks?.structured) {
+    for (const legacyDirectory of ["slice-reviews", "slice-closures"]) {
+      if (await pathExists(join(changePath, legacyDirectory))) {
+        findings.push(finding(
+          shapeLevel,
+          "LEGACY_V2_ARTIFACT",
+          normalizePath(join(displayRoot, legacyDirectory)),
+          `V2 Changes must not contain ${legacyDirectory}/; those directories belong only to unsupported historical workflows.`,
           context,
         ));
       }
     }
-    if (repositoryRoot) {
-      findings.push(...await validateArtifactLinks(
-        source,
-        absolutePath,
+    const reviewPath = join(changePath, "review.md");
+    let reviewFile = null;
+    try {
+      reviewFile = await readBoundRegularFile(reviewPath, {
+        ownerRoot: changePath,
+        allowMissing: true,
+        label: "V2 Change review",
+        unsafeCode: "UNSAFE_ARTIFACT_PATH",
+      });
+    } catch (error) {
+      if (error instanceof SddError && ["UNSAFE_ARTIFACT_PATH", "CONCURRENT_CHANGE"].includes(error.code)) {
+        findings.push(finding(
+          "error",
+          error.code,
+          normalizePath(join(displayRoot, "review.md")),
+          "V2 review.md must be an owner-confined stable regular file.",
+          context,
+        ));
+      } else throw error;
+    }
+    if (reviewFile === null) {
+      for (const outcome of structuredTasks.outcomes.filter((entry) => entry.status === "done")) {
+        findings.push(finding(
+          shapeLevel,
+          "MISSING_V2_REVIEW",
+          normalizePath(join(displayRoot, "review.md")),
+          `Done outcome ${outcome.id} requires central review.md.`,
+          { ...context, outcomeId: outcome.id },
+        ));
+      }
+    } else {
+      v2Review = validateV2ChangeReviewSource(reviewFile.source, {
+        changeId,
+        outcomes: structuredTasks.outcomes,
+      });
+      for (const reviewIssue of v2Review.issues) {
+        findings.push(finding(
+          shapeLevel,
+          reviewIssue.code,
+          normalizePath(join(displayRoot, "review.md")),
+          reviewIssue.message,
+          { ...context, ...(reviewIssue.outcomeId ? { outcomeId: reviewIssue.outcomeId } : {}) },
+        ));
+      }
+    }
+  }
+
+  return { findings, metadata, requiredFiles, structuredTasks, v2Review };
+}
+
+async function resolveAffectedEpicAssignments(
+  workspaceRoot,
+  config,
+  centralChanges,
+  selectedRepositories,
+  changeId,
+) {
+  const assignments = new Map(
+    selectedRepositories.map((repository) => [
+      repositoryProjectionKey(repository),
+      new Set(),
+    ]),
+  );
+  const findings = [];
+  if (!changeId || centralChanges.length !== 1) return { assignments, findings };
+
+  const [record] = centralChanges;
+  const change = record.requiredFiles?.["change.md"];
+  if (change?.error || typeof change?.source !== "string") {
+    return { assignments, findings };
+  }
+  const repositories = selectedRepositories.filter((repository) =>
+    changeProjectsToRepository(record, repository));
+  const declarations = [
+    ...[...declaredEpicPaths(change.source)].map((path) => ({
+      artifactId: path.split("/").at(-2),
+      path,
+      type: "path",
+    })),
+    ...[...declaredEpicIds(change.source)].map((id) => ({
+      artifactId: id,
+      path: id,
+      type: "id",
+    })),
+  ];
+  for (const declaration of declarations) {
+    const candidates = [];
+    for (const repository of repositories) {
+      const artifacts = resolveRepositoryArtifacts(config, repository);
+      const repositoryPath = resolveWorkspacePath(workspaceRoot, repository.resolvedPath);
+      const epicRoot = join(repositoryPath, artifacts.epics);
+      const directories = declaration.type === "path"
+        ? [declaredEpicDirectory(declaration.path, artifacts.epics)].filter(Boolean)
+        : (await listDirectories(epicRoot)).filter((directory) => {
+            const normalizedDirectory = directory.toLowerCase();
+            const normalizedId = declaration.artifactId.toLowerCase();
+            return normalizedDirectory === normalizedId
+              || normalizedDirectory.startsWith(`${normalizedId}-`);
+          });
+      for (const directory of directories) {
+        if (!(await isDirectory(join(epicRoot, directory)))) continue;
+        candidates.push({ repository, directory });
+      }
+    }
+    const { artifactId } = declaration;
+    if (candidates.length === 0) {
+      findings.push(finding(
+        "error",
+        "AFFECTED_EPIC_NOT_FOUND",
+        declaration.path,
+        `Change ${changeId} declares an affected Epic that does not exist in any selected repository: ${artifactId}.`,
+        {
+          spaceId: record.metadata?.space,
+          artifactType: "epic",
+          artifactId,
+        },
+      ));
+      continue;
+    }
+    if (candidates.length > 1) {
+      findings.push(finding(
+        "error",
+        "AFFECTED_EPIC_AMBIGUOUS",
+        declaration.path,
+        `Change ${changeId} declares an affected Epic that matches multiple selected repositories: ${artifactId}.`,
+        {
+          spaceId: record.metadata?.space,
+          artifactType: "epic",
+          artifactId,
+          repositories: [...new Set(candidates.map((candidate) =>
+            candidate.repository.resolvedPath))]
+            .sort((left, right) => left.localeCompare(right)),
+        },
+      ));
+      continue;
+    }
+    const [{ repository, directory }] = candidates;
+    assignments.get(repositoryProjectionKey(repository)).add(directory);
+  }
+  return { assignments, findings };
+}
+
+async function validateV2ReviewRepositoryState({
+  workspaceRoot,
+  repository,
+  repositoryPath,
+  record,
+  outcome,
+  epicRecords,
+  gitOptions,
+}) {
+  const review = record.v2Review?.outcomes.find((entry) => entry.id === outcome.id);
+  if (!review || record.v2Review.issues.some((entry) => entry.outcomeId === outcome.id)) return [];
+  const findings = [];
+  const level = record.closed ? "warning" : "error";
+  const context = {
+    spaceId: repository.spaceId,
+    repository: repository.resolvedPath,
+    artifactType: "change",
+    artifactId: record.changeId,
+    outcomeId: outcome.id,
+  };
+  const displayPath = relativeChangeStorePath(join(record.path, "review.md"), workspaceRoot);
+  const workingTree = /^working-tree:([0-9a-f]{40}):sha256:/.exec(review.candidate);
+  const committedCandidate = /^(?:commit:)?([0-9a-f]{40})$/.exec(review.candidate);
+
+  if (review.finalCommit === "pending") {
+    if (workingTree) {
+      try {
+        const current = await resolveCandidateEnvelope(repositoryPath, {
+          workspaceRoot,
+          baseline: workingTree[1],
+          candidate: "working-tree",
+        });
+        if (current.candidate.watermark !== review.candidate) {
+          findings.push(finding(
+            level,
+            "V2_REVIEW_CANDIDATE_MISMATCH",
+            displayPath,
+            `Outcome ${outcome.id} Review candidate does not match the current content-sensitive working-tree envelope.`,
+            context,
+          ));
+        }
+      } catch (error) {
+        findings.push(finding(
+          level,
+          "V2_REVIEW_CANDIDATE_MISMATCH",
+          displayPath,
+          `Outcome ${outcome.id} working-tree Review candidate cannot be reproduced: ${error.message}`,
+          context,
+        ));
+      }
+    } else if (committedCandidate) {
+      const resolved = await gitOutput(repositoryPath, ["rev-parse", "--verify", `${committedCandidate[1]}^{commit}`], gitOptions);
+      const tree = await gitOutput(repositoryPath, ["rev-parse", "--verify", `${committedCandidate[1]}^{tree}`], gitOptions);
+      const reachable = await gitOutput(repositoryPath, ["merge-base", "--is-ancestor", committedCandidate[1], "HEAD"], gitOptions);
+      if (!resolved.ok || !tree.ok || !reachable.ok || tree.stdout !== review.reviewedTree) {
+        findings.push(finding(
+          level,
+          "V2_REVIEW_CANDIDATE_MISMATCH",
+          displayPath,
+          `Outcome ${outcome.id} committed Review candidate must be reachable and match its reviewed tree.`,
+          context,
+        ));
+      }
+    }
+  } else {
+    const commit = review.finalCommit;
+    const resolvedCommit = await gitOutput(repositoryPath, ["rev-parse", "--verify", `${commit}^{commit}`], gitOptions);
+    const tree = await gitOutput(repositoryPath, ["rev-parse", "--verify", `${commit}^{tree}`], gitOptions);
+    const reachable = await gitOutput(repositoryPath, ["merge-base", "--is-ancestor", commit, "HEAD"], gitOptions);
+    if (
+      !resolvedCommit.ok
+      || resolvedCommit.stdout !== commit
+      || !tree.ok
+      || tree.stdout !== review.reviewedTree
+      || tree.stdout !== review.finalCommitTree
+      || !reachable.ok
+    ) {
+      findings.push(finding(
+        level,
+        "INVALID_V2_REVIEW_SEAL",
         displayPath,
-        repositoryRoot,
-        artifactRoots,
+        `Outcome ${outcome.id} reviewed tree must equal its reachable final commit tree.`,
         context,
       ));
+    }
+    const parents = await gitOutput(repositoryPath, ["rev-list", "--parents", "-n", "1", commit], gitOptions);
+    const parentParts = parents.stdout.split(/\s+/).filter(Boolean);
+    if (!parents.ok || parentParts.length !== 2 || committedCandidate?.[1] !== commit) {
+      findings.push(finding(
+        level,
+        "INVALID_V2_REVIEW_SEAL",
+        displayPath,
+        `Outcome ${outcome.id} final commit must have one parent and equal its committed Review candidate.`,
+        context,
+      ));
+    }
+  }
+
+  for (const scenarioRow of review.scenarios) {
+    const resolvedScenario = resolveReviewScenario(epicRecords, scenarioRow.Scenario);
+    if (!resolvedScenario) {
+      findings.push(finding(
+        level,
+        "V2_REVIEW_SCENARIO_NOT_FOUND",
+        displayPath,
+        `Outcome ${outcome.id} Scenario ${scenarioRow.Scenario} does not resolve exactly once in the affected Epics.`,
+        context,
+      ));
+      continue;
+    }
+    const { epic, story, scenario } = resolvedScenario;
+    const epicGap = epicVerificationGapClassification(epic.source, story, scenario);
+    const reviewGap = reviewGapClassification(scenarioRow.Gap);
+    const gapMatches = reviewGap.classification === "none"
+      ? epicGap === null
+      : epicGap?.classification === reviewGap.classification
+        && (reviewGap.classification !== "user-accepted" || epicGap.date === reviewGap.date)
+        && (reviewGap.classification !== "optional-confidence" || epicGap.policy === reviewGap.policy);
+    if (!gapMatches) {
+      findings.push(finding(
+        level,
+        "V2_REVIEW_EPIC_GAP_MISMATCH",
+        epic.displayPath,
+        `Scenario ${scenarioRow.Scenario} Review gap ${scenarioRow.Gap} must exactly match its Epic Verification Gap classification.`,
+        context,
+      ));
+    }
+    if (scenarioRow.Result === "pass") {
+      const canonicalEvidence = epic.evidenceByScenario.get(`${story}/${scenario}`) ?? new Set();
+      const canonicalReferences = new Set([...canonicalEvidence].flatMap(durableProofReferences));
+      const reviewReferences = durableProofReferences(scenarioRow.Evidence);
+      if (!reviewReferences.some((reference) => canonicalReferences.has(reference))) {
+        findings.push(finding(
+          level,
+          "V2_REVIEW_EVIDENCE_MISMATCH",
+          epic.displayPath,
+          `Passing Scenario ${scenarioRow.Scenario} must cite durable Review proof recorded as passing in its Epic Verified By map.`,
+          context,
+        ));
+      }
     }
   }
   return findings;
@@ -916,81 +1640,45 @@ async function validateRepository(
   workspaceRoot,
   config,
   repository,
-  { changeId, epicId, changedFrom } = {},
+  {
+    centralChanges = [],
+    changeId,
+    epicId,
+    epicDirectory,
+    changedFrom,
+    affectedEpicDirectories: resolvedAffectedEpicDirectories = null,
+    gitOptions,
+  } = {},
 ) {
   const findings = [];
   const repositoryPath = resolveWorkspacePath(workspaceRoot, repository.resolvedPath);
-  if (!(await isDirectory(repositoryPath))) {
+  let repositoryIsDirectory;
+  try {
+    repositoryIsDirectory = (await stat(repositoryPath)).isDirectory();
+  } catch (error) {
+    if (!["ENOENT", "ENOTDIR"].includes(error?.code)) throw error;
+    repositoryIsDirectory = false;
+  }
+  if (!repositoryIsDirectory) {
     return {
       findings: [finding("error", "REPOSITORY_NOT_FOUND", repository.resolvedPath, "Configured repository does not exist.", {
         spaceId: repository.spaceId,
         repository: repository.resolvedPath,
       })],
-      changes: 0,
       epics: 0,
       epicVerificationReports: 0,
-      changeLocations: [],
     };
   }
-
   const artifacts = resolveRepositoryArtifacts(config, repository);
-  const activeRoot = join(repositoryPath, artifacts.activeChanges);
-  const closedRoot = join(repositoryPath, artifacts.closedChanges);
-  const artifactRoots = [
-    artifacts.activeChanges,
-    artifacts.closedChanges,
-    artifacts.epics,
-  ].map(normalizePath);
-  const closedIsNested = dirname(closedRoot) === activeRoot;
-  const activeIds = epicId
-    ? []
-    : await listDirectories(activeRoot, { exclude: closedIsNested ? [basename(closedRoot)] : [] });
-  const closedIds = epicId ? [] : await listDirectories(closedRoot);
-  const collisions = activeIds.filter((id) => closedIds.includes(id));
-  for (const id of collisions) {
-    if (!changeId || id === changeId) {
-      findings.push(finding(
-        "error",
-        "CHANGE_LOCATION_COLLISION",
-        normalizePath(join(repository.resolvedPath, artifacts.activeChanges, id)),
-        "Change exists in both active and closed locations.",
-        {
-          spaceId: repository.spaceId,
-          repository: repository.resolvedPath,
-          artifactType: "change",
-          artifactId: id,
-        },
-      ));
-    }
-  }
-  const candidates = [
-    ...activeIds.map((id) => ({ id, location: artifacts.activeChanges, path: join(activeRoot, id) })),
-    ...closedIds.map((id) => ({ id, location: artifacts.closedChanges, path: join(closedRoot, id) })),
-  ].filter((candidate) => !changeId || candidate.id === changeId);
-
-  for (const candidate of candidates) {
-    findings.push(...await validateChange({
-      spaceId: repository.spaceId,
-      repository: repository.resolvedPath,
-      changeId: candidate.id,
-      displayRoot: normalizePath(join(repository.resolvedPath, candidate.location, candidate.id)),
-      changePath: candidate.path,
-      historical: candidate.location === artifacts.closedChanges,
-      repositoryRoot: repositoryPath,
-      artifactRoots,
-    }));
-  }
-
-  const affectedEpicDirectories = new Set();
-  if (changeId) {
-    for (const candidate of candidates) {
-      const proposalPath = join(candidate.path, "proposal.md");
-      if (!(await pathExists(proposalPath))) continue;
-      const proposal = await readFile(proposalPath, "utf8");
-      for (const directory of declaredEpicDirectories(
-        proposal,
-        artifacts.epics,
-      )) {
+  const artifactRoots = Object.values(artifacts).map(normalizePath);
+  const targetedChanges = centralChanges.filter((record) =>
+    changeProjectsToRepository(record, repository));
+  const affectedEpicDirectories = new Set(resolvedAffectedEpicDirectories ?? []);
+  if (changeId && resolvedAffectedEpicDirectories === null) {
+    for (const record of targetedChanges) {
+      const change = record.requiredFiles?.["change.md"];
+      if (change?.error || typeof change?.source !== "string") continue;
+      for (const directory of declaredEpicDirectories(change.source, artifacts.epics)) {
         affectedEpicDirectories.add(directory);
       }
     }
@@ -1017,15 +1705,17 @@ async function validateRepository(
     const epicRoot = join(repositoryPath, artifacts.epics);
     const availableEpicDirectories = await listDirectories(epicRoot);
     const normalizedEpicId = epicId?.toLowerCase();
-    const epicDirectories = changeId
-      ? [...affectedEpicDirectories].filter((directory) => availableEpicDirectories.includes(directory))
-      : epicId
-        ? availableEpicDirectories.filter((directory) => {
-          const normalizedDirectory = directory.toLowerCase();
-          return normalizedDirectory === normalizedEpicId
-            || normalizedDirectory.startsWith(`${normalizedEpicId}-`);
-        })
-        : availableEpicDirectories;
+    const epicDirectories = epicDirectory
+      ? availableEpicDirectories.includes(epicDirectory) ? [epicDirectory] : []
+      : changeId
+        ? [...affectedEpicDirectories].filter((directory) => availableEpicDirectories.includes(directory))
+        : epicId
+          ? availableEpicDirectories.filter((directory) => {
+            const normalizedDirectory = directory.toLowerCase();
+            return normalizedDirectory === normalizedEpicId
+              || normalizedDirectory.startsWith(`${normalizedEpicId}-`);
+          })
+          : availableEpicDirectories;
     if (changeId) {
       for (const directory of affectedEpicDirectories) {
         if (availableEpicDirectories.includes(directory)) continue;
@@ -1078,8 +1768,17 @@ async function validateRepository(
         artifactRoots,
         displayPath,
       );
-      if (epicId && result.epicId !== epicId && directory !== epicId) {
+      if (!epicDirectory && epicId && result.epicId !== epicId && directory !== epicId) {
         continue;
+      }
+      if (epicDirectory && result.epicId !== epicId) {
+        findings.push(finding(
+          "error",
+          "EPIC_ID_MISMATCH",
+          displayPath,
+          `Epic frontmatter ID ${result.epicId} does not match requested Epic ID ${epicId}.`,
+          epicContext(repository, epicId),
+        ));
       }
       findings.push(...result.findings);
       findings.push(...await validateEpicHistory({
@@ -1101,7 +1800,49 @@ async function validateRepository(
       epicRecords.push(result);
       epics += 1;
     }
+    if (epicDirectory && epicRecords.length === 1) {
+      const exactEpic = epicRecords[0];
+      if (typeof exactEpic.declaredEpicId === "string") {
+        for (const directory of availableEpicDirectories) {
+          if (directory === epicDirectory) continue;
+          const candidatePath = join(epicRoot, directory, "epic.md");
+          if (!(await pathExists(candidatePath))) continue;
+          const candidate = parseFrontmatter(await readFile(candidatePath, "utf8"));
+          if (candidate.error || candidate.data?.id !== exactEpic.declaredEpicId) continue;
+          findings.push(finding(
+            "error",
+            "DUPLICATE_EPIC_ID",
+            exactEpic.displayPath,
+            `Epic ID ${exactEpic.declaredEpicId} is also declared in ${normalizePath(join(
+              repository.resolvedPath,
+              artifacts.epics,
+              directory,
+              "epic.md",
+            ))}.`,
+            epicContext(repository, exactEpic.declaredEpicId),
+          ));
+        }
+      }
+    }
   }
+  for (const record of targetedChanges) {
+    const tasks = record.structuredTasks;
+    if (record.metadata?.schema !== CHANGE_SCHEMA_V2 || !tasks?.structured) continue;
+    for (const outcome of tasks.outcomes.filter((entry) =>
+      entry.repository === repository.id
+      && record.v2Review?.outcomes.some((review) => review.id === entry.id))) {
+      findings.push(...await validateV2ReviewRepositoryState({
+        workspaceRoot,
+        repository,
+        repositoryPath,
+        record,
+        outcome,
+        epicRecords,
+        gitOptions,
+      }));
+    }
+  }
+
   const seenEpicIds = new Map();
   const seenLegacyStoryIds = new Map();
   for (const epic of epicRecords) {
@@ -1132,51 +1873,249 @@ async function validateRepository(
   }
   return {
     findings,
-    changes: candidates.length,
     epics,
     epicVerificationReports,
-    changeLocations: candidates.map((candidate) => ({
-      spaceId: repository.spaceId,
-      repository: repository.resolvedPath,
-      changeId: candidate.id,
-      path: normalizePath(join(repository.resolvedPath, candidate.location, candidate.id)),
-    })),
   };
 }
 
-async function validatePlannedChanges(workspaceRoot, config, selectedSpaces, { changeId } = {}) {
+async function validateCentralRecords(
+  records,
+  workspaceRoot,
+  selectedSpaceIds,
+  {
+    changeId,
+    availableRepositories = [],
+    configuredSpaceIds = new Set(),
+    repositoryOnlySpaceIds = new Set(),
+    validateRepositoryOwnership = true,
+    afterChangeFileRead = null,
+  } = {},
+) {
   const findings = [];
-  const changeLocations = [];
-  let plannedChanges = 0;
-  for (const [spaceId, space] of selectedSpaces) {
-    const planningPath = normalizePath(resolveIdeaPlanningPath(config, spaceId, space));
-    const plannedRoot = normalizePath(join(planningPath, config.planning.plannedChangesDirectory));
-    const planningAbsoluteRoot = resolveWorkspacePath(workspaceRoot, planningPath);
-    const plannedAbsoluteRoot = resolveWorkspacePath(workspaceRoot, plannedRoot);
-    if (!(await isPathPhysicallyInside(planningAbsoluteRoot, plannedAbsoluteRoot))) {
+  const changes = [];
+  const locations = new Map();
+  for (const record of records) {
+    if (changeId && record.changeId !== changeId) continue;
+    const previous = locations.get(record.changeId);
+    if (previous) {
+      findings.push(finding(
+        "error",
+        "CHANGE_LOCATION_COLLISION",
+        relativeChangeStorePath(record.path, workspaceRoot),
+        `Change exists in active and closed central locations: ${record.changeId}.`,
+        { artifactType: "change", artifactId: record.changeId },
+      ));
+    } else {
+      locations.set(record.changeId, record);
+    }
+    const result = await validateChange({
+      workspaceRoot,
+      changeId: record.changeId,
+      displayRoot: relativeChangeStorePath(record.path, workspaceRoot),
+      changePath: record.path,
+      historical: record.closed,
+      afterChangeFileRead,
+    });
+    const metadataSpace = result.metadata?.space;
+    const configuredSpace = metadataSpace && configuredSpaceIds.has(metadataSpace);
+    const repositoryOnlyContext = metadataSpace
+      && repositoryOnlySpaceIds.has(metadataSpace);
+    const repositoryOnlyMetadata = isRepositoryOnlyChangeMetadata(result.metadata);
+    const metadataOnlyRepositorySpace = Boolean(
+      metadataSpace && !configuredSpace && repositoryOnlyMetadata,
+    );
+    if (
+      selectedSpaceIds
+      && result.metadata?.space
+      && !selectedSpaceIds.has(result.metadata.space)
+    ) {
+      continue;
+    }
+    if (
+      metadataSpace
+      && (!configuredSpace || repositoryOnlyContext)
+      && !repositoryOnlyMetadata
+    ) {
+      findings.push(finding(
+        "error",
+        "SPACE_NOT_FOUND",
+        relativeChangeStorePath(join(record.path, "change.md"), workspaceRoot),
+        `Change references unknown Space ID ${metadataSpace}.`,
+        {
+          artifactType: "change",
+          artifactId: record.changeId,
+          spaceId: metadataSpace,
+        },
+      ));
+    } else if (metadataOnlyRepositorySpace) {
+      findings.push(finding(
+        "warning",
+        "REPOSITORY_LOCATOR_UNAVAILABLE",
+        relativeChangeStorePath(join(record.path, "change.md"), workspaceRoot),
+        `Repository-only Space ${result.metadata.space} has no configured repository locator; central Change artifacts were validated, but the implementation projection is unavailable.`,
+        {
+          artifactType: "change",
+          artifactId: record.changeId,
+          spaceId: result.metadata.space,
+          repositoryId: result.metadata.space,
+        },
+      ));
+    }
+    findings.push(...result.findings);
+    changes.push({
+      ...record,
+      metadata: result.metadata,
+      requiredFiles: result.requiredFiles,
+      structuredTasks: result.structuredTasks,
+      v2Review: result.v2Review,
+    });
+    if (
+      validateRepositoryOwnership
+      && !result.metadata?.error
+      && Array.isArray(result.metadata.repositories)
+      && !metadataOnlyRepositorySpace
+    ) {
+      const ownedRepositoryIds = new Set(
+        availableRepositories
+          .filter((repository) => repository.spaceId === result.metadata.space)
+          .map((repository) => repository.id),
+      );
+      for (const repositoryId of [...result.metadata.repositories]
+        .sort((left, right) => left.localeCompare(right))) {
+        if (ownedRepositoryIds.has(repositoryId)) continue;
+        findings.push(finding(
+          "error",
+          "REPOSITORY_NOT_FOUND",
+          relativeChangeStorePath(join(record.path, "change.md"), workspaceRoot),
+          `Change references repository ID ${repositoryId}, which is not owned by Space ${result.metadata.space}.`,
+          {
+            artifactType: "change",
+            artifactId: record.changeId,
+            spaceId: result.metadata.space,
+            repositoryId,
+          },
+        ));
+      }
+    }
+  }
+  return { findings, changes };
+}
+
+async function validateCentralChanges(
+  workspaceRoot,
+  selectedSpaceIds,
+  options = {},
+) {
+  try {
+    return await readStoredChangesSnapshot(
+      workspaceRoot,
+      (records) => validateCentralRecords(
+        records,
+        workspaceRoot,
+        selectedSpaceIds,
+        options,
+      ),
+      {
+        afterInventory: options.afterStoredChangesInventory ?? null,
+        listOptions: {
+          afterClosedInventory: options.afterClosedChangeInventory ?? null,
+        },
+      },
+    );
+  } catch (error) {
+    if (!(error instanceof SddError) || error.code !== "UNSAFE_ARTIFACT_PATH") {
+      throw error;
+    }
+    const findings = [];
+    const unsafePaths = [...new Set(
+      error.details.filter((detail) => typeof detail === "string" && detail.length > 0),
+    )].sort((left, right) => left.localeCompare(right));
+    for (const path of unsafePaths.length > 0 ? unsafePaths : [".sdd/changes"]) {
       findings.push(finding(
         "error",
         "UNSAFE_ARTIFACT_PATH",
-        plannedRoot,
-        "Planned Changes directory resolves outside its planning owner.",
-        { spaceId, artifactType: "planned-change" },
+        path,
+        "Central Change store must use real directories at its fixed workspace paths.",
+        { artifactType: "change" },
       ));
-      continue;
     }
-    const ids = (await listDirectories(plannedAbsoluteRoot)).filter((id) => !changeId || id === changeId);
-    for (const id of ids) {
-      changeLocations.push({ spaceId, changeId: id, path: normalizePath(join(plannedRoot, id)) });
-      findings.push(...await validateChange({
-        spaceId,
-        changeId: id,
-        displayRoot: normalizePath(join(plannedRoot, id)),
-        changePath: join(plannedAbsoluteRoot, id),
-        planned: true,
-      }));
-    }
-    plannedChanges += ids.length;
+    return { findings, changes: [] };
   }
-  return { findings, plannedChanges, changeLocations };
+}
+
+function missingChangeRepositoryFinding(workspaceRoot, record, repositoryId) {
+  return finding(
+    "error",
+    "REPOSITORY_NOT_FOUND",
+    relativeChangeStorePath(join(record.path, "change.md"), workspaceRoot),
+    `Change references repository ID ${repositoryId}, which is not owned by Space ${record.metadata.space}.`,
+    {
+      artifactType: "change",
+      artifactId: record.changeId,
+      spaceId: record.metadata.space,
+      repositoryId,
+    },
+  );
+}
+
+async function targetedChangeRepositories(
+  workspaceRoot,
+  config,
+  central,
+  requestedRepositories,
+  expectedSpaceId,
+) {
+  if (central.changes.length !== 1) return [];
+  const [record] = central.changes;
+  const { metadata } = record;
+  if (expectedSpaceId && metadata?.space !== expectedSpaceId) return [];
+  if (
+    metadata?.error
+    || !Array.isArray(metadata?.repositories)
+    || !Object.hasOwn(config.ideas ?? {}, metadata.space)
+  ) {
+    return [];
+  }
+
+  const space = config.ideas[metadata.space];
+  if (isMetadataOnlyRepositorySpace(space)) {
+    const unknownSelectors = requestedRepositories.filter(
+      (selector) => selector !== metadata.space,
+    );
+    if (unknownSelectors.length > 0) {
+      throw new SddError(`Unknown repository for validation: ${unknownSelectors[0]}`, {
+        code: "REPOSITORY_NOT_FOUND",
+        details: [`Available repository ID without a configured locator: ${metadata.space}`],
+      });
+    }
+    return [];
+  }
+
+  const available = [];
+  for (const repositoryId of [...metadata.repositories]
+    .sort((left, right) => left.localeCompare(right))) {
+    try {
+      const [repository] = await resolveRepositoriesForMetadata(
+        workspaceRoot,
+        config,
+        config.ideas[metadata.space],
+        [repositoryId],
+      );
+      available.push({ ...repository, spaceId: metadata.space });
+    } catch (error) {
+      if (!(error instanceof SddError) || error.code !== "REPOSITORY_NOT_FOUND") throw error;
+      central.findings.push(missingChangeRepositoryFinding(
+        workspaceRoot,
+        record,
+        repositoryId,
+      ));
+    }
+  }
+  return selectConfiguredRepositories(
+    workspaceRoot,
+    available,
+    requestedRepositories,
+  );
 }
 
 export async function validateArtifacts(
@@ -1186,69 +2125,170 @@ export async function validateArtifacts(
     repositories = [],
     changeId = null,
     epicId = null,
+    epicDirectory = null,
+    repositoryProjection = null,
     changedFrom = null,
+    workspaceRoot: requestedWorkspaceRoot = null,
+    afterChangeFileRead = null,
+    afterClosedChangeInventory = null,
+    afterStoredChangesInventory = null,
+    gitCommand = "git",
+    gitTimeoutMs = REVIEW_GIT_TIMEOUT_MS,
   } = {},
 ) {
-  const { workspaceRoot, config } = await resolveOperationConfiguration(startPath);
+  const { workspaceRoot, config } = await resolveOperationConfiguration(
+    startPath,
+    requestedWorkspaceRoot ? { workspaceRoot: requestedWorkspaceRoot } : {},
+  );
   assertValidConfig(config, "validate SDD artifacts");
   if (changeId && epicId) {
     throw new SddError("Use either --change or --epic, not both.", { code: "USAGE" });
   }
+  if (epicDirectory && !epicId) {
+    throw new SddError("An exact Epic directory requires an Epic ID.", { code: "USAGE" });
+  }
+  if (epicDirectory
+    && (basename(epicDirectory) !== epicDirectory || [".", ".."].includes(epicDirectory))) {
+    throw new SddError("An exact Epic directory must be one repository-local directory name.", {
+      code: "USAGE",
+    });
+  }
+  if (repositoryProjection && (!epicId || changeId)) {
+    throw new SddError("An exact repository projection is only valid for Epic validation.", {
+      code: "USAGE",
+    });
+  }
 
+  const configuredSpaceIds = new Set(Object.keys(config.ideas ?? {}));
+  const repositoryOnlySpaceIds = new Set(
+    Object.entries(config.ideas ?? {})
+      .filter(([, space]) => space?._repositoryOnly === true)
+      .map(([id]) => id),
+  );
   let selectedSpaces = Object.entries(config.ideas ?? {});
   if (spaceId) {
-    const space = config.ideas[spaceId];
-    if (!space) {
+    const space = Object.hasOwn(config.ideas ?? {}, spaceId)
+      ? config.ideas[spaceId]
+      : null;
+    if (!space && !changeId) {
       throw new SddError(`Unknown Space ID: ${spaceId}`, {
         code: "SPACE_NOT_FOUND",
         details: Object.keys(config.ideas).sort().map((id) => `Available Space ID: ${id}`),
       });
     }
-    selectedSpaces = [[spaceId, space]];
+    if (space) selectedSpaces = [[spaceId, space]];
   }
 
-  const selectedRepositories = configuredRepositories(config, selectedSpaces, repositories);
-  const findings = [];
-  const planned = epicId
-    ? { findings: [], plannedChanges: 0, changeLocations: [] }
-    : await validatePlannedChanges(workspaceRoot, config, selectedSpaces, { changeId });
-  findings.push(...planned.findings);
-  let changes = 0;
+  const selectedSpaceIds = spaceId ? new Set([spaceId]) : null;
+  let central;
+  let selectedRepositories;
+  if (repositoryProjection) {
+    if (typeof repositoryProjection.resolvedPath !== "string") {
+      throw new SddError("An exact repository projection requires a resolved path.", {
+        code: "USAGE",
+      });
+    }
+    central = { findings: [], changes: [] };
+    selectedRepositories = [{
+      ...repositoryProjection,
+      spaceId: repositoryProjection.spaceId ?? spaceId,
+    }];
+  } else if (changeId) {
+    central = await validateCentralChanges(workspaceRoot, null, {
+      changeId,
+      configuredSpaceIds,
+      repositoryOnlySpaceIds,
+      validateRepositoryOwnership: false,
+      afterChangeFileRead,
+      afterClosedChangeInventory,
+      afterStoredChangesInventory,
+    });
+    for (const record of central.changes) {
+      synthesizeRepositoryOnlySpaceFromChangeMetadata(config, record.metadata);
+    }
+    if (spaceId && !Object.hasOwn(config.ideas ?? {}, spaceId)) {
+      throw new SddError(`Unknown Space ID: ${spaceId}`, {
+        code: "SPACE_NOT_FOUND",
+        details: Object.keys(config.ideas).sort().map((id) => `Available Space ID: ${id}`),
+      });
+    }
+    if (spaceId) {
+      const matchingChanges = central.changes.filter(
+        (record) => record.metadata?.space === spaceId,
+      );
+      if (matchingChanges.length > 0) {
+        central.changes = matchingChanges;
+      } else if (central.changes.length === 1 && central.changes[0].metadata?.space) {
+        const [record] = central.changes;
+        central.findings.push(finding(
+          "error",
+          "CHANGE_SPACE_MISMATCH",
+          relativeChangeStorePath(join(record.path, "change.md"), workspaceRoot),
+          `Change belongs to Space ${record.metadata?.space ?? "unknown"}, not ${spaceId}.`,
+          {
+            artifactType: "change",
+            artifactId: record.changeId,
+            spaceId,
+          },
+        ));
+      }
+    }
+    selectedRepositories = await targetedChangeRepositories(
+      workspaceRoot,
+      config,
+      central,
+      repositories,
+      spaceId,
+    );
+  } else {
+    const repositorySelection = await configuredRepositories(
+      workspaceRoot,
+      config,
+      selectedSpaces,
+      repositories,
+      { isolateDirectSelection: Boolean(epicId) },
+    );
+    central = epicId
+      ? { findings: [], changes: [] }
+      : await validateCentralChanges(workspaceRoot, selectedSpaceIds, {
+          availableRepositories: repositorySelection.available,
+          configuredSpaceIds,
+          repositoryOnlySpaceIds,
+          afterChangeFileRead,
+          afterClosedChangeInventory,
+          afterStoredChangesInventory,
+        });
+    selectedRepositories = repositorySelection.selected;
+  }
+  const findings = [...central.findings];
+  const affectedEpics = await resolveAffectedEpicAssignments(
+    workspaceRoot,
+    config,
+    central.changes,
+    selectedRepositories,
+    changeId,
+  );
+  findings.push(...affectedEpics.findings);
   let epics = 0;
   let epicVerificationReports = 0;
-  const repositoryChangeLocations = [];
   for (const repository of selectedRepositories) {
     const result = await validateRepository(workspaceRoot, config, repository, {
+      centralChanges: central.changes,
       changeId,
       epicId,
+      epicDirectory,
       changedFrom,
+      affectedEpicDirectories: changeId
+        ? affectedEpics.assignments.get(repositoryProjectionKey(repository)) ?? new Set()
+        : null,
+      gitOptions: { command: gitCommand, timeoutMs: gitTimeoutMs },
     });
     findings.push(...result.findings);
-    changes += result.changes;
     epics += result.epics;
     epicVerificationReports += result.epicVerificationReports;
-    repositoryChangeLocations.push(...result.changeLocations);
   }
 
-  for (const plannedLocation of planned.changeLocations) {
-    const promoted = repositoryChangeLocations.filter((location) =>
-      location.spaceId === plannedLocation.spaceId && location.changeId === plannedLocation.changeId);
-    if (promoted.length > 0) {
-      findings.push(finding(
-        "error",
-        "CHANGE_LOCATION_COLLISION",
-        plannedLocation.path,
-        `Change exists in planning and repository locations: ${promoted.map((entry) => entry.path).join(", ")}.`,
-        {
-          spaceId: plannedLocation.spaceId,
-          artifactType: "change",
-          artifactId: plannedLocation.changeId,
-        },
-      ));
-    }
-  }
-
-  if (changeId && changes === 0 && planned.plannedChanges === 0) {
+  if (changeId && central.changes.length === 0) {
     findings.push(finding("error", "ARTIFACT_NOT_FOUND", changeId, `Change was not found: ${changeId}.`, {
       spaceId,
       artifactType: "change",
@@ -1278,8 +2318,7 @@ export async function validateArtifacts(
     valid: errors === 0,
     summary: {
       repositories: selectedRepositories.length,
-      plannedChanges: planned.plannedChanges,
-      changes,
+      changes: central.changes.length,
       epics,
       epicVerificationReports,
       errors,

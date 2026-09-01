@@ -59,7 +59,7 @@
       </div>
     </aside>
 
-      <main id="main-content" tabindex="-1">
+    <main id="main-content" tabindex="-1">
       <section class="intro" id="top" aria-labelledby="page-title">
         <div class="introCopy">
           <p class="eyebrow">Guide / Methodology</p>
@@ -79,7 +79,7 @@
 
         <figure class="behaviorMap" aria-labelledby="map-caption">
           <figcaption id="map-caption">How the pieces connect</figcaption>
-          <div class="mapFlow" aria-label="Idea to verified evidence">
+          <div class="mapFlow" role="group" aria-label="Idea to verified evidence">
             <div class="mapNode mapNodePrimary">
               <span>01</span>
               <strong>Intent</strong>
@@ -160,7 +160,7 @@
           </aside>
         </div>
 
-        <div class="rediscoveryBand" aria-label="Cost of missing context">
+        <div class="rediscoveryBand" role="group" aria-label="Cost of missing context">
           <div>
             <span>For a developer</span>
             <p>The first hour disappears into routes, services, stale layers, and tests that may prove the wrong thing.
@@ -244,7 +244,7 @@
             Change becomes history; the updated Story remains.</p>
         </div>
 
-        <div class="modelEquation"
+        <div class="modelEquation" role="group"
           aria-label="Accepted behavior plus code ownership plus proof produces current application truth">
           <span>Accepted behavior</span>
           <b aria-hidden="true">+</b>
@@ -260,7 +260,7 @@
             <p class="columnLabel">Three records, three jobs</p>
             <div>
               <h3 id="records-title">These documents age differently, so I keep them separate.</h3>
-              <p>A PRD can guide the product for years. A Change becomes history as soon as the work is done. An Epic
+              <p>A PRD is a starting direction to revisit deliberately, not a document to synchronize after every outcome. A Change becomes history as soon as the work is done. An Epic
                 has to keep changing with the application. Asking one document to do all three jobs is how the docs stop
                 being useful.</p>
             </div>
@@ -272,7 +272,7 @@
               <h4>What are we trying to build?</h4>
               <p>Planning holds product direction, exploration, open questions, and possible work. It describes the
                 intent and constraints before the team has committed to a delivery path.</p>
-              <p class="recordNote">It can change or be abandoned without claiming that the product itself changed.</p>
+              <p class="recordNote">It can be broader, older, or phased differently without blocking an accepted Change; revisit it when product learning warrants.</p>
             </article>
 
             <article class="recordType recordProject">
@@ -314,7 +314,7 @@
             <span class="stepIndex">01</span>
             <div class="stepBody">
               <h3>Explore</h3>
-              <p>Work through the product or technical question before turning it into a build plan.</p>
+              <p>Preserve a substantial product, technical, operational, design, or business discussion as a synthesized record. Route mature outcomes to their owning workflow without turning exploration into an automatic build cascade.</p>
             </div>
           </li>
           <li>
@@ -350,9 +350,9 @@
           <li>
             <span class="stepIndex">06</span>
             <div class="stepBody">
-              <h3>Implement in verified slices</h3>
-              <p>Build one Requirement at a time, prefer BDD/TDD, and keep the Epic current as the implementation
-                changes.</p>
+              <h3>Implement one coherent outcome</h3>
+              <p>Build one dependency-ready outcome, prove its Scenarios with focused checks, review the exact candidate,
+                and stop after its local commit.</p>
             </div>
           </li>
           <li>
@@ -386,7 +386,7 @@
         </header>
 
         <div class="traceLayout">
-          <div class="traceStack" aria-label="Traceability hierarchy">
+          <div class="traceStack" role="group" aria-label="Traceability hierarchy">
             <div class="traceRow">
               <span class="traceType">Epic</span>
               <strong>What durable capability exists?</strong>
@@ -651,7 +651,8 @@
         <div>
           <h2 id="implementation-title">How I implemented SDD</h2>
           <p>Everything above this line is the method. What follows is my current local-first implementation: Markdown
-            artifacts, portable repository contracts, private user topology, a deterministic CLI, and agent skills.</p>
+            artifacts, portable repository contracts, private workspace topology, one central workspace Change store,
+            a deterministic CLI, and workspace-managed agent skills.</p>
         </div>
       </section>
 
@@ -669,10 +670,12 @@
           <div class="defaultLayoutHeader">
             <p class="columnLabel">Default filesystem layout</p>
             <div>
-              <h3 id="default-layout-title">The three record types get separate homes.</h3>
-              <p>Planning stays idea-owned and private by default. Project truth and active work live with the code.
-                <code>~/.sdd/config.yaml</code> maps those private relationships, while each repository commits its own
-                portable <code>.sdd/config.yaml</code>.
+              <h3 id="default-layout-title">Planning, project truth, and Changes have distinct owners.</h3>
+              <p>Planning stays Space-owned and private. Durable project truth lives with the code. Every dated Change
+                lives once under <code>&lt;workspace&gt;/.sdd/changes/</code>. The workspace's
+                <code>&lt;workspace&gt;/.sdd/config.yaml</code> maps private relationships, while each repository
+                commits its portable identity and artifact paths in <code>.sdd/config.yaml</code>. Managed skills
+                default to <code>&lt;workspace&gt;/.agents/skills/</code>.
               </p>
             </div>
           </div>
@@ -680,38 +683,64 @@
           <div class="recordTypes implementationRecords">
             <article class="recordType recordPlanning implementationRecord">
               <p class="recordIndex">01 / Planning</p>
-              <h4>Idea-owned context</h4>
-              <pre aria-label="Default planning document layout"><code>&lt;planning-root&gt;/&lt;idea&gt;/
+              <h4>Space-owned context</h4>
+              <pre role="region" tabindex="0" aria-label="Default planning document layout"><code>&lt;planning-path&gt;/
   prd.md
-  exploration/
-  planned-changes/</code></pre>
-              <p class="recordNote">Product direction, exploratory notes, Change Briefs, and planned Change drafts stay
-                here until work is ready to enter a repository.</p>
+  explorations/
+
+&lt;workspace&gt;/.sdd/
+  explorations/  # workspace-owned topics without one idea</code></pre>
+              <p class="recordNote">Substantial discussions usually stay here as synthesized durable records, while
+                local guidance or stronger artifact authority may provide a better home. Explore returns a routed
+                handoff when an outcome matures; Change, ADR, PRD, and implementation remain separate invocations.</p>
             </article>
 
             <article class="recordType recordProject implementationRecord">
               <p class="recordIndex">02 / Project</p>
               <h4>Repository-owned truth</h4>
-              <pre aria-label="Default project document layout"><code>&lt;repository&gt;/docs/
+              <pre role="region" tabindex="0" aria-label="Default project document layout"><code>&lt;repository&gt;/docs/
   epics/&lt;epic&gt;/epic.md
   adrs/&lt;date&gt;-&lt;decision&gt;.md
   audits/</code></pre>
-              <p class="recordNote">Epics hold durable behavior and evidence maps. ADRs keep lasting decisions. Audits
-                remain point-in-time advisory records.</p>
+              <p class="recordNote">Epics hold durable behavior and evidence maps. ADRs preserve consequential
+                technical choices only when real alternatives and their tradeoffs would otherwise be hard to
+                reconstruct. ADR returns the confirmed direction to its caller without implementing it. Audits remain
+                point-in-time advisory records.</p>
             </article>
 
             <article class="recordType recordChange implementationRecord">
               <p class="recordIndex">03 / Changes</p>
-              <h4>Repository-owned work</h4>
-              <pre aria-label="Default Change document layout"><code>&lt;repository&gt;/docs/changes/
+              <h4>Workspace-owned work</h4>
+              <pre role="region" tabindex="0" aria-label="Default Change document layout"><code>&lt;workspace&gt;/.sdd/changes/
   &lt;date&gt;-&lt;change&gt;/
-    proposal.md
-    design.md
-    tasks.md
-  closed/</code></pre>
-              <p class="recordNote">Promotion moves a planned Change here. Closeout moves it under
-                <code>docs/changes/closed/</code> after project truth has been reconciled.
+    change.md  # intent, plan, constraints, risks
+    tasks.md   # outcome queue and Resume checkpoint
+    review.md  # candidate, gates, findings, gaps, commit
+  closed/
+    &lt;date&gt;-&lt;change&gt;/</code></pre>
+              <p class="recordNote"><code>sdd change create</code> writes one proposed <code>change.md</code> whose
+                frontmatter owns status, Space, and repository IDs. Planning expands <code>change.md</code>, then adds a
+                compact <code>tasks.md</code> queue and one central <code>review.md</code>. Outcomes describe observable
+                behavior, Scenarios, dependencies, expected risks, and focused proof without predicting files or
+                implementation technique. One Requirement is a useful default, not a universal rule.
               </p>
+              <p class="recordNote">Every outcome passes five universal gates: scope and candidate, behavior, fresh
+                verification, independent Spec and Quality review, and integrity and authority. Planning declares
+                expected risks; Review runs concrete behavior-derived checks for those risks and may add material ones
+                it discovers. Required technical gaps remain explicit unless the owner accepts that exact gap with a
+                date. Manual product acceptance stays separate.
+              </p>
+              <p class="recordNote">Apply handles one outcome, permits one consolidated remediation batch and one fresh
+                final Review, selectively creates one content-identical local commit, records its SHA and tree in
+                <code>review.md</code>, and stops. It does not authorize another outcome, push, PR, merge, release, or
+                deployment. Schema-less and receipt-based Change records are unsupported pre-1.0 history, not a second
+                current profile. The CLI validates deterministic structure and provenance; independent Review judges
+                whether the proof is sufficient. Existing records may retain a compatible <code>design.md</code>.
+              </p>
+              <p class="recordNote">Pre-1.0 installation and Change formats are unsupported alpha data. Recreate a
+                current workspace with <code>sdd setup</code> and <code>sdd init</code>, then manually preserve only
+                records still worth keeping. <code>sdd update</code> reconciles current managed doctrine and skills;
+                it does not migrate product artifacts.</p>
             </article>
           </div>
         </section>
@@ -726,23 +755,28 @@
               <div class="columnLabel">Deterministic layer</div>
               <h3 id="cli-title">SDD CLI</h3>
               <ul>
-                <li>Install user skills and map private topology</li>
+                <li>Install workspace-managed skills and map private topology</li>
                 <li>Initialize portable repository contracts</li>
-                <li>Scaffold Changes and Epics</li>
-                <li>Validate artifacts, audit-report coherence, and optional Git-relative freshness</li>
-                <li>Report status across repositories</li>
-                <li>Guard lifecycle transitions</li>
+                <li>Scaffold canonical Changes and repository-owned Epics</li>
+                <li>Resolve immutable committed or working-tree envelopes with <code>sdd candidate resolve</code>; add Epic-specific validation input with <code>sdd epic update-input</code></li>
+                <li>Validate current Change structure, outcome dependencies, five universal gates, declared triggers, exact Scenario sets, dated gap treatment, commit reachability, and reviewed-tree/final-tree equality</li>
+                <li>Report central Change status across mapped repositories</li>
+                <li>Reconcile checksum-managed doctrine and skills during update</li>
+                <li>Guard one-record lifecycle transitions</li>
               </ul>
             </section>
             <section class="toolColumn" aria-labelledby="skills-title">
               <div class="columnLabel">Contextual layer</div>
               <h3 id="skills-title">Agent skills</h3>
               <ul>
+                <li>Gather the minimum relevant context</li>
                 <li>Refine outcomes and requirements</li>
-                <li>Compare technical paths</li>
+                <li>Compare viable technical paths and confirm consequential decisions</li>
                 <li>Route specialist guidance</li>
-                <li>Implement with evidence</li>
+                <li>Implement one coherent outcome against an exact baseline with fresh candidate-bound evidence</li>
                 <li>Review complete diffs through systematic search and validated findings</li>
+                <li>Reconcile durable Epic truth against one exact candidate</li>
+                <li>Write one reviewed candidate's native user/operator release entry when warranted</li>
                 <li>Audit broader codebase health</li>
               </ul>
             </section>
@@ -759,19 +793,31 @@
             </div>
           </div>
           <ol class="workflowMap">
+            <li><span>00</span><strong>Gather action-specific context</strong><code>/sdd-gather-context</code></li>
             <li><span>01</span><strong>Explore</strong><code>/sdd-explore</code></li>
-            <li><span>02</span><strong>Capture intent</strong><code>/sdd-change --brief</code></li>
-            <li><span>03</span><strong>Plan just in time</strong><code>/sdd-change --plan</code></li>
-            <li><span>04</span><strong>Converge the experience</strong><code>/sdd-design --plan</code></li>
-            <li><span>05</span><strong>Commit to a work scope</strong><code>sdd change promote</code></li>
-            <li><span>06</span><strong>Implement in verified slices</strong><code>/sdd-apply</code></li>
-            <li class="workflowMapMulti"><span>07</span><strong>Review independently</strong>
-              <div><code>/sdd-review</code><code>/sdd-epic-verify</code></div>
+            <li><span>02</span><strong>Capture intent</strong><code>/sdd-change</code></li>
+            <li class="workflowMapMulti"><span>03</span><strong>Plan coherent outcomes and settle branching decisions</strong>
+              <div><code>/sdd-change</code><code>/sdd-adr</code></div>
             </li>
-            <li class="workflowMapMulti"><span>08</span><strong>Reconcile and deliver</strong>
+            <li class="workflowMapMulti"><span>04</span><strong>Validate, then commit to the planned scope</strong>
+              <div><code>sdd validate &lt;space-id&gt; --change &lt;change-id&gt; --workspace &lt;path&gt;</code><code>/sdd-change</code></div>
+            </li>
+            <li><span>05</span><strong>Optionally converge the planned experience</strong><code>/sdd-design --plan</code></li>
+            <li class="workflowMapMulti"><span>06</span><strong>Deliver, verify, review, reconcile when needed, and commit one outcome</strong>
+              <div><code>/sdd-apply</code><code>/sdd-review --outcome-checkpoint</code><code>/sdd-epic-update</code></div>
+            </li>
+            <li class="workflowMapMulti"><span>07</span><strong>Repeat per outcome, then review the complete Change on current Epic truth</strong>
+              <div><code>/sdd-apply</code><code>/sdd-review</code><code>/sdd-epic-verify</code></div>
+            </li>
+            <li><span>08</span><strong>Confirm the final Review and Epic truth share one candidate</strong><code>/sdd-review</code></li>
+            <li><span>09</span><strong>Write candidate release communication when warranted</strong><code>/sdd-changelog</code></li>
+            <li class="workflowMapMulti"><span>10</span><strong>Deliver</strong>
               <div><code>/sdd-pr</code><code>/sdd-release</code></div>
             </li>
           </ol>
+          <p class="referenceNote"><code>/sdd-change</code> returns <code>complete</code>, <code>no-op</code>,
+            <code>needs-user</code>, <code>blocked</code>, or <code>routed</code>, then returns control before Design or
+            Apply begins. Design uses the same statuses, preserves a <code>planned</code> Change during initial convergence, binds revisions to exact repository candidates, keeps prototypes optional, and returns before separately invoked Apply or Review. Apply records an exact baseline, states a transient Scenario proof sketch without creating another durable matrix, implements one coherent outcome, and runs focused behavior-derived verification. Broad suites are reserved for material breadth, project policy, integration, or release risk. Independent Review records five universal gates and only the concrete triggered checks the candidate needs, with separate Spec Adherence and Implementation Quality judgments. Required technical gaps cannot pass as manual acceptance; an accepted technical gap names the exact gap and date, while product acceptance remains independently pending until the owner confirms it. Apply may perform one consolidated remediation batch and one fresh final Review. Epic reconciliation runs immediately when accepted behavior, Story completion, or a consumed contract or gap changes; otherwise it waits for Change completion. Once the exact candidate is ready, Apply stages only outcome-attributable files, creates one content-identical local commit, records the commit and matching tree in central <code>review.md</code>, and stops. Review and Epic Update remain directly callable, and a separate final Review on current Epic truth still owns complete-Change integration readiness. Changelog consumes the same candidate envelope after current final Review and current Epic truth, follows the repository's native release-record policy, returns <code>no-op</code> for internal-only or already accurate work, and stops before versioning, staging, commits, PRs, release, or deployment. Release owns aggregation and version intent. Apply's narrow local outcome-commit authority never implies push, PR, merge, release, deployment, or closeout.</p>
         </section>
 
         <section class="referenceLifecycle" aria-labelledby="reference-lifecycle-title">
@@ -796,9 +842,9 @@
 
         <div class="commandBlock">
           <div class="commandHeader">
-            <span>Install once, initialize each repository</span>
+            <span>Install once per workspace, initialize each repository</span>
             <button class="copyButton" id="copy-command" type="button"
-              data-copy="git clone https://github.com/TaylorHuston/sdd-skills.git&#10;cd sdd-skills&#10;npm install&#10;npm link&#10;sdd setup&#10;cd /path/to/repository&#10;sdd init&#10;sdd doctor"
+              data-copy="git clone https://github.com/TaylorHuston/sdd-skills.git&#10;cd sdd-skills&#10;npm install&#10;npm link&#10;sdd setup /path/to/workspace&#10;cd /path/to/workspace/spaces/repository&#10;sdd init&#10;sdd doctor --workspace /path/to/workspace"
               aria-label="Copy installation and initialization commands">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
@@ -811,10 +857,10 @@
 <span class="prompt">$</span> cd sdd-skills
 <span class="prompt">$</span> npm install
 <span class="prompt">$</span> npm link
-<span class="prompt">$</span> sdd setup
-<span class="prompt">$</span> cd /path/to/repository
+<span class="prompt">$</span> sdd setup /path/to/workspace
+<span class="prompt">$</span> cd /path/to/workspace/spaces/repository
 <span class="prompt">$</span> sdd init
-<span class="prompt">$</span> sdd doctor</code></pre>
+<span class="prompt">$</span> sdd doctor --workspace /path/to/workspace</code></pre>
           <p class="commandNote"><strong>Pre-1.0 distribution:</strong> install from the GitHub checkout for now. A
             standard npm registry install is targeted for the 1.0 release. <a
               href="https://github.com/TaylorHuston/sdd-skills/blob/main/CHANGELOG.md">See what changed <span

@@ -1,0 +1,4 @@
+interface:
+  display_name: "SDD Epic Update"
+  short_description: "Reconcile Epic truth when it changed"
+  default_prompt: "Use $sdd-epic-update to reconcile repository-owned Epic truth against one exact candidate when accepted behavior, Story completion, a consumed contract/gap, or current implementation/evidence maps changed. Record what is implemented, what proves it, and what remains; leave implementation method to repository guidance and specialists. Return an evidence-based no-op when immediate reconciliation is unnecessary, and stop before code review, fixes, central Change mutation, or commits."

@@ -9,15 +9,28 @@ Create or update Architecture Decision Records for durable technical decisions i
 
 ## Authority And Project Profile
 
-Resolve the workspace and repository with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before interpreting SDD artifact roles or Change status. Use the resolved repository and enforce ADR location under `docs/adrs/`. Project guidance still owns ADR status vocabulary, required links, and write policy. If user setup is missing, direct the user to `sdd setup`; if the repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
+Resolve the workspace, Space ID, repository, and stable repository ID with `sdd context <relevant-path> --json`, then read the `workflowPath` returned by `sdd context` completely before interpreting SDD artifact roles or Change status. Use the resolved repository and keep ADRs under its `docs/adrs/`. When Change context matters, run `sdd status <space-id> --json` and select relevant central Change records through that repository's filtered projection and their `change.md` metadata. Project guidance still owns ADR status vocabulary, required links, and write policy. If user setup is missing, direct the user to `sdd setup`; if the repository contract is missing, direct them to `sdd init` there. Use `sdd doctor` for an existing but unhealthy installation.
 
-Use this skill from `/sdd-explore` when a discussion reaches a durable architecture decision, and from `/sdd-change --plan` or `--replan` when the selected technical approach creates a rule future work should follow. Do not create an ADR from `/sdd-change --brief`; briefs intentionally avoid technical decisions.
+Use this skill from `/sdd-explore` when a discussion reaches a durable architecture decision. `/sdd-change` must invoke it whenever technical planning reveals two or more meaningfully different viable technical approaches; this skill owns their comparison, recommendation, user decision, and ADR-threshold assessment before returning the result to Change planning. Do not create an ADR during intent capture before technical decisions are understood.
 
-ADRs complement SDD artifacts. They do not replace Product Briefs/PRDs, Epics, Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, proposal/design/tasks files, review reports, changelogs, or release records.
+ADRs complement SDD artifacts. They do not replace Product Briefs/PRDs, Epics, Stories, Requirements, Scenarios, `Implemented By`, `Verified By`, progressive `change.md`, the behavioral queue in `tasks.md`, review reports, changelogs, or release records.
+
+## Gather Context
+
+Invoke `/sdd-gather-context` with action `adr`, the focused decision question, known Space/repository IDs, and the invoking exploration or Change path. It owns the shared minimum-read contract. Use its evidence-linked result to compare approaches; deepen only where the decision exposes a remaining gap.
+
+Do not recommend or record a decision while the result is insufficient for the focused question.
 
 ## ADR Threshold
 
-Create or update an ADR when the decision is durable enough that future implementation or review should respect it.
+Create or update an ADR only when all of these are true:
+
+- at least two meaningfully different approaches are viable;
+- the decision is consequential enough that future implementation or review must respect it;
+- the selected direction is surprising or difficult to reconstruct without the tradeoff context;
+- the comparison is grounded in current project evidence rather than invented alternatives.
+
+When only one approach is viable, state the constraining reason and return `no-op` without creating a ceremonial ADR.
 
 Good ADR candidates:
 
@@ -37,7 +50,7 @@ Do not create an ADR for:
 - decisions already governed clearly by project-local guidance
 - ideas the user has not decided or asked to preserve
 
-When unsure, offer an ADR candidate instead of writing a committed decision.
+When unsure, return `needs-user` with the threshold uncertainty instead of writing a committed decision. An explicitly requested draft may use status `Proposed`, but it must remain clearly undecided.
 
 ## Location
 
@@ -54,23 +67,29 @@ If the project has no `docs/adrs/`, create it only when the user has asked to dr
 ## Workflow
 
 1. Resolve project root and decision context.
-   - Read project `AGENTS.md`, README, existing ADRs, relevant SDD change artifacts, and relevant Epic files only as needed.
-   - If invoked from another skill, use the change folder, design notes, explored options, and selected approach already in context.
-2. Decide whether an ADR is warranted.
-   - If not warranted, report why and suggest recording the decision in `design.md`, `tasks.md`, or an exploration summary instead.
-   - If warranted but undecided, draft an ADR candidate with status `Proposed`.
-3. Create or update the ADR.
+   - Start from the `/sdd-gather-context` result.
+   - If invoked from another skill, preserve the stable Change ID, progressive planning context, focused decision question, relevant constraints, and approaches already discovered.
+2. Establish the real choice.
+   - Confirm that at least two meaningfully different approaches remain viable under current evidence. Do not invent alternatives merely to justify an ADR.
+   - Compare viable options and their tradeoffs, recommend one, and ask the user to settle the choice. A clear selection or acceptance already given by the user in the current discussion counts as confirmation; otherwise do not silently choose.
+   - If context is insufficient, return `blocked`. If the choice or ADR threshold remains unresolved, return `needs-user`. When invoked by `/sdd-change`, the Change remains `proposed` until the choice is settled.
+3. Apply the ADR threshold.
+   - If the decision does not warrant an ADR, return `no-op` with the selected direction, constraining reason or tradeoff summary, and caller follow-up for the technical-planning sections of `change.md` or the exploration record.
+   - If an ADR is warranted but the user requested only a draft, write a clearly undecided candidate with status `Proposed` and return `needs-user`.
+4. Create or update the ADR after confirmation.
    - Use `assets/adr-template.md`.
    - Preserve existing ADR status unless the user or project workflow explicitly changes it.
    - Use status values that match the project when present; otherwise use `Proposed`, `Accepted`, `Superseded`, or `Rejected`.
-4. Link the ADR.
-   - Link related SDD change folders, Epics, Stories, Requirements, Scenarios, PRs, or implementation evidence when known.
-   - If invoked during `/sdd-change --plan` or `--replan`, ensure `design.md` and `tasks.md` mention the ADR path or ADR candidate.
-   - If invoked during `/sdd-explore`, offer to link the ADR from an exploration summary or later `/sdd-change --plan`.
-5. Verify the ADR.
+5. Link repository-owned truth.
+   - Link related Changes by stable Change ID, and link repository-local Epics, Stories, Requirements, Scenarios, PRs, or implementation evidence when known. Never put a private absolute central Change path in a repository-local ADR.
+   - Return the repository ID, repository-relative ADR path, selected direction, and binding consequences to the caller. The caller owns any corresponding update to `change.md`, an exploration record, or a delivery outcome; do not mutate those artifacts from this skill.
+6. Verify the ADR.
    - Re-read the ADR.
    - Confirm it states context, decision, options considered, consequences, validation, and reconsideration signals.
    - Confirm it does not include secrets, private credentials, raw environment values, speculative roadmap promises, or unrelated private notes.
+7. Stop at the decision boundary.
+   - Do not plan a Change, edit `tasks.md`, update Epic behavior, implement code, review, commit, release, or invoke the next workflow automatically.
+   - Return control to the caller. Any recommended next workflow is a terminal handoff for this invocation.
 
 ## Content Rules
 
@@ -79,16 +98,32 @@ If the project has no `docs/adrs/`, create it only when the user has asked to dr
 - Record tradeoffs honestly; an ADR with no downside is usually weak.
 - Name validation evidence needed to prove the decision works.
 - Include "Reconsider When" so future agents know when the decision may be stale.
-- Keep ADRs concise. Put implementation progress in `tasks.md`, not in the ADR.
+- Keep ADRs concise. Put implementation progress in the central Change's `tasks.md`, not in the ADR.
+- Refer to related Changes by stable Change ID, not by an installation-specific absolute `<workspace>/.sdd/changes/...` path.
 - Keep Epic/Story truth authoritative for behavior. ADRs explain technical decisions and constraints, not user behavior truth.
 
-## Final Response
+## Result Contract
+
+Return exactly one status:
+
+- `complete` — the decision was confirmed and the warranted ADR was created or updated;
+- `no-op` — the assessment completed but no ADR mutation was warranted or the existing ADR already expresses the confirmed decision;
+- `needs-user` — the choice, threshold judgment, or requested draft remains undecided;
+- `blocked` — setup or evidence is insufficient to assess the decision safely;
+- `routed` — the discovered issue belongs to another workflow, such as behavioral scope returning to `/sdd-change`.
 
 Summarize:
 
-- ADR path
-- status
-- decision
-- options considered
-- links to related SDD artifacts
-- follow-up needed in `design.md`, `tasks.md`, Epic truth, or review
+- result status and why
+- repository ID and ADR path, when one exists
+- ADR status
+- selected or unresolved decision
+- viable options considered and decisive tradeoffs
+- links to related stable Change IDs and repository-local SDD artifacts
+- caller-owned follow-up for `change.md`, an exploration record, Requirement/outcome constraints, Epic truth, or review
+- recommended next workflow, if any
+
+An ADR result is terminal for this invocation. Return the selected direction and reference without implementing it or crossing into the caller's artifact boundary.
+
+## Self Improvement
+After completing this skill ask yourself "what improvements to this skill could be made that would improve our overall SDD workflow?" Report any suggestions to the user.

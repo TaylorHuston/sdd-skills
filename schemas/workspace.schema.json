@@ -2,41 +2,76 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/TaylorHuston/sdd-skills/schemas/workspace.schema.json",
   "title": "SDD Workspace Configuration",
+  "description": "Lexical path and mapping-key constraints are represented here. Runtime validation additionally enforces dynamic root references, cross-Space repository ownership, normalized artifact-path relationships, and physical containment after symlink resolution because JSON Schema cannot compare those values or inspect the filesystem.",
   "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nonEmptyNulFreeString": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\u0000]+$"
+    },
+    "configuredPath": {
+      "description": "A non-empty path without NUL bytes, home-directory shorthand, a drive-relative prefix, or a parent-directory segment. Absolute paths remain schema-portable, but runtime resolution rejects syntax that belongs only to another host platform.",
+      "allOf": [
+        { "$ref": "#/$defs/nonEmptyNulFreeString" },
+        { "not": { "pattern": "^~(?:$|[\\\\/])" } },
+        { "not": { "pattern": "^[A-Za-z]:(?:$|[^\\\\/])" } },
+        { "not": { "pattern": "(?:^|[\\\\/])\\.\\.(?:$|[\\\\/])" } }
+      ]
+    },
+    "relativePath": {
+      "description": "A configured path that is relative on POSIX and Windows and therefore cannot begin with a root separator or Windows drive prefix.",
+      "allOf": [
+        { "$ref": "#/$defs/configuredPath" },
+        { "not": { "pattern": "^(?:[\\\\/]|[A-Za-z]:)" } }
+      ]
+    },
     "repositoryArtifacts": {
       "type": "object",
-      "required": ["activeChanges", "closedChanges", "epics", "adrs", "audits"],
+      "description": "Artifact owners are lexical repository-relative paths. Runtime validation additionally rejects normalized ownership of the repository root, overlapping artifact owners, and filesystem paths that escape their physical owner.",
+      "required": ["epics", "adrs", "audits"],
       "properties": {
-        "activeChanges": { "type": "string", "minLength": 1 },
-        "closedChanges": { "type": "string", "minLength": 1 },
-        "epics": { "type": "string", "minLength": 1 },
-        "adrs": { "type": "string", "minLength": 1 },
-        "audits": { "type": "string", "minLength": 1 }
+        "epics": { "$ref": "#/$defs/relativePath" },
+        "adrs": { "$ref": "#/$defs/relativePath" },
+        "audits": { "$ref": "#/$defs/relativePath" }
       },
       "additionalProperties": false
     },
     "ideas": {
       "type": "object",
-      "description": "Mapping keyed by stable, case-sensitive Space ID.",
-      "propertyNames": { "minLength": 1 },
+      "description": "Mapping keyed by stable, case-sensitive Space ID. Runtime validation resolves repository root names against repositories.roots and prevents one normalized repository from being claimed by multiple Spaces.",
+      "propertyNames": { "$ref": "#/$defs/nonEmptyNulFreeString" },
       "additionalProperties": {
         "type": "object",
         "required": ["repositories"],
         "properties": {
           "status": { "enum": ["active", "inactive", "archived"] },
-          "planning": { "type": "string", "minLength": 1 },
-          "planningPath": { "type": "string", "minLength": 1 },
+          "planning": { "$ref": "#/$defs/relativePath" },
+          "planningPath": { "$ref": "#/$defs/configuredPath" },
           "repositories": {
             "type": "array",
             "items": {
               "type": "object",
               "required": ["path"],
               "properties": {
-                "root": { "type": "string", "minLength": 1 },
-                "path": { "type": "string", "minLength": 1 },
-                "role": { "type": "string", "minLength": 1 },
+                "root": { "$ref": "#/$defs/nonEmptyNulFreeString" },
+                "path": { "$ref": "#/$defs/configuredPath" },
+                "role": { "$ref": "#/$defs/nonEmptyString" },
                 "status": { "enum": ["active", "inactive", "archived"] }
               },
+              "allOf": [
+                {
+                  "if": { "required": ["root"] },
+                  "then": {
+                    "properties": {
+                      "path": { "$ref": "#/$defs/relativePath" }
+                    }
+                  }
+                }
+              ],
               "additionalProperties": false
             }
           }
@@ -49,26 +84,21 @@
   "type": "object",
   "required": ["version", "schema", "skills", "planning", "repositories", "repositoryArtifacts", "ideas"],
   "properties": {
-    "version": { "const": 2 },
-    "schema": { "const": "sdd-v2" },
+    "version": { "const": 3 },
+    "schema": { "const": "sdd-v3" },
     "skills": {
       "type": "object",
       "required": ["directory"],
       "properties": {
-        "directory": { "type": "string", "minLength": 1 }
+        "directory": { "$ref": "#/$defs/relativePath" }
       },
       "additionalProperties": false
     },
     "planning": {
       "type": "object",
-      "required": ["root", "plannedChangesDirectory"],
+      "required": ["root"],
       "properties": {
-        "root": { "type": "string", "minLength": 1 },
-        "plannedChangesDirectory": {
-          "type": "string",
-          "minLength": 1,
-          "pattern": "^(?![\\\\/]|[A-Za-z]:[\\\\/]|~(?:[\\\\/]|$))(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
-        }
+        "root": { "$ref": "#/$defs/configuredPath" }
       },
       "additionalProperties": false
     },
@@ -79,7 +109,8 @@
         "roots": {
           "type": "object",
           "minProperties": 1,
-          "additionalProperties": { "type": "string", "minLength": 1 }
+          "propertyNames": { "$ref": "#/$defs/nonEmptyNulFreeString" },
+          "additionalProperties": { "$ref": "#/$defs/configuredPath" }
         }
       },
       "additionalProperties": false

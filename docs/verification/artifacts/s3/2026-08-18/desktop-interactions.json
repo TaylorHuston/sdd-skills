@@ -1,0 +1,17 @@
+{
+  "skipBefore": {
+    "tag": "A",
+    "text": "Skip to content",
+    "opacity": "1"
+  },
+  "skipAfter": {
+    "tag": "MAIN",
+    "id": "main-content"
+  },
+  "clipboardFallback": {
+    "setup": "navigator.clipboard replaced with undefined in the isolated local browser session",
+    "label": "Selected",
+    "selectedExpectedCommand": true,
+    "selectionLength": 227
+  }
+}

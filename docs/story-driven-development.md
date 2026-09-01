@@ -1,6 +1,6 @@
 ---
 created: 2026-06-13
-modified: 2026-07-22
+modified: 2026-08-15
 ---
 # Story-Driven Development
 
@@ -26,7 +26,7 @@ This doctrine owns the portable core:
 
 - artifact roles and authority
 - default one-to-many relationship from private product ideas to implementation repositories
-- canonical repository layout under `docs/`
+- fixed central Change storage and canonical repository-local artifact topology
 - Epic, Story, Requirement, and Scenario semantics
 - implementation and verification traceability
 - evidence typing and gap honesty
@@ -43,36 +43,64 @@ Project or workspace guidance owns the operating profile:
 - required supporting docs and architecture, API, UI, security, or platform constraints
 - available tools and skills, external-service permissions, and local reporting preferences
 
-Each skill must read the project profile before acting and apply this workflow through that profile. Once the idea planning path and target implementation repository are resolved, this package requires Epics under `docs/epics/`, active changes under `docs/changes/`, closed changes under `docs/changes/closed/`, ADRs under `docs/adrs/`, and package-defined audit/report locations under the implementation repository's relevant `docs/` subtree. Project guidance may override idea/repository resolution explicitly, but it may not silently relocate canonical SDD artifacts inside the implementation repository. A project that intentionally uses another repository-internal layout must modify the canonical workflow source, affected skills, and templates together. Operational customization must not weaken artifact authority, behavior-to-code traceability, evidence honesty, or reconciliation requirements.
+Each skill must read the project profile before acting and apply this workflow through that profile. Change storage is fixed within the resolved workspace: active Changes live only at `<workspace>/.sdd/changes/<change-id>/`, from initial intent onward, and closed Changes live only at `<workspace>/.sdd/changes/closed/<change-id>/`. Epics remain under `docs/epics/`, ADRs remain under `docs/adrs/`, and implementation, tests, and supporting docs remain in each target repository. Package-defined audits and reports also remain under the relevant repository's `docs/` subtree. Project guidance may override idea/repository resolution explicitly and may define allowed repository-local supporting-doc layouts, but it may not relocate, duplicate, or re-scope the workspace-central Change store.
 
-### Default Idea-To-Repository Relationship
+### Default Space, Change, And Repository Topology
 
-Private product direction is idea-owned, and an idea may map to zero, one, or many implementation repositories. User-specific topology and portable repository configuration are separate:
+Private product direction is idea-owned, dated Change coordination is workspace-central, and accepted implementation truth is repository-local. An idea may map to zero, one, or many implementation repositories:
 
 ```text
-~/.sdd/
-  config.yaml
-  install-lock.json
-<repository>/
+<workspace>/
   .sdd/
     config.yaml
-<planning-root>/
-  <idea>/
-<repository-root>/
-  <repo-a>/
-  <repo-b>/
+    install-lock.json
+    story-driven-development.md
+    changes/
+      <change-id>/
+        change.md        # intent, lifecycle, constraints, accepted approach
+        tasks.md         # compact outcomes and one Resume checkpoint
+        review.md        # outcome and final Change Review authority
+        design.md        # optional context retained by an existing Change
+      closed/
+        <change-id>/
+  .agents/
+    skills/
+      sdd-*/
+  <planning-root>/
+    <idea>/
+      prd.md
+  <repository-root>/
+    <repo-a>/
+      .sdd/config.yaml
+      docs/epics/
+      docs/adrs/
+    <repo-b>/
+      .sdd/config.yaml
+      docs/epics/
+      docs/adrs/
 ```
 
-- **User configuration**: `~/.sdd/config.yaml` contains private planning roots, named repository roots, idea-to-repository mappings, roles, and lifecycle status. Paths may be absolute, home-relative, or relative to the user's home.
-- **Repository configuration**: each participating repository commits `.sdd/config.yaml` with `kind: repository`, a stable repository ID, and repository-relative artifact paths. It contains no private planning path or reverse workspace link.
-- **Canonical relationship**: each user-level `ideas.<idea>` entry declares lifecycle `status`, and each mapped repository declares a `path`, lifecycle `status`, optional named `root`, and optional concise `role`. The private mapper may associate one idea with many repositories; the repository contract remains independently cloneable.
+- **Workspace configuration**: `<workspace>/.sdd/config.yaml` contains private planning roots, named repository roots, `ideas` mappings, roles, and lifecycle status. The current contract is `version: 3`, `schema: sdd-v3`, with no `kind`. Workspace-contained paths serialize relative to the workspace when possible; explicitly mapped external repository roots may remain absolute.
+- **Managed skills**: `<workspace>/.agents/skills/` is the default registry. A configured `skills.directory` must remain lexically and physically inside the workspace, including after existing symlink ancestors are resolved.
+- **Central Change store**: `<workspace>/.sdd/changes/` is the sole owner of dated Change records in that workspace. Active Change directories are direct children; closed Change directories are direct children of `<workspace>/.sdd/changes/closed/`. A Change ID is unique across both locations within that workspace and is never nested under, prefixed by, or scoped through a Space or repository. Unrelated workspaces have independent namespaces.
+- **Repository configuration**: each participating repository commits `.sdd/config.yaml` with `kind: repository`, a stable portable repository ID, and paths for repository-owned artifacts such as Epics, ADRs, audits, and reports. It contains no private planning path, central Change content, dated Change path, managed-skill path, or reverse workspace link.
+- **Canonical relationship**: each workspace `ideas.<idea>` entry declares lifecycle `status`, and each mapped repository declares a `path`, lifecycle `status`, optional named `root`, and optional concise `role`. The private mapper may associate one idea with many repositories; the repository contract remains independently cloneable.
+- **Artifact ownership**: the one central Change may coordinate one or many repositories by stable repository ID. Epics, ADRs, implementation, tests, migrations, generated contracts, and supporting docs stay in the repository that owns them. A repository view of a Change is a projection of the central record, never another stored record.
 
 ```yaml
+version: 3
+schema: sdd-v3
+skills:
+  directory: .agents/skills
 planning:
-  root: ~/product/ideas
+  root: product/ideas
 repositories:
   roots:
-    code: ~/src/products
+    code: products
+repositoryArtifacts:
+  epics: docs/epics
+  adrs: docs/adrs
+  audits: docs/audits
 ideas:
   product:
     status: active
@@ -87,29 +115,35 @@ ideas:
         status: inactive
 ```
 
-The relationship map is intentionally user-owned. Do not put private planning paths or user-machine topology into public repository configuration.
+`sdd setup [workspace-path]` creates or reconciles the workspace configuration, central active and closed Change directories, installation lock and recovery state, managed doctrine, and managed skills. Omitting the path selects the current directory; setup never infers the user's home.
 
-Idea and mapped-repository lifecycle status uses exactly `active`, `inactive`, or `archived`. `active` means current development and is included in default user status and new Change targeting. `inactive` retains paused or potential work; `archived` is historical/read-only reference. The portable repository contract does not prescribe a user's lifecycle state.
+Resolve workspace ownership in this order:
 
-Resolve roots in this order:
+1. an explicit command `--workspace <path>`;
+2. `SDD_WORKSPACE_ROOT`;
+3. the nearest ancestor workspace of the command's target path;
+4. the nearest ancestor workspace of the current directory when the target is an explicitly mapped external repository.
 
-1. Run `sdd context <relevant-path> --json` and use its user topology, repository contract, idea, idea status, `planningPath`, repository status, role, resolved path, related repositories, and package `workflowPath`.
-2. Prefer an explicit user-selected repository when more than one mapped repository is relevant.
-3. Apply declared project guidance only when it intentionally overrides the configured topology for the active operation.
-4. Ask when multiple target repositories remain plausible or ownership cannot be resolved safely. Do not infer or persist an undeclared relationship silently.
+There is no home-directory fallback. An external repository that is outside the workspace tree must be mapped by the selected workspace and invoked with an explicit `--workspace` or from a current directory inside that workspace. Ambiguous or unmapped ownership fails without selecting another installation.
+
+Pre-1.0 home-scoped installations and older workspace or repository configuration schemas are unsupported. Recreate a current workspace with `sdd setup`, initialize repositories with `sdd init`, and manually preserve only alpha data still worth keeping. No operational command treats an older configuration or Change namespace as current.
+
+Idea and mapped-repository lifecycle status uses exactly `active`, `inactive`, or `archived`. `active` means current development and is included in default workspace status and new Change targeting. `inactive` retains paused or potential work; `archived` is historical/read-only reference. The portable repository contract does not prescribe workspace lifecycle state.
+
+For an existing Change, treat its `change.md` `space` and `repositories` frontmatter as the declared scope; resolve those repository IDs through the selected workspace rather than deriving a different target set from the current directory. Repository ownership may remain empty while `proposed`, but it is required before `planned`. Ask when ownership cannot be resolved safely.
 
 One idea may map to many repositories. Under the current model, one repository should be claimed by at most one idea, and shared tooling repositories may remain unlinked. If real usage requires one repository to support multiple ideas, evolve the config schema and resolver deliberately into a many-to-many model rather than adding ad hoc reverse links.
 
-`~/.sdd/config.yaml` is authoritative for the user's private relationship map; `<repository>/.sdd/config.yaml` is authoritative for portable repository identity and artifact locations. A repository-only context with no mapped Idea planning path may own repository artifacts, but it cannot invent a private planning destination: creating or promoting a planned Change requires an explicit user-level Idea-to-repository mapping. Do not create a missing idea directory during read-only work. When a user root moves, use `sdd configure` to repair it while preserving Space IDs, statuses, roles, and mappings. Change configured relationships only when the active workflow is authorized to modify user topology.
+`<workspace>/.sdd/config.yaml` is authoritative for the workspace's private relationship map; `<repository>/.sdd/config.yaml` is authoritative for portable repository identity and repository-local artifact locations; `<workspace>/.sdd/changes/` is authoritative for every Change in that workspace. A repository-only context with no mapped Idea planning path may use its repository ID as the Space ID and may own a central Change. Do not create a missing idea directory during read-only work. When a workspace root moves, use `sdd configure` to repair it while preserving Space IDs, statuses, roles, and mappings.
 
-Default inventory commands include only active ideas and active mapped repositories. Use `sdd status --all` for lifecycle auditing and historical inventory. Explicit `sdd status <space-id>` remains able to show every repository mapped to that Space. Do not create or apply new work against an inactive idea or inactive/archived mapping; update the user lifecycle status first when work intentionally resumes.
+Default inventory commands include only active ideas and active mapped repositories. Use `sdd status --all` for lifecycle auditing and historical inventory. Explicit `sdd status <space-id>` remains able to show every repository mapped to that Space. Do not create or apply new work against an inactive idea or inactive/archived mapping; update the workspace lifecycle status first when work intentionally resumes.
 
-The planning root is not a second implementation source of truth. Product direction and private context live there; accepted implemented behavior, code maps, and verification maps remain in Epics and Stories under the implementation repository's `docs/` tree.
+Neither the planning root nor the central Change store is a second implementation source of truth. Product direction and private context live in the planning root; the central Change is the working coordination record; accepted implemented behavior, code maps, and verification maps remain in Epics and Stories under each implementation repository's `docs/` tree.
 
 ## Core Terms
 
-- **Space / Space ID**: A planning-owned product or work area represented by one key under `~/.sdd/config.yaml` `ideas`. That exact, case-sensitive key is the stable Space ID used by cross-repository CLI commands and may map to zero, one, or many implementation repositories. A standalone repository defaults to its repository ID when no private mapping exists.
-- **Product Brief/PRD**: Private product context stored by default at `<planning-root>/prd.md`. It describes product purpose, audience, scope, principles, market context when useful, and open product questions. It guides SDD work but is not an implementation checklist.
+- **Space / Space ID**: A planning-owned product or work area represented by one key under `<workspace>/.sdd/config.yaml` `ideas`. That exact, case-sensitive key is the stable Space ID used by cross-repository CLI commands and may map to zero, one, or many implementation repositories. A standalone repository defaults to its repository ID when no private mapping exists.
+- **Product Brief/PRD**: Private product context stored by default at `<planning-path>/prd.md`. It is a starting point for product purpose, audience, scope, principles, market context when useful, and open product questions, and should be revisited deliberately as the product evolves. It is not an implementation checklist, continuously synchronized status artifact, or ordinary Apply/Review gate.
 - **Epic**: The durable capability file. It lives at `docs/epics/<key>-<###>-epic-name>/epic.md` and contains the capability narrative, embedded Stories, Requirements, Scenarios, independent implementation and verification state, behavior and evidence maps, and known gaps.
 - **Story**: A durable user-path contract embedded inside an Epic. New Epics should use Epic-scoped Story labels such as `S1`, `S2`, and full references such as `EPIC-ID/S1`; legacy app-wide Story IDs may remain when existing tests, reports, or history depend on them. Stories should usually use "As a <actor>, I want to <action/path>, so that <user-facing value/outcome>." A Story should describe one primary user path to a meaningful action or outcome, not a tiny UI requirement or a container for several independently valuable workflows. Its `Implementation` state is `not implemented`, `partial`, or `implemented`; its independent `Verification` state is `unverified`, `partial`, or `verified`.
 - **Requirement**: A concrete behavior expectation under a Story. Prefer `SHALL` wording.
@@ -118,9 +152,8 @@ The planning root is not a second implementation source of truth. Product direct
 - **Implementation Gaps**: Accepted Story behavior that does not currently exist. An implemented Story has no implementation gaps; a partial Story names the missing Requirement or Scenario references explicitly.
 - **Verified By**: A behavior evidence index. It should name concrete tests, assertions, browser/manual scenarios, review artifacts, or other proof tied to the Requirement or Scenario. Automated evidence uses a repository-relative `path#exact test title or stable anchor` so a future developer can rerun and inspect it. It is not a chronological command log.
 - **Verification Gaps**: Known missing, deferred, or accepted gaps. Empty or stale gaps are misleading and should be cleaned up.
-- **Change Brief**: An undated private outcome capture at `<planning-path>/<plannedChangesDirectory>/<change-slug>.md`. It records why a change may matter, the desired observable outcome, scope boundaries, success signals, durable constraints, and open product questions without choosing a technical approach. It has no Change status and does not authorize planning, promotion, or implementation by itself.
-- **Planned Change Draft**: A private implementation-ready scaffold under `<planning-path>/<plannedChangesDirectory>/yyyy-mm-dd-change-name/` containing `proposal.md`, `design.md`, and `tasks.md` with `status: proposed`. It is not an active repository Change, does not authorize implementation, and does not override Epic/Story truth.
-- **Change**: A tracked working artifact set under `docs/changes/yyyy-mm-dd-change-name/` containing `proposal.md`, `design.md`, and `tasks.md`. The change may create a new Epic, update an existing Epic, or both. Its active status is machine-readable from `tasks.md`; its closed state is derived from folder location.
+- **Change**: One dated tracked record at `<workspace>/.sdd/changes/<change-id>/` while active or `<workspace>/.sdd/changes/closed/<change-id>/` after close. Current Changes use `schema: sdd-change-v2`. `change.md` captures intent, lifecycle, ownership, constraints, accepted approach, and expected risks. Planning adds compact outcome coordination in `tasks.md` and pending candidate-bound sections in one central `review.md`. Existing Changes may retain `design.md` as context, but current workflows do not create it. Schema-less and receipt-based Changes are unsupported history.
+- **Repository projection**: A filtered view of a central Change for one targeted repository. Status, validation, implementation, review, PR, and release workflows may use projections to operate on repository-local artifacts, but a projection is never a stored Change copy or an independent lifecycle owner.
 
 ## Artifact Authority
 
@@ -130,8 +163,8 @@ Use this authority order:
 
 1. Running implementation and tests reveal what the application actually does.
 2. Epic files are the durable written map for accepted implemented capabilities, embedded Stories, Requirements, Scenarios, implementation evidence, verification evidence, and known gaps.
-3. Active change folders are working records for proposed or in-progress changes.
-4. Product Briefs/PRDs and confirmed Change Briefs guide product intent, audience, scope, principles, desired outcomes, and open product questions. They never override current implementation or Epic truth.
+3. The one central active Change record is the working coordination truth for proposed, planned, in-progress, or in-review work across all of its target repositories.
+4. Product Briefs/PRDs provide directional starting context and may intentionally remain broader, older, aspirational, or phased differently. They never override current implementation, accepted active Change scope, or Epic truth, and ordinary drift does not block implementation or Review. A current Change blocks only when it explicitly depends on an unresolved product decision.
 5. Reviews, release notes, changelogs, and exploration notes are evidence and transition records.
 6. READMEs and general docs are supporting documentation and must not contradict active Epic truth.
 
@@ -139,17 +172,17 @@ There should be no separate durable answer to "what is implemented?" outside Epi
 
 Generated Story indexes, such as `docs/epics/index.md` or `docs/epics/story-index.json`, are optional project-local validation or navigation artifacts. They are not canonical. If a project intentionally maintains them, keep them generated and current; do not hand-maintain them.
 
-Legacy root-level `changes/`, standalone Story files under `docs/stories/`, old Story implementation records, non-Story Task records, and `.llm/plans` or `.llm/reviews` artifacts are migration inputs only. Canonical SDD workflows must migrate root-level changes into `docs/changes/` before applying, reviewing, or closing them unless the package itself has been deliberately customized for another layout.
+Legacy idea-owned planned Change directories and repository-local active or closed dated Change directories—including root-level `changes/`, `docs/changes/`, and `docs/changes/closed/`—are unsupported historical data. Canonical workflows must never treat them as live owners or edit them in place. Recreate worthwhile intent through `/sdd-change` or manually convert records into the current central artifact shape. Standalone Story files under `docs/stories/`, old Story implementation records, non-Story Task records, and `.llm/plans` or `.llm/reviews` artifacts are likewise non-canonical historical context.
 
 ## Project Docs
 
-Project docs outside the canonical Epic and change artifacts are supporting documentation. They are useful for architecture, testing, deployment, style, data/API contracts, operations, and onboarding, but they must not become a competing source of truth for implemented behavior.
+Repository docs outside canonical Epic artifacts are supporting documentation. They are useful for architecture, testing, deployment, style, data/API contracts, operations, and onboarding, but they must not become a competing source of truth for implemented behavior or a stored copy of the central Change.
 
 `sdd doctor` may inspect recognized root guidance files in active mapped repositories for deterministic package drift, such as references to retired SDD commands or obsolete managed-workflow locations. It does not require a particular agent-guidance file to exist, interpret arbitrary prose, or enforce project-specific branch, framework, or documentation policy.
 
 Do not require every app to carry the same `docs/` inventory unless project-local guidance says so. Project-local guidance should identify the supporting documents that make current-state, architecture, API, data, deployment, testing, security, or product-routing claims and therefore must be reconciled by apply and review. Existing or locally required docs must stay truthful when implementation changes affect them. Missing docs are findings only when project-local `AGENTS.md`, `docs/README.md`, another app-local guide, or workspace guidance explicitly requires them. When no inventory is declared, inspect the README, changed docs, and documents whose current claims intersect the changed surface; record the ambiguity instead of inventing a universal doc set.
 
-`/sdd-apply` should update affected project docs as part of implementation. `/sdd-review` should treat stale project docs, or missing locally required docs, as review findings before ready, merge, or closeout.
+Repository guidance should route affected project-doc updates through the appropriate implementation or documentation workflow. `/sdd-review` should treat stale project docs, or missing locally required docs, as review findings before ready, merge, or closeout.
 
 ## Implementation Map Discipline
 
@@ -177,7 +210,7 @@ Keep evidence types distinct:
 - **Rendered UI verification**: agent-executed evidence for UI-bearing changes. Render the affected surface, exercise the changed interactions, capture and directly inspect the resulting UI, and inspect relevant console and network failures. Cover representative desktop and mobile viewports plus applicable default, loading, empty, error, populated, long-content, focus, selected, and disabled states. A green build, passing non-visual tests, or generated-but-uninspected screenshots do not satisfy this evidence type.
 - **Log or debug evidence**: local logs, persisted debug rows, screenshots, traces, or console output. Use this to support a Scenario only when the inspected artifact is named and repeatable enough for future diagnosis.
 
-Chronological command output belongs in `tasks.md` verification ledgers. Epic `Verified By` should summarize only durable, scenario-mapped evidence. Before claiming E2E, migration, auth, recovery, security, or production-path coverage, inspect the cited source and confirm the relevant route, command, fixture, failure injection, and assertion exist and are discovered by the passing command. Distinguish server-side enforcement from client-side retry, redirect, timeout, draft, navigation, and recovery behavior. If evidence is missing, stale, skipped, undiscovered, live-only, manual-only, boundary-mismatched, or weaker than the Scenario needs, put that in `Verification Gaps` and reopen any contradictory completion claim rather than smoothing it over with a broad command list.
+Chronological command output is transient unless the Change needs a conditional evidence section; durable scenario-mapped proof belongs in Epic `Verified By`. Technical proof must remain independently inspectable or reproducible after the current session. Interactive, rendered, live-provider, or multi-context evidence therefore needs either a repository-owned deterministic test/stable project artifact or a durable descriptor naming the exact candidate, date, environment or fixture, actors/contexts, route or entry point, actions, assertions or observations, console/network outcome when applicable, and stable artifact path or content hash plus enough non-secret setup to reproduce it. A `/tmp` path, ephemeral browser profile, chat transcript, reviewer summary, screenshot hash without a retained artifact or reproducible procedure, or bare “local observation” phrase is supporting context only and cannot close a required technical boundary. Before claiming E2E, migration, auth, recovery, security, or production-path coverage, inspect the cited source and confirm the relevant route, command, fixture, failure injection, and assertion exist and are discovered by the passing command. Distinguish server-side enforcement from client-side retry, redirect, timeout, draft, navigation, and recovery behavior. If evidence is missing, stale, skipped, undiscovered, live-only, manual-only, boundary-mismatched, or weaker than the Scenario needs, put that in `Verification Gaps` and reopen any contradictory completion claim rather than smoothing it over with a broad command list. Use canonical gap markers after a local Scenario reference: `[required]`, `[optional confidence:<durable-policy-reference>]`, `[manual acceptance]`, or `[user accepted YYYY-MM-DD]`. Central Review uses the corresponding machine values `optional-confidence:<reference>`, `manual-acceptance`, or `user-accepted:YYYY-MM-DD`; unresolved required gaps keep the outcome open. Dated accepted technical gaps must agree between central Review and Epic truth.
 
 ## Epic And Story Shape
 
@@ -213,78 +246,93 @@ Capture important failure modes as Scenarios when they affect user-visible behav
 
 Use just-in-time elaboration instead of making early technical assumptions durable:
 
-1. `/sdd-change --brief` captures an undated private Change Brief containing durable product intent only. Briefs are not Changes, do not use the Change status vocabulary, and may wait in the backlog without technical plans becoming stale.
-2. `/sdd-change --plan` confirms the brief's outcome, refreshes current project and implementation context, and uses `sdd change create <space-id> <slug>` to scaffold the dated Planned Change Draft with `status: proposed`. When the Change introduces an Epic, use `sdd epic create <space-id> <epic-id> <slug>` so the repository artifact starts from the canonical validated shape rather than an agent-authored approximation. The skill then refines `proposal.md`, `design.md`, and `tasks.md` around the required end state, constraints, known risks, and confirmation obligations, then sets `status: planned` only when the Change is coherent and implementation-ready. It does not attempt to prescribe every implementation step, file, or discovery in advance. Assign the dated Change ID at this point, not when the brief is first captured.
-3. When a UI-bearing Change has material experience uncertainty, `/sdd-design --plan` may converge user flow, responsive composition, component/state behavior, accessibility, and visual direction into the existing `design.md` and `tasks.md`. After implementation begins, `/sdd-design --revise` may reopen an accepted experience direction when comparison, review, or manual feedback shows that its visual or interaction expression needs another pass without changing accepted behavior. Classify and confirm the revision before moving an `in_review` Change back to `in_progress`; behavioral discovery routes directly through `/sdd-change --plan` or `--replan` instead. Neither mode authorizes application or component-preview edits.
-4. Once the planned artifacts validate and `proposal.md` preserves the brief's durable intent, the brief is consumed so there is no duplicate live planning truth. Planned drafts are not included in active repository status until promoted.
-5. `sdd change promote <space-id> <change-id>` promotes the settled draft with explicit `--repo` selections when needed. Promotion requires `status: planned`, creates each selected repository Change under its configured active-Change path, removes private planning-path references, and removes the planning draft only after every selected destination succeeds. Invoking `/sdd-apply` against an explicitly selected or unambiguously inferred private Planned Change authorizes that skill to perform this deterministic promotion without separate confirmation. Any other Change status is a stop condition and must be reported to the user; apply does not silently plan or replan it.
-6. After promotion, `/sdd-apply` reconciles repository-specific readiness before implementation. Planning-level gaps return to `/sdd-change --replan`. There must be only one active truth for each repository Change.
+1. `/sdd-change` uses `sdd change create <space-id> <slug>` to create one central v2 `change.md` in `proposed` status as soon as durable intent is captured. Repository ownership may remain empty while proposed.
+2. The skill asks whether the user wants to continue into technical planning. If not, the proposed Change remains the backlog record.
+3. Technical planning settles repository ownership and observable behavior, expands `change.md`, creates compact `tasks.md` outcomes, and initializes one central `review.md`. Outcomes describe what must become true, not implementation technique. One Requirement is a useful default; several may be coupled when separate delivery would publish an incoherent contract. Material branching technical choices route to `/sdd-adr`.
+4. After focused validation, `/sdd-change` transitions the Change to `planned` and returns control. Material experience uncertainty may route next to `/sdd-design --plan`; otherwise `/sdd-apply` is next.
+5. Apply selects one ready outcome and follows repository guidance and specialist workflows. Planning-level discoveries return to `/sdd-change`. Candidate mutation stales affected verification and Review.
 
-When implementation is expected immediately, `--plan` may capture and confirm the brief-level outcome in the same invocation before technical planning. It must not silently skip the intent boundary merely because the brief is short-lived.
-
-Use the canonical dated change layout:
+Use the canonical central dated Change layout:
 
 ```text
-docs/changes/yyyy-mm-dd-change-name/
-  proposal.md
-  design.md
-  tasks.md
-  review.md        # only when review finds deficiencies
+<workspace>/.sdd/changes/<change-id>/
+  change.md        # intent, lifecycle, constraints, accepted approach
+  tasks.md         # compact delivery outcomes and Resume checkpoint
+  review.md        # outcome and final Change Review authority
+  design.md        # optional context retained by an existing Change
 ```
 
-`proposal.md` defines the problem, goal, scope, non-goals, affected Epics, and expected user/product outcome.
+`change.md` defines the problem, desired outcome, scope, non-goals, success signals, durable constraints, target repositories, affected repository-local Epics, open questions, lifecycle metadata, and—once planning proceeds—the current context, behavior changes, selected technical approach, alternatives, constraints, verification strategy, risks, and applicable experience design.
 
-`design.md` is the high-level solution approach. It should explain the chosen technical approach, important alternatives considered, risks, dependencies, migration or data implications, and how the Epic/Story/Requirement truth will change. For UI-bearing Changes, its concise `Experience Design` section is the current accepted experience contract linking the user-confirmed flow, responsive composition, component/state behavior, accessibility, visual direction, and stable prototype references. Revision history belongs in the `tasks.md` `Design Updates` ledger so superseded and current directions do not compete. `design.md` should not become a step-by-step implementation plan or duplicate behavioral truth.
+The technical-planning sections of `change.md` are the high-level solution approach. They explain the chosen approach, important alternatives, risks, dependencies, migration or data implications, repository boundaries, and intended repository-local Epic/Story/Requirement changes. `/sdd-change` hands meaningfully different viable approaches to `/sdd-adr`, then records the returned decision summary and repository-relative ADR path when warranted. For UI-bearing Changes, `Experience Design` is the current accepted experience contract. Existing `design.md` files remain valid source context for their current Changes, but future Changes do not create them.
 
-`tasks.md` is the adaptive implementation ledger. It records `Resume Here`, end-state task progress, implementation evidence, verification evidence, a living implementation-risk and confirmation matrix, decision fan-out, verification-environment readiness, planning updates, design revisions, manual UI confirmation status, the immutable review-handoff candidate, release-communication impact, review status, branch/PR/merge state, deferred gaps, and closeout readiness. Planning seeds what is knowable; Apply adds, refines, and resolves rows as implementation reveals the real path.
+`tasks.md` is the compact delivery queue for the whole Change. It contains one replaceable `Resume Here` checkpoint, `Delivery Outcomes`, and concise `Closeout` state. Each outcome identifies its repository, new or revised Requirements, Story changes, observable result, authoritative Scenarios, dependencies, binding constraints, expected risk triggers, focused verification intent, and manual acceptance. Add `Consumes` and `Produces` only when another outcome or repository relies on that contract. One Requirement is a useful default; combine Requirements when separate completion would publish an incoherent contract and record a concise coupling justification. Outcomes describe what must be implemented, not files, framework techniques, test architecture, delegation, or an engineered-up-front sequence.
+
+Outcome order is advisory. `/sdd-apply` may select any ready outcome and may resequence or reshape future outcomes when implementation evidence warrants it, while preserving accepted Requirement and Scenario truth. Genuine behavior or scope changes return through `/sdd-change`. `tasks.md` does not own candidate verdicts, gap disposition, commit facts, implementation ledgers, gate ledgers, per-slice Review paths, receipts, or command history.
+
+`Resume Here` contains fixed labels for Change, current outcome, phase, next action, and blocker. Replace stale values rather than adding session history. Candidate, Review, findings, gaps, acceptance, remediation, and final commit/tree belong in one central `review.md`. Durable implementation and verification ownership remains in repository-local Epic maps. `tasks.md` must not become a second technical plan or engineering diary.
+
+Each reviewed outcome executes five universal gates: scope/candidate, behavior, fresh verification, independent Spec Adherence and Implementation Quality review, and integrity/authority. Planning declares expected risk triggers; Review executes them and may add material discovered triggers. Trigger rows name a reason, concrete falsifiable check, result, gap treatment, and evidence. Do not create fixed `not-applicable` manifests. Focused behavior-derived and repository-required verification is the default; broad aggregate suites are triggered by candidate breadth, project policy, integration, or release risk.
+
+Apply records one exact candidate, permits one consolidated remediation batch and one fresh final Review, conditionally reconciles Epic truth, selectively creates one content-identical local commit, records the full SHA and matching tree in central `review.md`, marks the outcome done, and stops. It does not create per-slice Review files, receipts, digests, verification descriptors, duplicate ledgers, or closure-only commits.
 
 ### Change Status
 
-Every Change `tasks.md`, active or closed, must begin with YAML frontmatter containing exactly one `status` value:
+Every current active or closed Change `change.md` must begin with complete YAML frontmatter:
 
 ```yaml
 ---
+schema: sdd-change-v2
 status: proposed
+space: product
+repositories:
+  - product-web
+  - product-mobile
 ---
 ```
 
-The lifecycle is `proposed -> planned -> in_progress -> in_review -> closed`:
+`space` is the stable Space ID. `repositories` lists stable portable repository IDs, not paths, roles, remotes, or display names. It may be empty while the Change is `proposed`; at least one repository is required before `planned`. The metadata is shared by planning, implementation, review, status, validation, PR, release, and closeout workflows.
 
-- `proposed`: the dated Change artifacts are being drafted and may still contain unresolved planning decisions.
-- `planned`: the Change is coherent, validated, and ready for promotion or implementation.
-- `in_progress`: implementation, verification, ordinary remediation, or active plan reconciliation is underway.
-- `in_review`: implementation is believed complete and the Change is awaiting or undergoing independent review and closeout gates.
-- `closed`: the Change folder has moved under `docs/changes/closed/`; this is a location-derived state, not a stored `tasks.md` status.
+The stored Change status vocabulary is exactly `proposed`, `planned`, `in_progress`, or `in_review`:
 
-The active status values may move backward when reality demands it. Review findings return ordinary implementation work to `in_progress`. A discovery that invalidates the plan returns the Change to `proposed` while `/sdd-change --replan` revises it, then to `planned` before implementation resumes. Do not add separate activity states such as `replanning` or readiness assertions such as `ready_to_close`; those facts belong in the task ledger and review record.
+- `proposed`: the central dated Change artifacts are being drafted and may still contain unresolved planning decisions.
+- `planned`: the whole Change is coherent, validated, and every targeted repository is ready for implementation to begin.
+- `in_progress`: implementation, verification, ordinary remediation, or active plan reconciliation is underway across the targeted repositories.
+- `in_review`: every targeted repository has completed its implementation handoff and the whole Change is awaiting or undergoing independent review and closeout gates.
 
-Use `sdd change transition <space-id> <change-id> --from <status> --to <status>` when a skill changes an active Change status. The command is a compare-and-set filesystem primitive: it preflights every selected repository, refuses stale or invalid lifecycle edges, supports dry-run and JSON output, and changes only `tasks.md` frontmatter. The owning skill still decides why a transition is justified and must reconcile `Resume Here`, planning or design updates, evidence, review state, and Epic truth. In particular, `/sdd-design --revise` classifies feedback and confirms that it stays within accepted behavior before using `in_review -> in_progress`; planning invalidation routes directly to `proposed`; and implementation handoff uses `in_progress -> in_review` only after its contextual gates pass.
+Closure is not a fifth stored status. A Change is closed only when its directory is under `<workspace>/.sdd/changes/closed/<change-id>/`; the moved `change.md` retains `status: in_review`, and location-derived closure takes precedence. Active status values may move backward when reality demands it. A review deficiency may return the Change to `in_progress`; invalidated planning returns it to `proposed` and resumes `/sdd-change`.
 
-Moving the entire Change folder to `docs/changes/closed/` is the canonical and machine-readable closed transition. After contextual review, acceptance, PR/merge, and authorization gates pass, use `sdd change close <space-id> <change-id>` with explicit `--repo` selections when needed. The command requires `status: in_review`, preflights every selected destination, and performs only the configured folder transition; it does not decide readiness, merge branches, commit files, or reconcile product truth. The moved `tasks.md` retains `in_review`; folder location takes precedence. Historical closed Changes may retain status values that were valid under an earlier workflow version.
+Use `sdd change transition <space-id> <change-id> --from <status> --to <status>` when a workflow changes an active Change status. The command updates only the `status` field in central `change.md`. The `proposed -> planned` transition additionally requires repository ownership, the technical-planning sections in `change.md`, and `tasks.md`. A compatible existing `design.md` can satisfy the technical-plan shape for an older Change. It takes no `--repo` flags and performs no repository-local mutation.
 
-Closeout must reconcile both forward and backward. Updating the current Story is not sufficient when a change changes the meaning of earlier Stories, Requirements, Scenarios, `Implemented By`, `Implementation Gaps`, `Verified By`, `Verification Gaps`, or closed change records. Before closing, scan affected Epics and related active/closed change artifacts for stale assumptions such as "Not implemented yet", "Not verified yet", outdated manual confirmation status, old boundary wording, or accepted gaps that no longer match reality.
+`sdd status` reports central Changes once at the workspace level: `activeChanges` contains unique active central records and `recentChanges` contains unique recent central history. Per-repository status entries are filtered projections of those same records by `change.md` `repositories`; they must retain the same workspace-local Change ID and must not be counted, stored, or mutated as independent Changes. Active versus recent/closed classification comes from the central directory location, not from a stored `closed` status.
 
-Changes may be small or large. Small fixes still deserve enough tracking to keep Epic truth accurate. Large changes should remain adaptable rather than pretending every implementation phase is knowable up front. Planning describes what must be true and what must be checked; Apply decides and revises how to reach that state from current evidence.
+After contextual review, acceptance, PR/merge, release, and authorization gates applicable to every targeted repository pass, use `sdd change close <space-id> <change-id>`. The command requires central `status: in_review`, takes no `--repo` flags, preflights the one central record, and moves the whole directory once from `<workspace>/.sdd/changes/<change-id>/` to `<workspace>/.sdd/changes/closed/<change-id>/`. It does not decide readiness, merge branches, commit files, release code, or reconcile product truth. Repository-specific gates remain recorded in the one ledger; the Change-wide close must wait until all targeted repositories meet them.
 
-Planning artifacts are documentation, but their allowed branch and commit behavior belongs to project policy. Before writing them, follow the consuming project's documentation policy. Before changing application code, tests, schemas, configuration, generated project artifacts, or runtime behavior, follow its implementation branch and authorization policy.
+Closeout must reconcile both forward and backward across every targeted repository. Updating the current Story is not sufficient when a Change alters the meaning of earlier Stories, Requirements, Scenarios, `Implemented By`, `Implementation Gaps`, `Verified By`, `Verification Gaps`, repository-specific ledger state, or closed Change records. Before closing, scan all affected repository-local Epics and the related central active and closed Change history for stale assumptions such as "Not implemented yet", "Not verified yet", outdated manual confirmation status, old boundary wording, or accepted gaps that no longer match reality.
 
-The implicit promotion permission granted by `/sdd-apply` does not waive validation, destination disambiguation, collision checks, repository guidance, branch policy, or any separate permission required for commits, pushes, merges, deployments, or destructive operations.
+Changes may be small or large. Small fixes still deserve enough tracking to keep behavioral truth accurate. Large changes should remain adaptable rather than pretending every implementation phase is knowable up front. Planning describes what must be true; Apply selects one ready outcome, while repository guidance decides how to implement it.
 
-When implementation or manual feedback discovers a new or meaningfully changed Requirement, Scenario, constraint, or Epic ownership question that needs planning before more code changes, use `/sdd-change --replan` against the active change. That mode returns `tasks.md` to `status: proposed`, updates `proposal.md`, `design.md`, and `tasks.md`, records the planning update, sets `status: planned` when the revised plan is coherent, and then hands back to a fresh `/sdd-apply`.
+Central Change records are workspace-local workflow state and do not inherit any one repository's branch or documentation-storage policy. Before changing repository-local Epics, ADRs, application code, tests, schemas, configuration, generated artifacts, or runtime behavior, follow the branch, commit, documentation, and authorization policy of each affected repository.
+
+Central storage does not waive validation, target-repository disambiguation, workspace-local ID collision checks, repository guidance, branch policy, or any separate permission required for commits, pushes, merges, deployments, releases, or destructive operations.
+
+When implementation or feedback changes a Requirement, Scenario, constraint, technical approach, or Epic ownership question, return the same `change.md` to `proposed` and resume `/sdd-change`. Update `change.md` and `tasks.md`, plus any compatible existing `design.md`, then restore `planned` only when the revised plan is coherent.
 
 ## Deterministic Artifact Validation
 
-Use `sdd validate` as the machine-readable structural baseline for SDD work. It checks only facts derivable from workspace files: required Change files and core sections, valid status and folder placement, duplicate planned/active/closed locations, unresolved scaffolding, Epic template/schema shape, Story Index alignment, Story/Requirement/Scenario identifier shape and uniqueness, independent implementation and verification state, one canonical implementation/verification map per Story, behavior-mapped implementation coverage, repository-relative implementation-path existence, implementation and verification gap coverage, traceability table headers, evidence references to declared Requirements/Scenarios, concrete automated-test paths, rejection of generic framework evidence anchors, Story-size review signals, versioned Epic verification-report identity/current-result/lineage coherence, and broken local Markdown links to Epic or Change artifacts. Scope it by Space, repository, Change, or Epic when a workflow owns a narrower surface. A Change-scoped run also validates Epic paths declared under its proposal's `Epic Actions` and reports a missing affected Epic rather than silently returning `epics: 0`. Pass `--changed-from <commit-ish>` when a workflow has a meaningful Git baseline; validation then compares baseline Epic content with the current working tree and rejects stale top-level `modified` metadata across dates. Date-only metadata cannot distinguish a second substantive edit on the same local day, so that case remains valid rather than requiring a future date. Closed history still receives strict file, status, collision, and reference checks, but older title, section, and placeholder shape is reported as compatibility warnings so a newer template does not retroactively invalidate completed work.
+Use `sdd validate` as the machine-readable structural baseline for SDD work. It reads dated Changes from the selected workspace's central store and checks facts derivable from workspace files: Change IDs unique across central active and closed locations; current `sdd-change-v2` metadata; required Change files and core sections; valid lifecycle and location-derived closure; compact outcome IDs, fields, references, dependencies, and Resume shape; central Review gate/trigger/Scenario sets; candidate, gap, commit, and tree coherence; Epic template/schema shape; Story Index alignment; Story/Requirement/Scenario identifiers; independent implementation and verification state; canonical implementation/evidence maps; path and anchor validity; explicit gaps; current Epic verification report truth; and optional Git-relative freshness.
 
 Epic verification reports use `schema: sdd-epic-verify-report-v1`. Current gates, findings, and checks must remain separate from historical audit failures. An `aligned` result means every current gate passes or is not applicable, current blocking and required findings are empty, required current checks pass, and the verdict matches the verified source. A later remediation creates a successor report with an explicit repository-relative `supersedes` link; it does not rewrite historical failure into an apparently always-aligned report.
 
-A passing validation result does not establish product completeness, implementation truth, test strength, manual acceptance, review readiness, or release readiness. Skills remain responsible for those contextual judgments and must not convert a structural pass into a semantic claim. A failing result is actionable workflow drift unless the finding is an intentional compatibility warning that the owning skill explicitly records. New Epics use `schema: sdd-epic-v2`; unversioned legacy Epics remain readable with a compatibility warning. The next material edit to behavior, implementation state, verification state, ownership, gaps, or evidence must normalize the whole Epic file to v2 because the schema applies to the complete artifact, not only the edited Story. Cosmetic or history-only edits may leave the legacy shape intact.
+For a done outcome, validation requires one matching central Review section whose committed candidate equals the final commit, five universal gates pass, planned triggers and Scenarios match exactly, gaps are coherent and dated where accepted, the final commit is reachable, and reviewed/final trees are equal. Validation rejects stale candidates, missing gates or trigger/Scenario rows, gap mismatches, unrelated current legacy directories, and technical waivers relabeled as manual acceptance or `none`. It intentionally does not judge semantic sufficiency; independent Review owns that judgment.
+
+A passing validation result does not establish that outcomes are well chosen, product completeness, implementation truth, test strength, manual acceptance, review readiness, or release readiness. Skills remain responsible for those contextual judgments. Schema-less Changes, checklist task shapes, slice Reviews, and closure receipts are unsupported history and are not a second current workflow. New Epics use `schema: sdd-epic-v2`; unversioned legacy Epics remain readable with a compatibility warning until materially edited.
 
 During normalization, do not mechanically copy a legacy `Status` into both new states. Legacy `planned`, `draft`, or `not implemented` normally begins as `Implementation: not implemented` and `Verification: unverified`. Legacy `partial` or `in progress` requires separate inspection of code coverage and evidence. Legacy `implemented` or `complete` may support `Implementation: implemented` only after current code inspection; `Verification` is independently `verified`, `partial`, or `unverified` according to current scenario evidence and gaps.
 
 Structural validation is primarily forward traceability: it checks whether declared artifact references are well formed. SDD workflows must also perform reverse traceability so implementation and tests cannot exist outside the durable Epic map:
 
-- `/sdd-apply` inventories the changed implementation surface before handoff and reconciles each candidate with affected Story evidence, an explicit support/generated classification, or a tracked cleanup decision.
+- Repository guidance may require changed-surface or traceability checks during implementation and should route them through the appropriate skill.
 - `/sdd-review` independently inventories the source-vs-target diff and treats unexplained behavior-bearing files, tests, routes, registrations, or stale supporting truth as review findings.
 - `/sdd-epic-verify` inventories the full Epic scope, not only paths already named by the Epic, and cannot report `aligned` when that reverse inventory was skipped.
 - `/sdd-orphan-audit` remains the repository-wide maintenance pass for candidates outside a current Change or Epic audit.
@@ -293,57 +341,49 @@ The universal inventory is intentionally conservative. It expands path globs, re
 
 A behavior-preserving refactor still invalidates navigation claims and may invalidate verification confidence. Update code anchors immediately, rerun the focused proof for every affected Requirement/Scenario, and update `last_verified` only from current evidence. Prior evidence may remain current only when its assertion and relevant behavior boundary are unchanged and the check still passes; otherwise downgrade `Verification` or record the explicit gap.
 
-`/sdd-change --plan` and `--replan` validate the planned or replanned Change before handoff. `/sdd-apply` validates the selected Change and affected Epics during Discovery and again after reconciliation. `/sdd-review` treats scoped validation as one input to its independent diff and truth review. `/sdd-epic-verify` begins with scoped Epic validation before auditing completeness, implementation, and evidence quality.
+## Candidate-Bound Epic Reconciliation
+
+`/sdd-epic-update` is the independently callable mutation capability that reconciles repository-owned Epic truth to one exact committed or working-tree candidate. It accepts the shared diff envelope with or without an active Change, outcome, or Apply session. Manual behavioral work, behavior-preserving refactors, and traceability-only drift use the same public contract without invented Apply history.
+
+The generic CLI command `sdd candidate resolve <repository-path> --baseline <commit-ish> [--candidate working-tree|<commit-ish>]` resolves refs to immutable SHAs, rejects a committed baseline that is not an ancestor of its candidate, and inventories committed or staged/unstaged/untracked changed paths with a content-sensitive watermark. `sdd epic update-input` preserves that envelope and adds the configured Epic root plus a scoped validation command. Both helpers are read-only and deliberately do not infer affected behavior, release significance, or mutate artifacts; semantic ownership remains with the invoking skill.
+
+Epic Update derives affected behavior from inspected implementation and symbol propagation rather than filenames alone. It mutates only repository-owned Epics and directly owned generated Epic indexes. `Implemented By` comes from actual governing surfaces; `Verified By` changes only when durable candidate-bound evidence directly proves its Requirement or Scenario; missing or weaker proof remains an explicit verification gap. Before success, semantic closure compares each affected Story's index row, body states, implementation/evidence maps, and gap sections so mapped behavior cannot remain described as missing and every partial state has a matching remaining gap. Evidence closure enumerates every affected Scenario and records claimed boundary, cited proof, proven boundary, result, and gap classification. Backend/data, rendered interaction, live multi-context/realtime, provider/production, and manual acceptance are distinct boundaries: a helper result or source inspection does not prove rendered feedback/focus, a direct backend confirmation flag does not prove a user's confirmation/cancellation interaction, and a later query does not prove an active subscription. Required technical gaps remain blocking unless project policy makes them optional or the user explicitly accepts the named gap with a date. Deterministic validation is necessary but does not replace either check. A same-candidate second invocation should normally return `no-op`.
+
+Behavioral change or disputed intent routes to `/sdd-change`, branching durable tradeoffs route to `/sdd-adr`, missing implementation or proof routes to implementation/verification work, and full-Epic coherence uncertainty routes to `/sdd-epic-verify`. Epic Update stops before code review, code fixes, Change/task/review mutation, lifecycle transitions, changelog work, commits, PRs, releases, deployment, or closeout. It returns `complete`, `no-op`, `needs-user`, `blocked`, or `routed`, along with affected Epic references, artifacts written, validation results, candidate watermarks, stale downstream gates, and the recommended next workflow.
+
+## Candidate-Bound Changelog Entries
+
+`/sdd-changelog` is the independently callable mutation capability that creates or updates the release communication owned by one completed Change or clearly scoped manual candidate. It accepts the same exact committed or working-tree diff envelope without requiring Apply history. It requires current Review evidence and, whenever behavior, ownership, or durable proof changed, a current `/sdd-epic-update` result or evidence-based `no-op`.
+
+The capability reads project guidance and native records to resolve whether the repository uses Keep a Changelog, changesets, generated provider notes, another release record, or intentionally no per-change record. This policy remains project-owned rather than a repository-schema path because release systems may be files, directories, generators, or provider workflows. Changelog classifies the reviewed result as user-visible, operator-relevant, internal-only, or speculative/unverified. It returns `no-op` for internal-only work the project does not record, generated/no-record policies, duplicate accurate entries, and bookkeeping-only candidates.
+
+When an entry is warranted, Changelog writes exactly one native unreleased or per-change entry in product language. It never versions or dates an unreleased section, edits released history, claims deployment or availability, or copies private SDD bookkeeping. It re-resolves the candidate with `sdd candidate resolve`, proves that only authorized release-record paths changed and that the non-changelog implementation projection is unchanged, runs native record validation, and normally returns `no-op` on a same-candidate second invocation. The expected changelog-only repository watermark does not invalidate Review or Epic Update when this projection is proved.
+
+Changelog stops before implementation, code review, Epic/Change mutation, version selection, staging, commits, PRs, release, or deployment. It returns `complete`, `no-op`, `needs-user`, `blocked`, or `routed`. `/sdd-release` remains the owner of release-wide aggregation, version recommendation and confirmation, promotion of unreleased records, and production handoff.
+
+`/sdd-change` validates a planned or revised Change before handoff. `/sdd-apply` reads the selected Change and outcome, follows repository-defined checks, and requires fresh candidate-bound verification before it can report that outcome complete. `/sdd-review` treats scoped validation and Apply evidence as inputs to—not substitutes for—its independent diff and truth review. `/sdd-epic-verify` begins with scoped Epic validation before auditing completeness, implementation, and evidence quality.
 
 ## Implementation And Review
 
-Implementation should usually follow a BDD/TDD loop around each Requirement or Scenario:
+`/sdd-apply` selects one ready or explicitly requested outcome. It does not consume the full Change. A completed outcome defaults to deterministic central Review/commit/tree audit; renewed semantic discovery requires an explicit deep re-review.
 
-1. Write or identify the failing or characterizing test when practical.
-2. Implement the smallest slice that satisfies the Requirement or Scenario.
-3. Run the focused verification.
-4. Update `tasks.md` and affected Epic truth.
-5. Commit the completed, verified slice before starting the next independently reviewable phase when commits are authorized and the app branch policy allows it.
+Before implementation, Apply reads applicable workspace and repository guidance. Those sources own development method, specialist skills, test architecture, documentation, generated artifacts, delegation, isolation, commit style, and branch policy. Apply states only the behavioral brief: outcome, Requirements, Story changes, Scenarios, dependencies, constraints, contracts, verification intent, manual acceptance, repository, and branch result. A transient proof sketch may guide the session but is not another durable artifact.
 
-Before selecting and before closing each slice, Apply re-evaluates the living risk, decision fan-out, and verification-environment records. It actively challenges authoritative refresh and derived selection, overlapping writes and recovery, owner/tenant/type/environment boundaries, untrusted output publication, existing-data migration and rollback, configuration/default propagation, generated contracts, and stale supporting truth when those classes intersect the change. Relevant recent `review.md` findings from the same Epic, subsystem, or boundary may seed this challenge; unrelated reviews do not become generic scope.
+Apply records the exact baseline and dirty state, preserves unrelated work, and stops when attribution is unsafe. It moves a planned Change to `in_progress`, marks only the selected outcome `in progress`, implements under project guidance, and runs fresh proportional verification on the exact candidate. Focused behavior-derived and repository-required checks are the default. Broad suites are added only when repository policy, candidate breadth, integration, or release risk triggers them. Candidate mutation stales affected evidence.
 
-When a slice adds or changes an adapter, client, route, workspace, worker, migration, command, or other implementation parallel to an established surface, Apply maintains a triggered Pattern Parity Matrix. It identifies the closest current reference and compares applicable authentication, session expiry, sign-in/sign-out destination, CSRF or credential refresh, retry, timeout/cancellation, error/conflict handling, recovery, pending writes, identity, route context, configuration, generated contracts, accessibility, and visual-token behavior plus focused tests. Similar source shape is not proof of equivalent behavior; intentional divergence needs an inspected reason, and a defect in the reference must not be copied merely for parity.
+Apply then composes independent `/sdd-review` for the exact candidate. Review records five universal gates in the one central `review.md`: scope/candidate, behavior, fresh verification, independent Spec and Quality judgment, and integrity/authority. It executes every planned trigger and may add material discovered triggers, each with a concrete check, result, gap treatment, and evidence. Every declared Scenario receives one same-boundary coverage row. Fixed `not-applicable` manifests are not used.
 
-When a typed result, error, status, permission, or retry decision crosses a service, plugin/capability, transport, or client boundary, Apply maintains a triggered Boundary Contract Matrix. It traces each important origin condition through its domain result, adapter or transport mapping, client-visible behavior and retryability, and exact proof. A generic fallback must not erase distinctions that downstream behavior depends on.
+When Review returns required findings grounded in accepted behavior, material safety, project policy, false closure, or deterministic contract failure, Apply may perform one consolidated safe remediation batch, rerun affected proof, and request one fresh comprehensive final Review. It does not enter an unlimited review/fix loop.
 
-When implementation owns editable, autosaving, cached, routed, asynchronous, durable, or identity-sensitive state, Apply maintains a triggered Stateful Transition Matrix. It exercises applicable entity changes, pending-write navigation, failed/conflicted save recovery, concurrent starts before and after the first await, cancellation or disconnect while work is pending, stale completion after replacement, terminal retry, mounted-consumer refresh, remount, process restart, durable work whose identifier never reached the client, historical return context, direct entry and browser history, session expiry/sign-out, authoritative refresh, and slow or permanently hung requests. Reserve durable identity before the first await when recovery depends on finding in-flight work. Static-state rendering alone cannot prove hidden timing, persistence, identity, or transport behavior.
+Epic reconciliation runs immediately when accepted behavior, Story completion, or a contract/gap consumed by another outcome changes, or when current maps became false. Otherwise it waits for Change completion. Any Epic mutation changes the candidate and requires fresh affected verification and Review.
 
-Capability-style identifiers and content budgets are conservation boundaries. Apply identifies who issued an identifier, the scope and lifetime that authorize its use, behavior for guessed, pasted, stale, cross-run, or cross-owner reuse, and every content-bearing path that consumes a declared budget or contributes provider-visible provenance. Filesystem changes validate every existing ancestor and confinement boundary before creating descendants, revalidate mutable roots when replacement is possible, and inspect what was written when a fail-closed path rejects the operation.
+After the final candidate is ready, Apply selectively stages only outcome-owned paths, creates one normal local commit, and proves the commit tree equals the reviewed staged tree. It records the immutable commit SHA and matching tree in central `review.md`, marks the outcome done in `tasks.md`, refreshes Resume/Closeout, validates the Change, and stops. It does not create per-slice Reviews, receipts, digests, verification descriptors, duplicate ledgers, or reseal commits. Another outcome requires another Apply invocation.
 
-A safety mechanism correctly refusing to run against an unsafe database or environment is evidence for that safety mechanism, not for the functional behavior it prevented from running. Required database, migration, E2E, live-provider, and rendered-UI evidence must run in a safe usable environment or remain an explicit gap. Before `in_review`, Apply identifies the exact committed candidate and integration target or merge base, confirms intended implementation is not stranded in the working tree, identifies unrelated dirt, and runs applicable commit-sensitive or generated-contract checks.
+Apply returns `complete`, `no-op`, `needs-user`, `blocked`, or `routed`. Its standing commit authority covers only the selected outcome's reviewed local repository commit. It does not authorize broad staging, central workspace files, push, amend, rebase, merge, PR, release, deployment, destructive action, or another repository.
 
-Treat local commits as regular phase boundaries rather than end-of-Change cleanup. A default/full `/sdd-apply` invocation authorizes local commits for completed verified slices unless the user selects `--no-commit`, explicitly prohibits commits, or repository policy disallows them. Do not accumulate several independent Requirements or Scenario slices into one working-tree batch. For an unusually long phase, commit additional coherent, green checkpoints; avoid noisy per-file commits and never commit an expected failing or contradictory state.
+`/sdd-review` remains independently callable for direct candidates, active outcomes, completed-outcome seal audits, explicit deep re-review, and final Change-wide integration readiness. It returns `ready`, `changes-requested`, or `blocked`, with separate Spec Adherence and Implementation Quality results. Required manual acceptance may remain `pending user` while technical Review is ready, but acceptance-dependent integration or closeout remains blocked.
 
-Use subagents for isolated implementation slices, specialist guidance, and fresh-context review when the work is non-trivial. The orchestrating agent remains responsible for validating subagent claims, reconciling artifacts, and deciding whether to stop.
-
-Delegation must not make the workflow appear stuck. After spawning a subagent, continue independent local work instead of waiting immediately. When the main thread is genuinely blocked on delegated output, wait at most 60 seconds without a user-visible status update. If the subagent is still running, report what is complete and what remains, then continue any available work. Treat roughly three minutes of cumulative waiting on one delegated task or wave as a recovery threshold: interrupt or close the agent and finish locally, or delegate the remaining question again with a narrower scope. Do not repeatedly poll, silently wait on optional verification, or let a slow reviewer prevent a concise status response. Close completed or abandoned agents promptly.
-
-Manual UI confirmation is part of the workflow for browser-visible or otherwise user-facing changes. The agent should walk the user through what to manually confirm, record the status in `tasks.md`, and classify feedback as implementation bug, experience revision, requirement change, follow-up, or accepted gap. Experience revision within accepted behavior routes through `/sdd-design --revise`; changed behavior routes through `/sdd-change --replan`.
-
-Rendered UI verification is a separate implementation and review gate for UI-bearing changes. Prefer the project's existing browser, screenshot, or component-preview tooling; otherwise use an available runtime browser capability, a rendered fixture or preview, or a manual browser capture. Do not add a named tool merely to satisfy SDD. The implementation pass and independent review must directly inspect current rendering rather than infer visual correctness from source, builds, test exits, or screenshot generation. Record the affected surface, route or fixture, viewport, state or interaction, tool or setup, inspected evidence, console/network result, and outcome in the Change's Visual Verification Matrix. If the current environment cannot render a required surface, record the exact blocked or pending verification instead of silently passing it. Owner manual acceptance remains distinct and may still be `pending user` after rendered verification passes.
-
-Manual confirmation status must use the same vocabulary everywhere: `not applicable`, `pending user`, `user confirmed`, or `accepted gap`.
-
-`/sdd-apply` should treat Epic/Story truth as non-negotiable while implementation is happening. Behavior changes, stale Story wording, changed Requirement or Scenario meaning, moved Epic ownership, and changed verification confidence must be reconciled into affected Epics during the apply work or called out as a blocker before claiming progress. `/sdd-apply` should end implementation with an implementation self-check: confirm the slice is complete, verified, reconciled into Epic truth, and ready for independent review. The self-check should gather its materially relevant specialist findings before remediation, apply the safe set as one batch, and run one regression-focused validation pass rather than surfacing findings serially. This self-check does not replace `/sdd-review`.
-
-`/sdd-review` is the local PR-style gate after implementation. It independently checks proposal/design/tasks, Epic truth, Requirements, Scenarios, tests, manual confirmation, code quality, security, docs, release-communication impact, branch policy, and closeout consistency. For new or high-risk evidence claims, Review opens the cited proof and independently checks the exact test or stable anchor, important assertion or observation, actual test discovery, Scenario aggregation, and implementation boundary rather than trusting artifact wording or aggregate green commands. It also compares new sibling implementations with their established behavior contracts and challenges applicable stateful transitions. Review should be comprehensive rather than serial: complete the materially relevant review wave, validate and consolidate all findings, remediate the complete safe subset as one batch, then perform one regression-focused rereview. It should not require repeated user invocations merely to reveal the next review category. If deficiencies remain, it creates or updates `review.md` with the consolidated set. When the independent review is clean and a complete, current walkthrough only awaits manual confirmation, report verdict `ready` and manual confirmation `pending user`; do not misclassify the pending acceptance gate as `changes-requested`. Required manual confirmation may still block integration or closeout. If review and closeout gates are fully clean for a non-production integration target, it should offer the policy-defined merge-and-close as the recommended next action, but must ask the user before merging, moving the change folder, pushing, or taking any other integration action.
-
-Review breadth comes from a repeatable search pipeline, not a single intelligent reading. Default review derives intent from available Change, PR, issue, discussion, commit-history, and related-repository context; inspects every changed path and behavior-bearing hunk; traces changed public or behavior-owning symbols through materially relevant callers, consumers, registrations, schemas, persistence, configuration, generated contracts, and tests; runs applicable project-configured deterministic analyzers; performs separate risk-shaped reasoning passes; and records material blind spots. Analyzer output and search indexes generate candidates rather than findings. Review validates each reported issue against the actual diff, a concrete code path, executable evidence, or an artifact contract, and retains the union of candidates until the complete discovery wave can be consolidated.
-
-`/sdd-pr` and `/sdd-release` must preserve that distinction. They may continue a PR or release handoff with manual confirmation pending only when project policy permits that exact action, and must carry the acceptance status forward explicitly. Neither workflow may call a candidate merge-ready, merge, deploy, close, or perform another acceptance-dependent action while required confirmation remains `pending user`.
-
-Both workflows must also reconcile the exact source-to-target changed-file inventory. Classify every added, modified, deleted, or renamed path as intended product scope, required SDD/supporting truth, accepted review remediation, authorized release metadata, or project-required generated output. Recompute that inventory after remediation or metadata commits and immediately before push/PR handoff. An unexpected path is a stop condition, even when it was already committed or does not make tests fail.
-
-Status transitions must accompany the work that justifies them: `/sdd-change --brief` creates no status; `/sdd-change --plan` creates `proposed` and sets `planned` when planning is complete; `/sdd-apply` changes `planned` to `in_progress` and then `in_review` at implementation handoff; `/sdd-review` keeps `in_review`, returns implementation or experience deficiencies to `in_progress`, or routes invalidated planning through `proposed` and `/sdd-change --replan`; `/sdd-design --revise` works in `in_progress` and never restores `in_review` itself. Use guarded `sdd change transition` calls for these active-status mutations. Closing is represented only by the folder move performed through `sdd change close` after the owning skill has completed the contextual gates and obtained required authorization.
-
-`/sdd-release` prepares promotion to the project-defined production target. It runs the project-defined release checks, reviews the changelog against the actual release scope, recommends the next version under the project's versioning policy, and explicitly confirms with the user whether the handoff should be a version update before mutating versioned release artifacts. It performs a proportional cumulative source-to-target risk scan and requires a fresh-context cumulative release-candidate code/security/state review for initial releases, multiple integrated Changes, material post-review work, or high-risk combined diffs; this reviews the exact combined candidate without reopening individual Change lifecycle or duplicating unaffected artifact review. A default/full invocation is scoped authorization for the resulting release-metadata commits, one normal push of the resolved source branch, and creation of the configured release PR or equivalent handoff after all gates pass; it should not ask again merely because the source branch is not yet remote. That authorization does not include force-push, direct production-target push, merge, deploy, tag, publish, production migration, announcement, or another destructive or production mutation.
-
-PR feedback does not bypass Epic truth or invalidate review silently. `/sdd-review` records the immutable source commit it covered. `/sdd-pr` classifies every accepted change after that commit, reconciles Epic/Story truth, evidence, supporting docs and release communication when affected, and requires a fresh `/sdd-review` for material behavior, contract, security, data, API, architecture, or risk-surface changes. It also records a head watermark for each configured remote reviewer and status check, including whether it is required or optional, the triggered head, completed head, and result. A resolved old-head comment is historical evidence rather than current-head review; material fixes retrigger configured review when supported. A PR is merge-ready only when its current head is the latest reconciled head, no post-review commits remain unclassified, and every required remote-review watermark is current and successful or project policy explicitly accepts another path.
+Status transitions accompany the work that justifies them: Change creates `proposed` and plans `planned`; Apply enters `in_progress`; outcome Review does not change lifecycle; final Change Review may enter `in_review` or route deficiencies back to implementation/planning. Every transition acts once on the workspace-central record.
 
 ## Branching
 
@@ -366,9 +406,10 @@ A Story is ready for handoff only when:
 - `Verification Gaps` contains only real remaining gaps.
 - Evidence type is clear enough to distinguish deterministic tests, broad gates, live-provider playtests, manual confirmation, and debug/log inspection.
 - Production-path and mock-boundary risks have proof or explicit gaps.
-- Required rendered UI verification is complete, not applicable with a reason, or recorded as a blocking or explicitly accepted gap.
+- Required rendered UI verification is complete, not applicable with a reason, or recorded as a blocking or explicitly dated user-accepted gap.
+- Required live multi-context/realtime, provider/production, and other non-manual evidence is complete, policy-optional, or explicitly accepted by the user with a date; it is never relabeled as manual acceptance merely because a person must trigger or observe it.
 - Manual UI confirmation is complete, not applicable, pending user, or recorded as an accepted gap.
-- The active change's `tasks.md` does not contradict Epic truth, review state, release-communication state, PR/merge state, folder state, or accepted deferred gaps.
+- The central active Change's `tasks.md` does not contradict any targeted repository's Epic truth, review state, release-communication state, PR/merge state, the central location-derived lifecycle, or accepted deferred gaps.
 
 ## Definition Of Done For An Epic
 
@@ -382,9 +423,9 @@ An Epic is healthy only when:
 - Every Story has one authoritative current implementation map and one authoritative current verification map; historical maps do not compete with them.
 - Primary anchors resolve to the definitions or registrations that govern the claimed behavior, and distinct governing boundaries are mapped at Requirement or Scenario granularity.
 - Automated evidence uses an exact test title or stable named test anchor rather than a generic framework token, and the cited proof actually asserts the mapped Scenario.
-- Related active or closed changes do not contradict Epic truth.
+- Related central active or closed Changes do not contradict Epic truth.
 - Earlier Stories are reconciled when later Stories supersede their assumptions.
-- Closed change artifacts do not still claim accepted work is unimplemented, unverified, pending, or located in an active folder unless that language is explicitly historical and non-authoritative.
+- Closed central Change artifacts do not still claim accepted work is unimplemented, unverified, pending, or located at `<workspace>/.sdd/changes/<change-id>/` unless that language is explicitly historical and non-authoritative.
 - Any maintained generated indexes are current and do not point to missing evidence.
 - Deferred scope and open decisions remain accurate.
 
@@ -394,7 +435,7 @@ Avoid:
 
 - Creating a new Story to avoid fixing a stale existing Story.
 - Allowing implemented behavior to live only in code, chat, a stale report, or a private memory instead of the relevant Epic/Story.
-- Treating `proposal.md`, `design.md`, or `tasks.md` as more authoritative than implementation reality or Epic truth.
+- Treating `change.md`, `tasks.md`, or a compatible existing `design.md` as more authoritative than implementation reality or Epic truth.
 - Turning Stories into tiny UI control requirements.
 - Hiding product scope expansion inside technical design or implementation tasks.
 - Recording only generic command logs in `Verified By`.
@@ -412,8 +453,19 @@ Avoid:
 - Blurring deterministic E2E, live-provider playtests, manual confirmation, and debug/log evidence into one undifferentiated "verified" bucket.
 - Treating fake-backed tests as full production-path proof when the real boundary is risky.
 - Hand-maintaining generated indexes.
-- Leaving completed `design.md`, `tasks.md`, or review records with stale "Not implemented yet", "Not verified yet", old manual status vocabulary, or superseded boundary wording.
-- Closing, merging, or promoting a change while Epic truth, tasks, review status, release-communication state, PR/merge state, or manual confirmation status remains contradictory.
+- Leaving completed `change.md`, `tasks.md`, compatible existing `design.md`, or review records with stale "Not implemented yet", "Not verified yet", old manual status vocabulary, or superseded boundary wording.
+- Creating or keeping a dated Change anywhere except `<workspace>/.sdd/changes/<change-id>/` or `<workspace>/.sdd/changes/closed/<change-id>/`, including beside its undated Brief or inside a repository.
+- Giving one Change repository-specific IDs or stored copies instead of one workspace-unique ID and one central multi-repository ledger.
+- Treating a per-repository status or validation projection as an independently mutable Change owner.
+- Applying, reviewing, transitioning, or closing an idea-planned or repository-local legacy Change in place instead of recreating or manually converting worthwhile intent into the current central store.
+- Using repository filters with `sdd change transition` or `sdd change close`, or advancing the Change-wide lifecycle before every targeted repository has met the gate.
+- Closing or merging a Change while Epic truth, central tasks, repository-specific review/release/PR/merge state, or manual confirmation status remains contradictory.
+
+## Shared Context Gathering
+
+Before `/sdd-explore`, `/sdd-adr`, or `/sdd-change` makes substantive claims, it invokes `/sdd-gather-context` in the same session with an action and focused question. The shared skill owns the minimum-read policy across planning direction, governing decisions, accepted behavior, current implementation/tests, and repository state. It reuses current reads, opens missing evidence, surfaces authority/freshness conflicts and gaps, and returns an evidence-linked sufficiency result without creating an artifact or taking over the caller's judgment.
+
+The minimum is action-shaped rather than repository-wide. Exploration emphasizes prior discussion and relevant planning; ADR work emphasizes governing decisions and the affected technical seam; Change work emphasizes accepted intent and behavior, overlapping work, implementation, tests, contracts, and Git state. The caller deepens only where the shared result leaves a material gap.
 
 ## Skill Workflow
 
@@ -421,14 +473,17 @@ Use the skills to apply this doctrine consistently:
 
 | Skill | Purpose |
 |---|---|
+| `/sdd-gather-context` | Read and reconcile the minimum evidence required for an exploration, ADR, or Change in the caller's current session; create no artifact and make no parent-workflow decision. |
 | `/sdd-prd` | Create or revise the private Product Brief/PRD that guides product scope, audience, principles, market context, monetization, and open product questions. |
-| `/sdd-explore` | Think through product ideas, technical options, codebase findings, or requirement questions before deciding whether to create a change. |
-| `/sdd-adr` | Create, update, or assess ADRs for durable technical decisions that future SDD work should respect. |
-| `/sdd-change` | Capture durable intent with `--brief`, create a just-in-time dated plan with `--plan`, or revise an active Change with `--replan`. |
-| `/sdd-design` | Plan initial experience readiness or revise an implemented experience within accepted behavior without editing application or component-preview code. |
-| `/sdd-interactive` | Create and apply a lightweight tracked change in one working session for small concrete changes that do not need a full upfront proposal pass. |
-| `/sdd-apply` | Implement or continue an active change using Requirement/Scenario-driven slices, subagent delegation when useful, verification, artifact reconciliation, and manual UI confirmation. |
-| `/sdd-review` | Run the local PR-style integration gate after implementation or before closing a change. |
+| `/sdd-explore` | Preserve any substantial discussion the user wants to survive chat as one synthesized durable record. Choose its destination deliberately—usually the owning idea's `explorations/`, or workspace `.sdd/explorations/` when no one idea owns it—and return a routed handoff to `/sdd-prd`, `/sdd-change`, `/sdd-adr`, or another owner when conclusions mature. |
+| `/sdd-adr` | Compare real viable technical approaches, obtain user confirmation, and create or update an ADR only for consequential decisions whose tradeoff context future work must preserve. Return an explicit result and stop before caller-owned planning or implementation. |
+| `/sdd-change` | Create or resume one central v2 Change, capture intent, and optionally plan coherent observable outcomes plus pending central Review. Return `complete`, `no-op`, `needs-user`, `blocked`, or `routed`, and stop before implementation. |
+| `/sdd-design` | After Change reaches `planned`, confirm initial experience readiness; or revise one exact `in_progress`/`in_review` implementation candidate within accepted behavior. Return `complete`, `no-op`, `needs-user`, `blocked`, or `routed`, and stop before application/component-preview edits or downstream workflow mutations. |
+| `/sdd-interactive` | Capture a lightweight Change with the same three v2 records and compose exactly one public Apply outcome; do not create an Interactive-only workflow. |
+| `/sdd-apply` | Deliver one ready or explicitly requested outcome, follow repository implementation guidance, run focused proof, compose independent central Review and conditional Epic reconciliation, seal one reviewed local commit, record its SHA/tree, and stop. |
+| `/sdd-review` | Independently review an exact candidate or outcome with five universal gates and concrete triggered checks in central `review.md`; final mode owns Change-wide integration readiness. |
+| `/sdd-epic-update` | Directly or Apply-composed, reconcile repository-owned Epic/Story behavior, implementation maps, gaps, and verification maps to one exact candidate; stop before code review, implementation, lifecycle changes, changelog work, or commits. |
+| `/sdd-changelog` | Create or update one reviewed candidate's native user/operator release entry, or return an evidence-based `no-op`; stop before versioning, staging, commits, PRs, release, or deployment. |
 | `/sdd-epic-verify` | Audit an Epic end to end against current implementation, tests, evidence, Change status, and Story/Requirement/Scenario quality. |
 | `/sdd-space-status` | Produce a read-only re-entry brief for returning to an app after time away. |
 | `/sdd-code-audit` | Audit repository or subsystem health through independent specialist review and synthesize validated findings into candidate improvements. |
@@ -441,17 +496,19 @@ Do not create separate compatibility-wrapper skills for older command names. Can
 
 This document defines the durable doctrine for Story-Driven Development. Skills operationalize the doctrine for specific workflows.
 
-Keep SDD skills focused on workflow procedure: what to read, what decisions to make, what artifacts to update, what verification to run, and what to report. Put portable SDD semantics, the default idea-to-repository relationship, and the canonical `docs/` repository layout in this doctrine. Put private relationships in `~/.sdd/config.yaml`, portable repository facts in `<repository>/.sdd/config.yaml`, and technology, branch, command, release, and reporting preferences in project guidance instead of repeating them in skills or treating them as SDD requirements.
+Keep SDD skills focused on workflow procedure: what to read, what decisions to make, what artifacts to update, what verification to run, and what to report. Put portable SDD semantics, the default idea-to-repository relationship, fixed workspace-central Change storage, workspace-local Change identity, projection semantics, and canonical repository-local Epic/ADR ownership in this doctrine. Put private relationships in `<workspace>/.sdd/config.yaml`, the one central dated Change record under `<workspace>/.sdd/changes/`, portable repository facts in `<repository>/.sdd/config.yaml`, and technology, branch, command, release, and reporting preferences in project guidance instead of repeating them in skills or treating them as SDD requirements.
+
+Skills must resolve every dated Change through the selected workspace's central store and mutate its lifecycle once. Repository selection may filter implementation, validation, review, PR, or release work, but it must not create a repository-local Change or reinterpret a projection as authority. `sdd change transition` and `sdd change close` are repository-free, workspace-scoped single-record operations. Schema-less, idea-planned, repository-local, and receipt-based Change formats are unsupported history; current workflows neither migrate them nor treat them as live. `sdd update` reconciles only current managed doctrine and skills.
 
 Put project-specific branch, merge, release, deployment, and repository rules in the app repo's local `AGENTS.md` or equivalent project guidance. SDD skills should read and enforce those rules, falling back to documented workspace guidance when local policy is absent, instead of restating a branch model inside each workflow.
 
-Strong portable defaults such as BDD/TDD, orchestrator/subagent use for non-trivial work when tooling allows it, manual confirmation semantics, and Epic/Story truth discipline belong in this doctrine. Individual skills should explain how their workflow applies those defaults only where procedure or stop conditions differ.
+Portable defaults are behavioral and authority boundaries, not one prescribed engineering method. Keep Epic/Story truth, candidate freshness, proportional proof, independent Review, gap honesty, manual-acceptance separation, selective commit integrity, and explicit handoff authority in this doctrine. Repository guidance and specialist workflows own TDD/BDD use, architecture, test design, delegation, and technology-specific procedure.
 
-Skill-assisted implementation is capability-driven. `/sdd-apply` should inspect the skills available in the current runtime, select only those materially relevant to the active slice, read and enforce their guidance, and pass selected guidance into delegated work. The workflow must not require any named optional skill to be installed. When no matching skill is available, continue from project guidance, current SDD artifacts, and sound engineering judgment. Record concrete consequences of applied guidance in the existing implementation and verification record, not a separate skill-selection inventory.
+Skill-assisted implementation is guidance-driven. `/sdd-apply` reads applicable workspace and repository `AGENTS.md` files, which decide specialist skills, development method, verification, documentation, delegation, isolation, commit message, and branch policy for the selected outcome. Apply owns exact baseline/candidate tracking, fresh proportional verification, independent central Review, conditional Epic reconciliation, one content-identical local outcome commit, and its terminal result. Review and Epic Update remain independently callable; composition does not create private variants.
 
 Current documentation is capability-driven as well. When exploration, planning, implementation, or debugging depends on version-sensitive library, framework, SDK, API, CLI, or cloud-platform behavior, prefer an available current-documentation provider such as Context7 over model memory. Scope lookups to the exact concept and installed version when known. No named provider is required; use primary vendor documentation when one is unavailable.
 
-Design tooling is also capability-driven. `/sdd-design` may use installed visual-review, browser, prototyping, design-system, component-preview, screenshot, measurement, image, or accessibility capabilities, but portable SDD must not require Stitch, Penpot, Storybook, Playwright, Figma, or any other named product. For revisions, prefer equivalent states, fixtures, viewports, and component crops when comparing implementations. Stable references to selected external artifacts belong in the Change; prototypes and screenshots remain design evidence rather than behavioral or implementation truth. For UI-bearing Changes, design planning defines the representative surfaces, viewports, states, interactions, and expected rendered behavior that `/sdd-apply` and `/sdd-review` must inspect.
+Design tooling is also capability-driven. `/sdd-design` may use installed visual-review, browser, prototyping, design-system, component-preview, screenshot, measurement, image, or accessibility capabilities, but portable SDD must not require Stitch, Penpot, Storybook, Playwright, Figma, a runnable prototype, or any other named product. For revisions, Design resolves one exact baseline/candidate envelope per affected repository with `sdd candidate resolve`, prefers equivalent states, fixtures, viewports, and component crops, and records one replaceable preserve/change/non-goal handoff rather than a chronological design diary. Stable references to selected external artifacts belong in the Change; prototypes and screenshots remain optional design evidence rather than behavioral or implementation truth. When implementation must change, Design reopens every affected outcome, preserves dependency order for Apply selection, makes downstream candidate-sensitive claims stale, and recommends a separately invoked Apply. When the candidate already satisfies the corrected contract, it recommends a fresh Review without fabricating implementation work. Epic Update and Changelog remain separate candidate-bound capabilities. For UI-bearing Changes, design planning defines representative surfaces, viewports, states, interactions, and expected rendered behavior; repository guidance decides how implementation verifies them, and `/sdd-review` independently checks the implemented experience.
 
 Shared component and pattern catalogs are optional incubators rather than mandatory dependencies. When a project uses one, design work should classify material components as existing application components, adopted references, application-specific components, reference candidates, or deliberate divergences. Adopted references follow the consuming project's ownership model. Consumer evidence means implemented use outside the catalog artifact itself; project guidance decides how much use justifies promotion or a standardized claim. Required component-state evidence may come from a component preview, rendered route or fixture, browser evidence, or a manual walkthrough. Foundation-first work should not block an application unless the accepted Change explicitly requires it.
 

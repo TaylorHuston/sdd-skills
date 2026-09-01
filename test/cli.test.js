@@ -1,9 +1,23 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { chmod, cp, mkdtemp, mkdir, readFile, readdir, rename, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  cp,
+  lstat,
+  mkdtemp,
+  mkdir,
+  readFile,
+  readdir,
+  readlink,
+  realpath,
+  rename,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import test from "node:test";
+import { basename, dirname, join } from "node:path";
+import test, { after } from "node:test";
 import { promisify } from "node:util";
 import { parse } from "yaml";
 
@@ -13,45 +27,84 @@ import {
   inspectWorkspaceConfiguration,
 } from "../src/commands/configure.js";
 import { closeChange } from "../src/commands/change-close.js";
-import { createPlannedChange } from "../src/commands/change-create.js";
-import { promotePlannedChange } from "../src/commands/change-promote.js";
+import { createChange } from "../src/commands/change-create.js";
 import { transitionChange } from "../src/commands/change-transition.js";
 import { createEpic } from "../src/commands/epic-create.js";
 import { diagnoseWorkspace } from "../src/commands/doctor.js";
-import { initRepository } from "../src/commands/init-installation.js";
-import { initWorkspace } from "../src/commands/init.js";
+import { initRepository, setupInstallation } from "../src/commands/init-installation.js";
 import { getStatus } from "../src/commands/status.js";
 import { validateArtifacts } from "../src/commands/validate.js";
 import { statusSummaryRows } from "../src/cli.js";
 import { updateWorkspace } from "../src/commands/update.js";
 import {
-  getConfigPath,
-  getInstallLockPath,
+  getWorkspaceConfigPath,
+  getWorkspaceInstallLockPath,
+  createInitialConfig,
+  getRepositoryConfigPath,
   createRepositoryConfig,
-  createUserConfig,
-  readConfig,
+  readWorkspaceConfig,
+  readRepositoryConfig,
+  writeRepositoryConfig,
+  writeWorkspaceConfig,
   validateConfig,
   validateRepositoryConfig,
-  writeConfig,
 } from "../src/config.js";
+import {
+  getActiveChangePath,
+  getChangesRoot,
+  getClosedChangePath,
+  listStoredChanges,
+} from "../src/change-store.js";
+import { inspectChangeStatuses } from "../src/change-status.js";
 import { PACKAGE_ROOT, WORKFLOW_SOURCE_PATH } from "../src/constants.js";
 import { SddError } from "../src/errors.js";
-import { hashDirectory, pathExists } from "../src/fs.js";
-import { collectConfigureOptions, collectInitOptions } from "../src/prompts.js";
-
+import { hashDirectory, hashFile, pathExists } from "../src/fs.js";
+import { collectConfigureOptions, collectSetupOptions } from "../src/prompts.js";
 const execFileAsync = promisify(execFile);
+
+const inheritedWorkspaceRoot = process.env.SDD_WORKSPACE_ROOT;
+const inheritedUserHome = process.env.SDD_USER_HOME;
+delete process.env.SDD_WORKSPACE_ROOT;
+delete process.env.SDD_USER_HOME;
+after(() => {
+  if (inheritedWorkspaceRoot === undefined) delete process.env.SDD_WORKSPACE_ROOT;
+  else process.env.SDD_WORKSPACE_ROOT = inheritedWorkspaceRoot;
+  if (inheritedUserHome === undefined) delete process.env.SDD_USER_HOME;
+  else process.env.SDD_USER_HOME = inheritedUserHome;
+});
+
+async function initWorkspace(root, options = {}) {
+  return setupInstallation(root, {
+    skillsDirectory: ".agents/skills",
+    ...options,
+  });
+}
+
 
 async function createWorkspace(prefix = "sdd-cli-") {
   return mkdtemp(join(tmpdir(), prefix));
 }
 
-async function createMappedWorkspace() {
-  const root = await createWorkspace();
-  await mkdir(join(root, "ideas", "sample"), { recursive: true });
+function subprocessEnvForDecoyHome(decoyHome) {
+  const env = { ...process.env, HOME: decoyHome, SDD_USER_HOME: decoyHome };
+  delete env.SDD_WORKSPACE_ROOT;
+  return env;
+}
+
+async function populateMappedWorkspace(root, { spaceId = "sample" } = {}) {
+  await mkdir(join(root, "ideas", spaceId), { recursive: true });
   await mkdir(join(root, "code", "sample-web"), { recursive: true });
   await mkdir(join(root, "code", "sample-mobile"), { recursive: true });
+  await writeRepositoryConfig(
+    join(root, "code", "sample-web"),
+    createRepositoryConfig("sample-web"),
+  );
+  await writeRepositoryConfig(
+    join(root, "code", "sample-mobile"),
+    createRepositoryConfig("sample-mobile"),
+  );
   await writeFile(
-    join(root, "ideas", "sample", "sample.md"),
+    join(root, "ideas", spaceId, `${spaceId}.md`),
     [
       "---",
       "repositories:",
@@ -60,12 +113,100 @@ async function createMappedWorkspace() {
       "  - path: code/sample-mobile",
       "    role: mobile",
       "---",
-      "# Sample",
+      `# ${spaceId === "sample" ? "Sample" : "Home Only"}`,
       "",
     ].join("\n"),
     "utf8",
   );
   return root;
+}
+
+async function createMappedWorkspace() {
+  return populateMappedWorkspace(await createWorkspace());
+}
+
+async function assertRepositoryArtifactCommandsReject(
+  workspaceRoot,
+  repositorySelector,
+  repositoryStartPath = null,
+) {
+  const rejectsUnsafeArtifact = (error) =>
+    error instanceof SddError && error.code === "UNSAFE_ARTIFACT_PATH";
+  const status = await getStatus(workspaceRoot, "sample", { workspaceRoot });
+  assert.ok(status.repositoryDiagnostics.some((diagnostic) =>
+    diagnostic.code === "UNSAFE_ARTIFACT_PATH"));
+  await assert.rejects(
+    () => validateArtifacts(workspaceRoot, {
+      spaceId: "sample",
+      repositories: [repositorySelector],
+      epicId: "OUTSIDE-E001",
+      workspaceRoot,
+    }),
+    rejectsUnsafeArtifact,
+  );
+  const diagnosis = await diagnoseWorkspace(workspaceRoot, { workspaceRoot });
+  assert.equal(diagnosis.healthy, false);
+  const doctorFinding = diagnosis.findings.find((finding) =>
+    finding.code === "UNSAFE_ARTIFACT_PATH");
+  assert.ok(doctorFinding);
+  assert.ok(Array.isArray(doctorFinding.details));
+  await assert.rejects(
+    () => execFileAsync(process.execPath, [
+      join(PACKAGE_ROOT, "bin", "sdd.js"),
+      "doctor",
+      "--workspace",
+      workspaceRoot,
+      "--json",
+    ], { cwd: workspaceRoot }),
+    (error) => {
+      const commandDiagnosis = JSON.parse(error.stdout);
+      return error.code === 1
+        && commandDiagnosis.healthy === false
+        && commandDiagnosis.findings.some((finding) =>
+          finding.code === "UNSAFE_ARTIFACT_PATH"
+            && Array.isArray(finding.details));
+    },
+  );
+  if (repositoryStartPath !== null) {
+    const repositoryStatus = await getStatus(repositoryStartPath, "sample", { workspaceRoot });
+    assert.ok(repositoryStatus.repositoryDiagnostics.some((diagnostic) =>
+      diagnostic.code === "UNSAFE_ARTIFACT_PATH"));
+  }
+}
+
+async function createExplicitWorkspaceWithDecoyHome(prefix) {
+  const root = await createWorkspace(prefix);
+  const workspaceRoot = join(root, "workspace");
+  const decoyHome = join(root, "home");
+  const outside = join(root, "outside");
+  await populateMappedWorkspace(workspaceRoot);
+  await populateMappedWorkspace(decoyHome, { spaceId: "home-only" });
+  await mkdir(outside, { recursive: true });
+  await initWorkspace(workspaceRoot);
+  await initWorkspace(decoyHome);
+  await writeFile(
+    join(decoyHome, ".sdd", "home-installation-sentinel.txt"),
+    "explicit workspace commands must not touch this installation\n",
+    "utf8",
+  );
+  return {
+    root,
+    workspaceRoot,
+    decoyHome,
+    outside,
+    env: subprocessEnvForDecoyHome(decoyHome),
+  };
+}
+
+async function addRetiredManagedSkill(root, skillName) {
+  const retiredPath = join(root, ".agents", "skills", skillName);
+  await mkdir(retiredPath, { recursive: true });
+  await writeFile(join(retiredPath, "SKILL.md"), `# ${skillName}\n`, "utf8");
+  const lockPath = getWorkspaceInstallLockPath(root);
+  const lock = JSON.parse(await readFile(lockPath, "utf8"));
+  lock.managedSkills[skillName] = await hashDirectory(retiredPath);
+  await writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`, "utf8");
+  return retiredPath;
 }
 
 async function moveWorkspaceRoots(root) {
@@ -74,20 +215,207 @@ async function moveWorkspaceRoots(root) {
   await rename(join(root, "code"), join(root, "spaces", "code"));
 }
 
+async function addRepositoryRootMapping(root, rootId, configuredRoot, repositoryPath) {
+  const config = await readWorkspaceConfig(root);
+  config.repositories.roots[rootId] = configuredRoot;
+  config.ideas.sample.repositories.push({
+    root: rootId,
+    path: repositoryPath,
+    status: "active",
+  });
+  await writeWorkspaceConfig(root, config);
+}
+
 async function writeChange(root, repository, changeId, status, { closed = false } = {}) {
   const changePath = join(
     root,
-    "code",
-    repository,
-    "docs",
+    ".sdd",
     "changes",
     ...(closed ? ["closed"] : []),
     changeId,
   );
+  const outcomeStatus = status === "in_progress" ? "in progress" : "ready";
+  const scenario = "SAMPLE-E001/S1 R1-S1";
+  const triggerReason = "Exercise the current v2 fixture contract.";
   await mkdir(changePath, { recursive: true });
   await writeFile(
+    join(changePath, "change.md"),
+    [
+      "---",
+      "schema: sdd-change-v2",
+      `status: ${status}`,
+      "space: sample",
+      "repositories:",
+      `  - ${repository}`,
+      "---",
+      `# Change: ${changeId}`,
+      "",
+      "## Why",
+      "",
+      "A concrete reason.",
+      "",
+      "## Desired Outcome",
+      "",
+      "A concrete behavior change.",
+      "",
+      "## Scope",
+      "",
+      "A bounded scope.",
+      "",
+      "## Success Signals",
+      "",
+      "The behavior works.",
+      "",
+      "## Open Questions",
+      "",
+      "None.",
+      "",
+      "## Current Context",
+      "",
+      "The current behavior has been inspected.",
+      "",
+      "## Behavioral Changes",
+      "",
+      "The current v2 contract remains authoritative.",
+      "",
+      "## Technical Decision Handoffs",
+      "",
+      "No handoff is required.",
+      "",
+      "## Selected Approach",
+      "",
+      "Use one compact v2 Change record.",
+      "",
+      "## Alternatives Considered",
+      "",
+      "Receipt-era fixtures are unsupported.",
+      "",
+      "## Implementation Constraints",
+      "",
+      "Keep the fixture current and compact.",
+      "",
+      "## Verification Strategy",
+      "",
+      "Exercise the public command boundary.",
+      "",
+      "## Risks / Trade-Offs",
+      "",
+      "The fixture is intentionally minimal.",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await writeFile(
     join(changePath, "tasks.md"),
-    `---\nstatus: ${status}\n---\n# Tasks: ${changeId}\n`,
+    [
+      `# Tasks: ${changeId}`,
+      "",
+      "## Resume Here",
+      "",
+      `- Change: \`${changeId}\``,
+      "- Current outcome: S1",
+      "- Phase: fixture verification",
+      "- Next action: Exercise the current command.",
+      "- Blocker: none",
+      "",
+      "## Delivery Outcomes",
+      "",
+      "### S1: Exercise the current contract",
+      "",
+      `- Status: ${outcomeStatus}`,
+      `- Repository: \`${repository}\``,
+      "- Requirements:",
+      "  - Revised: `SAMPLE-E001/S1 R1` — The current v2 contract remains usable.",
+      "- Story changes:",
+      "  - Update: `SAMPLE-E001/S1` — Exercise current behavior.",
+      "- Outcome: The current v2 command behavior is observable.",
+      `- Scenarios: \`${scenario}\``,
+      "- Dependencies: none",
+      "- Binding constraints: Do not restore receipt-era compatibility.",
+      "- Expected triggers:",
+      `  - \`current-contract\` — ${triggerReason}`,
+      "- Verification intent: Exercise the public command boundary.",
+      "- Manual acceptance: not required",
+      "",
+      "## Closeout",
+      "",
+      "- Remaining outcomes: S1",
+      "- Review: pending",
+      "- Manual acceptance: not required",
+      "- Accepted gaps: none",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await writeFile(
+    join(changePath, "review.md"),
+    [
+      "---",
+      "schema: sdd-review-v2",
+      `change: ${changeId}`,
+      `updated: ${changeId.slice(0, 10)}`,
+      "---",
+      `# Review: ${changeId}`,
+      "",
+      "## Outcome S1: Exercise the current contract",
+      "",
+      "### Summary",
+      "",
+      `- Repository: \`${repository}\``,
+      "- Candidate: pending",
+      "- Verdict: pending",
+      "- Spec Adherence: pending",
+      "- Implementation Quality: pending",
+      "- Manual acceptance: not required",
+      "- Reviewed tree: pending",
+      "- Final commit: pending",
+      "- Final commit tree: pending",
+      "",
+      "### Universal Gates",
+      "",
+      "| Gate | Check | Result | Evidence |",
+      "|---|---|---|---|",
+      "| scope-candidate | Resolve the fixture candidate. | pending | Not reviewed yet. |",
+      "| behavior | Compare current behavior. | pending | Not reviewed yet. |",
+      "| fresh-verification | Run focused proof. | pending | Not reviewed yet. |",
+      "| independent-review | Review both axes. | pending | Not reviewed yet. |",
+      "| integrity-authority | Check authority. | pending | Not reviewed yet. |",
+      "",
+      "### Triggered Checks",
+      "",
+      "| Trigger | Source | Reason | Check | Result | Gap | Evidence |",
+      "|---|---|---|---|---|---|---|",
+      `| current-contract | planned | ${triggerReason} | Exercise the command. | pending | none | Not reviewed yet. |`,
+      "",
+      "### Scenario Coverage",
+      "",
+      "| Scenario | Claimed boundary | Evidence | Proven boundary | Result | Gap |",
+      "|---|---|---|---|---|---|",
+      `| ${scenario} | current v2 command behavior | Not reviewed yet. | pending | pending | none |`,
+      "",
+      "### Findings",
+      "",
+      "#### BLOCKING",
+      "",
+      "- None.",
+      "",
+      "#### REQUIRED",
+      "",
+      "- None.",
+      "",
+      "#### ACCEPTED GAPS",
+      "",
+      "- None.",
+      "",
+      "#### SUGGESTION",
+      "",
+      "- None.",
+      "",
+      "### Remediation",
+      "",
+      "- Not reviewed yet.",
+      "",
+    ].join("\n"),
     "utf8",
   );
 }
@@ -100,128 +428,48 @@ async function writeCanonicalChange(
   { closed = false } = {},
 ) {
   await writeChange(root, repository, changeId, status, { closed });
-  const changePath = join(
+}
+
+async function declareFixtureEpic(root, changeId, { closed = false } = {}) {
+  const changeFilePath = join(
     root,
-    "code",
-    repository,
-    "docs",
+    ".sdd",
     "changes",
     ...(closed ? ["closed"] : []),
     changeId,
+    "change.md",
   );
   await writeFile(
-    join(changePath, "proposal.md"),
-    [
-      `# Proposal: ${changeId}`,
-      "",
-      "## Why",
-      "",
-      "A concrete reason.",
-      "",
-      "## What Changes",
-      "",
-      "A concrete behavior change.",
-      "",
-      "## Impact",
-      "",
-      "Focused impact.",
-      "",
-      "## Open Questions",
-      "",
-      "None.",
-      "",
-    ].join("\n"),
-    "utf8",
-  );
-  await writeFile(
-    join(changePath, "design.md"),
-    [
-      `# Design: ${changeId}`,
-      "",
-      "## Context",
-      "",
-      "Current context.",
-      "",
-      "## Goals / Non-Goals",
-      "",
-      "A bounded goal.",
-      "",
-      "## Selected Approach",
-      "",
-      "A selected approach.",
-      "",
-      "## Verification Strategy",
-      "",
-      "Focused verification.",
-      "",
-      "## Risks / Trade-Offs",
-      "",
-      "Known trade-offs.",
-      "",
-    ].join("\n"),
-    "utf8",
-  );
-  await writeFile(
-    join(changePath, "tasks.md"),
-    [
-      "---",
-      `status: ${status}`,
-      "---",
-      `# Tasks: ${changeId}`,
-      "",
-      "## Resume Here",
-      "",
-      "Ready for the next action.",
-      "",
-      "## Task Checklist",
-      "",
-      "- [ ] Complete the work.",
-      "",
-      "## Implementation Ledger",
-      "",
-      "No implementation yet.",
-      "",
-      "## Verification Ledger",
-      "",
-      "No verification yet.",
-      "",
-      "## Blockers / Open Questions",
-      "",
-      "None.",
-      "",
-      "## Closeout",
-      "",
-      "Not ready to close.",
-      "",
-    ].join("\n"),
+    changeFilePath,
+    `${await readFile(changeFilePath, "utf8")}\n## Epic Impact\n\n- Affected Epic: \`SAMPLE-E001\`.\n`,
     "utf8",
   );
 }
 
 async function setPlannedChangeStatus(root, created, status = "planned") {
-  const tasksPath = join(root, created.path, "tasks.md");
-  const source = await readFile(tasksPath, "utf8");
+  const changePath = join(root, created.path, "change.md");
+  const source = await readFile(changePath, "utf8");
   await writeFile(
-    tasksPath,
+    changePath,
     source.replace(/^status: \S+$/m, `status: ${status}`),
     "utf8",
   );
 }
 
-async function writeCanonicalEpic(root, repository, epicId = "SAMPLE-E001") {
-  await mkdir(join(root, "code", repository, "src"), { recursive: true });
-  await mkdir(join(root, "code", repository, "test"), { recursive: true });
+async function writeCanonicalEpicAt(repositoryRoot, epicId = "SAMPLE-E001") {
+  await mkdir(join(repositoryRoot, "src"), { recursive: true });
+  await mkdir(join(repositoryRoot, "test"), { recursive: true });
   await writeFile(
-    join(root, "code", repository, "src", "core.js"),
+    join(repositoryRoot, "src", "core.js"),
     "export function runCoreJourney() { return true; }\n",
     "utf8",
   );
   await writeFile(
-    join(root, "code", repository, "test", "core.test.js"),
+    join(repositoryRoot, "test", "core.test.js"),
     "test(\"core journey completes successfully\", () => {});\n",
     "utf8",
   );
-  const epicPath = join(root, "code", repository, "docs", "epics", "sample-e001-core");
+  const epicPath = join(repositoryRoot, "docs", "epics", "sample-e001-core");
   await mkdir(epicPath, { recursive: true });
   await writeFile(
     join(epicPath, "epic.md"),
@@ -332,6 +580,10 @@ async function writeCanonicalEpic(root, repository, epicId = "SAMPLE-E001") {
     "utf8",
   );
   return join(epicPath, "epic.md");
+}
+
+async function writeCanonicalEpic(root, repository, epicId = "SAMPLE-E001") {
+  return writeCanonicalEpicAt(join(root, "code", repository), epicId);
 }
 
 async function writeEpicVerificationReport(
@@ -456,18 +708,22 @@ async function writeEpicVerificationReport(
   return reportPath;
 }
 
-test("init creates a local workspace contract and imports one-to-many mappings", async (t) => {
+test("setup creates a workspace contract and imports one-to-many mappings", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
 
   const result = await initWorkspace(root);
-  assert.equal(result.created, true);
-  assert.equal(result.ideasImported, 1);
-  assert.equal(result.skills.actions.length, 14);
+  assert.equal(result.command, "setup");
+  assert.equal(result.workspaceRoot, root);
+  assert.equal(result.createdWorkspaceConfig, true);
+  assert.ok(result.skills.actions.length > 0);
   assert.ok(result.skills.actions.every((entry) => entry.action === "install"));
-  assert.equal(result.workflow.action, "install");
+  assert.equal(result.workflowPath, join(root, ".sdd", "story-driven-development.md"));
 
-  const config = parse(await readFile(getConfigPath(root), "utf8"));
+  const config = parse(await readFile(getWorkspaceConfigPath(root), "utf8"));
+  assert.equal(config.version, 3);
+  assert.equal(config.schema, "sdd-v3");
+  assert.equal(Object.hasOwn(config, "kind"), false);
   assert.equal(config.planning.root, "ideas");
   assert.deepEqual(config.repositories.roots, { code: "code" });
   assert.equal(config.ideas.sample.planning, undefined);
@@ -477,35 +733,14 @@ test("init creates a local workspace contract and imports one-to-many mappings",
     { root: "code", path: "sample-mobile", role: "mobile", status: "active" },
   ]);
   assert.equal(await pathExists(join(root, ".agents", "skills", "sdd-change", "SKILL.md")), true);
-  assert.equal(await pathExists(join(root, ".agents", "skills", "sdd-code-audit", "SKILL.md")), true);
-  assert.equal(await pathExists(join(root, ".agents", "skills", "sdd-design", "SKILL.md")), true);
-  assert.match(
-    await readFile(join(root, ".agents", "skills", "sdd-design", "SKILL.md"), "utf8"),
-    /\/sdd-design --revise/,
-  );
-  assert.equal(
-    await pathExists(join(root, ".agents", "skills", "sdd-change", "assets", "brief-template.md")),
-    true,
-  );
   assert.equal(await pathExists(join(root, ".sdd", "install-lock.json")), true);
   assert.equal(
     await readFile(join(root, ".sdd", "story-driven-development.md"), "utf8"),
     await readFile(WORKFLOW_SOURCE_PATH, "utf8"),
   );
-  assert.match(
-    await readFile(join(root, ".sdd", "story-driven-development.md"), "utf8"),
-    /sdd change transition/,
-  );
-  assert.match(
-    await readFile(
-      join(root, ".agents", "skills", "sdd-change", "assets", "tasks-template.md"),
-      "utf8",
-    ),
-    /## Design Updates/,
-  );
 });
 
-test("init rejects a managed skills path through an external symlink ancestor", async (t) => {
+test("setup rejects a managed skills path through an external symlink ancestor", async (t) => {
   const root = await createMappedWorkspace();
   const external = await createWorkspace("sdd-cli-external-");
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -523,9 +758,14 @@ test("update refuses to overlap another managed mutation", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
-  const installLockPath = getInstallLockPath(root);
+  const installLockPath = getWorkspaceInstallLockPath(root);
   const before = await readFile(installLockPath, "utf8");
-  await writeFile(join(root, ".sdd", "mutation.lock"), "held\n", "utf8");
+  const heldMutationLock = join(root, ".sdd", "mutation.lock");
+  await writeFile(
+    heldMutationLock,
+    `${JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() })}\n`,
+    "utf8",
+  );
 
   await assert.rejects(
     () => updateWorkspace(root),
@@ -534,7 +774,7 @@ test("update refuses to overlap another managed mutation", async (t) => {
   assert.equal(await readFile(installLockPath, "utf8"), before);
 });
 
-test("init dry-run reports work without writing workspace files", async (t) => {
+test("setup dry-run reports work without writing workspace files", async (t) => {
   const root = await createWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
 
@@ -544,137 +784,20 @@ test("init dry-run reports work without writing workspace files", async (t) => {
   assert.equal(await pathExists(join(root, ".agents")), false);
 });
 
-test("CLI setup installs user-level skills without initializing a repository", async (t) => {
-  const root = await createWorkspace("sdd-user-init-");
-  const userRoot = join(root, "home");
-  const repositoryRoot = join(root, "repos", "sample-app");
+test("CLI setup owns only the explicit workspace and exposes workspace output fields", async (t) => {
+  const root = await createWorkspace("sdd-workspace-setup-");
+  const workspaceRoot = join(root, "workspace");
+  const decoyHome = join(root, "home");
+  const repositoryRoot = join(workspaceRoot, "repos", "sample-app");
   await mkdir(repositoryRoot, { recursive: true });
+  await mkdir(decoyHome, { recursive: true });
   t.after(() => rm(root, { recursive: true, force: true }));
 
-  const env = { ...process.env, SDD_USER_HOME: userRoot };
+  const env = subprocessEnvForDecoyHome(decoyHome);
   const first = await execFileAsync(process.execPath, [
     join(PACKAGE_ROOT, "bin", "sdd.js"),
     "setup",
-    "--planning-root",
-    "product/ideas",
-    "--yes",
-    "--json",
-  ], { env });
-  const result = JSON.parse(first.stdout);
-
-  assert.equal(result.mode, "user");
-  assert.equal(result.createdUserConfig, true);
-  assert.equal(
-    await pathExists(join(userRoot, ".agents", "skills", "sdd-apply", "SKILL.md")),
-    true,
-  );
-  assert.equal(await pathExists(join(userRoot, ".sdd", "install-lock.json")), true);
-  assert.equal(await pathExists(join(userRoot, ".sdd", "story-driven-development.md")), false);
-  assert.equal(await pathExists(join(repositoryRoot, ".sdd")), false);
-
-  const userConfig = parse(await readFile(join(userRoot, ".sdd", "config.yaml"), "utf8"));
-  assert.equal(userConfig.kind, "user");
-  assert.equal(userConfig.skills.directory, ".agents/skills");
-  assert.equal(userConfig.planning.root, "product/ideas");
-  assert.deepEqual(userConfig.repositories.roots, {});
-
-  const second = await execFileAsync(process.execPath, [
-    join(PACKAGE_ROOT, "bin", "sdd.js"),
-    "setup",
-    "--yes",
-    "--json",
-  ], { env });
-  const repeated = JSON.parse(second.stdout);
-  assert.equal(repeated.createdUserConfig, false);
-  assert.ok(repeated.skills.actions.every((entry) => entry.action === "unchanged"));
-});
-
-test("CLI setup adopts matching preinstalled global skills", async (t) => {
-  const root = await createWorkspace("sdd-user-adopt-");
-  const userRoot = join(root, "home");
-  const targetSkill = join(userRoot, ".agents", "skills", "sdd-apply");
-  await mkdir(join(userRoot, ".agents", "skills"), { recursive: true });
-  await cp(join(PACKAGE_ROOT, "skills", "sdd-apply"), targetSkill, { recursive: true });
-  t.after(() => rm(root, { recursive: true, force: true }));
-
-  const output = await execFileAsync(process.execPath, [
-    join(PACKAGE_ROOT, "bin", "sdd.js"),
-    "setup",
-    "--yes",
-    "--json",
-  ], { env: { ...process.env, SDD_USER_HOME: userRoot } });
-  const result = JSON.parse(output.stdout);
-  const adopted = result.skills.actions.find((entry) => entry.skillName === "sdd-apply");
-
-  assert.equal(adopted.action, "adopt");
-  const lock = JSON.parse(await readFile(join(userRoot, ".sdd", "install-lock.json"), "utf8"));
-  assert.equal(lock.managedSkills["sdd-apply"], adopted.hash);
-});
-
-test("CLI setup migrates a legacy workspace without modifying its source configuration", async (t) => {
-  const legacyRoot = await createMappedWorkspace();
-  const userRoot = join(await createWorkspace("sdd-user-migrate-"), "home");
-  t.after(() => rm(legacyRoot, { recursive: true, force: true }));
-  t.after(() => rm(join(userRoot, ".."), { recursive: true, force: true }));
-  await initWorkspace(legacyRoot);
-  const legacyConfigPath = join(legacyRoot, ".sdd", "config.yaml");
-  const legacySource = await readFile(legacyConfigPath, "utf8");
-  const env = { ...process.env, SDD_USER_HOME: userRoot };
-
-  const dryRunOutput = await execFileAsync(process.execPath, [
-    join(PACKAGE_ROOT, "bin", "sdd.js"),
-    "setup",
-    "--from-workspace",
-    legacyRoot,
-    "--dry-run",
-    "--json",
-  ], { env });
-  const dryRun = JSON.parse(dryRunOutput.stdout);
-  assert.equal(dryRun.dryRun, true);
-  assert.equal(dryRun.migratedFromWorkspace, legacyRoot);
-  assert.equal(dryRun.config.planning.root, join(legacyRoot, "ideas"));
-  assert.equal(dryRun.config.repositories.roots.code, join(legacyRoot, "code"));
-  assert.equal(dryRun.config.ideas.sample.repositories[0].root, "code");
-  assert.equal(dryRun.config.ideas.sample.repositories[0].path, "sample-web");
-  assert.equal(await pathExists(join(userRoot, ".sdd")), false);
-
-  await execFileAsync(process.execPath, [
-    join(PACKAGE_ROOT, "bin", "sdd.js"),
-    "setup",
-    "--from-workspace",
-    legacyRoot,
-    "--json",
-  ], { env });
-  const migrated = parse(await readFile(join(userRoot, ".sdd", "config.yaml"), "utf8"));
-  assert.equal(migrated.kind, "user");
-  assert.equal(migrated.skills.directory, ".agents/skills");
-  assert.equal(await readFile(legacyConfigPath, "utf8"), legacySource);
-});
-
-test("CLI init requires setup and creates only a portable repository contract", async (t) => {
-  const root = await createWorkspace("sdd-repository-init-");
-  const userRoot = join(root, "home");
-  const repositoryRoot = join(root, "repos", "sample-app");
-  await mkdir(repositoryRoot, { recursive: true });
-  t.after(() => rm(root, { recursive: true, force: true }));
-
-  const env = { ...process.env, SDD_USER_HOME: userRoot };
-  await assert.rejects(
-    execFileAsync(process.execPath, [
-      join(PACKAGE_ROOT, "bin", "sdd.js"),
-      "init",
-      repositoryRoot,
-      "--json",
-    ], { env }),
-    (error) => {
-      assert.match(error.stderr, /Run `sdd setup` first/);
-      return true;
-    },
-  );
-
-  await execFileAsync(process.execPath, [
-    join(PACKAGE_ROOT, "bin", "sdd.js"),
-    "setup",
+    workspaceRoot,
     "--planning-root",
     "product/ideas",
     "--repository-root",
@@ -682,168 +805,864 @@ test("CLI init requires setup and creates only a portable repository contract", 
     "--yes",
     "--json",
   ], { env });
+  const result = JSON.parse(first.stdout);
+
+  assert.equal(result.command, "setup");
+  assert.equal(result.mode, "workspace");
+  assert.equal(result.workspaceRoot, workspaceRoot);
+  assert.equal(result.workspaceConfigPath, getWorkspaceConfigPath(workspaceRoot));
+  assert.equal(result.createdWorkspaceConfig, true);
+  assert.equal(Object.hasOwn(result, "userRoot"), false);
+  assert.equal(Object.hasOwn(result, "userConfigPath"), false);
+  assert.equal(
+    await pathExists(join(workspaceRoot, ".agents", "skills", "sdd-apply", "SKILL.md")),
+    true,
+  );
+  assert.equal(await pathExists(join(workspaceRoot, ".sdd", "install-lock.json")), true);
+  assert.equal(
+    await pathExists(join(workspaceRoot, ".sdd", "story-driven-development.md")),
+    true,
+  );
+  assert.equal(await pathExists(join(repositoryRoot, ".sdd")), false);
+  assert.equal(await pathExists(join(decoyHome, ".sdd")), false);
+  assert.equal(await pathExists(join(decoyHome, ".agents")), false);
+
+  const config = await readWorkspaceConfig(workspaceRoot);
+  assert.equal(config.version, 3);
+  assert.equal(config.schema, "sdd-v3");
+  assert.equal(Object.hasOwn(config, "kind"), false);
+  assert.equal(config.skills.directory, ".agents/skills");
+  assert.equal(config.planning.root, "product/ideas");
+  assert.deepEqual(config.repositories.roots, { repos: "repos" });
+
+  const second = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "setup",
+    workspaceRoot,
+    "--yes",
+    "--json",
+  ], { env });
+  const repeated = JSON.parse(second.stdout);
+  assert.equal(repeated.createdWorkspaceConfig, false);
+  assert.ok(repeated.skills.actions.every((entry) => entry.action === "unchanged"));
+});
+
+test("workspace configuration stores contained topology paths relative to the workspace", async (t) => {
+  const root = await createWorkspace("sdd-workspace-topology-");
+  const workspaceRoot = join(root, "workspace");
+  const planningRoot = join(workspaceRoot, "my-vault", "sdd", "ideas");
+  const repositoryRoot = join(workspaceRoot, "spaces");
+  const ideaRoot = join(planningRoot, "sample");
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(ideaRoot, { recursive: true });
+  await mkdir(join(repositoryRoot, "sample-app"), { recursive: true });
+  await writeFile(
+    join(ideaRoot, "sample.md"),
+    "---\nrepositories:\n  - path: spaces/sample-app\n    role: primary\n---\n# Sample\n",
+    "utf8",
+  );
+
+  const config = await createInitialConfig(workspaceRoot, {
+    planningRoot,
+    repositoryRoots: [repositoryRoot],
+  });
+
+  assert.equal(config.planning.root, "my-vault/sdd/ideas");
+  assert.deepEqual(config.repositories.roots, { spaces: "spaces" });
+  assert.deepEqual(config.ideas.sample.repositories, [{
+    root: "spaces",
+    path: "sample-app",
+    role: "primary",
+    status: "active",
+  }]);
+});
+
+test("repeated setup treats identical absolute contained layout options as idempotent", async (t) => {
+  const workspaceRoot = await createMappedWorkspace();
+  t.after(() => rm(workspaceRoot, { recursive: true, force: true }));
+  const options = {
+    planningRoot: join(workspaceRoot, "ideas"),
+    repositoryRoots: [join(workspaceRoot, "code")],
+    skillsDirectory: join(workspaceRoot, ".agents", "skills"),
+  };
+
+  const first = await setupInstallation(workspaceRoot, options);
+  const configPath = getWorkspaceConfigPath(workspaceRoot);
+  const sourceAfterFirstSetup = await readFile(configPath, "utf8");
+  const second = await setupInstallation(workspaceRoot, options);
+  const config = await readWorkspaceConfig(workspaceRoot);
+
+  assert.equal(first.createdWorkspaceConfig, true);
+  assert.equal(second.createdWorkspaceConfig, false);
+  assert.equal(await readFile(configPath, "utf8"), sourceAfterFirstSetup);
+  assert.equal(config.skills.directory, ".agents/skills");
+  assert.equal(config.planning.root, "ideas");
+  assert.deepEqual(config.repositories.roots, { code: "code" });
+  assert.ok(second.skills.actions.every((entry) => entry.action === "unchanged"));
+});
+
+test("CLI setup adopts a matching skill already inside the workspace registry", async (t) => {
+  const root = await createWorkspace("sdd-workspace-adopt-");
+  const workspaceRoot = join(root, "workspace");
+  const targetSkill = join(workspaceRoot, ".agents", "skills", "sdd-apply");
+  await mkdir(join(workspaceRoot, ".agents", "skills"), { recursive: true });
+  await cp(join(PACKAGE_ROOT, "skills", "sdd-apply"), targetSkill, { recursive: true });
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const output = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "setup",
+    workspaceRoot,
+    "--yes",
+    "--json",
+  ]);
+  const result = JSON.parse(output.stdout);
+  const adopted = result.skills.actions.find((entry) => entry.skillName === "sdd-apply");
+
+  assert.equal(adopted.action, "adopt");
+  const lock = JSON.parse(
+    await readFile(join(workspaceRoot, ".sdd", "install-lock.json"), "utf8"),
+  );
+  assert.equal(lock.managedSkills["sdd-apply"], adopted.hash);
+});
+
+test("CLI setup parser exposes only current workspace setup", async () => {
+  const output = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "--help",
+  ]);
+  assert.match(output.stdout, /sdd setup \[workspace-path\]/);
+  assert.match(output.stdout, /Configure options:\n  --workspace <path>/);
+  assert.doesNotMatch(output.stdout, /--from-user|--from-workspace|--legacy-workspace|user-level|~\/\.sdd/);
+
+  for (const args of [
+    ["setup", "--from-workspace", "", "--json"],
+    ["init", "--legacy-workspace", "", "--json"],
+  ]) {
+    await assert.rejects(
+      execFileAsync(process.execPath, [
+        join(PACKAGE_ROOT, "bin", "sdd.js"),
+        ...args,
+      ]),
+      (error) => {
+        const cliError = JSON.parse(error.stderr).error;
+        assert.equal(cliError.code, "USAGE");
+        assert.match(cliError.message, /Unknown option/);
+        return true;
+      },
+    );
+  }
+});
+
+test("CLI rejects empty positional and option paths before authority discovery", async (t) => {
+  const root = await createWorkspace("sdd-empty-cli-path-");
+  const outside = join(root, "outside");
+  const target = join(root, "target");
+  await mkdir(outside, { recursive: true });
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const cases = [
+    ["setup positional", ["setup", ""]],
+    ["setup --planning-root", ["setup", target, "--planning-root", ""]],
+    ["setup --repository-root", ["setup", target, "--repository-root", ""]],
+    ["setup --skills-dir", ["setup", target, "--skills-dir", ""]],
+    ["init positional", ["init", ""]],
+    ["init --workspace", ["init", target, "--workspace", ""]],
+    ["configure positional", ["configure", ""]],
+    ["configure --workspace", ["configure", "--workspace", ""]],
+    ["configure --planning-root", ["configure", "--planning-root", ""]],
+    ["configure --repository-root", ["configure", "--repository-root", ""]],
+    ["update positional", ["update", ""]],
+    ["update --workspace", ["update", "--workspace", ""]],
+    ["doctor positional", ["doctor", ""]],
+    ["doctor --workspace", ["doctor", "--workspace", ""]],
+    ["context positional", ["context", ""]],
+    ["context --workspace", ["context", "--workspace", ""]],
+    ["status --workspace", ["status", "--workspace", ""]],
+    ["validate --workspace", ["validate", "--workspace", ""]],
+    ["validate --repo", ["validate", "--repo", ""]],
+    ["epic create --workspace", ["epic", "create", "sample", "e001", "slug", "--workspace", ""]],
+    ["epic create --repo", ["epic", "create", "sample", "e001", "slug", "--repo", ""]],
+    ["change create --workspace", ["change", "create", "sample", "slug", "--workspace", ""]],
+    ["change create --repo", ["change", "create", "sample", "slug", "--repo", ""]],
+    [
+      "change transition --workspace",
+      ["change", "transition", "sample", "change-id", "--from", "planned", "--to", "in_progress", "--workspace", ""],
+    ],
+    ["change close --workspace", ["change", "close", "sample", "change-id", "--workspace", ""]],
+  ];
+
+  for (const [name, args] of cases) {
+    await assert.rejects(
+      execFileAsync(process.execPath, [
+        join(PACKAGE_ROOT, "bin", "sdd.js"),
+        ...args,
+        "--json",
+      ], { cwd: outside }),
+      (error) => {
+        const cliError = JSON.parse(error.stderr).error;
+        assert.equal(cliError.code, "USAGE");
+        assert.match(cliError.message, /non-empty path/);
+        return true;
+      },
+      name,
+    );
+  }
+
+  assert.equal(await pathExists(getWorkspaceConfigPath(outside)), false);
+  assert.equal(await pathExists(target), false);
+});
+
+test("explicit workspace repository routing preserves invalid config diagnostics", async (t) => {
+  const workspaceRoot = await createMappedWorkspace();
+  const outside = await createWorkspace("sdd-invalid-routing-cwd-");
+  await initWorkspace(workspaceRoot);
+  const config = await readWorkspaceConfig(workspaceRoot);
+  config.ideas.sample.repositories = "not-an-array";
+  await writeFile(
+    getWorkspaceConfigPath(workspaceRoot),
+    `${JSON.stringify(config, null, 2)}\n`,
+    "utf8",
+  );
+  t.after(() => rm(workspaceRoot, { recursive: true, force: true }));
+  t.after(() => rm(outside, { recursive: true, force: true }));
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      join(PACKAGE_ROOT, "bin", "sdd.js"),
+      "validate",
+      "sample",
+      "--repo",
+      "sample-web",
+      "--workspace",
+      workspaceRoot,
+      "--json",
+    ], { cwd: outside }),
+    (error) => {
+      const cliError = JSON.parse(error.stderr).error;
+      assert.equal(cliError.code, "INVALID_CONFIG");
+      assert.notEqual(cliError.code, "UNEXPECTED_ERROR");
+      return true;
+    },
+  );
+});
+
+test("commands do not discover a workspace from HOME or SDD_USER_HOME", async (t) => {
+  const root = await createWorkspace("sdd-no-home-fallback-");
+  const decoyHome = join(root, "home");
+  const outside = join(root, "outside");
+  await mkdir(decoyHome, { recursive: true });
+  await mkdir(outside, { recursive: true });
+  await writeWorkspaceConfig(decoyHome, await createInitialConfig(decoyHome));
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const env = subprocessEnvForDecoyHome(decoyHome);
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      join(PACKAGE_ROOT, "bin", "sdd.js"),
+      "status",
+      "--json",
+    ], { cwd: outside, env }),
+    (error) => {
+      assert.match(error.stderr, /"code": "WORKSPACE_NOT_FOUND"/);
+      return true;
+    },
+  );
+});
+
+test("CLI update with an explicit workspace leaves a populated decoy home unchanged", async (t) => {
+  const fixture = await createExplicitWorkspaceWithDecoyHome(
+    "sdd-explicit-update-no-home-",
+  );
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+
+  const workspaceRetiredSkill = "sdd-retired-explicit-workspace-fixture";
+  const decoyRetiredSkill = "sdd-retired-decoy-home-fixture";
+  const workspaceRetiredPath = await addRetiredManagedSkill(
+    fixture.workspaceRoot,
+    workspaceRetiredSkill,
+  );
+  const decoyRetiredPath = await addRetiredManagedSkill(
+    fixture.decoyHome,
+    decoyRetiredSkill,
+  );
+  const decoyBefore = await hashDirectory(fixture.decoyHome);
+
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "update",
+    "--workspace",
+    fixture.workspaceRoot,
+    "--json",
+  ], { cwd: fixture.outside, env: fixture.env });
+  const result = JSON.parse(stdout);
+
+  assert.equal(result.command, "update");
+  assert.equal(result.workspaceRoot, fixture.workspaceRoot);
+  assert.equal(Object.hasOwn(result, "migration"), false);
+  assert.ok(result.skills.actions.some(
+    (entry) => entry.skillName === workspaceRetiredSkill && entry.action === "remove",
+  ));
+  assert.equal(await pathExists(workspaceRetiredPath), false);
+  assert.equal(await pathExists(decoyRetiredPath), true);
+  assert.equal(await hashDirectory(fixture.decoyHome), decoyBefore);
+});
+
+test("CLI lifecycle mutation with an explicit workspace leaves a populated decoy home unchanged", async (t) => {
+  const fixture = await createExplicitWorkspaceWithDecoyHome(
+    "sdd-explicit-lifecycle-no-home-",
+  );
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  const changeId = "2026-08-08-explicit-workspace-home-authority";
+  await writeChange(fixture.workspaceRoot, "sample-web", changeId, "in_review");
+  await writeChange(fixture.decoyHome, "sample-web", changeId, "proposed");
+  const workspaceChangePath = join(
+    fixture.workspaceRoot,
+    ".sdd",
+    "changes",
+    changeId,
+    "change.md",
+  );
+  const workspaceChangeBefore = await readFile(workspaceChangePath, "utf8");
+  const decoyBefore = await hashDirectory(fixture.decoyHome);
+
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "change",
+    "transition",
+    "sample",
+    changeId,
+    "--workspace",
+    fixture.workspaceRoot,
+    "--from",
+    "in_review",
+    "--to",
+    "in_progress",
+    "--json",
+  ], { cwd: fixture.workspaceRoot, env: fixture.env });
+  const result = JSON.parse(stdout);
+  const workspaceChangeAfter = await readFile(workspaceChangePath, "utf8");
+
+  assert.equal(result.command, "change-transition");
+  assert.equal(result.workspaceRoot, fixture.workspaceRoot);
+  assert.notEqual(workspaceChangeAfter, workspaceChangeBefore);
+  assert.match(workspaceChangeAfter, /^status: in_progress$/m);
+  assert.equal(await hashDirectory(fixture.decoyHome), decoyBefore);
+});
+
+test("targetless CLI routes start from an explicit workspace instead of unrelated cwd", async (t) => {
+  const fixture = await createExplicitWorkspaceWithDecoyHome(
+    "sdd-explicit-targetless-start-",
+  );
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  const decoyBefore = await hashDirectory(fixture.decoyHome);
+  const runJson = async (...args) => {
+    const { stdout } = await execFileAsync(process.execPath, [
+      join(PACKAGE_ROOT, "bin", "sdd.js"),
+      ...args,
+      "--workspace",
+      fixture.workspaceRoot,
+      "--json",
+    ], { cwd: fixture.decoyHome, env: fixture.env });
+    return JSON.parse(stdout);
+  };
+
+  const doctor = await runJson("doctor");
+  const status = await runJson("status");
+  const validation = await runJson("validate");
+  const epic = await runJson(
+    "epic",
+    "create",
+    "sample",
+    "SAMPLE-E999",
+    "explicit-workspace",
+    "--repo",
+    "sample-web",
+    "--dry-run",
+  );
+  const created = await runJson(
+    "change",
+    "create",
+    "sample",
+    "explicit-workspace",
+    "--repo",
+    "sample-web",
+    "--date",
+    "2026-08-08",
+    "--dry-run",
+  );
+  for (const result of [doctor, status, validation, epic, created]) {
+    assert.equal(result.workspaceRoot, fixture.workspaceRoot);
+  }
+  assert.deepEqual(status.spaces.map((space) => space.spaceId), ["sample"]);
+
+  const changeId = "2026-08-08-explicit-workspace-dry-run";
+  await writeCanonicalChange(
+    fixture.workspaceRoot,
+    "sample-web",
+    changeId,
+    "in_review",
+  );
+  const transitioned = await runJson(
+    "change",
+    "transition",
+    "sample",
+    changeId,
+    "--from",
+    "in_review",
+    "--to",
+    "in_progress",
+    "--dry-run",
+  );
+  const closed = await runJson(
+    "change",
+    "close",
+    "sample",
+    changeId,
+    "--dry-run",
+  );
+  assert.equal(transitioned.workspaceRoot, fixture.workspaceRoot);
+  assert.equal(closed.workspaceRoot, fixture.workspaceRoot);
+  assert.equal(await hashDirectory(fixture.decoyHome), decoyBefore);
+});
+
+test("CLI init requires an owning workspace and creates only a portable repository contract", async (t) => {
+  const root = await createWorkspace("sdd-repository-init-");
+  const workspaceRoot = join(root, "workspace");
+  const repositoryRoot = join(workspaceRoot, "repos", "sample-app");
+  await mkdir(repositoryRoot, { recursive: true });
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      join(PACKAGE_ROOT, "bin", "sdd.js"),
+      "init",
+      repositoryRoot,
+      "--workspace",
+      workspaceRoot,
+      "--json",
+    ]),
+    (error) => {
+      assert.match(error.stderr, /"code": "WORKSPACE_NOT_INITIALIZED"/);
+      return true;
+    },
+  );
+
+  await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "setup",
+    workspaceRoot,
+    "--planning-root",
+    "product/ideas",
+    "--repository-root",
+    "repos",
+    "--yes",
+    "--json",
+  ]);
 
   const first = await execFileAsync(process.execPath, [
     join(PACKAGE_ROOT, "bin", "sdd.js"),
     "init",
     repositoryRoot,
+    "--workspace",
+    workspaceRoot,
     "--json",
-  ], { env });
+  ]);
   const result = JSON.parse(first.stdout);
   assert.equal(result.mode, "repository");
+  assert.equal(result.workspaceRoot, workspaceRoot);
+  assert.equal(result.workspaceConfigPath, getWorkspaceConfigPath(workspaceRoot));
   assert.equal(result.createdRepositoryConfig, true);
 
-  const repositoryConfig = parse(
-    await readFile(join(repositoryRoot, ".sdd", "config.yaml"), "utf8"),
-  );
+  const repositoryConfig = await readRepositoryConfig(repositoryRoot);
   assert.equal(repositoryConfig.kind, "repository");
   assert.equal(repositoryConfig.id, "sample-app");
   assert.equal(repositoryConfig.artifacts.epics, "docs/epics");
   repositoryConfig.artifacts.epics = "specs/epics";
-  await writeFile(
-    join(repositoryRoot, ".sdd", "config.yaml"),
-    `${JSON.stringify(repositoryConfig, null, 2)}\n`,
-    "utf8",
-  );
+  await writeRepositoryConfig(repositoryRoot, repositoryConfig);
 
   const contextOutput = await execFileAsync(process.execPath, [
     join(PACKAGE_ROOT, "bin", "sdd.js"),
     "context",
     repositoryRoot,
+    "--workspace",
+    workspaceRoot,
     "--json",
-  ], { env });
+  ]);
   const context = JSON.parse(contextOutput.stdout);
+  assert.equal(context.workspaceRoot, workspaceRoot);
+  assert.equal(context.workspaceConfigPath, getWorkspaceConfigPath(workspaceRoot));
+  assert.equal(Object.hasOwn(context, "userRoot"), false);
   assert.equal(context.kind, "repository");
-  assert.equal(context.idea, null);
-  assert.equal(context.spaceId, "sample-app");
-  assert.equal(context.planningPath, null);
   assert.equal(context.repository.id, "sample-app");
   assert.equal(context.repository.artifacts.epics, "specs/epics");
-  assert.equal(context.workflowPath, WORKFLOW_SOURCE_PATH);
-
-  await assert.rejects(
-    execFileAsync(process.execPath, [
-      join(PACKAGE_ROOT, "bin", "sdd.js"),
-      "change",
-      "create",
-      "sample-app",
-      "unmapped-planning",
-      "--workspace",
-      repositoryRoot,
-      "--dry-run",
-      "--json",
-    ], { env }),
-    (error) => {
-      const failure = JSON.parse(error.stderr);
-      assert.equal(failure.error.code, "PLANNING_MAPPING_REQUIRED");
-      return true;
-    },
+  assert.equal(
+    context.workflowPath,
+    join(workspaceRoot, ".sdd", "story-driven-development.md"),
   );
 
-  await assert.rejects(
-    execFileAsync(process.execPath, [
-      join(PACKAGE_ROOT, "bin", "sdd.js"),
-      "change",
-      "promote",
-      "sample-app",
-      "2026-07-14-unmapped-planning",
-      "--workspace",
-      repositoryRoot,
-      "--dry-run",
-      "--json",
-    ], { env }),
-    (error) => {
-      const failure = JSON.parse(error.stderr);
-      assert.equal(failure.error.code, "PLANNING_MAPPING_REQUIRED");
-      return true;
-    },
-  );
-
-  const epicOutput = await execFileAsync(process.execPath, [
+  const changeOutput = await execFileAsync(process.execPath, [
     join(PACKAGE_ROOT, "bin", "sdd.js"),
-    "epic",
+    "change",
     "create",
     "sample-app",
-    "APP-001",
-    "first-capability",
+    "repository-only-work",
+    "--repo",
+    repositoryRoot,
+    "--date",
+    "2026-07-14",
     "--workspace",
-    repositoryRoot,
+    workspaceRoot,
+    "--dry-run",
     "--json",
-  ], { env });
-  assert.equal(JSON.parse(epicOutput.stdout).epicId, "APP-001");
-  assert.equal(
-    await pathExists(join(repositoryRoot, "specs", "epics", "app-001-first-capability", "epic.md")),
-    true,
-  );
-
-  const doctorOutput = await execFileAsync(process.execPath, [
-    join(PACKAGE_ROOT, "bin", "sdd.js"),
-    "doctor",
-    repositoryRoot,
-    "--json",
-  ], { env });
-  const doctor = JSON.parse(doctorOutput.stdout);
-  assert.equal(
-    doctor.findings.some((finding) => finding.message.includes("Planning directory for sample-app")),
-    false,
-  );
+  ], { cwd: repositoryRoot });
+  const change = JSON.parse(changeOutput.stdout);
+  assert.equal(change.workspaceRoot, workspaceRoot);
+  assert.equal(change.path, ".sdd/changes/2026-07-14-repository-only-work");
+  assert.equal(change.repositories[0].id, "sample-app");
 
   const second = await execFileAsync(process.execPath, [
     join(PACKAGE_ROOT, "bin", "sdd.js"),
     "init",
     repositoryRoot,
+    "--workspace",
+    workspaceRoot,
     "--json",
-  ], { env });
-  const repeated = JSON.parse(second.stdout);
-  assert.equal(repeated.createdRepositoryConfig, false);
+  ]);
+  assert.equal(JSON.parse(second.stdout).createdRepositoryConfig, false);
+});
 
-  const updateOutput = await execFileAsync(process.execPath, [
+test("CLI context keeps cwd as the target when --workspace supplies external ownership", async (t) => {
+  const root = await createWorkspace("sdd-external-context-");
+  const workspaceRoot = join(root, "workspace");
+  const planningRoot = join(workspaceRoot, "product", "ideas", "sample");
+  const externalRepositoriesRoot = join(root, "external-code");
+  const repositoryRoot = join(externalRepositoriesRoot, "sample-app");
+  await mkdir(planningRoot, { recursive: true });
+  await mkdir(repositoryRoot, { recursive: true });
+  await writeRepositoryConfig(repositoryRoot, createRepositoryConfig("sample-app"));
+  await writeFile(
+    join(planningRoot, "sample.md"),
+    [
+      "---",
+      "repositories:",
+      "  - path: ../external-code/sample-app",
+      "    role: app",
+      "---",
+      "# Sample",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await initWorkspace(workspaceRoot, {
+    planningRoot: "product/ideas",
+    repositoryRoots: [externalRepositoriesRoot],
+  });
+  const imported = await readWorkspaceConfig(workspaceRoot);
+  assert.deepEqual(imported.ideas.sample.repositories, [{
+    root: "external-code",
+    path: "sample-app",
+    role: "app",
+    status: "active",
+  }]);
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const { stdout } = await execFileAsync(process.execPath, [
     join(PACKAGE_ROOT, "bin", "sdd.js"),
-    "update",
-    repositoryRoot,
+    "context",
+    "--workspace",
+    workspaceRoot,
     "--json",
-  ], { env });
-  const updated = JSON.parse(updateOutput.stdout);
-  assert.equal(updated.workflow.action, "bundled");
-  assert.equal(await pathExists(join(userRoot, ".sdd", "story-driven-development.md")), false);
+  ], { cwd: repositoryRoot });
+  const context = JSON.parse(stdout);
+
+  assert.equal(context.workspaceRoot, workspaceRoot);
+  assert.equal(context.kind, "repository");
+  assert.equal(context.repository.id, "sample-app");
+});
+test("Change-store helpers require an explicit workspace root", () => {
+  assert.throws(
+    () => getChangesRoot(),
+    (error) => error instanceof SddError && error.code === "WORKSPACE_REQUIRED",
+  );
+});
+
+test("Change-store listing rejects an internal alias at the fixed active root", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changesRoot = getChangesRoot(root);
+  await rm(changesRoot, { recursive: true });
+  await symlink(join(root, ".sdd"), changesRoot);
+
+  await assert.rejects(
+    () => listStoredChanges(root),
+    (error) => error instanceof SddError
+      && error.code === "UNSAFE_ARTIFACT_PATH"
+      && error.details.length === 1
+      && error.details[0] === ".sdd/changes",
+  );
+});
+
+test("Change-store listing rejects an internal alias at the fixed closed-history root", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changesRoot = getChangesRoot(root);
+  const closedRoot = join(changesRoot, "closed");
+  await rm(closedRoot, { recursive: true });
+  await symlink(changesRoot, closedRoot);
+
+  await assert.rejects(
+    () => listStoredChanges(root),
+    (error) => error instanceof SddError
+      && error.code === "UNSAFE_ARTIFACT_PATH"
+      && error.details.length === 1
+      && error.details[0] === ".sdd/changes/closed",
+  );
+});
+
+test("Change-store listing rejects file and symlink swaps after directory inventory", async (t) => {
+  for (const replacement of ["file", "symlink"]) {
+    const root = await createMappedWorkspace();
+    t.after(() => rm(root, { recursive: true, force: true }));
+    await initWorkspace(root);
+    const changesRoot = getChangesRoot(root);
+    const changeId = `2026-08-09-${replacement}-swap`;
+    const changePath = join(changesRoot, changeId);
+    const symlinkTarget = join(changesRoot, ".swap-target");
+    await mkdir(changePath);
+    if (replacement === "symlink") await mkdir(symlinkTarget);
+    let hookCalls = 0;
+
+    await assert.rejects(
+      () => listStoredChanges(root, {
+        afterInventory: async () => {
+          hookCalls += 1;
+          await rm(changePath, { recursive: true });
+          if (replacement === "file") {
+            await writeFile(changePath, "not a Change directory\n", "utf8");
+          } else {
+            await symlink(symlinkTarget, changePath);
+          }
+        },
+      }),
+      (error) => error instanceof SddError
+        && error.code === "UNSAFE_ARTIFACT_PATH"
+        && error.details.length === 1
+        && error.details[0] === `.sdd/changes/${changeId}`,
+      `${replacement} replacement`,
+    );
+    assert.equal(hookCalls, 1);
+    const replacementState = await lstat(changePath);
+    assert.equal(
+      replacement === "file"
+        ? replacementState.isFile()
+        : replacementState.isSymbolicLink(),
+      true,
+    );
+  }
+});
+
+test("status and validate retry when a Change closes between root inventories", async (t) => {
+  for (const consumer of ["status", "validate"]) {
+    const root = await createMappedWorkspace();
+    t.after(() => rm(root, { recursive: true, force: true }));
+    await initWorkspace(root);
+    const changeId = `2026-08-09-${consumer}-inventory-close`;
+    await writeCanonicalChange(root, "sample-web", changeId, "in_review");
+    const activePath = getActiveChangePath(changeId, root);
+    const closedPath = getClosedChangePath(changeId, root);
+    let hookCalls = 0;
+    const afterClosedChangeInventory = async ({ attempt }) => {
+      hookCalls += 1;
+      if (attempt === 1) await rename(activePath, closedPath);
+    };
+
+    if (consumer === "status") {
+      const result = await getStatus(root, "sample", { afterClosedChangeInventory });
+      assert.equal(result.activeChanges.length, 0);
+      assert.deepEqual(
+        result.recentChanges.map((change) => change.changeId),
+        [changeId],
+      );
+    } else {
+      const result = await validateArtifacts(root, {
+        spaceId: "sample",
+        changeId,
+        afterClosedChangeInventory,
+      });
+      assert.equal(result.summary.changes, 1);
+      assert.equal(
+        result.findings.some((finding) => finding.code === "ARTIFACT_NOT_FOUND"),
+        false,
+      );
+    }
+    assert.equal(hookCalls, 2);
+  }
+});
+
+test("Change consumers retry when a stable inventory location closes before file reads", async (t) => {
+  for (const consumer of ["status", "inspect", "validate", "doctor"]) {
+    const root = await createMappedWorkspace();
+    t.after(() => rm(root, { recursive: true, force: true }));
+    await initWorkspace(root);
+    const changeId = `2026-08-09-${consumer}-snapshot-close`;
+    await writeCanonicalChange(root, "sample-web", changeId, "in_review");
+    const activePath = getActiveChangePath(changeId, root);
+    const closedPath = getClosedChangePath(changeId, root);
+    let hookCalls = 0;
+    const afterStoredChangesInventory = async ({ attempt }) => {
+      hookCalls += 1;
+      if (attempt === 1) await rename(activePath, closedPath);
+    };
+
+    if (consumer === "status") {
+      const result = await getStatus(root, "sample", { afterStoredChangesInventory });
+      assert.deepEqual(
+        result.recentChanges.map((change) => change.changeId),
+        [changeId],
+      );
+    } else if (consumer === "inspect") {
+      const config = await readWorkspaceConfig(root);
+      const findings = await inspectChangeStatuses(root, config, null, {
+        afterStoredChangesInventory,
+      });
+      assert.equal(
+        findings.some((finding) => /missing tasks\.md/i.test(finding.message)),
+        false,
+      );
+    } else if (consumer === "validate") {
+      const result = await validateArtifacts(root, {
+        spaceId: "sample",
+        changeId,
+        afterStoredChangesInventory,
+      });
+      assert.equal(result.summary.changes, 1);
+      assert.equal(
+        result.findings.some((finding) =>
+          ["ARTIFACT_NOT_FOUND", "MISSING_CHANGE_FILE"].includes(finding.code)),
+        false,
+      );
+    } else {
+      const result = await diagnoseWorkspace(root, { afterStoredChangesInventory });
+      assert.equal(
+        result.findings.some((finding) => /missing tasks\.md/i.test(finding.message)),
+        false,
+      );
+    }
+    assert.equal(await pathExists(activePath), false);
+    assert.equal(await pathExists(closedPath), true);
+    assert.equal(hookCalls, 2);
+  }
+});
+
+test("Change consumers still report a stable missing required file", async (t) => {
+  for (const consumer of ["status", "inspect", "validate", "doctor"]) {
+    const root = await createMappedWorkspace();
+    t.after(() => rm(root, { recursive: true, force: true }));
+    await initWorkspace(root);
+    const changeId = `2026-08-09-${consumer}-stable-missing`;
+    await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
+    await rm(join(getActiveChangePath(changeId, root), "tasks.md"));
+
+    if (consumer === "status") {
+      await assert.rejects(
+        () => getStatus(root, "sample"),
+        (error) => error instanceof SddError && error.code === "INCOMPLETE_CHANGE",
+      );
+    } else if (consumer === "inspect") {
+      const config = await readWorkspaceConfig(root);
+      const findings = await inspectChangeStatuses(root, config);
+      assert.equal(
+        findings.some((finding) => /missing tasks\.md/i.test(finding.message)),
+        true,
+      );
+    } else if (consumer === "validate") {
+      const result = await validateArtifacts(root, {
+        spaceId: "sample",
+        changeId,
+      });
+      assert.equal(
+        result.findings.some((finding) => finding.code === "MISSING_CHANGE_FILE"),
+        true,
+      );
+    } else {
+      const result = await diagnoseWorkspace(root);
+      assert.equal(
+        result.findings.some((finding) => /missing tasks\.md/i.test(finding.message)),
+        true,
+      );
+    }
+  }
 });
 
 test("repository init rejects concurrent first initialization without losing the winner", async (t) => {
   const root = await createWorkspace("sdd-concurrent-repository-init-");
-  const userRoot = join(root, "home");
-  const repositoryRoot = join(root, "repos", "sample-app");
-  const originalUserRoot = process.env.SDD_USER_HOME;
-  process.env.SDD_USER_HOME = userRoot;
-  t.after(() => {
-    if (originalUserRoot === undefined) delete process.env.SDD_USER_HOME;
-    else process.env.SDD_USER_HOME = originalUserRoot;
-  });
+  const workspaceRoot = join(root, "workspace");
+  const repositoryRoot = join(workspaceRoot, "repos", "sample-app");
   t.after(() => rm(root, { recursive: true, force: true }));
   await mkdir(repositoryRoot, { recursive: true });
-  await writeConfig(userRoot, await createUserConfig(userRoot));
+  await initWorkspace(workspaceRoot, {
+    planningRoot: "ideas",
+    repositoryRoots: ["repos"],
+  });
 
-  const results = await Promise.allSettled([
-    initRepository(repositoryRoot, { repositoryId: "winner-one" }),
-    initRepository(repositoryRoot, { repositoryId: "winner-two" }),
-  ]);
-  const successes = results.filter((result) => result.status === "fulfilled");
-  const failures = results.filter((result) => result.status === "rejected");
+  let releaseFirst;
+  let signalFirst;
+  const firstPaused = new Promise((resolve) => {
+    signalFirst = resolve;
+  });
+  const continueFirst = new Promise((resolve) => {
+    releaseFirst = resolve;
+  });
+  const first = initRepository(repositoryRoot, {
+    repositoryId: "loser",
+    workspaceRoot,
+    beforeConfigPublish: async () => {
+      signalFirst();
+      await continueFirst;
+    },
+  });
+  await firstPaused;
 
-  assert.equal(successes.length, 1);
-  assert.equal(failures.length, 1);
-  assert.equal(failures[0].reason.code, "OPERATION_IN_PROGRESS");
-  const repositoryConfig = parse(await readFile(join(repositoryRoot, ".sdd", "config.yaml"), "utf8"));
-  assert.equal(repositoryConfig.id, successes[0].value.repositoryConfig.id);
-  assert.equal(await pathExists(join(repositoryRoot, ".sdd", "mutation.lock")), false);
+  const winner = await initRepository(repositoryRoot, {
+    repositoryId: "winner",
+    workspaceRoot,
+  });
+  releaseFirst();
+  await assert.rejects(
+    first,
+    (error) => error.code === "CONCURRENT_CHANGE"
+      && error.details.some((detail) => detail.includes("retry")),
+  );
+  const repositoryConfigPath = getRepositoryConfigPath(repositoryRoot);
+  const expectedRepositoryRoot = join(root, "expected-repository");
+  await mkdir(expectedRepositoryRoot, { recursive: true });
+  await writeRepositoryConfig(
+    expectedRepositoryRoot,
+    createRepositoryConfig("winner"),
+  );
+  const expectedConfigBytes = await readFile(
+    getRepositoryConfigPath(expectedRepositoryRoot),
+  );
+
+  assert.equal(winner.repositoryConfig.id, "winner");
+  assert.equal((await readRepositoryConfig(repositoryRoot)).id, "winner");
+  assert.deepEqual(await readFile(repositoryConfigPath), expectedConfigBytes);
+  assert.deepEqual(
+    (await readdir(join(repositoryRoot, ".sdd"))).filter((name) => name.includes("sdd-config-")),
+    [],
+  );
 });
 
-test("interactive init asks for planning and repository roots", async (t) => {
+test("interactive setup asks for planning and repository roots", async (t) => {
   const root = await createWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   const questions = [];
   const responses = ["product/ideas", "apps, services"];
 
-  const options = await collectInitOptions(
+  const options = await collectSetupOptions(
     root,
     { dryRun: false, force: false },
     {
@@ -860,14 +1679,38 @@ test("interactive init asks for planning and repository roots", async (t) => {
   assert.deepEqual(options.repositoryRoots, ["apps", "services"]);
 });
 
-test("interactive init accepts detected roots and skips explicitly configured questions", async (t) => {
+test("interactive setup rejects a dangling config authority without prompting", async (t) => {
+  const root = await createWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(join(root, ".sdd"), { recursive: true });
+  await symlink(join(root, "missing-config.yaml"), getWorkspaceConfigPath(root));
+  let prompted = false;
+
+  await assert.rejects(
+    collectSetupOptions(
+      root,
+      {},
+      {
+        interactive: true,
+        ask: async () => {
+          prompted = true;
+          return "";
+        },
+      },
+    ),
+    (error) => error?.code === "UNSAFE_CONFIG_PATH",
+  );
+  assert.equal(prompted, false);
+});
+
+test("interactive setup accepts detected roots and skips explicitly configured questions", async (t) => {
   const root = await createWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await mkdir(join(root, "ideas"), { recursive: true });
   await mkdir(join(root, "code"), { recursive: true });
   const questions = [];
 
-  const detected = await collectInitOptions(
+  const detected = await collectSetupOptions(
     root,
     {},
     {
@@ -882,7 +1725,7 @@ test("interactive init accepts detected roots and skips explicitly configured qu
   assert.deepEqual(detected.repositoryRoots, ["code"]);
 
   questions.length = 0;
-  const explicit = await collectInitOptions(
+  const explicit = await collectSetupOptions(
     root,
     { planningRoot: "plans", repositoryRoots: ["repos"] },
     { interactive: true, ask: async (question) => questions.push(question) },
@@ -896,7 +1739,7 @@ test("configure detects renamed workspace roots and preserves mappings", async (
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
-  const original = await readConfig(root);
+  const original = await readWorkspaceConfig(root);
   await moveWorkspaceRoots(root);
 
   const diagnosis = await diagnoseWorkspace(root);
@@ -923,10 +1766,10 @@ test("configure detects renamed workspace roots and preserves mappings", async (
       ["repository", "code", "spaces/code"],
     ],
   );
-  assert.equal((await readConfig(root)).planning.root, "ideas");
+  assert.equal((await readWorkspaceConfig(root)).planning.root, "ideas");
 
   const result = await configureWorkspace(root, { acceptSuggestions: true });
-  const configured = await readConfig(root);
+  const configured = await readWorkspaceConfig(root);
   assert.equal(result.changed, true);
   assert.equal(configured.planning.root, "spaces/ideas");
   assert.deepEqual(configured.repositories.roots, { code: "spaces/code" });
@@ -935,70 +1778,232 @@ test("configure detects renamed workspace roots and preserves mappings", async (
   assert.equal((await diagnoseWorkspace(root)).findings.length, 0);
 });
 
-test("runtime config validation rejects unknown keys and ambiguous artifact roots", async () => {
-  const workspaceConfig = {
-    version: 2,
-    schema: "sdd-v2",
-    skills: { directory: ".agents/skills", unexpected: true },
-    planning: { root: "planning", plannedChangesDirectory: "planned-changes" },
-    repositories: { roots: { apps: "code" } },
-    repositoryArtifacts: {
-      activeChanges: "docs/changes",
-      closedChanges: "docs/changes/closed",
-      epics: "docs/changes/epics",
-      adrs: "docs/adrs",
-      audits: "docs/audits",
-    },
-    ideas: { sample: { repositories: [] } },
-  };
+test("configure preserves a config that replaces its preflight snapshot before publish", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await moveWorkspaceRoots(root);
+  const winner = await readWorkspaceConfig(root);
+  winner.skills.directory = ".agents/concurrent-skills";
+
+  let injected = false;
+  await assert.rejects(
+    configureWorkspace(root, {
+      acceptSuggestions: true,
+      beforeConfigPublish: async () => {
+        injected = true;
+        await writeWorkspaceConfig(root, winner);
+      },
+    }),
+    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
+  );
+
+  assert.equal(injected, true);
+  assert.deepEqual(await readWorkspaceConfig(root), winner);
+});
+
+test("configure persists absolute contained replacements as portable relative paths", async (t) => {
+  const workspaceRoot = await createMappedWorkspace();
+  t.after(() => rm(workspaceRoot, { recursive: true, force: true }));
+  await initWorkspace(workspaceRoot);
+  await moveWorkspaceRoots(workspaceRoot);
+
+  const result = await configureWorkspace(workspaceRoot, {
+    planningRoot: join(workspaceRoot, "spaces", "ideas"),
+    repositoryRoots: { code: join(workspaceRoot, "spaces", "code") },
+  });
+  const configured = await readWorkspaceConfig(workspaceRoot);
+
+  assert.equal(result.changed, true);
+  assert.equal(result.planningRoot, "spaces/ideas");
+  assert.deepEqual(result.repositoryRoots, { code: "spaces/code" });
+  assert.equal(configured.planning.root, "spaces/ideas");
+  assert.deepEqual(configured.repositories.roots, { code: "spaces/code" });
+});
+
+test("configure publishes distinct physical repository roots that resolve successfully", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await mkdir(join(root, "distinct-code", "sample-web"), { recursive: true });
+  await addRepositoryRootMapping(root, "alternate", "old-code", "sample-web");
+
+  const result = await configureWorkspace(root, {
+    repositoryRoots: { alternate: "distinct-code" },
+  });
+
+  assert.equal(result.changed, true);
+  assert.equal((await readWorkspaceConfig(root)).repositories.roots.alternate, "distinct-code");
+  const context = await getWorkspaceContext(join(root, "distinct-code", "sample-web"));
+  assert.equal(context.repository.resolvedPath, "distinct-code/sample-web");
+});
+
+test("configure rejects a symbolic-link alias with duplicate physical repository ownership", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await addRepositoryRootMapping(root, "alternate", "old-code", "sample-web");
+  await symlink(join(root, "code"), join(root, "code-alias"), "dir");
+  const configPath = getWorkspaceConfigPath(root);
+  const before = await readFile(configPath, "utf8");
+
+  await assert.rejects(
+    configureWorkspace(root, {
+      repositoryRoots: { alternate: "code-alias" },
+    }),
+    (error) => error instanceof SddError
+      && error.code === "INVALID_CONFIG"
+      && error.message === "Cannot resolve context with duplicate physical repository ownership."
+      && error.details.length === 1,
+  );
+
+  assert.equal(await readFile(configPath, "utf8"), before);
+});
+
+test("configure rejects remapped artifact roots that resolve outside their repository", async (t) => {
+  const root = await createMappedWorkspace();
+  const external = await createWorkspace("sdd-configure-external-artifacts-");
+  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => rm(external, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const repositoryRoot = join(root, "distinct-code", "sample-web");
+  await mkdir(join(repositoryRoot, "docs"), { recursive: true });
+  await symlink(external, join(repositoryRoot, "docs", "epics"), "dir");
+  await addRepositoryRootMapping(root, "alternate", "old-code", "sample-web");
+  const configPath = getWorkspaceConfigPath(root);
+  const before = await readFile(configPath, "utf8");
+
+  await assert.rejects(
+    configureWorkspace(root, {
+      repositoryRoots: { alternate: "distinct-code" },
+    }),
+    (error) => error instanceof SddError && error.code === "UNSAFE_ARTIFACT_PATH",
+  );
+
+  assert.equal(await readFile(configPath, "utf8"), before);
+});
+
+test("runtime config validation rejects unknown keys", async () => {
+  const workspaceConfig = await createInitialConfig("/workspace", {
+    planningRoot: "planning",
+    repositoryRoots: ["code"],
+  });
+  workspaceConfig.skills.unexpected = true;
   const findings = validateConfig(workspaceConfig);
   assert.ok(findings.some((finding) => finding.message.includes("skills contains unknown key")));
-  assert.ok(findings.some((finding) => finding.message.includes("repositoryArtifacts.activeChanges")
-    && finding.message.includes("repositoryArtifacts.epics")));
 
-  const repositoryFindings = validateRepositoryConfig({
-    kind: "repository",
-    version: 1,
-    schema: "sdd-repository-v1",
-    id: "sample",
-    unexpected: true,
-    artifacts: {
-      activeChanges: "docs/changes",
-      closedChanges: "docs/changes/closed",
-      epics: "docs/epics",
-      adrs: "docs/adrs",
-      audits: "docs/audits",
-    },
-  });
+  const repositoryConfig = createRepositoryConfig("sample");
+  repositoryConfig.unexpected = true;
+  repositoryConfig.artifacts.activeChanges = "docs/changes";
+  const repositoryFindings = validateRepositoryConfig(repositoryConfig);
   assert.ok(repositoryFindings.some((finding) =>
     finding.message.includes("Repository configuration contains unknown key")));
+  assert.ok(repositoryFindings.some((finding) =>
+    finding.message.includes("artifacts contains unknown key: activeChanges")));
 });
 
-test("runtime config validation confines planned Change directories to their owner", async () => {
-  const config = await createUserConfig("/workspace");
-  for (const plannedChangesDirectory of ["/outside", "\\outside", "../../outside", "~/outside"]) {
-    config.planning.plannedChangesDirectory = plannedChangesDirectory;
+test("runtime config validation rejects NUL path values without filesystem errors", async () => {
+  const base = await createInitialConfig("/workspace", {
+    planningRoot: "planning",
+    repositoryRoots: ["code"],
+  });
+  base.ideas.sample = {
+    status: "active",
+    repositories: [{ root: "code", path: "sample-web", status: "active" }],
+  };
+  const cases = [
+    (config) => { config.skills.directory = "skills\0escape"; },
+    (config) => { config.planning.root = "ideas\0escape"; },
+    (config) => { config.repositories.roots.code = "code\0escape"; },
+    (config) => { config.repositoryArtifacts.epics = "docs/epics\0escape"; },
+    (config) => { config.ideas.sample.planningPath = "sample\0escape"; },
+    (config) => { config.ideas.sample.repositories[0].path = "sample-web\0escape"; },
+  ];
+  for (const mutate of cases) {
+    const config = structuredClone(base);
+    mutate(config);
+    const findings = validateConfig(config);
     assert.ok(
-      validateConfig(config).some((finding) =>
-        finding.message.includes("planning.plannedChangesDirectory must be relative")),
-      plannedChangesDirectory,
+      findings.some((finding) => finding.message.includes("NUL")),
+      JSON.stringify(findings),
     );
   }
-  config.planning.plannedChangesDirectory = "changes/planned";
-  assert.equal(validateConfig(config).filter((finding) => finding.level === "error").length, 0);
+
+  const repositoryConfig = createRepositoryConfig("sample");
+  repositoryConfig.artifacts.epics = "docs/epics\0escape";
+  assert.ok(validateRepositoryConfig(repositoryConfig)
+    .some((finding) => finding.message.includes("NUL")));
 });
+
+test("CLI update rejects malformed workspace paths before filesystem access", async (t) => {
+  const writeMalformedConfig = async (root, config) => {
+    await mkdir(join(root, ".sdd"), { recursive: true });
+    await writeFile(
+      getWorkspaceConfigPath(root),
+      `${JSON.stringify(config, null, 2)}\n`,
+      "utf8",
+    );
+  };
+  const runUpdate = async (root) => {
+    await assert.rejects(
+      () => execFileAsync(process.execPath, [
+        join(PACKAGE_ROOT, "bin", "sdd.js"),
+        "update",
+        root,
+        "--json",
+      ], { env: { ...process.env, SDD_WORKSPACE_ROOT: root } }),
+      (error) => (
+        typeof error.stderr === "string"
+        && error.stderr.includes('"code": "INVALID_CONFIG"')
+        && !error.stderr.includes('"code": "UNEXPECTED_ERROR"')
+      ),
+    );
+  };
+
+  const nulRoot = await createWorkspace("sdd-update-nul-config-");
+  t.after(() => rm(nulRoot, { recursive: true, force: true }));
+  const nulConfig = await createInitialConfig(nulRoot);
+  nulConfig.planning.root = `ideas\0escape`;
+  await writeMalformedConfig(nulRoot, nulConfig);
+  await runUpdate(nulRoot);
+
+  const typedRoot = await createWorkspace("sdd-update-typed-config-");
+  t.after(() => rm(typedRoot, { recursive: true, force: true }));
+  const typedConfig = await createInitialConfig(typedRoot);
+  typedConfig.repositories.roots.code = 42;
+  typedConfig.ideas.sample = {
+    status: "active",
+    repositories: [{ root: "code", path: "sample-web", status: "active" }],
+  };
+  await writeMalformedConfig(typedRoot, typedConfig);
+  await runUpdate(typedRoot);
+
+  const legacyRoot = await createWorkspace("sdd-update-legacy-typed-config-");
+  t.after(() => rm(legacyRoot, { recursive: true, force: true }));
+  await writeMalformedConfig(legacyRoot, {
+    version: 1,
+    schema: "sdd-v1",
+    skills: { directory: ".agents/skills" },
+    planning: { root: "ideas" },
+    repositories: { roots: [42] },
+    repositoryArtifacts: nulConfig.repositoryArtifacts,
+    ideas: {},
+  });
+  await runUpdate(legacyRoot);
+});
+
 
 test("context rejects physical aliases claimed as different repositories", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   await symlink(join(root, "code", "sample-web"), join(root, "code", "sample-web-alias"));
-  const config = await readConfig(root);
+  const config = await readWorkspaceConfig(root);
   config.ideas.other = {
     status: "active",
     repositories: [{ path: "code/sample-web-alias", status: "active" }],
   };
-  await writeConfig(root, config);
+  await writeWorkspaceConfig(root, config);
 
   await assert.rejects(
     () => getWorkspaceContext(join(root, "code", "sample-web")),
@@ -1008,21 +2013,51 @@ test("context rejects physical aliases claimed as different repositories", async
   );
 });
 
-test("validation rejects a planned Changes directory symlinked outside its owner", async (t) => {
+test("validation rejects a central Change store symlinked outside its owner", async (t) => {
   const root = await createMappedWorkspace();
-  const externalRoot = await createWorkspace("sdd-external-planned-changes-");
+  const externalRoot = await createWorkspace("sdd-external-changes-");
   t.after(() => rm(root, { recursive: true, force: true }));
   t.after(() => rm(externalRoot, { recursive: true, force: true }));
   await initWorkspace(root);
-  await mkdir(join(externalRoot, "outside-change"), { recursive: true });
-  await symlink(externalRoot, join(root, "ideas", "sample", "planned-changes"));
+  await rm(join(root, ".sdd", "changes"), { recursive: true });
+  await symlink(externalRoot, join(root, ".sdd", "changes"));
 
   const result = await validateArtifacts(root, { spaceId: "sample" });
 
   assert.equal(result.valid, false);
-  assert.equal(result.summary.plannedChanges, 0);
+  assert.equal(result.summary.changes, 0);
   assert.ok(result.findings.some((finding) => finding.code === "UNSAFE_ARTIFACT_PATH"
-    && finding.path === "ideas/sample/planned-changes"));
+    && finding.path === ".sdd/changes"));
+});
+
+test("validation inventories active and closed Change-shaped symbolic-link entries", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changesRoot = getChangesRoot(root);
+  const closedRoot = join(changesRoot, "closed");
+  const activeChangeId = "2026-08-09-active-symlink";
+  const closedChangeId = "2026-08-08-closed-symlink";
+  const activeTarget = join(changesRoot, ".active-symlink-target");
+  const closedTarget = join(closedRoot, ".closed-symlink-target");
+  await mkdir(activeTarget);
+  await mkdir(closedTarget);
+  await symlink(activeTarget, join(changesRoot, activeChangeId));
+  await symlink(closedTarget, join(closedRoot, closedChangeId));
+
+  const result = await validateArtifacts(root, { spaceId: "sample" });
+
+  assert.equal(result.valid, false);
+  assert.equal(result.summary.changes, 0);
+  assert.deepEqual(
+    result.findings
+      .filter((finding) => finding.code === "UNSAFE_ARTIFACT_PATH")
+      .map((finding) => finding.path),
+    [
+      `.sdd/changes/${activeChangeId}`,
+      `.sdd/changes/closed/${closedChangeId}`,
+    ],
+  );
 });
 
 test("interactive configure asks only for missing roots and accepts detected defaults", async (t) => {
@@ -1066,29 +2101,85 @@ test("configure requires input when prompting and suggestion acceptance are disa
   );
 });
 
-test("CLI configure accepts detected path replacements with JSON output", async (t) => {
+test("CLI configure accepts --workspace from unrelated cwd and detects path replacements", async (t) => {
   const root = await createMappedWorkspace();
+  const outside = await createWorkspace("sdd-configure-outside-");
   t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => rm(outside, { recursive: true, force: true }));
   await initWorkspace(root);
   await moveWorkspaceRoots(root);
 
   const { stdout } = await execFileAsync(process.execPath, [
     join(PACKAGE_ROOT, "bin", "sdd.js"),
     "configure",
+    "--workspace",
     root,
     "--yes",
     "--json",
-  ]);
+  ], { cwd: outside });
   const result = JSON.parse(stdout);
 
   assert.equal(result.command, "configure");
+  assert.equal(result.workspaceRoot, root);
+  assert.equal(result.workspaceConfigPath, getWorkspaceConfigPath(root));
+  assert.equal(Object.hasOwn(result, "configPath"), false);
+
   assert.equal(result.changed, true);
   assert.equal(result.planningRoot, "spaces/ideas");
   assert.deepEqual(result.repositoryRoots, { code: "spaces/code" });
   assert.equal((await diagnoseWorkspace(root)).findings.length, 0);
 });
+test("configure rejects unsupported pre-1.0 user configurations", async (t) => {
+  const root = await createWorkspace("sdd-configure-legacy-user-");
+  t.after(() => rm(root, { recursive: true, force: true }));
+  for (const [version, schema] of [
+    [1, "sdd-user-v1"],
+    [2, "sdd-user-v2"],
+  ]) {
+    const legacyUserRoot = join(root, `legacy-home-v${version}`);
+    const versionOne = version === 1;
+    await mkdir(join(legacyUserRoot, ".sdd"), { recursive: true });
+    await writeFile(
+      join(legacyUserRoot, ".sdd", "config.yaml"),
+      `${JSON.stringify({
+        kind: "user",
+        version,
+        schema,
+        skills: { directory: ".agents/skills" },
+        planning: {
+          root: "planning",
+          ...(versionOne ? { plannedChangesDirectory: "planned-changes" } : {}),
+        },
+        repositories: { roots: {} },
+        repositoryArtifacts: versionOne
+          ? {
+              activeChanges: "docs/changes",
+              closedChanges: "docs/changes/closed",
+              epics: "docs/epics",
+              adrs: "docs/adrs",
+              audits: "docs/audits",
+            }
+          : {
+              epics: "docs/epics",
+              adrs: "docs/adrs",
+              audits: "docs/audits",
+            },
+        ideas: {},
+      }, null, 2)}\n`,
+      "utf8",
+    );
 
-test("repeated init is idempotent and preserves unrelated skills", async (t) => {
+    await assert.rejects(
+      () => inspectWorkspaceConfiguration(legacyUserRoot, {
+        workspaceRoot: legacyUserRoot,
+      }),
+      (error) => error instanceof SddError
+        && error.code === "INVALID_CONFIG",
+    );
+  }
+});
+
+test("repeated setup is idempotent and preserves unrelated skills", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await mkdir(join(root, ".agents", "skills", "custom-skill"), { recursive: true });
@@ -1097,7 +2188,7 @@ test("repeated init is idempotent and preserves unrelated skills", async (t) => 
   await initWorkspace(root);
   const second = await initWorkspace(root);
 
-  assert.equal(second.created, false);
+  assert.equal(second.createdWorkspaceConfig, false);
   assert.ok(second.skills.actions.every((entry) => entry.action === "unchanged"));
   assert.equal(
     await readFile(join(root, ".agents", "skills", "custom-skill", "SKILL.md"), "utf8"),
@@ -1140,23 +2231,19 @@ test("forced update restores a conflicting managed skill", async (t) => {
   assert.equal((await diagnoseWorkspace(root)).healthy, true);
 });
 
-test("managed workflow changes conflict by default and recover only with force", async (t) => {
+test("workspace update refuses to overwrite a locally modified managed workflow", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   const workflowPath = join(root, ".sdd", "story-driven-development.md");
-  await writeFile(workflowPath, `${await readFile(workflowPath, "utf8")}\nlocal edit\n`, "utf8");
+  const localSource = `${await readFile(workflowPath, "utf8")}\nlocal edit\n`;
+  await writeFile(workflowPath, localSource, "utf8");
 
   await assert.rejects(
     () => updateWorkspace(root),
     (error) => error instanceof SddError && error.code === "WORKFLOW_CONFLICT",
   );
-  assert.equal((await diagnoseWorkspace(root)).healthy, false);
-
-  const result = await updateWorkspace(root, { force: true });
-  assert.equal(result.workflow.action, "update-forced");
-  assert.equal(await readFile(workflowPath, "utf8"), await readFile(WORKFLOW_SOURCE_PATH, "utf8"));
-  assert.equal((await diagnoseWorkspace(root)).healthy, true);
+  assert.equal(await readFile(workflowPath, "utf8"), localSource);
 });
 
 test("update removes a retired skill only when it matches its managed hash", async (t) => {
@@ -1166,7 +2253,7 @@ test("update removes a retired skill only when it matches its managed hash", asy
   const retiredPath = join(root, ".agents", "skills", "sdd-doctrine");
   await mkdir(retiredPath, { recursive: true });
   await writeFile(join(retiredPath, "SKILL.md"), "retired\n", "utf8");
-  const lockPath = getInstallLockPath(root);
+  const lockPath = getWorkspaceInstallLockPath(root);
   const lock = JSON.parse(await readFile(lockPath, "utf8"));
   lock.managedSkills["sdd-doctrine"] = await hashDirectory(retiredPath);
   await writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`, "utf8");
@@ -1192,12 +2279,12 @@ test("doctor reports duplicate repository ownership", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
-  const config = await readConfig(root);
+  const config = await readWorkspaceConfig(root);
   config.ideas.another = {
     planning: "another",
     repositories: [{ root: "code", path: "sample-web" }],
   };
-  await writeConfig(root, config);
+  await writeWorkspaceConfig(root, config);
 
   const diagnosis = await diagnoseWorkspace(root);
   assert.equal(diagnosis.healthy, false);
@@ -1206,6 +2293,324 @@ test("doctor reports duplicate repository ownership", async (t) => {
       finding.message.includes("claimed by both sample and another"),
     ),
   );
+});
+
+test("status preserves Changes when a mapped repository contract is absent", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await rm(getRepositoryConfigPath(join(root, "code", "sample-web")));
+  const changeId = "2026-08-09-unavailable-repository";
+  await writeChange(root, "sample-web", changeId, "in_progress");
+
+  const diagnosis = await diagnoseWorkspace(root);
+  assert.equal(diagnosis.healthy, false);
+  assert.ok(diagnosis.findings.some((finding) =>
+    finding.level === "error"
+      && finding.code === "REPOSITORY_ID_REQUIRED"
+      && finding.message.includes("sample (code/sample-web)")));
+
+  const jsonOutput = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "status",
+    "--workspace",
+    root,
+    "--json",
+  ], { cwd: root });
+  const json = JSON.parse(jsonOutput.stdout);
+  const [space] = json.spaces;
+  assert.equal(space.activeChanges[0].changeId, changeId);
+  assert.deepEqual(space.activeChanges[0].unresolvedRepositoryIds, ["sample-web"]);
+  assert.deepEqual(space.unresolvedRepositoryIds, ["sample-web"]);
+  assert.deepEqual(
+    space.repositories.map((repository) => repository.id),
+    ["sample-mobile"],
+  );
+  assert.ok(space.repositoryDiagnostics.some((diagnostic) =>
+    diagnostic.code === "REPOSITORY_ID_REQUIRED"
+      && diagnostic.repository === "code/sample-web"));
+
+  const humanOutput = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "status",
+    "--workspace",
+    root,
+  ], { cwd: root });
+  assert.match(
+    humanOutput.stdout,
+    new RegExp(`Space Change: ${changeId} \\[in_progress\\] \\(sample-web\\)`),
+  );
+  assert.match(
+    humanOutput.stdout,
+    /Repository diagnostic \[REPOSITORY_ID_REQUIRED\]: Cannot resolve mapped repository code\/sample-web/,
+  );
+  assert.match(humanOutput.stdout, /Repository: code\/sample-mobile \[active\] \(mobile\)/);
+});
+
+test("doctor reports malformed repository YAML and an empty repository ID", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const repositoryRoot = join(root, "code", "sample-web");
+  const repositoryConfigPath = getRepositoryConfigPath(repositoryRoot);
+  await writeFile(repositoryConfigPath, "kind: repository\nversion: [\n", "utf8");
+
+  let diagnosis = await diagnoseWorkspace(root);
+  assert.equal(diagnosis.healthy, false);
+  assert.ok(diagnosis.findings.some((finding) =>
+    finding.level === "error"
+      && finding.code === "INVALID_YAML"
+      && finding.message.includes("code/sample-web")));
+  let status = await getStatus(root);
+  assert.deepEqual(status.spaces[0].repositories.map((repository) => repository.id), ["sample-mobile"]);
+  assert.ok(status.spaces[0].repositoryDiagnostics.some((diagnostic) =>
+    diagnostic.code === "INVALID_YAML" && diagnostic.repository === "code/sample-web"));
+
+  const emptyIdConfig = createRepositoryConfig("sample-web");
+  emptyIdConfig.id = "";
+  await writeRepositoryConfig(repositoryRoot, emptyIdConfig);
+  diagnosis = await diagnoseWorkspace(root);
+  assert.equal(diagnosis.healthy, false);
+  assert.ok(diagnosis.findings.some((finding) =>
+    finding.level === "error"
+      && finding.code === "INVALID_REPOSITORY_CONFIG"
+      && finding.message.includes("Repository id must use lowercase letters")));
+  status = await getStatus(root);
+  assert.deepEqual(status.spaces[0].repositories.map((repository) => repository.id), ["sample-mobile"]);
+  assert.ok(status.spaces[0].repositoryDiagnostics.some((diagnostic) =>
+    diagnostic.code === "INVALID_REPOSITORY_CONFIG"
+      && diagnostic.repository === "code/sample-web"));
+});
+
+test("explicit workspace commands reject a contained repository custom artifact escape", async (t) => {
+  const root = await createMappedWorkspace();
+  const outsideArtifacts = await createWorkspace("sdd-contained-artifact-escape-");
+  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => rm(outsideArtifacts, { recursive: true, force: true }));
+  await initWorkspace(root);
+
+  const repositoryRoot = join(root, "code", "sample-web");
+  await mkdir(
+    join(outsideArtifacts, "epics", "OUTSIDE-E001", "epic.md"),
+    { recursive: true },
+  );
+  await symlink(outsideArtifacts, join(repositoryRoot, "custom"), "dir");
+  const repositoryConfig = createRepositoryConfig("sample-web");
+  repositoryConfig.artifacts.epics = "custom/epics";
+  await writeRepositoryConfig(repositoryRoot, repositoryConfig);
+
+  await assertRepositoryArtifactCommandsReject(root, "sample-web", repositoryRoot);
+  assert.equal(
+    await pathExists(join(outsideArtifacts, "epics", "OUTSIDE-E001", "epic.md")),
+    true,
+  );
+});
+
+test("explicit workspace commands reject an external repository custom artifact escape", async (t) => {
+  const root = await createMappedWorkspace();
+  const externalRepository = await createWorkspace("sdd-external-artifact-repository-");
+  const outsideArtifacts = await createWorkspace("sdd-external-artifact-escape-");
+  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => rm(externalRepository, { recursive: true, force: true }));
+  t.after(() => rm(outsideArtifacts, { recursive: true, force: true }));
+  await initWorkspace(root);
+
+  await mkdir(
+    join(outsideArtifacts, "epics", "OUTSIDE-E001", "epic.md"),
+    { recursive: true },
+  );
+  await symlink(outsideArtifacts, join(externalRepository, "custom"), "dir");
+  const repositoryConfig = createRepositoryConfig("external-service");
+  repositoryConfig.artifacts.epics = "custom/epics";
+  await writeRepositoryConfig(externalRepository, repositoryConfig);
+  const workspaceConfig = await readWorkspaceConfig(root);
+  workspaceConfig.repositories.roots.external = externalRepository;
+  workspaceConfig.ideas.sample.repositories = [{
+    root: "external",
+    path: ".",
+    role: "service",
+    status: "active",
+  }];
+  await writeWorkspaceConfig(root, workspaceConfig);
+
+  await assertRepositoryArtifactCommandsReject(root, externalRepository, externalRepository);
+  assert.equal(
+    await pathExists(join(outsideArtifacts, "epics", "OUTSIDE-E001", "epic.md")),
+    true,
+  );
+});
+
+test("status validate and doctor reject physically overlapping custom artifact aliases", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+
+  const repositoryRoot = join(root, "code", "sample-web");
+  const sharedArtifacts = join(repositoryRoot, "shared-artifacts");
+  const aliases = join(repositoryRoot, "artifact-aliases");
+  await Promise.all([
+    mkdir(sharedArtifacts, { recursive: true }),
+    mkdir(aliases, { recursive: true }),
+  ]);
+  await Promise.all([
+    symlink(sharedArtifacts, join(aliases, "epics"), "dir"),
+    symlink(sharedArtifacts, join(aliases, "adrs"), "dir"),
+  ]);
+  const repositoryConfig = createRepositoryConfig("sample-web");
+  repositoryConfig.artifacts.epics = "artifact-aliases/epics";
+  repositoryConfig.artifacts.adrs = "artifact-aliases/adrs";
+  await writeRepositoryConfig(repositoryRoot, repositoryConfig);
+
+  await assertRepositoryArtifactCommandsReject(root, "sample-web");
+});
+
+test("status degrades duplicate portable repository IDs within a Space", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeRepositoryConfig(
+    join(root, "code", "sample-mobile"),
+    createRepositoryConfig("sample-web"),
+  );
+
+  const diagnosis = await diagnoseWorkspace(root);
+  assert.equal(diagnosis.healthy, false);
+  assert.ok(diagnosis.findings.some((finding) =>
+    finding.level === "error"
+      && finding.code === "REPOSITORY_ID_COLLISION"
+      && finding.message.includes("sample (code/sample-mobile), sample (code/sample-web)")));
+  const changeId = "2026-08-09-duplicate-repository-id";
+  await writeChange(root, "sample-web", changeId, "in_progress");
+  const status = await getStatus(root);
+  assert.deepEqual(status.spaces[0].repositories, []);
+  assert.deepEqual(status.spaces[0].unresolvedRepositoryIds, ["sample-web"]);
+  assert.equal(status.spaces[0].activeChanges[0].changeId, changeId);
+  assert.ok(status.spaces[0].repositoryDiagnostics.some((diagnostic) =>
+    diagnostic.code === "REPOSITORY_ID_COLLISION"
+      && diagnostic.repositories.join(",") === "code/sample-mobile,code/sample-web"));
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "status",
+    "--workspace",
+    root,
+  ], { cwd: root });
+  assert.match(stdout, new RegExp(`Space Change: ${changeId} \\[in_progress\\] \\(sample-web\\)`));
+  assert.match(stdout, /Repository diagnostic \[REPOSITORY_ID_COLLISION\]/);
+  assert.match(stdout, /Repositories: none/);
+});
+
+test("status degrades mapped paths that resolve to one physical repository", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await symlink("sample-web", join(root, "code", "sample-web-alias"), "dir");
+  const config = await readWorkspaceConfig(root);
+  config.ideas.sample.repositories.push({
+    root: "code",
+    path: "sample-web-alias",
+    role: "alias",
+  });
+  await writeWorkspaceConfig(root, config);
+
+  const diagnosis = await diagnoseWorkspace(root);
+  assert.equal(diagnosis.healthy, false);
+  assert.ok(diagnosis.findings.some((finding) =>
+    finding.level === "error"
+      && finding.code === "REPOSITORY_OWNERSHIP_COLLISION"
+      && finding.message.includes("sample (code/sample-web)")
+      && finding.message.includes("sample (code/sample-web-alias)")));
+  await assert.rejects(
+    () => execFileAsync(process.execPath, [
+      join(PACKAGE_ROOT, "bin", "sdd.js"),
+      "doctor",
+      "--workspace",
+      root,
+      "--json",
+    ], { cwd: root }),
+    (error) => {
+      const commandDiagnosis = JSON.parse(error.stdout);
+      return error.code === 1
+        && commandDiagnosis.healthy === false
+        && commandDiagnosis.findings.some((finding) =>
+          finding.code === "REPOSITORY_OWNERSHIP_COLLISION");
+    },
+  );
+  const changeId = "2026-08-09-duplicate-repository-owner";
+  await writeChange(root, "sample-web", changeId, "in_progress");
+  const status = await getStatus(root);
+  assert.deepEqual(
+    status.spaces[0].repositories.map((repository) => repository.id),
+    ["sample-mobile"],
+  );
+  assert.deepEqual(status.spaces[0].unresolvedRepositoryIds, ["sample-web"]);
+  assert.ok(status.spaces[0].repositoryDiagnostics.some((diagnostic) =>
+    diagnostic.code === "REPOSITORY_ID_COLLISION"));
+  assert.ok(status.spaces[0].repositoryDiagnostics.some((diagnostic) =>
+    diagnostic.code === "REPOSITORY_OWNERSHIP_COLLISION"));
+  const commandOutput = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "status",
+    "--workspace",
+    root,
+    "--json",
+  ], { cwd: root });
+  const commandStatus = JSON.parse(commandOutput.stdout);
+  assert.equal(commandStatus.spaces[0].activeChanges[0].changeId, changeId);
+  assert.deepEqual(commandStatus.spaces[0].unresolvedRepositoryIds, ["sample-web"]);
+  assert.ok(commandStatus.spaces[0].repositoryDiagnostics.some((diagnostic) =>
+    diagnostic.code === "REPOSITORY_OWNERSHIP_COLLISION"));
+});
+
+test("doctor resolves a mapped symlink to an external repository contract", async (t) => {
+  const root = await createMappedWorkspace();
+  const externalRepository = await createWorkspace("sdd-doctor-external-repository-");
+  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => rm(externalRepository, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeRepositoryConfig(
+    externalRepository,
+    createRepositoryConfig("external-service"),
+  );
+  await symlink(
+    externalRepository,
+    join(root, "code", "external-service"),
+    "dir",
+  );
+  const config = await readWorkspaceConfig(root);
+  config.ideas.sample.repositories.push({
+    root: "code",
+    path: "external-service",
+    role: "service",
+  });
+  await writeWorkspaceConfig(root, config);
+  await writeChange(
+    root,
+    "external-service",
+    "2026-07-14-external-service",
+    "in_progress",
+  );
+
+  const diagnosis = await diagnoseWorkspace(root);
+  assert.equal(diagnosis.healthy, true);
+  assert.equal(diagnosis.findings.some((finding) =>
+    finding.code === "REPOSITORY_NOT_FOUND"), false);
+});
+
+
+test("doctor keeps an unavailable archived repository as a warning", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const config = await readWorkspaceConfig(root);
+  config.ideas.sample.repositories[0].status = "archived";
+  await writeWorkspaceConfig(root, config);
+  await rm(join(root, "code", "sample-web"), { recursive: true });
+
+  const diagnosis = await diagnoseWorkspace(root);
+  assert.equal(diagnosis.healthy, true);
+  assert.ok(diagnosis.findings.some((finding) =>
+    finding.level === "warning"
+      && finding.message.includes("Repository for sample does not exist: code/sample-web")));
 });
 
 test("doctor reports obsolete workflow references in project guidance", async (t) => {
@@ -1262,6 +2667,9 @@ test("doctor accepts guidance that resolves the workflow through sdd context", a
   );
 
   const diagnosis = await diagnoseWorkspace(root);
+  assert.equal(diagnosis.workspaceRoot, root);
+  assert.equal(diagnosis.workspaceConfigPath, getWorkspaceConfigPath(root));
+  assert.equal(Object.hasOwn(diagnosis, "userRoot"), false);
   assert.equal(diagnosis.healthy, true);
 });
 
@@ -1269,9 +2677,9 @@ test("doctor ignores obsolete guidance in archived repository mappings", async (
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
-  const config = await readConfig(root);
+  const config = await readWorkspaceConfig(root);
   config.ideas.sample.repositories[0].status = "archived";
-  await writeConfig(root, config);
+  await writeWorkspaceConfig(root, config);
   await writeFile(
     join(root, "code", "sample-web", "AGENTS.md"),
     "Read `<workspaceRoot>/.sdd/story-driven-development.md`.\n",
@@ -1282,71 +2690,76 @@ test("doctor ignores obsolete guidance in archived repository mappings", async (
   assert.equal(diagnosis.healthy, true);
 });
 
-test("doctor validates active Change status frontmatter", async (t) => {
+test("doctor validates central Change metadata and status", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
-  const changePath = join(root, "code", "sample-web", "docs", "changes", "2026-07-14-example");
+  const changeId = "2026-07-14-example";
+  const changePath = join(root, ".sdd", "changes", changeId);
   await mkdir(changePath, { recursive: true });
-  await writeFile(join(changePath, "tasks.md"), "# Tasks\n", "utf8");
+  await writeFile(join(changePath, "change.md"), "# Change without metadata\n", "utf8");
 
   let diagnosis = await diagnoseWorkspace(root);
   assert.equal(diagnosis.healthy, false);
-  assert.ok(diagnosis.findings.some((finding) => finding.message.includes("missing tasks.md status")));
+  assert.ok(diagnosis.findings.some((finding) =>
+    finding.message.includes("Cannot parse Change metadata")));
 
-  await writeFile(
-    join(changePath, "tasks.md"),
-    "---\nstatus: in_progress\n---\n# Tasks\n",
-    "utf8",
-  );
+  await rm(changePath, { recursive: true });
+  await writeChange(root, "sample-web", changeId, "in_progress");
   diagnosis = await diagnoseWorkspace(root);
   assert.equal(diagnosis.healthy, true);
 
-  await writeFile(join(changePath, "tasks.md"), "---\nstatus: review\n---\n# Tasks\n", "utf8");
+  const changeFilePath = join(changePath, "change.md");
+  await writeFile(
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace("status: in_progress", "status: review"),
+    "utf8",
+  );
   diagnosis = await diagnoseWorkspace(root);
   assert.equal(diagnosis.healthy, false);
   assert.ok(diagnosis.findings.some((finding) => finding.message.includes('"review"')));
-
-  await writeFile(join(changePath, "tasks.md"), "---\nstatus: active\n---\n# Tasks\n", "utf8");
-  diagnosis = await diagnoseWorkspace(root);
-  assert.equal(diagnosis.healthy, false);
-  assert.ok(diagnosis.findings.some((finding) => finding.message.includes('"active"')));
 });
 
-test("doctor validates Changes in unmapped repositories under configured roots", async (t) => {
+test("doctor rejects a central Change with an unknown repository ID", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
-  const changePath = join(root, "code", "shared-tool", "docs", "changes", "2026-07-14-example");
-  await mkdir(changePath, { recursive: true });
-  await writeFile(join(changePath, "tasks.md"), "# Tasks\n", "utf8");
+  await writeChange(root, "ghost", "2026-07-14-unknown-repository", "in_progress");
 
   const diagnosis = await diagnoseWorkspace(root);
   assert.equal(diagnosis.healthy, false);
-  assert.ok(diagnosis.findings.some((finding) => finding.message.includes("code/shared-tool")));
+  assert.ok(diagnosis.findings.some((finding) =>
+    finding.level === "error"
+      && finding.code === "REPOSITORY_NOT_FOUND"
+      && finding.message.includes("repository ID ghost")
+      && finding.message.includes("Space sample")));
+  await assert.rejects(
+    () => transitionChange(
+      root,
+      "sample",
+      "2026-07-14-unknown-repository",
+      { from: "in_progress", to: "in_review", dryRun: true },
+    ),
+    (error) => error instanceof SddError && error.code === "REPOSITORY_NOT_FOUND",
+  );
 });
 
-test("closed Change state comes from folder location and accepts historical statuses", async (t) => {
+
+test("closed Change state comes from central folder location and requires in_review metadata", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
-  const changePath = join(root, "code", "sample-web", "docs", "changes", "closed", "2026-07-14-example");
-  await mkdir(changePath, { recursive: true });
-  await writeFile(join(changePath, "tasks.md"), "# Tasks\n", "utf8");
+  const changeId = "2026-07-14-example";
+  await writeChange(root, "sample-web", changeId, "closed", { closed: true });
+  const changeFilePath = join(root, ".sdd", "changes", "closed", changeId, "change.md");
 
   let diagnosis = await diagnoseWorkspace(root);
-  assert.equal(diagnosis.healthy, false);
-  assert.ok(diagnosis.findings.some((finding) => finding.message.includes("missing tasks.md status")));
-
-  await writeFile(join(changePath, "tasks.md"), "---\nstatus: closed\n---\n# Tasks\n", "utf8");
-
-  diagnosis = await diagnoseWorkspace(root);
   assert.equal(diagnosis.healthy, false);
   assert.ok(diagnosis.findings.some((finding) => finding.message.includes('"closed"')));
 
   await writeFile(
-    join(changePath, "tasks.md"),
-    "---\nstatus: ready_to_close\n---\n# Tasks\n",
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace("status: closed", "status: in_review"),
     "utf8",
   );
   diagnosis = await diagnoseWorkspace(root);
@@ -1362,10 +2775,11 @@ test("doctor reports malformed configuration without inspecting managed skills",
   const diagnosis = await diagnoseWorkspace(root);
   assert.equal(diagnosis.healthy, false);
   assert.ok(diagnosis.counts.errors >= 1);
-  assert.ok(diagnosis.findings.some((finding) => finding.message.includes("skills.directory")));
+  assert.ok(diagnosis.findings.some((finding) =>
+    finding.message.includes("Configuration version must be 3")));
 });
 
-test("init rejects layout overrides after configuration exists", async (t) => {
+test("setup rejects layout overrides after configuration exists", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
@@ -1376,50 +2790,6 @@ test("init rejects layout overrides after configuration exists", async (t) => {
   );
 });
 
-test("init migrates v1 workspace paths to derived v2 references", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await mkdir(join(root, ".sdd"), { recursive: true });
-  await writeConfig(root, {
-    version: 1,
-    schema: "sdd-v1",
-    skills: { directory: ".agents/skills" },
-    planning: { root: "ideas", plannedChangesDirectory: "planned-changes" },
-    repositories: { roots: ["code"] },
-    repositoryArtifacts: {
-      activeChanges: "docs/changes",
-      closedChanges: "docs/changes/closed",
-      epics: "docs/epics",
-      adrs: "docs/adrs",
-      audits: "docs/audits",
-    },
-    ideas: {
-      sample: {
-        planning: "ideas/sample",
-        repositories: [
-          { path: "code/sample-web", role: "web" },
-          { path: "code/sample-mobile", role: "mobile" },
-        ],
-      },
-    },
-  });
-
-  const result = await initWorkspace(root);
-  const config = await readConfig(root);
-  assert.equal(result.migratedFrom, 1);
-  assert.equal(config.version, 2);
-  assert.equal(config.schema, "sdd-v2");
-  assert.deepEqual(config.repositories.roots, { code: "code" });
-  assert.equal(config.ideas.sample.planning, undefined);
-  assert.equal(config.ideas.sample.status, "active");
-  assert.deepEqual(config.ideas.sample.repositories[0], {
-    root: "code",
-    path: "sample-web",
-    role: "web",
-    status: "active",
-  });
-  assert.equal((await diagnoseWorkspace(root)).healthy, true);
-});
 
 test("idea planning and repository paths support explicit project overrides", async (t) => {
   const root = await createMappedWorkspace();
@@ -1428,7 +2798,11 @@ test("idea planning and repository paths support explicit project overrides", as
   await mkdir(join(root, "ideas", "custom-planning"), { recursive: true });
   await mkdir(join(root, "private", "external-planning"), { recursive: true });
   await mkdir(join(root, "integrations", "special-client"), { recursive: true });
-  const config = await readConfig(root);
+  await writeRepositoryConfig(
+    join(root, "integrations", "special-client"),
+    createRepositoryConfig("special-client"),
+  );
+  const config = await readWorkspaceConfig(root);
   config.ideas.sample.planning = "custom-planning";
   config.ideas.sample.repositories.push({
     path: "integrations/special-client",
@@ -1438,7 +2812,7 @@ test("idea planning and repository paths support explicit project overrides", as
     planningPath: "private/external-planning",
     repositories: [],
   };
-  await writeConfig(root, config);
+  await writeWorkspaceConfig(root, config);
 
   const planning = await getWorkspaceContext(join(root, "ideas", "custom-planning"));
   const externalPlanning = await getWorkspaceContext(join(root, "private", "external-planning"));
@@ -1475,50 +2849,107 @@ test("context resolves planning and repository ownership", async (t) => {
   assert.equal(repository.repository.resolvedPath, "code/sample-mobile");
 });
 
+test("CLI context discovers regular files from their parent and rejects symbolic-link files", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const sourceRoot = join(root, "code", "sample-web", "src");
+  const sourcePath = join(sourceRoot, "entry.js");
+  await mkdir(sourceRoot, { recursive: true });
+  await writeFile(sourcePath, "export {};\n", "utf8");
+
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "context",
+    "code/sample-web/src/entry.js",
+    "--json",
+  ], { cwd: root });
+  const context = JSON.parse(stdout);
+  assert.equal(context.command, "context");
+  assert.equal(context.workspaceRoot, await realpath(root));
+  assert.equal(context.relativePath, "code/sample-web/src/entry.js");
+  assert.equal(context.kind, "repository");
+  assert.equal(context.repository.id, "sample-web");
+
+  const sourceAlias = join(sourceRoot, "entry-alias.js");
+  const danglingAlias = join(sourceRoot, "dangling-alias.js");
+  await symlink(sourcePath, sourceAlias);
+  await symlink(join(sourceRoot, "absent.js"), danglingAlias);
+  for (const alias of [sourceAlias, danglingAlias]) {
+    await assert.rejects(
+      execFileAsync(process.execPath, [
+        join(PACKAGE_ROOT, "bin", "sdd.js"),
+        "context",
+        alias,
+        "--json",
+      ], { cwd: root }),
+      (error) => {
+        assert.match(error.stderr, /"code": "UNSAFE_CONFIG_PATH"/);
+        return true;
+      },
+    );
+  }
+});
+
 test("context rejects a repository-only ID that collides with an existing Idea", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   const repositoryRoot = join(root, "code", "unmapped-repository");
   await mkdir(repositoryRoot, { recursive: true });
-  await writeConfig(repositoryRoot, createRepositoryConfig("sample"));
-  const before = await readFile(getConfigPath(root), "utf8");
+  await writeRepositoryConfig(repositoryRoot, createRepositoryConfig("sample"));
+  const before = await readFile(getWorkspaceConfigPath(root), "utf8");
 
   await assert.rejects(
     () => getWorkspaceContext(repositoryRoot),
     (error) => error instanceof SddError && error.code === "REPOSITORY_ID_COLLISION",
   );
-  assert.equal(await readFile(getConfigPath(root), "utf8"), before);
+  assert.equal(await readFile(getWorkspaceConfigPath(root), "utf8"), before);
   assert.equal(await pathExists(join(repositoryRoot, "docs", "changes")), false);
 });
 
-test("status honors committed artifact paths for a repository-only checkout", async (t) => {
+test("status resolves central Changes for a repository-only checkout", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   const repositoryRoot = join(root, "code", "repository-only-status");
-  const repositoryConfig = createRepositoryConfig("repository-only-status");
-  repositoryConfig.artifacts = {
-    activeChanges: "work/changes",
-    closedChanges: "work/closed-changes",
-    epics: "work/epics",
-    adrs: "work/adrs",
-    audits: "work/audits",
-  };
-  await mkdir(join(repositoryRoot, "work", "changes", "2026-07-24-custom-artifacts"), {
-    recursive: true,
-  });
-  await writeConfig(repositoryRoot, repositoryConfig);
+  await mkdir(repositoryRoot, { recursive: true });
+  await writeRepositoryConfig(repositoryRoot, createRepositoryConfig("repository-only-status"));
+  const changeId = "2026-07-24-repository-only-status";
+  await writeCanonicalChange(root, "repository-only-status", changeId, "in_progress");
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
   await writeFile(
-    join(repositoryRoot, "work", "changes", "2026-07-24-custom-artifacts", "tasks.md"),
-    "---\nstatus: in_progress\n---\n# Tasks\n",
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace(
+      "space: sample",
+      "space: repository-only-status",
+    ),
     "utf8",
   );
 
   const result = await getStatus(repositoryRoot, "repository-only-status");
 
-  assert.equal(result.change.changeId, "2026-07-24-custom-artifacts");
+  assert.equal(result.change.changeId, changeId);
   assert.equal(result.repositoryActivity[0].activeChangeCount, 1);
+  assert.equal(result.repositoryActivity[0].resolvedPath, repositoryRoot);
+});
+
+test("status and doctor reject a Change-shaped symbolic-link entry", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changesRoot = getChangesRoot(root);
+  const changeId = "2026-08-09-status-symlink";
+  const target = join(changesRoot, ".status-symlink-target");
+  await mkdir(target);
+  await symlink(target, join(changesRoot, changeId));
+
+  const rejectsUnsafeEntry = (error) => error instanceof SddError
+    && error.code === "UNSAFE_ARTIFACT_PATH"
+    && error.details.length === 1
+    && error.details[0] === `.sdd/changes/${changeId}`;
+  await assert.rejects(() => getStatus(root), rejectsUnsafeEntry);
+  await assert.rejects(() => diagnoseWorkspace(root), rejectsUnsafeEntry);
 });
 
 test("status summarizes every Space and prefers its newest active Change", async (t) => {
@@ -1570,6 +3001,73 @@ test("status summarizes every Space and prefers its newest active Change", async
   ]);
 });
 
+test("status retains Space-owned Changes whose repository IDs no longer resolve", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-08-07-stale-repository-target";
+  await writeChange(root, "retired-repository", changeId, "in_progress");
+
+  const result = await getStatus(root);
+  const [space] = result.spaces;
+
+  assert.equal(space.spaceId, "sample");
+  assert.equal(space.activeChangeCount, 1);
+  assert.equal(space.change.changeId, changeId);
+  assert.deepEqual(space.unresolvedRepositoryIds, ["retired-repository"]);
+  assert.deepEqual(
+    space.activeChanges.map((change) => ({
+      changeId: change.changeId,
+      unresolvedRepositoryIds: change.unresolvedRepositoryIds,
+    })),
+    [{ changeId, unresolvedRepositoryIds: ["retired-repository"] }],
+  );
+  assert.ok(space.repositoryActivity.every((repository) => repository.activeChangeCount === 0));
+  assert.deepEqual(statusSummaryRows(result).at(-1), [
+    "sample",
+    "active",
+    "-",
+    "unresolved",
+    "in_progress",
+    changeId,
+    "retired-repository",
+    0,
+  ]);
+});
+
+test("status reports unresolved targets for a Change also projected by a healthy repository", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-08-08-mixed-repository-targets";
+  await writeChange(root, "sample-web", changeId, "in_progress");
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
+  const changeSource = await readFile(changeFilePath, "utf8");
+  await writeFile(
+    changeFilePath,
+    changeSource.replace("  - sample-web\n", "  - sample-web\n  - retired-repository\n"),
+    "utf8",
+  );
+
+  const result = await getStatus(root);
+  assert.deepEqual(statusSummaryRows(result).filter((row) => row[5] === changeId), [
+    ["sample", "active", "active", "web", "in_progress", changeId, "code/sample-web", 1],
+    ["sample", "active", "-", "unresolved", "in_progress", changeId, "retired-repository", 0],
+  ]);
+
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "status",
+    "--workspace",
+    root,
+  ], { cwd: root });
+  assert.match(
+    stdout,
+    new RegExp(`Space Change: ${changeId} \\[in_progress\\] \\(retired-repository\\)`),
+  );
+  assert.match(stdout, new RegExp(`Active Change: ${changeId} \\[in_progress\\]`));
+});
+
 test("status reports branch and uncommitted Git state for each mapped repository", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -1594,7 +3092,7 @@ test("status reports branch and uncommitted Git state for each mapped repository
     dirty: true,
     staged: 1,
     unstaged: 1,
-    untracked: 1,
+    untracked: 2,
     conflicted: 0,
   });
   assert.deepEqual(mobile.git, {
@@ -1602,10 +3100,10 @@ test("status reports branch and uncommitted Git state for each mapped repository
     branch: "main",
     head: null,
     detached: false,
-    dirty: false,
+    dirty: true,
     staged: 0,
     unstaged: 0,
-    untracked: 0,
+    untracked: 1,
     conflicted: 0,
   });
 });
@@ -1655,7 +3153,7 @@ test("CLI status ends human output with a blank line", async (t) => {
     "status",
     "--workspace",
     root,
-  ]);
+  ], { cwd: root });
 
   assert.equal(stdout.endsWith("\n\n"), true);
 });
@@ -1667,10 +3165,10 @@ test("status filters inactive lifecycle entries unless all are requested", async
   await writeChange(root, "sample-web", "2026-07-10-web-active", "in_progress");
   await writeChange(root, "sample-mobile", "2026-07-11-mobile-active", "in_review");
 
-  const config = await readConfig(root);
+  const config = await readWorkspaceConfig(root);
   config.ideas.sample.status = "inactive";
   config.ideas.sample.repositories[0].status = "archived";
-  await writeConfig(root, config);
+  await writeWorkspaceConfig(root, config);
 
   const filteredIdea = await getStatus(root);
   assert.equal(filteredIdea.filter, "active");
@@ -1689,14 +3187,18 @@ test("status filters inactive lifecycle entries unless all are requested", async
   ]);
 
   config.ideas.sample.status = "active";
-  await writeConfig(root, config);
+  await writeWorkspaceConfig(root, config);
   const filteredRepository = await getStatus(root);
   assert.equal(filteredRepository.spaces.length, 1);
   assert.deepEqual(
     filteredRepository.spaces[0].repositories.map((repository) => repository.resolvedPath),
     ["code/sample-mobile"],
   );
-  assert.equal(filteredRepository.spaces[0].activeChangeCount, 1);
+  assert.equal(filteredRepository.spaces[0].activeChangeCount, 2);
+  assert.deepEqual(statusSummaryRows(filteredRepository), [
+    ["sample", "active", "active", "mobile", "in_review", "2026-07-11-mobile-active", "code/sample-mobile", 1],
+    ["sample", "active", "-", "space", "in_progress", "2026-07-10-web-active", "sample-web", 0],
+  ]);
 
   const detail = await getStatus(root, "sample");
   assert.equal(detail.status, "active");
@@ -1704,6 +3206,86 @@ test("status filters inactive lifecycle entries unless all are requested", async
     "archived",
     "active",
   ]);
+});
+
+test("status retains a planning-only Change without repository targets", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const config = await readWorkspaceConfig(root);
+  config.ideas.sample.repositories = [];
+  await writeWorkspaceConfig(root, config);
+  const changeId = "2026-07-14-planning-only";
+  await createChange(root, "sample", "planning-only", { date: "2026-07-14" });
+
+  const result = await getStatus(root);
+  assert.equal(result.spaces[0].activeChangeCount, 1);
+  assert.equal(result.spaces[0].activeChanges[0].changeId, changeId);
+  assert.deepEqual(statusSummaryRows(result), [
+    ["sample", "active", "-", "space", "proposed", changeId, "-", 0],
+  ]);
+});
+
+test("CLI status lists an active planning-only Change in human output", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-15-cli-planning-only";
+  await createChange(root, "sample", "cli-planning-only", { date: "2026-07-15" });
+
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "status",
+    "--workspace",
+    root,
+  ], { cwd: root });
+
+  assert.match(stdout, /Active Changes: 1/);
+  assert.match(stdout, new RegExp(`Space Change: ${changeId} \\[proposed\\] \\(-\\)`));
+  assert.equal(stdout.split(changeId).length - 1, 1);
+});
+
+test("CLI status lists an active Change whose only target is archived", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-16-cli-archived-target";
+  await writeChange(root, "sample-web", changeId, "in_progress");
+  const config = await readWorkspaceConfig(root);
+  config.ideas.sample.repositories[0].status = "archived";
+  await writeWorkspaceConfig(root, config);
+
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "status",
+    "--workspace",
+    root,
+  ], { cwd: root });
+
+  assert.match(stdout, /Active Changes: 1/);
+  assert.match(stdout, new RegExp(`Space Change: ${changeId} \\[in_progress\\] \\(sample-web\\)`));
+  assert.equal(stdout.split(changeId).length - 1, 1);
+});
+
+test("CLI status lists a recent closed Change with no visible repository projection", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-07-17-cli-closed-stale-target";
+  await writeChange(root, "retired-repository", changeId, "ready_to_close", {
+    closed: true,
+  });
+
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "status",
+    "--workspace",
+    root,
+  ], { cwd: root });
+
+  assert.match(stdout, /Active Changes: 0/);
+  assert.match(stdout, new RegExp(`Space Change: ${changeId} \\[closed\\] \\(retired-repository\\)`));
+  assert.equal(stdout.split(changeId).length - 1, 1);
 });
 
 test("status summary retains active ideas and repositories without active Changes", async (t) => {
@@ -1812,7 +3394,7 @@ test("CLI status counts and prints only closed Changes as recent", async (t) => 
     "sample",
     "--workspace",
     root,
-  ]);
+  ], { cwd: root });
 
   assert.match(stdout, /Active Changes \(1\):\n  2026-07-14-active \[planned\]/);
   assert.match(stdout, /Recent Changes \(1\):\n  2026-07-13-closed \[closed\]/);
@@ -1862,9 +3444,118 @@ test("epic create scaffolds and validates a canonical Epic in one repository", a
   assert.doesNotMatch(source, /EPIC-ID|Epic Name|yyyy-mm-dd/);
 });
 
+test("explicit-repository Epic validation ignores unrelated missing repository identity", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await rename(join(root, "code", "sample-web"), join(root, "code", "web-app"));
+  const config = await readWorkspaceConfig(root);
+  const frontend = config.ideas.sample.repositories.find(
+    (repository) => repository.path === "sample-web",
+  );
+  assert.ok(frontend);
+  frontend.path = "web-app";
+  await writeWorkspaceConfig(root, config);
+  await writeRepositoryConfig(
+    join(root, "code", "web-app"),
+    createRepositoryConfig("frontend"),
+  );
+  await rm(getRepositoryConfigPath(join(root, "code", "sample-mobile")));
+
+  const created = await createEpic(root, "sample", "SAMPLE-E002", "saved-searches", {
+    date: "2026-07-14",
+    repositories: ["code/web-app"],
+  });
+  assert.equal(created.validation.valid, true);
+  assert.deepEqual(created.validation.scope.repositories, ["code/web-app"]);
+
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "validate",
+    "sample",
+    "--epic",
+    "SAMPLE-E002",
+    "--repo",
+    "frontend",
+    "--workspace",
+    root,
+    "--json",
+  ], { cwd: root });
+  const targeted = JSON.parse(stdout);
+  assert.equal(targeted.valid, true);
+  assert.equal(targeted.summary.epics, 1);
+  assert.deepEqual(targeted.scope.repositories, ["code/web-app"]);
+
+  await assert.rejects(
+    () => validateArtifacts(root, { spaceId: "sample" }),
+    (error) => error instanceof SddError && error.code === "REPOSITORY_ID_REQUIRED",
+  );
+});
+
+test("explicit Epic validation rejects a broken duplicate claim for the selected repository ID", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeCanonicalEpic(root, "sample-web");
+  await writeRepositoryConfig(
+    join(root, "code", "sample-web"),
+    createRepositoryConfig("app"),
+  );
+  const brokenDuplicate = createRepositoryConfig("app");
+  brokenDuplicate.artifacts.epics = "../outside";
+  await writeRepositoryConfig(
+    join(root, "code", "sample-mobile"),
+    brokenDuplicate,
+  );
+
+  for (const repository of ["app", "code/sample-web"]) {
+    await assert.rejects(
+      () => validateArtifacts(root, {
+        spaceId: "sample",
+        repositories: [repository],
+        epicId: "SAMPLE-E001",
+      }),
+      (error) => error instanceof SddError
+        && error.code === "REPOSITORY_ID_COLLISION"
+        && error.details.includes("code/sample-web")
+        && error.details.includes("code/sample-mobile"),
+    );
+  }
+});
+
+test("CLI exposes shared candidate and Epic Update envelope helpers plus their skills", async () => {
+  const { stdout: candidateHelp } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "candidate",
+    "--help",
+  ]);
+  assert.match(candidateHelp, /sdd candidate resolve/);
+  assert.match(candidateHelp, /--baseline <ref>/);
+  assert.match(candidateHelp, /working-tree \(default\)/);
+
+  const { stdout: epicHelp } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "epic",
+    "--help",
+  ]);
+  assert.match(epicHelp, /sdd epic update-input/);
+  assert.match(epicHelp, /--baseline <ref>/);
+  assert.match(epicHelp, /working-tree \(default\)/);
+
+  const bundledSkills = await readdir(join(PACKAGE_ROOT, "skills"));
+  assert.ok(bundledSkills.includes("sdd-epic-update"));
+  assert.ok(bundledSkills.includes("sdd-changelog"));
+  const [epicUpdate, changelog] = await Promise.all([
+    readFile(join(PACKAGE_ROOT, "skills", "sdd-epic-update", "SKILL.md"), "utf8"),
+    readFile(join(PACKAGE_ROOT, "skills", "sdd-changelog", "SKILL.md"), "utf8"),
+  ]);
+  assert.match(epicUpdate, /^name: sdd-epic-update$/m);
+  assert.match(changelog, /^name: sdd-changelog$/m);
+});
+
 test("packaged Epic templates stay synchronized", async () => {
   const canonical = await readFile(join(PACKAGE_ROOT, "docs", "templates", "epic.md"), "utf8");
-  for (const skill of ["sdd-change", "sdd-apply", "sdd-epic-verify"]) {
+  for (const skill of ["sdd-change", "sdd-epic-verify"]) {
     assert.equal(
       await readFile(join(PACKAGE_ROOT, "skills", skill, "assets", "epic-template.md"), "utf8"),
       canonical,
@@ -1873,7 +3564,7 @@ test("packaged Epic templates stay synchronized", async () => {
   }
 });
 
-test("packaged workflow templates preserve boundary, transition, and evidence-integrity contracts", async () => {
+test("packaged templates define compact v2 outcomes and one central Review", async () => {
   const tasksTemplate = await readFile(
     join(PACKAGE_ROOT, "docs", "templates", "tasks.md"),
     "utf8",
@@ -1886,12 +3577,17 @@ test("packaged workflow templates preserve boundary, transition, and evidence-in
     tasksTemplate,
     "sdd-change tasks template must match the canonical package template",
   );
-  assert.match(tasksTemplate, /^## Pattern Parity Matrix$/m);
-  assert.match(tasksTemplate, /^## Boundary Contract Matrix$/m);
-  assert.match(tasksTemplate, /^## Stateful Transition Matrix$/m);
-  assert.match(tasksTemplate, /concurrent start \/ cancel then late completion \/ replacement \/ retry \/ remount \/ restart/);
-  assert.match(tasksTemplate, /^## Verification Scope Decision$/m);
-  assert.match(tasksTemplate, /exact test title or stable named test anchor/);
+  assert.match(tasksTemplate, /^## Resume Here$/m);
+  assert.match(tasksTemplate, /^## Delivery Outcomes$/m);
+  assert.match(tasksTemplate, /^## Closeout$/m);
+  assert.match(tasksTemplate, /What must be observably true/);
+  assert.match(tasksTemplate, /one fresh session/);
+  assert.match(tasksTemplate, /^  - New: `EPIC-ID\/S1 R1`/m);
+  assert.match(tasksTemplate, /^  - Update: `EPIC-ID\/S1`/m);
+  assert.match(tasksTemplate, /^- Expected triggers:$/m);
+  assert.doesNotMatch(tasksTemplate, /^## Implementation Ledger$/m);
+  assert.doesNotMatch(tasksTemplate, /^## Slice Gate Ledger$/m);
+  assert.doesNotMatch(tasksTemplate, /Closure receipt/);
 
   const reviewTemplate = await readFile(
     join(PACKAGE_ROOT, "docs", "templates", "review.md"),
@@ -1905,73 +3601,28 @@ test("packaged workflow templates preserve boundary, transition, and evidence-in
     reviewTemplate,
     "sdd-review report template must match the canonical package template",
   );
-  assert.match(reviewTemplate, /^\| Evidence falsification \|/m);
-  assert.match(reviewTemplate, /^\| Pattern conformance \|/m);
-  assert.match(reviewTemplate, /^\| Boundary contracts \|/m);
-  assert.match(reviewTemplate, /^\| Stateful transitions \|/m);
-  assert.match(reviewTemplate, /^## Boundary And Conservation Review$/m);
-  assert.match(reviewTemplate, /^## Verification Scope And Candidate Gates$/m);
-
-  const epicVerifyTemplate = await readFile(
-    join(PACKAGE_ROOT, "docs", "templates", "epic-verify-report.md"),
-    "utf8",
-  );
-  assert.equal(
-    await readFile(
-      join(PACKAGE_ROOT, "skills", "sdd-epic-verify", "assets", "epic-verify-report-template.md"),
-      "utf8",
-    ),
-    epicVerifyTemplate,
-    "sdd-epic-verify report template must match the canonical package template",
-  );
-  assert.match(epicVerifyTemplate, /^schema: sdd-epic-verify-report-v1$/m);
-  assert.match(epicVerifyTemplate, /^result: blocked$/m);
-  assert.match(epicVerifyTemplate, /^## Current Findings$/m);
-  assert.match(epicVerifyTemplate, /^\| Aggregate\/runtime verification scope \|/m);
-
-  const releaseTemplate = await readFile(
-    join(PACKAGE_ROOT, "docs", "templates", "release-pr.md"),
-    "utf8",
-  );
-  assert.equal(
-    await readFile(
-      join(PACKAGE_ROOT, "skills", "sdd-release", "assets", "release-pr-template.md"),
-      "utf8",
-    ),
-    releaseTemplate,
-    "sdd-release PR template must match the canonical package template",
-  );
-  assert.match(releaseTemplate, /^## File Scope Reconciliation$/m);
-  assert.match(releaseTemplate, /^## Remote Review Watermarks$/m);
-  assert.match(releaseTemplate, /Cumulative release-candidate review required/);
-  assert.match(releaseTemplate, /^## Documentation And SDD Integrity$/m);
-
-  const applySkill = await readFile(
-    join(PACKAGE_ROOT, "skills", "sdd-apply", "SKILL.md"),
-    "utf8",
-  );
-  const reviewSkill = await readFile(
-    join(PACKAGE_ROOT, "skills", "sdd-review", "SKILL.md"),
-    "utf8",
-  );
-  assert.match(applySkill, /Pattern Parity Matrix/);
-  assert.match(applySkill, /Boundary Contract Matrix/);
-  assert.match(applySkill, /Stateful Transition Matrix/);
-  assert.match(applySkill, /filesystem mutation-order/);
-  assert.match(applySkill, /Evidence Claim Integrity/);
-  assert.match(applySkill, /Keep three proof layers distinct/);
-  assert.match(reviewSkill, /\*\*Evidence falsification\*\*/);
-  assert.match(reviewSkill, /\*\*Pattern conformance\*\*/);
-  assert.match(reviewSkill, /\*\*Boundary contracts\*\*/);
-  assert.match(reviewSkill, /\*\*Risk-shaped evidence and stateful transitions\*\*/);
-  assert.match(reviewSkill, /durable work whose identifier never reached the client/);
-  assert.match(reviewSkill, /Require integration-candidate proof/);
+  for (const gate of [
+    "scope-candidate",
+    "behavior",
+    "fresh-verification",
+    "independent-review",
+    "integrity-authority",
+  ]) {
+    assert.match(reviewTemplate, new RegExp(`^\\| ${gate} \\|`, "m"));
+  }
+  assert.match(reviewTemplate, /^### Triggered Checks$/m);
+  assert.match(reviewTemplate, /^### Scenario Coverage$/m);
+  assert.doesNotMatch(reviewTemplate, /artifact-truth|canonical-map-authority|integration-readiness \|/);
 });
 
 test("packaged audit and handoff skills preserve current-state and file-scope gates", async () => {
   const epicVerifySkill = await readFile(
     join(PACKAGE_ROOT, "skills", "sdd-epic-verify", "SKILL.md"),
     "utf8",
+  );
+  assert.equal(
+    await readFile(join(PACKAGE_ROOT, "skills", "sdd-epic-verify", "assets", "epic-verify-report-template.md"), "utf8"),
+    await readFile(join(PACKAGE_ROOT, "docs", "templates", "epic-verify-report.md"), "utf8"),
   );
   assert.match(epicVerifySkill, /immutable audit snapshot/);
   assert.match(epicVerifySkill, /Current Tests And Checks/);
@@ -1996,6 +3647,10 @@ test("packaged audit and handoff skills preserve current-state and file-scope ga
   assert.match(releaseSkill, /Per-Change focused evidence/);
   assert.match(releaseSkill, /fresh-context cumulative release-candidate code\/security\/state review/);
   assert.match(releaseSkill, /initial production release, multiple integrated Changes/);
+  assert.equal(
+    await readFile(join(PACKAGE_ROOT, "skills", "sdd-release", "assets", "release-pr-template.md"), "utf8"),
+    await readFile(join(PACKAGE_ROOT, "docs", "templates", "release-pr.md"), "utf8"),
+  );
 });
 
 test("epic create refuses ambiguous repositories, collisions, and dry-run writes", async (t) => {
@@ -2050,51 +3705,33 @@ test("CLI exposes epic create with JSON output", async (t) => {
     "--date",
     "2026-07-14",
     "--json",
-  ]);
+  ], { cwd: root });
   const result = JSON.parse(stdout);
 
   assert.equal(result.command, "epic-create");
+  assert.equal(result.workspaceRoot, root);
+  assert.equal(Object.hasOwn(result, "userRoot"), false);
   assert.equal(result.epicId, "SAMPLE-E002");
   assert.equal(result.validation.valid, true);
-});
 
-test("change create scaffolds a planned Change for a selected repository", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-
-  const result = await createPlannedChange(root, "sample", "mobile-notes-access", {
-    date: "2026-07-14",
-    repositories: ["code/sample-mobile"],
-  });
-
-  assert.equal(result.command, "change-create");
-  assert.equal(result.changeId, "2026-07-14-mobile-notes-access");
-  assert.equal(result.path, "ideas/sample/planned-changes/2026-07-14-mobile-notes-access");
-  assert.deepEqual(result.repositories, [
-    {
-      root: "code",
-      path: "sample-mobile",
-      role: "mobile",
-      status: "active",
-      resolvedPath: "code/sample-mobile",
-    },
-  ]);
-  assert.deepEqual(result.files, ["proposal.md", "design.md", "tasks.md"]);
-
-  const changeRoot = join(root, result.path);
-  const proposal = await readFile(join(changeRoot, "proposal.md"), "utf8");
-  const design = await readFile(join(changeRoot, "design.md"), "utf8");
-  const tasks = await readFile(join(changeRoot, "tasks.md"), "utf8");
-  assert.match(proposal, /^# Proposal: Mobile Notes Access/m);
-  assert.match(proposal, /Planned location: `ideas\/sample\/planned-changes\/2026-07-14-mobile-notes-access`/);
-  assert.match(proposal, /`code\/sample-mobile` \(mobile\)/);
-  assert.match(design, /^# Design: Mobile Notes Access/m);
-  assert.match(tasks, /^---\nstatus: proposed\n---/);
-  assert.match(tasks, /run scoped `sdd validate`/i);
-  assert.match(tasks, /run `sdd change close`/);
-  assert.match(tasks, /^# Tasks: Mobile Notes Access/m);
-  assert.doesNotMatch(`${proposal}\n${design}\n${tasks}`, /CHANGE TITLE|yyyy-mm-dd-change-name/);
+  const { stdout: human } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "epic",
+    "create",
+    "sample",
+    "SAMPLE-E003",
+    "dry-run-output",
+    "--workspace",
+    root,
+    "--repo",
+    "sample-web",
+    "--date",
+    "2026-07-14",
+    "--dry-run",
+  ], { cwd: root });
+  assert.match(human, /^Would create Epic: SAMPLE-E003$/m);
+  assert.match(human, /^Repository: code\/sample-web$/m);
+  assert.match(human, /^Path: code\/sample-web\/docs\/epics\/sample-e003-dry-run-output\/epic\.md$/m);
 });
 
 test("change create skips archived repositories and rejects inactive Spaces", async (t) => {
@@ -2102,38 +3739,21 @@ test("change create skips archived repositories and rejects inactive Spaces", as
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
 
-  const config = await readConfig(root);
+  const config = await readWorkspaceConfig(root);
   for (const repository of config.ideas.sample.repositories) repository.status = "archived";
-  await writeConfig(root, config);
+  await writeWorkspaceConfig(root, config);
 
-  const planningOnly = await createPlannedChange(root, "sample", "replacement-planning", {
+  const planningOnly = await createChange(root, "sample", "replacement-planning", {
     date: "2026-07-14",
   });
   assert.deepEqual(planningOnly.repositories, []);
 
   config.ideas.sample.status = "inactive";
-  await writeConfig(root, config);
+  await writeWorkspaceConfig(root, config);
   await assert.rejects(
-    () => createPlannedChange(root, "sample", "inactive-work", { date: "2026-07-15" }),
+    () => createChange(root, "sample", "inactive-work", { date: "2026-07-15" }),
     (error) => error instanceof SddError && error.code === "SPACE_NOT_ACTIVE",
   );
-});
-
-test("change create dry-run reports the planned Change without writing files", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-
-  const result = await createPlannedChange(root, "sample", "dry-run-example", {
-    date: "2026-07-14",
-    repositories: ["sample-web"],
-    dryRun: true,
-  });
-
-  assert.equal(result.dryRun, true);
-  assert.equal(result.path, "ideas/sample/planned-changes/2026-07-14-dry-run-example");
-  assert.equal(result.repositories[0].resolvedPath, "code/sample-web");
-  assert.equal(await pathExists(join(root, result.path)), false);
 });
 
 test("CLI exposes change create with JSON output", async (t) => {
@@ -2154,71 +3774,62 @@ test("CLI exposes change create with JSON output", async (t) => {
     "--date",
     "2026-07-14",
     "--json",
-  ]);
+  ], { cwd: root });
   const result = JSON.parse(stdout);
 
   assert.equal(result.command, "change-create");
-  assert.equal(result.path, "ideas/sample/planned-changes/2026-07-14-cli-example");
+  assert.equal(result.path, ".sdd/changes/2026-07-14-cli-example");
   assert.equal(result.repositories[0].resolvedPath, "code/sample-web");
 });
 
-test("change create refuses to guess among multiple mapped repositories", async (t) => {
+test("CLI change create resolves a sole absolute repository selector from an explicit workspace", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
-
-  await assert.rejects(
-    () => createPlannedChange(root, "sample", "ambiguous-target", { date: "2026-07-14" }),
-    (error) =>
-      error instanceof SddError &&
-      error.code === "REPOSITORY_REQUIRED" &&
-      error.details.includes("Available repository: code/sample-web") &&
-      error.details.includes("Available repository: code/sample-mobile"),
-  );
-});
-
-test("change create infers a sole repository and refuses an existing Change", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const config = await readConfig(root);
-  config.ideas.sample.repositories = [config.ideas.sample.repositories[0]];
-  await writeConfig(root, config);
-
-  const first = await createPlannedChange(root, "sample", "single-target", {
-    date: "2026-07-14",
-  });
-  assert.equal(first.repositories[0].resolvedPath, "code/sample-web");
-
-  await assert.rejects(
-    () => createPlannedChange(root, "sample", "single-target", { date: "2026-07-14" }),
-    (error) => error instanceof SddError && error.code === "CHANGE_EXISTS",
-  );
-});
-
-test("change create refuses IDs already active or closed in a selected repository", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  await writeCanonicalChange(root, "sample-web", "2026-07-14-active-collision", "in_progress");
-  await writeCanonicalChange(
+  const repositoryRoot = join(root, "code", "sample-web");
+  const command = (slug, repository) => [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "change",
+    "create",
+    "sample",
+    slug,
+    "--workspace",
     root,
-    "sample-web",
-    "2026-07-14-closed-collision",
-    "in_review",
-    { closed: true },
-  );
+    "--repo",
+    repository,
+    "--date",
+    "2026-08-09",
+    "--dry-run",
+    "--json",
+  ];
 
-  for (const slug of ["active-collision", "closed-collision"]) {
-    await assert.rejects(
-      () => createPlannedChange(root, "sample", slug, {
-        date: "2026-07-14",
-        repositories: ["sample-web"],
-        dryRun: true,
-      }),
-      (error) => error instanceof SddError && error.code === "CHANGE_EXISTS",
-    );
-  }
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    command("absolute-repository", repositoryRoot),
+    { cwd: tmpdir() },
+  );
+  const result = JSON.parse(stdout);
+  assert.equal(result.workspaceRoot, root);
+  assert.equal(result.dryRun, true);
+  assert.deepEqual(
+    result.repositories.map((repository) => repository.resolvedPath),
+    ["code/sample-web"],
+  );
+  assert.equal(await pathExists(join(root, result.path)), false);
+
+  let selectionError;
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      command("unrelated-absolute-path", join(root, "ideas", "sample")),
+      { cwd: tmpdir() },
+    ),
+    (error) => {
+      selectionError = JSON.parse(error.stderr).error;
+      return true;
+    },
+  );
+  assert.equal(selectionError.code, "REPOSITORY_NOT_FOUND");
 });
 
 test("change create rejects a planned directory through an external symlink", async (t) => {
@@ -2227,16 +3838,41 @@ test("change create rejects a planned directory through an external symlink", as
   t.after(() => rm(root, { recursive: true, force: true }));
   t.after(() => rm(external, { recursive: true, force: true }));
   await initWorkspace(root);
-  await symlink(external, join(root, "ideas", "sample", "planned-changes"));
+  await rm(join(root, ".sdd", "changes"), { recursive: true });
+  await symlink(external, join(root, ".sdd", "changes"));
 
   await assert.rejects(
-    () => createPlannedChange(root, "sample", "external-plan", {
+    () => createChange(root, "sample", "external-plan", {
       date: "2026-07-14",
       repositories: ["sample-web"],
     }),
     (error) => error instanceof SddError && error.code === "UNSAFE_ARTIFACT_PATH",
   );
   assert.deepEqual(await readdir(external), []);
+});
+
+test("change create rejects an internal alias at the fixed Change-store root without writing", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changesRoot = getChangesRoot(root);
+  await rm(changesRoot, { recursive: true });
+  await symlink(join(root, ".sdd"), changesRoot);
+  const before = (await readdir(join(root, ".sdd"))).sort();
+  const changeId = "2026-08-09-internal-alias";
+
+  await assert.rejects(
+    () => createChange(root, "sample", "internal-alias", {
+      date: "2026-08-09",
+      repositories: ["sample-web"],
+    }),
+    (error) => error instanceof SddError
+      && error.code === "UNSAFE_ARTIFACT_PATH"
+      && error.details.length === 1
+      && error.details[0] === ".sdd/changes",
+  );
+  assert.equal(await pathExists(join(root, ".sdd", changeId)), false);
+  assert.deepEqual((await readdir(join(root, ".sdd"))).sort(), before);
 });
 
 test("change create rejects unsafe slugs and impossible dates before writing", async (t) => {
@@ -2246,7 +3882,7 @@ test("change create rejects unsafe slugs and impossible dates before writing", a
 
   await assert.rejects(
     () =>
-      createPlannedChange(root, "sample", "../outside", {
+      createChange(root, "sample", "../outside", {
         date: "2026-07-14",
         repositories: ["sample-web"],
       }),
@@ -2254,293 +3890,241 @@ test("change create rejects unsafe slugs and impossible dates before writing", a
   );
   await assert.rejects(
     () =>
-      createPlannedChange(root, "sample", "invalid-date", {
+      createChange(root, "sample", "invalid-date", {
         date: "2026-02-30",
         repositories: ["sample-web"],
       }),
     (error) => error instanceof SddError && error.code === "INVALID_CHANGE_DATE",
   );
-  assert.equal(await pathExists(join(root, "ideas", "sample", "planned-changes")), false);
+  assert.deepEqual(await readdir(join(root, ".sdd", "changes")), ["closed"]);
 });
 
-test("change promote moves a planned draft into a selected repository", async (t) => {
+
+
+
+
+
+
+
+
+
+test("Change creation treats a dangling closed-history entry as an identity collision", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
-  const created = await createPlannedChange(root, "sample", "mobile-notes-access", {
-    date: "2026-07-14",
-    repositories: ["code/sample-mobile"],
-  });
-  await setPlannedChangeStatus(root, created);
-  await writeFile(
-    join(root, created.path, "design.md"),
-    `# Design\n\nDraft: \`${created.path}\`\n`,
-    "utf8",
-  );
-
-  const result = await promotePlannedChange(root, "sample", created.changeId, {
-    repositories: ["code/sample-mobile"],
-  });
-
-  assert.equal(result.command, "change-promote");
-  assert.equal(result.sourcePath, created.path);
-  assert.equal(result.sourceRemoved, true);
-  assert.equal(result.repositories.length, 1);
-  assert.equal(
-    result.repositories[0].path,
-    "code/sample-mobile/docs/changes/2026-07-14-mobile-notes-access",
-  );
-  assert.equal(await pathExists(join(root, created.path)), false);
-
-  const promotedRoot = join(root, result.repositories[0].path);
-  const proposal = await readFile(join(promotedRoot, "proposal.md"), "utf8");
-  const design = await readFile(join(promotedRoot, "design.md"), "utf8");
-  const tasks = await readFile(join(promotedRoot, "tasks.md"), "utf8");
-  assert.match(proposal, /- This repository \(role: mobile\)\./);
-  assert.match(proposal, /Planned location: promoted; private draft removed/);
-  assert.match(proposal, /Active location: `docs\/changes\/2026-07-14-mobile-notes-access\/`/);
-  assert.doesNotMatch(proposal, /code\/sample-mobile/);
-  assert.match(design, /Draft: `docs\/changes\/2026-07-14-mobile-notes-access`/);
-  assert.match(tasks, /^---\nstatus: planned\n---/);
-  assert.match(tasks, /Expected dirty files: `docs\/changes\/2026-07-14-mobile-notes-access\/`/);
-});
-
-test("change promote supports coordinated multi-repository promotion", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const created = await createPlannedChange(root, "sample", "shared-contract", {
-    date: "2026-07-14",
-    repositories: ["sample-web", "sample-mobile"],
-  });
-  await setPlannedChangeStatus(root, created);
-
-  const result = await promotePlannedChange(root, "sample", created.changeId, {
-    repositories: ["sample-web", "sample-mobile"],
-  });
-
-  assert.equal(result.repositories.length, 2);
-  assert.equal(await pathExists(join(root, created.path)), false);
-  for (const repository of result.repositories) {
-    const proposal = await readFile(join(root, repository.path, "proposal.md"), "utf8");
-    assert.match(proposal, /Coordinated promotion: 2 repository Changes total\./);
-    assert.match(proposal, new RegExp(`role: ${repository.role}`));
-  }
-});
-
-test("change promote dry-run reports destinations without moving the draft", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const config = await readConfig(root);
-  config.ideas.sample.repositories = [config.ideas.sample.repositories[0]];
-  await writeConfig(root, config);
-  const created = await createPlannedChange(root, "sample", "dry-run-promotion", {
-    date: "2026-07-14",
-  });
-  await setPlannedChangeStatus(root, created);
-
-  const result = await promotePlannedChange(root, "sample", created.changeId, { dryRun: true });
-
-  assert.equal(result.dryRun, true);
-  assert.equal(result.sourceRemoved, false);
-  assert.equal(await pathExists(join(root, created.path)), true);
-  assert.equal(await pathExists(join(root, result.repositories[0].path)), false);
-});
-
-test("change promote preflights every destination before modifying the draft", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const created = await createPlannedChange(root, "sample", "collision-check", {
-    date: "2026-07-14",
-    repositories: ["sample-web", "sample-mobile"],
-  });
-  await setPlannedChangeStatus(root, created);
-  const collision = join(root, "code", "sample-mobile", "docs", "changes", created.changeId);
-  await mkdir(collision, { recursive: true });
+  const changeId = "2026-08-19-dangling-closed";
+  const closedPath = getClosedChangePath(changeId, root);
+  const danglingTarget = join(root, "missing-closed-change");
+  await symlink(danglingTarget, closedPath);
 
   await assert.rejects(
-    () => promotePlannedChange(root, "sample", created.changeId, {
-      repositories: ["sample-web", "sample-mobile"],
+    () => createChange(root, "sample", "dangling-closed", {
+      date: "2026-08-19",
+      repositories: ["sample-web"],
     }),
     (error) => error instanceof SddError && error.code === "CHANGE_EXISTS",
   );
-  assert.equal(await pathExists(join(root, created.path)), true);
-  assert.equal(
-    await pathExists(join(root, "code", "sample-web", "docs", "changes", created.changeId)),
-    false,
-  );
+
+  assert.equal(await readlink(closedPath), danglingTarget);
+  assert.equal(await pathExists(getActiveChangePath(changeId, root)), false);
 });
 
-test("change promote preserves a concurrent replacement of the planned draft", async (t) => {
+test("concurrent Change creation preserves one complete central winner", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
-  const created = await createPlannedChange(root, "sample", "concurrent-promotion", {
-    date: "2026-07-14",
-    repositories: ["sample-web"],
-  });
-  await setPlannedChangeStatus(root, created, "planned");
-  const latestTasks = "---\nstatus: planned\n---\n# Tasks: concurrent latest draft\n";
 
-  await assert.rejects(
-    () => promotePlannedChange(root, "sample", created.changeId, {
+  let arrivals = 0;
+  let release;
+  const bothReady = new Promise((resolve) => {
+    release = resolve;
+  });
+  const beforePublish = async () => {
+    arrivals += 1;
+    if (arrivals === 2) release();
+    await bothReady;
+  };
+  const attempts = await Promise.allSettled([
+    createChange(root, "sample", "one-winner", {
+      date: "2026-08-19",
       repositories: ["sample-web"],
-      beforeCommit: async ({ sourcePath }) => {
-        await mkdir(sourcePath, { recursive: true });
-        await writeFile(join(sourcePath, "tasks.md"), latestTasks, "utf8");
-      },
+      beforePublish,
     }),
-    (error) => error instanceof SddError
-      && error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes("original retained")),
-  );
-  assert.equal(await readFile(join(root, created.path, "tasks.md"), "utf8"), latestTasks);
-  const plannedParent = dirname(join(root, created.path));
-  assert.ok((await readdir(plannedParent)).some((entry) =>
-    entry.startsWith(`.${created.changeId}.sdd-promoted-`)));
-  assert.equal(
-    await pathExists(join(root, "code", "sample-web", "docs", "changes", created.changeId)),
-    false,
-  );
-});
-
-test("change promote rejects symbolic links anywhere in the planned draft", async (t) => {
-  const root = await createMappedWorkspace();
-  const external = await createWorkspace("sdd-private-draft-content-");
-  t.after(() => rm(root, { recursive: true, force: true }));
-  t.after(() => rm(external, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const created = await createPlannedChange(root, "sample", "symlinked-draft", {
-    date: "2026-07-14",
-    repositories: ["sample-web"],
-  });
-  await setPlannedChangeStatus(root, created, "planned");
-  const privateFile = join(external, "private.md");
-  const designPath = join(root, created.path, "design.md");
-  await writeFile(privateFile, "private external content\n");
-  await rm(designPath);
-  await symlink(privateFile, designPath);
-
-  await assert.rejects(
-    () => promotePlannedChange(root, "sample", created.changeId, {
+    createChange(root, "sample", "one-winner", {
+      date: "2026-08-19",
       repositories: ["sample-web"],
+      beforePublish,
     }),
-    (error) => error instanceof SddError && error.code === "UNSAFE_ARTIFACT_PATH",
-  );
-  assert.equal(await readFile(privateFile, "utf8"), "private external content\n");
-  assert.equal(
-    await pathExists(join(root, "code", "sample-web", "docs", "changes", created.changeId)),
-    false,
-  );
-});
-
-test("change promote preserves a destination edited after commit when a later destination fails", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const created = await createPlannedChange(root, "sample", "post-commit-promotion-edit", {
-    date: "2026-07-14",
-    repositories: ["sample-web", "sample-mobile"],
-  });
-  await setPlannedChangeStatus(root, created, "planned");
-  const firstDestination = join(root, "code", "sample-web", "docs", "changes", created.changeId);
-  const secondDestination = join(root, "code", "sample-mobile", "docs", "changes", created.changeId);
-  const latestTasks = "---\nstatus: planned\n---\n# Tasks: destination edited after promotion\n";
-
-  await assert.rejects(
-    () => promotePlannedChange(root, "sample", created.changeId, {
-      repositories: ["sample-web", "sample-mobile"],
-      beforeDestinationCommit: async ({ index }) => {
-        if (index !== 1) return;
-        await writeFile(join(firstDestination, "tasks.md"), latestTasks, "utf8");
-        await mkdir(secondDestination, { recursive: true });
-      },
-    }),
-    (error) => error instanceof SddError
-      && error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes("newer content preserved")),
-  );
-
-  assert.equal(await readFile(join(firstDestination, "tasks.md"), "utf8"), latestTasks);
-  assert.equal(await pathExists(join(root, created.path)), true);
-});
-
-test("change promote rejects a proposed draft until planning is complete", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const created = await createPlannedChange(root, "sample", "invalid-draft", {
-    date: "2026-07-14",
-    repositories: ["sample-web"],
-  });
-  await assert.rejects(
-    () => promotePlannedChange(root, "sample", created.changeId, {
-      repositories: ["sample-web"],
-    }),
-    (error) => error instanceof SddError && error.code === "CHANGE_NOT_PLANNED",
-  );
-  assert.equal(await pathExists(join(root, created.path)), true);
-});
-
-test("CLI exposes change promote with JSON output", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const created = await createPlannedChange(root, "sample", "cli-promotion", {
-    date: "2026-07-14",
-    repositories: ["sample-web"],
-  });
-  await setPlannedChangeStatus(root, created);
-
-  const { stdout } = await execFileAsync(process.execPath, [
-    join(PACKAGE_ROOT, "bin", "sdd.js"),
-    "change",
-    "promote",
-    "sample",
-    created.changeId,
-    "--workspace",
-    root,
-    "--repo",
-    "sample-web",
-    "--json",
   ]);
-  const result = JSON.parse(stdout);
 
-  assert.equal(result.command, "change-promote");
-  assert.equal(result.sourceRemoved, true);
-  assert.equal(result.repositories[0].resolvedPath, "code/sample-web");
+  assert.equal(attempts.filter((attempt) => attempt.status === "fulfilled").length, 1);
+  const rejected = attempts.find((attempt) => attempt.status === "rejected");
+  assert.equal(rejected.reason.code, "CHANGE_EXISTS");
+  const changePath = getActiveChangePath("2026-08-19-one-winner", root);
+  const source = await readFile(join(changePath, "change.md"), "utf8");
+  assert.match(source, /^status: proposed$/m);
+  assert.match(source, /^space: sample$/m);
+  assert.deepEqual(await readdir(changePath), ["change.md"]);
 });
 
-test("change close moves an in-review Change without writing a closed status", async (t) => {
+test("Change creation preserves a replacement after exclusive directory creation", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
-  const changeId = "2026-07-14-ready-change";
-  await writeChange(root, "sample-web", changeId, "in_review");
+  const changeId = "2026-08-19-create-replacement";
+  const activePath = getActiveChangePath(changeId, root);
+  const displacedPath = `${activePath}.displaced`;
+  const marker = "concurrent winner\n";
 
-  const result = await closeChange(root, "sample", changeId, {
+  await assert.rejects(
+    () => createChange(root, "sample", "create-replacement", {
+      date: "2026-08-19",
+      repositories: ["sample-web"],
+      afterDirectoryCreate: async ({ targetPath }) => {
+        await rename(targetPath, displacedPath);
+        await mkdir(targetPath);
+        await writeFile(join(targetPath, "winner.txt"), marker, "utf8");
+      },
+    }),
+    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
+  );
+
+  assert.equal(await readFile(join(activePath, "winner.txt"), "utf8"), marker);
+  assert.deepEqual(await readdir(activePath), ["winner.txt"]);
+  assert.deepEqual(await readdir(displacedPath), []);
+});
+
+test("Change lifecycle commands do not consume the managed-install mutation lock", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const lockPath = join(root, ".sdd", "mutation.lock");
+  await writeFile(lockPath, "managed install held\n", "utf8");
+
+  const created = await createChange(root, "sample", "narrow-lifecycle", {
+    date: "2026-08-19",
     repositories: ["sample-web"],
   });
+  const activePath = getActiveChangePath(created.changeId, root);
+  const source = await readFile(join(activePath, "change.md"), "utf8");
+  await writeFile(
+    join(activePath, "change.md"),
+    source.replace("status: proposed", "status: in_review"),
+    "utf8",
+  );
+  await transitionChange(root, "sample", created.changeId, {
+    from: "in_review",
+    to: "in_progress",
+  });
+  await transitionChange(root, "sample", created.changeId, {
+    from: "in_progress",
+    to: "in_review",
+  });
+  await closeChange(root, "sample", created.changeId);
 
-  assert.equal(result.command, "change-close");
-  assert.equal(result.dryRun, false);
-  assert.equal(result.repositories.length, 1);
-  assert.equal(
-    result.repositories[0].sourcePath,
-    `code/sample-web/docs/changes/${changeId}`,
+  assert.equal(await readFile(lockPath, "utf8"), "managed install held\n");
+  assert.equal(await pathExists(activePath), false);
+  assert.equal(await pathExists(getClosedChangePath(created.changeId, root)), true);
+});
+
+test("change close preserves restrictive directory modes through publication and cleanup", async (t) => {
+  const root = await createMappedWorkspace();
+  const changeId = "2026-07-14-close-directory-modes";
+  const activePath = getActiveChangePath(changeId, root);
+  const closedPath = getClosedChangePath(changeId, root);
+  t.after(async () => {
+    for (const path of [activePath, closedPath, join(activePath, "evidence"), join(closedPath, "evidence")]) {
+      await chmod(path, 0o755).catch(() => {});
+    }
+    await rm(root, { recursive: true, force: true });
+  });
+  await initWorkspace(root);
+  await writeChange(root, "sample-web", changeId, "in_review");
+  const nestedPath = join(activePath, "evidence");
+  const evidencePath = join(nestedPath, "review.txt");
+  await mkdir(nestedPath);
+  await writeFile(evidencePath, "reviewed\n", "utf8");
+  await chmod(evidencePath, 0o444);
+  await chmod(nestedPath, 0o555);
+  await chmod(activePath, 0o555);
+
+  await closeChange(root, "sample", changeId);
+
+  const closedEvidencePath = join(closedPath, "evidence", "review.txt");
+  assert.equal((await lstat(closedPath)).mode & 0o777, 0o555);
+  assert.equal((await lstat(join(closedPath, "evidence"))).mode & 0o777, 0o555);
+  assert.equal((await lstat(closedEvidencePath)).mode & 0o777, 0o444);
+  assert.equal(await readFile(closedEvidencePath, "utf8"), "reviewed\n");
+  assert.equal(await pathExists(activePath), false);
+  assert.deepEqual(await readdir(getChangesRoot(root)), ["closed"]);
+});
+
+test("change close never chmods a source symlink replacement", async (t) => {
+  const root = await createMappedWorkspace();
+  const external = await createWorkspace("sdd-close-external-source-");
+  const changeId = "2026-08-28-close-source-replacement";
+  const activePath = getActiveChangePath(changeId, root);
+  const displacedPath = `${activePath}.displaced`;
+  t.after(async () => {
+    for (const path of [activePath, displacedPath, external]) {
+      await chmod(path, 0o755).catch(() => {});
+    }
+    await rm(root, { recursive: true, force: true });
+    await rm(external, { recursive: true, force: true });
+  });
+  await initWorkspace(root);
+  await writeChange(root, "sample-web", changeId, "in_review");
+  await chmod(activePath, 0o555);
+  await chmod(external, 0o555);
+
+  await assert.rejects(
+    () => closeChange(root, "sample", changeId, {
+      afterDirectoryOpen: async () => {
+        await chmod(activePath, 0o755);
+        await rename(activePath, displacedPath);
+        await symlink(external, activePath, "dir");
+      },
+    }),
+    (error) => error instanceof SddError
+      && ["CONCURRENT_CHANGE", "UNSAFE_ARTIFACT_PATH"].includes(error.code),
   );
-  assert.equal(
-    result.repositories[0].path,
-    `code/sample-web/docs/changes/closed/${changeId}`,
+
+  assert.equal((await lstat(external)).mode & 0o777, 0o555);
+  assert.equal(await pathExists(displacedPath), true);
+});
+
+test("change close restores the moved inode without chmodding a destination replacement", async (t) => {
+  const root = await createMappedWorkspace();
+  const external = await createWorkspace("sdd-close-external-destination-");
+  const changeId = "2026-08-28-close-destination-replacement";
+  const activePath = getActiveChangePath(changeId, root);
+  const closedPath = getClosedChangePath(changeId, root);
+  const displacedPath = `${closedPath}.displaced`;
+  t.after(async () => {
+    for (const path of [activePath, closedPath, displacedPath, external]) {
+      await chmod(path, 0o755).catch(() => {});
+    }
+    await rm(root, { recursive: true, force: true });
+    await rm(external, { recursive: true, force: true });
+  });
+  await initWorkspace(root);
+  await writeChange(root, "sample-web", changeId, "in_review");
+  await chmod(activePath, 0o555);
+  await chmod(external, 0o555);
+
+  await assert.rejects(
+    () => closeChange(root, "sample", changeId, {
+      afterMove: async () => {
+        await rename(closedPath, displacedPath);
+        await symlink(external, closedPath, "dir");
+      },
+    }),
+    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
   );
-  assert.equal(await pathExists(join(root, result.repositories[0].sourcePath)), false);
-  assert.equal(await pathExists(join(root, result.repositories[0].path)), true);
-  assert.match(
-    await readFile(join(root, result.repositories[0].path, "tasks.md"), "utf8"),
-    /^---\nstatus: in_review\n---/,
-  );
+
+  assert.equal((await lstat(external)).mode & 0o777, 0o555);
+  assert.equal((await lstat(displacedPath)).mode & 0o777, 0o555);
+  assert.equal(await readFile(join(displacedPath, "change.md"), "utf8").then((source) => source.includes("status: in_review")), true);
 });
 
 test("change close dry-run validates without moving the Change", async (t) => {
@@ -2556,14 +4140,32 @@ test("change close dry-run validates without moving the Change", async (t) => {
   });
 
   assert.equal(result.dryRun, true);
-  assert.equal(
-    await pathExists(join(root, "code", "sample-web", "docs", "changes", changeId)),
-    true,
+  assert.equal(await pathExists(join(root, ".sdd", "changes", changeId)), true);
+  assert.equal(await pathExists(join(root, ".sdd", "changes", "closed", changeId)), false);
+});
+
+test("change close ignores an unrelated mapped repository without portable identity", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await rm(join(root, "code", "sample-web", ".sdd"), { recursive: true });
+
+  const healthyChangeId = "2026-07-14-close-healthy-target";
+  await writeChange(root, "sample-mobile", healthyChangeId, "in_review");
+  const result = await closeChange(root, "sample", healthyChangeId);
+
+  assert.deepEqual(result.repositories.map((repository) => repository.id), ["sample-mobile"]);
+  assert.equal(await pathExists(join(root, ".sdd", "changes", "closed", healthyChangeId)), true);
+
+  const unresolvedChangeId = "2026-07-14-close-unresolved-target";
+  await writeChange(root, "sample-web", unresolvedChangeId, "in_review");
+  await assert.rejects(
+    () => closeChange(root, "sample", unresolvedChangeId),
+    (error) => error instanceof SddError
+      && error.code === "REPOSITORY_ID_REQUIRED"
+      && error.details.includes("code/sample-web: REPOSITORY_ID_REQUIRED"),
   );
-  assert.equal(
-    await pathExists(join(root, "code", "sample-web", "docs", "changes", "closed", changeId)),
-    false,
-  );
+  assert.equal(await pathExists(join(root, ".sdd", "changes", unresolvedChangeId)), true);
 });
 
 test("change close requires in_review status", async (t) => {
@@ -2580,37 +4182,9 @@ test("change close requires in_review status", async (t) => {
       error.code === "CHANGE_NOT_IN_REVIEW" &&
       error.details.includes("Current status: in_progress"),
   );
-  assert.equal(
-    await pathExists(join(root, "code", "sample-web", "docs", "changes", changeId)),
-    true,
-  );
+  assert.equal(await pathExists(join(root, ".sdd", "changes", changeId)), true);
 });
 
-test("change close preflights every destination before moving any Change", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-14-coordinated-close";
-  await writeChange(root, "sample-web", changeId, "in_review");
-  await writeChange(root, "sample-mobile", changeId, "in_review");
-  await writeChange(root, "sample-mobile", changeId, "in_review", { closed: true });
-
-  await assert.rejects(
-    () =>
-      closeChange(root, "sample", changeId, {
-        repositories: ["sample-web", "sample-mobile"],
-      }),
-    (error) => error instanceof SddError && error.code === "CHANGE_ALREADY_CLOSED",
-  );
-  assert.equal(
-    await pathExists(join(root, "code", "sample-web", "docs", "changes", changeId)),
-    true,
-  );
-  assert.equal(
-    await pathExists(join(root, "code", "sample-web", "docs", "changes", "closed", changeId)),
-    false,
-  );
-});
 
 test("change close rechecks status at commit time", async (t) => {
   const root = await createMappedWorkspace();
@@ -2618,17 +4192,40 @@ test("change close rechecks status at commit time", async (t) => {
   await initWorkspace(root);
   const changeId = "2026-07-14-close-status-race";
   await writeChange(root, "sample-web", changeId, "in_review");
-  const tasksPath = join(root, "code", "sample-web", "docs", "changes", changeId, "tasks.md");
-  const latestTasks = "---\nstatus: in_progress\n---\n# Tasks: reopened during close\n";
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
+  const latestChange = (await readFile(changeFilePath, "utf8"))
+    .replace("status: in_review", "status: in_progress");
 
   await assert.rejects(
     () => closeChange(root, "sample", changeId, {
-      repositories: ["sample-web"],
-      beforeRepositoryCommit: () => writeFile(tasksPath, latestTasks, "utf8"),
+      beforeCommit: () => writeFile(changeFilePath, latestChange, "utf8"),
     }),
     (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
   );
-  assert.equal(await readFile(tasksPath, "utf8"), latestTasks);
+  assert.equal(await readFile(changeFilePath, "utf8"), latestChange);
+});
+
+test("change close preserves a destination that appears before the final move", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-08-19-close-destination-race";
+  await writeChange(root, "sample-web", changeId, "in_review");
+  const activePath = getActiveChangePath(changeId, root);
+  const closedPath = getClosedChangePath(changeId, root);
+
+  await assert.rejects(
+    () => closeChange(root, "sample", changeId, {
+      beforeMove: async ({ destinationPath }) => {
+        await mkdir(destinationPath);
+        await writeFile(join(destinationPath, "winner.txt"), "winner\n", "utf8");
+      },
+    }),
+    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
+  );
+
+  assert.equal(await pathExists(activePath), true);
+  assert.equal(await readFile(join(closedPath, "winner.txt"), "utf8"), "winner\n");
 });
 
 test("change transition updates an active Change with compare-and-set semantics", async (t) => {
@@ -2637,6 +4234,8 @@ test("change transition updates an active Change with compare-and-set semantics"
   await initWorkspace(root);
   const changeId = "2026-07-15-design-revision";
   await writeChange(root, "sample-web", changeId, "in_review");
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
+  await chmod(changeFilePath, 0o640);
 
   const result = await transitionChange(root, "sample", changeId, {
     repositories: ["sample-web"],
@@ -2645,11 +4244,39 @@ test("change transition updates an active Change with compare-and-set semantics"
   });
 
   assert.equal(result.command, "change-transition");
-  assert.equal(result.repositories[0].tasksPath, `code/sample-web/docs/changes/${changeId}/tasks.md`);
+  assert.equal(result.changeFilePath, `.sdd/changes/${changeId}/change.md`);
   assert.match(
-    await readFile(join(root, result.repositories[0].tasksPath), "utf8"),
+    await readFile(join(root, result.changeFilePath), "utf8"),
     /^status: in_progress$/m,
   );
+  assert.equal((await lstat(changeFilePath)).mode & 0o777, 0o640);
+});
+
+test("change transition preserves an edit made at the final replacement boundary", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-08-19-transition-final-edit";
+  await writeChange(root, "sample-web", changeId, "in_progress");
+  const activePath = getActiveChangePath(changeId, root);
+  const changeFilePath = join(activePath, "change.md");
+  const latestChange = `${await readFile(changeFilePath, "utf8")}\nConcurrent note.\n`;
+  let temporaryPath;
+
+  await assert.rejects(
+    () => transitionChange(root, "sample", changeId, {
+      from: "in_progress",
+      to: "in_review",
+      beforeReplace: async (context) => {
+        temporaryPath = context.temporaryPath;
+        await writeFile(changeFilePath, latestChange, "utf8");
+      },
+    }),
+    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
+  );
+
+  assert.equal(await readFile(changeFilePath, "utf8"), latestChange);
+  assert.equal(await pathExists(temporaryPath), false);
 });
 
 test("change transition rejects an active Change through an external symlink ancestor", async (t) => {
@@ -2658,13 +4285,12 @@ test("change transition rejects an active Change through an external symlink anc
   t.after(() => rm(root, { recursive: true, force: true }));
   t.after(() => rm(external, { recursive: true, force: true }));
   await initWorkspace(root);
-  const repositoryDocs = join(root, "code", "sample-web", "docs");
-  await mkdir(repositoryDocs, { recursive: true });
-  await symlink(external, join(repositoryDocs, "changes"));
+  await rm(join(root, ".sdd", "changes"), { recursive: true });
+  await symlink(external, join(root, ".sdd", "changes"));
   const changeId = "2026-07-15-external-transition";
   await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const tasksPath = join(external, changeId, "tasks.md");
-  const before = await readFile(tasksPath, "utf8");
+  const changeFilePath = join(external, changeId, "change.md");
+  const before = await readFile(changeFilePath, "utf8");
 
   await assert.rejects(
     () => transitionChange(root, "sample", changeId, {
@@ -2674,157 +4300,39 @@ test("change transition rejects an active Change through an external symlink anc
     }),
     (error) => error instanceof SddError && error.code === "UNSAFE_ARTIFACT_PATH",
   );
-  assert.equal(await readFile(tasksPath, "utf8"), before);
+  assert.equal(await readFile(changeFilePath, "utf8"), before);
 });
 
-test("change transition preserves a concurrent tasks edit", async (t) => {
+test("an explicit workspace override ignores a nested unrelated workspace configuration", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
-  const changeId = "2026-07-15-concurrent-transition";
+  const changeId = "2026-07-15-explicit-workspace";
   await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const tasksPath = join(
-    root,
-    "code",
-    "sample-web",
-    "docs",
-    "changes",
-    changeId,
-    "tasks.md",
-  );
-  const latestTasks = "---\nstatus: in_progress\n---\n# Tasks: concurrent latest edit\n";
+  const tasksPath = join(root, ".sdd", "changes", changeId, "tasks.md");
+  const before = await readFile(tasksPath, "utf8");
+  const nestedRoot = join(root, "code", "sample-web", "untrusted");
+  const nestedConfig = await readWorkspaceConfig(root);
+  nestedConfig.ideas.forged = {
+    status: "active",
+    repositories: [{ root: "code", path: "sample-web", status: "active" }],
+  };
+  await mkdir(nestedRoot, { recursive: true });
+  await writeWorkspaceConfig(nestedRoot, nestedConfig);
 
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web"],
-      from: "in_progress",
-      to: "in_review",
-      beforeCommit: () => writeFile(tasksPath, latestTasks, "utf8"),
-    }),
-    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
-  );
-  assert.equal(await readFile(tasksPath, "utf8"), latestTasks);
-});
-
-test("change transition reports incomplete rollback with the affected path", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-recovery-report";
-  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  await writeCanonicalChange(root, "sample-mobile", changeId, "in_progress");
-
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web", "sample-mobile"],
-      from: "in_progress",
-      to: "in_review",
-      beforeRepositoryCommit: async ({ index, transition, transitions }) => {
-        if (index !== 1) return;
-        await rm(transitions[0].backupPath, { force: true });
-        await rm(transition.tasksAbsolutePath, { force: true });
-      },
-    }),
-    (error) => error instanceof SddError
-      && error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes("sample-web")),
-  );
-});
-
-test("change transition preserves an edit made after an earlier repository commit", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-post-commit-transition-edit";
-  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  await writeCanonicalChange(root, "sample-mobile", changeId, "in_progress");
-  const firstTasks = join(root, "code", "sample-web", "docs", "changes", changeId, "tasks.md");
-  const latestTasks = "---\nstatus: in_progress\n---\n# Tasks: edited after first commit\n";
-
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web", "sample-mobile"],
-      from: "in_progress",
-      to: "in_review",
-      beforeRepositoryCommit: async ({ index, transition }) => {
-        if (index !== 1) return;
-        await writeFile(firstTasks, latestTasks, "utf8");
-        await rm(transition.tasksAbsolutePath, { force: true });
-      },
-    }),
-    (error) => error instanceof SddError
-      && error.code === "MUTATION_RECOVERY_FAILED"
-      && error.details.some((detail) => detail.includes("newer content preserved")),
-  );
-  assert.equal(await readFile(firstTasks, "utf8"), latestTasks);
-});
-
-test("change transition dry-run reports without updating tasks", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-transition-preview";
-  await writeChange(root, "sample-web", changeId, "in_review");
-
-  const result = await transitionChange(root, "sample", changeId, {
-    repositories: ["sample-web"],
-    from: "in_review",
-    to: "in_progress",
-    dryRun: true,
+  const inspection = await inspectWorkspaceConfiguration(nestedRoot, {
+    workspaceRoot: root,
   });
-
-  assert.equal(result.dryRun, true);
-  assert.match(
-    await readFile(join(root, "code", "sample-web", "docs", "changes", changeId, "tasks.md"), "utf8"),
-    /^status: in_review$/m,
-  );
-});
-
-test("change transition rejects stale or invalid lifecycle requests", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-transition-guard";
-  await writeChange(root, "sample-web", changeId, "in_progress");
-
+  assert.equal(inspection.workspaceRoot, root);
   await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web"],
-      from: "in_review",
-      to: "in_progress",
-    }),
-    (error) => error instanceof SddError && error.code === "CHANGE_STATUS_MISMATCH",
-  );
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web"],
+    () => transitionChange(nestedRoot, "forged", changeId, {
       from: "in_progress",
-      to: "planned",
+      to: "in_review",
+      workspaceRoot: root,
     }),
-    (error) => error instanceof SddError && error.code === "INVALID_CHANGE_TRANSITION",
+    (error) => error instanceof SddError && error.code === "SPACE_NOT_FOUND",
   );
-});
-
-test("change transition preflights every selected repository before writing", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const changeId = "2026-07-15-coordinated-transition";
-  await writeChange(root, "sample-web", changeId, "in_review");
-  await writeChange(root, "sample-mobile", changeId, "in_progress");
-
-  await assert.rejects(
-    () => transitionChange(root, "sample", changeId, {
-      repositories: ["sample-web", "sample-mobile"],
-      from: "in_review",
-      to: "in_progress",
-    }),
-    (error) => error instanceof SddError && error.code === "CHANGE_STATUS_MISMATCH",
-  );
-  assert.match(
-    await readFile(join(root, "code", "sample-web", "docs", "changes", changeId, "tasks.md"), "utf8"),
-    /^status: in_review$/m,
-  );
+  assert.equal(await readFile(tasksPath, "utf8"), before);
 });
 
 test("CLI exposes change transition with JSON output", async (t) => {
@@ -2842,14 +4350,12 @@ test("CLI exposes change transition with JSON output", async (t) => {
     changeId,
     "--workspace",
     root,
-    "--repo",
-    "sample-web",
     "--from",
     "in_review",
     "--to",
     "in_progress",
     "--json",
-  ]);
+  ], { cwd: root });
   const result = JSON.parse(stdout);
 
   assert.equal(result.command, "change-transition");
@@ -2873,15 +4379,13 @@ test("CLI exposes change close with JSON output", async (t) => {
     changeId,
     "--workspace",
     root,
-    "--repo",
-    "sample-web",
     "--json",
-  ]);
+  ], { cwd: root });
   const result = JSON.parse(stdout);
 
   assert.equal(result.command, "change-close");
   assert.equal(result.repositories[0].resolvedPath, "code/sample-web");
-  assert.equal(result.repositories[0].path, `code/sample-web/docs/changes/closed/${changeId}`);
+  assert.equal(result.path, `.sdd/changes/closed/${changeId}`);
 });
 
 test("CLI exposes change command-group help", async () => {
@@ -2892,7 +4396,7 @@ test("CLI exposes change command-group help", async () => {
   ]);
 
   assert.match(stdout, /sdd change create/);
-  assert.match(stdout, /sdd change promote/);
+  assert.doesNotMatch(stdout, /sdd change promote/);
   assert.match(stdout, /sdd change transition/);
   assert.match(stdout, /sdd change close/);
 });
@@ -2917,12 +4421,36 @@ test("CLI exposes changed-from validation help", async () => {
   assert.match(stdout, /--changed-from <commit-ish>/);
 });
 
+test("CLI exposes focused validate and update help", async () => {
+  const validate = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "validate",
+    "--help",
+  ]);
+  assert.match(validate.stdout, /^SDD Validate$/m);
+  assert.match(validate.stdout, /current v2 Changes, compact outcomes, central Reviews and commit\/tree integrity/);
+  assert.match(validate.stdout, /--changed-from <commit-ish>/);
+  assert.doesNotMatch(validate.stdout, /Setup options:/);
+
+  const update = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "update",
+    "--help",
+  ]);
+  assert.match(update.stdout, /^SDD Update$/m);
+  assert.match(update.stdout, /checksum-managed workflow and packaged skills/);
+  assert.match(update.stdout, /--force/);
+  assert.doesNotMatch(update.stdout, /Validate options:/);
+});
+
 test("validate accepts a canonical active Change", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   const changeId = "2026-07-14-canonical-change";
   await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
+  await writeCanonicalEpic(root, "sample-web");
+  await declareFixtureEpic(root, changeId);
 
   const result = await validateArtifacts(root, {
     spaceId: "sample",
@@ -2937,6 +4465,304 @@ test("validate accepts a canonical active Change", async (t) => {
   assert.deepEqual(result.findings, []);
 });
 
+test("explicit Change validation resolves only repositories declared by its central metadata", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await mkdir(join(root, "ideas", "other"), { recursive: true });
+  await mkdir(join(root, "code", "other-web"), { recursive: true });
+  const config = await readWorkspaceConfig(root);
+  config.ideas.other = {
+    status: "active",
+    repositories: [{ root: "code", path: "other-web", status: "active" }],
+  };
+  await writeWorkspaceConfig(root, config);
+
+  const changeId = "2026-08-09-authoritative-change-scope";
+  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
+  await writeCanonicalEpic(root, "sample-web");
+  await declareFixtureEpic(root, changeId);
+
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "validate",
+    "--change",
+    changeId,
+    "--repo",
+    "code/sample-web",
+    "--workspace",
+    root,
+    "--json",
+  ], { cwd: root });
+  const withoutSpace = JSON.parse(stdout);
+  assert.equal(withoutSpace.valid, true);
+  assert.equal(withoutSpace.summary.repositories, 1);
+  assert.deepEqual(withoutSpace.scope.repositories, ["code/sample-web"]);
+
+  const withOwningSpace = await validateArtifacts(root, {
+    spaceId: "sample",
+    changeId,
+  });
+  assert.equal(withOwningSpace.valid, true);
+  assert.deepEqual(withOwningSpace.scope.repositories, ["code/sample-web"]);
+
+  const withWrongSpace = await validateArtifacts(root, {
+    spaceId: "other",
+    changeId,
+  });
+  assert.equal(withWrongSpace.valid, false);
+  assert.ok(withWrongSpace.findings.some((finding) =>
+    finding.code === "CHANGE_SPACE_MISMATCH"
+    && finding.spaceId === "other"));
+
+  await assert.rejects(
+    () => validateArtifacts(root, {
+      repositories: ["code/sample-mobile"],
+      changeId,
+    }),
+    (error) => error instanceof SddError && error.code === "REPOSITORY_NOT_FOUND",
+  );
+  await assert.rejects(
+    () => validateArtifacts(root),
+    (error) => error instanceof SddError && error.code === "REPOSITORY_ID_REQUIRED",
+  );
+});
+
+test("validate scopes equal repository IDs by owning Space", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const sampleRepository = join(root, "code", "sample-web");
+  const otherRepository = join(root, "code", "other-web");
+  await writeRepositoryConfig(sampleRepository, createRepositoryConfig("app"));
+  await mkdir(join(root, "ideas", "other"), { recursive: true });
+  await mkdir(otherRepository, { recursive: true });
+  await writeRepositoryConfig(otherRepository, createRepositoryConfig("app"));
+  const config = await readWorkspaceConfig(root);
+  config.ideas.other = {
+    status: "active",
+    repositories: [{ root: "code", path: "other-web", status: "active" }],
+  };
+  await writeWorkspaceConfig(root, config);
+
+  await mkdir(join(sampleRepository, "docs", "epics", "sample-e999-missing"), {
+    recursive: true,
+  });
+  await mkdir(join(otherRepository, "docs", "epics", "other-e999-missing"), {
+    recursive: true,
+  });
+
+  const completeInventory = await validateArtifacts(root);
+  assert.equal(completeInventory.summary.repositories, 3);
+  assert.deepEqual(
+    completeInventory.findings
+      .filter((finding) => finding.code === "MISSING_EPIC_FILE")
+      .map((finding) => ({
+        spaceId: finding.spaceId,
+        repository: finding.repository,
+        path: finding.path,
+      }))
+      .sort((left, right) => left.spaceId.localeCompare(right.spaceId)),
+    [
+      {
+        spaceId: "other",
+        repository: "code/other-web",
+        path: "code/other-web/docs/epics/other-e999-missing/epic.md",
+      },
+      {
+        spaceId: "sample",
+        repository: "code/sample-web",
+        path: "code/sample-web/docs/epics/sample-e999-missing/epic.md",
+      },
+    ],
+  );
+
+  const selectedInventory = await validateArtifacts(root, {
+    repositories: ["code/sample-web", "code/other-web"],
+  });
+  assert.equal(selectedInventory.summary.repositories, 2);
+  assert.deepEqual(
+    selectedInventory.findings
+      .filter((finding) => finding.code === "MISSING_EPIC_FILE")
+      .map((finding) => finding.repository)
+      .sort(),
+    ["code/other-web", "code/sample-web"],
+  );
+
+  const sampleChangeId = "2026-08-08-sample-app";
+  const otherChangeId = "2026-08-08-other-app";
+  await writeCanonicalChange(root, "app", sampleChangeId, "in_progress");
+  await writeCanonicalChange(root, "app", otherChangeId, "in_progress");
+  const sampleChangeFilePath = join(root, ".sdd", "changes", sampleChangeId, "change.md");
+  const otherChangeFilePath = join(root, ".sdd", "changes", otherChangeId, "change.md");
+  await writeFile(
+    otherChangeFilePath,
+    (await readFile(otherChangeFilePath, "utf8")).replace("space: sample", "space: other"),
+    "utf8",
+  );
+  await writeFile(
+    sampleChangeFilePath,
+    `${await readFile(sampleChangeFilePath, "utf8")}\n## Epic Actions\n\n### New Epic Directories\n\n- Create \`docs/epics/sample-e001-projected/epic.md\`.\n`,
+    "utf8",
+  );
+  await writeFile(
+    otherChangeFilePath,
+    `${await readFile(otherChangeFilePath, "utf8")}\n## Epic Actions\n\n### New Epic Directories\n\n- Create \`docs/epics/other-e001-projected/epic.md\`.\n`,
+    "utf8",
+  );
+
+  const sampleProjection = await validateArtifacts(root, { changeId: sampleChangeId });
+  const otherProjection = await validateArtifacts(root, { changeId: otherChangeId });
+  assert.equal(sampleProjection.summary.repositories, 1);
+  assert.equal(otherProjection.summary.repositories, 1);
+  assert.deepEqual(
+    sampleProjection.findings
+      .filter((finding) => finding.code === "AFFECTED_EPIC_NOT_FOUND")
+      .map((finding) => ({
+        spaceId: finding.spaceId,
+        repository: finding.repository,
+        path: finding.path,
+      })),
+    [{
+      spaceId: "sample",
+      repository: undefined,
+      path: "docs/epics/sample-e001-projected/epic.md",
+    }],
+  );
+  assert.deepEqual(
+    otherProjection.findings
+      .filter((finding) => finding.code === "AFFECTED_EPIC_NOT_FOUND")
+      .map((finding) => ({
+        spaceId: finding.spaceId,
+        repository: finding.repository,
+        path: finding.path,
+      })),
+    [{
+      spaceId: "other",
+      repository: undefined,
+      path: "docs/epics/other-e001-projected/epic.md",
+    }],
+  );
+});
+
+test("validate rejects equal repository IDs within one Space", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await writeRepositoryConfig(
+    join(root, "code", "sample-web"),
+    createRepositoryConfig("app"),
+  );
+  await writeRepositoryConfig(
+    join(root, "code", "sample-mobile"),
+    createRepositoryConfig("app"),
+  );
+
+  await assert.rejects(
+    () => validateArtifacts(root, { spaceId: "sample" }),
+    (error) => error instanceof SddError
+      && error.code === "REPOSITORY_ID_COLLISION"
+      && /Repository ID app is claimed by multiple mapped repositories/.test(error.message),
+  );
+});
+
+test("validate rejects absent and cross-Space Change repository IDs deterministically", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await mkdir(join(root, "ideas", "other"), { recursive: true });
+  await mkdir(join(root, "code", "other-web"), { recursive: true });
+  await writeRepositoryConfig(join(root, "code", "other-web"), createRepositoryConfig("other-web"));
+  const config = await readWorkspaceConfig(root);
+  config.ideas.other = {
+    status: "active",
+    repositories: [{ root: "code", path: "other-web", status: "active" }],
+  };
+  await writeWorkspaceConfig(root, config);
+
+  const changeId = "2026-08-07-invalid-repository-ownership";
+  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
+  await writeFile(
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace(
+      "  - sample-web",
+      "  - other-web\n  - missing-repository",
+    ),
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    changeId,
+  });
+  const repositoryFindings = result.findings.filter(
+    (finding) => finding.code === "REPOSITORY_NOT_FOUND",
+  );
+
+  assert.equal(result.valid, false);
+  assert.equal(result.summary.changes, 1);
+  assert.deepEqual(
+    repositoryFindings.map((finding) => ({
+      repositoryId: finding.repositoryId,
+      spaceId: finding.spaceId,
+      path: finding.path,
+      message: finding.message,
+    })),
+    [
+      {
+        repositoryId: "missing-repository",
+        spaceId: "sample",
+        path: `.sdd/changes/${changeId}/change.md`,
+        message: "Change references repository ID missing-repository, which is not owned by Space sample.",
+      },
+      {
+        repositoryId: "other-web",
+        spaceId: "sample",
+        path: `.sdd/changes/${changeId}/change.md`,
+        message: "Change references repository ID other-web, which is not owned by Space sample.",
+      },
+    ],
+  );
+});
+
+test("validate rejects a central Change owned by an unknown Space", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-08-07-unknown-space";
+  await writeCanonicalChange(root, "sample-web", changeId, "proposed");
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
+  await writeFile(
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace(
+      "space: sample\nrepositories:\n  - sample-web",
+      "space: deleted-space\nrepositories: []",
+    ),
+    "utf8",
+  );
+
+  const scoped = await validateArtifacts(root, { spaceId: "sample" });
+  assert.deepEqual([scoped.valid, scoped.summary.changes, scoped.findings.some((finding) => finding.spaceId === "deleted-space")], [true, 0, false]);
+  const result = await validateArtifacts(root);
+  assert.equal(result.valid, false);
+  assert.equal(result.summary.changes, 1);
+  assert.deepEqual(
+    result.findings
+      .filter((finding) => finding.code === "SPACE_NOT_FOUND")
+      .map((finding) => ({
+        spaceId: finding.spaceId,
+        path: finding.path,
+        message: finding.message,
+      })),
+    [{
+      spaceId: "deleted-space",
+      path: `.sdd/changes/${changeId}/change.md`,
+      message: "Change references unknown Space ID deleted-space.",
+    }],
+  );
+});
+
 test("change-scoped validation includes Epic paths declared by the Change", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -2944,11 +4770,11 @@ test("change-scoped validation includes Epic paths declared by the Change", asyn
   const changeId = "2026-07-14-affected-epic";
   await writeCanonicalChange(root, "sample-web", changeId, "in_review");
   const epicPath = await writeCanonicalEpic(root, "sample-web");
-  const changePath = join(root, "code", "sample-web", "docs", "changes", changeId);
-  const proposalPath = join(changePath, "proposal.md");
+  const changePath = join(root, ".sdd", "changes", changeId);
+  const changeFilePath = join(changePath, "change.md");
   await writeFile(
-    proposalPath,
-    `${await readFile(proposalPath, "utf8")}\n## Epic Actions\n\n### Existing Epic Directory Updates\n\n- Revise \`docs/epics/sample-e001-core/epic.md\`.\n`,
+    changeFilePath,
+    `${await readFile(changeFilePath, "utf8")}\n## Epic Actions\n\n### Existing Epic Directory Updates\n\n- Revise \`docs/epics/sample-e001-core/epic.md\`.\n`,
     "utf8",
   );
   await writeFile(
@@ -2976,18 +4802,10 @@ test("change-scoped validation reports a declared Epic path that does not exist"
   await initWorkspace(root);
   const changeId = "2026-07-14-missing-affected-epic";
   await writeCanonicalChange(root, "sample-web", changeId, "in_review");
-  const proposalPath = join(
-    root,
-    "code",
-    "sample-web",
-    "docs",
-    "changes",
-    changeId,
-    "proposal.md",
-  );
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
   await writeFile(
-    proposalPath,
-    `${await readFile(proposalPath, "utf8")}\n## Epic Actions\n\n### New Epic Directories\n\n- Create \`docs/epics/sample-e002-missing/epic.md\`.\n`,
+    changeFilePath,
+    `${await readFile(changeFilePath, "utf8")}\n## Epic Actions\n\n### New Epic Directories\n\n- Create \`docs/epics/sample-e002-missing/epic.md\`.\n`,
     "utf8",
   );
 
@@ -3004,56 +4822,113 @@ test("change-scoped validation reports a declared Epic path that does not exist"
     && finding.path.endsWith("docs/epics/sample-e002-missing/epic.md")));
 });
 
+test("change-scoped Epic IDs resolve once across all declared repositories", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-08-09-cross-repository-affected-epic";
+  await writeCanonicalChange(root, "sample-web", changeId, "in_review");
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
+  await writeFile(
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace(
+      "  - sample-web",
+      "  - sample-web\n  - sample-mobile",
+    ),
+    "utf8",
+  );
+  await writeCanonicalEpic(root, "sample-web");
+  await writeFile(
+    changeFilePath,
+    `${await readFile(changeFilePath, "utf8")}\n## Epic Actions\n\n### Existing Epic Directory Updates\n\n- Revise \`SAMPLE-E001\`.\n`,
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, { changeId });
+
+  assert.equal(result.valid, true);
+  assert.equal(result.summary.repositories, 2);
+  assert.equal(result.summary.epics, 1);
+  assert.ok(!result.findings.some((finding) =>
+    finding.code === "AFFECTED_EPIC_NOT_FOUND"));
+});
+
+test("change-scoped Epic paths report one missing finding across all declared repositories", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-08-09-cross-repository-missing-epic";
+  await writeCanonicalChange(root, "sample-web", changeId, "in_review");
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
+  await writeFile(
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace(
+      "  - sample-web",
+      "  - sample-web\n  - sample-mobile",
+    ),
+    "utf8",
+  );
+  await writeFile(
+    changeFilePath,
+    `${await readFile(changeFilePath, "utf8")}\n## Epic Actions\n\n### Existing Epic Directory Updates\n\n- Revise \`docs/epics/sample-e001-core/epic.md\`.\n`,
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, { changeId });
+  const missing = result.findings.filter((finding) =>
+    finding.code === "AFFECTED_EPIC_NOT_FOUND");
+
+  assert.equal(result.valid, false);
+  assert.equal(result.summary.epics, 0);
+  assert.equal(missing.length, 1);
+  assert.equal(missing[0].path, "docs/epics/sample-e001-core/epic.md");
+});
+
+test("change-scoped Epic paths reject ambiguous matches across declared repositories", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const changeId = "2026-08-09-cross-repository-ambiguous-epic";
+  await writeCanonicalChange(root, "sample-web", changeId, "in_review");
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
+  await writeFile(
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace(
+      "  - sample-web",
+      "  - sample-web\n  - sample-mobile",
+    ),
+    "utf8",
+  );
+  await writeCanonicalEpic(root, "sample-web");
+  await writeCanonicalEpic(root, "sample-mobile");
+  await writeFile(
+    changeFilePath,
+    `${await readFile(changeFilePath, "utf8")}\n## Epic Actions\n\n### Existing Epic Directory Updates\n\n- Revise \`docs/epics/sample-e001-core/epic.md\`.\n`,
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, { changeId });
+  const ambiguous = result.findings.filter((finding) =>
+    finding.code === "AFFECTED_EPIC_AMBIGUOUS");
+
+  assert.equal(result.valid, false);
+  assert.equal(result.summary.epics, 0);
+  assert.equal(ambiguous.length, 1);
+  assert.deepEqual(
+    ambiguous[0].repositories,
+    ["code/sample-mobile", "code/sample-web"],
+  );
+});
+
 test("validate accepts the documented lightweight interactive Change shape", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
   const changeId = "2026-07-14-interactive-shape";
-  const changePath = join(root, "code", "sample-web", "docs", "changes", changeId);
-  await mkdir(changePath, { recursive: true });
-  await writeFile(
-    join(changePath, "proposal.md"),
-    [
-      "# Proposal: Interactive Shape",
-      "## Why",
-      "## Interactive Scope Boundary",
-      "## Epic / Story Impact",
-      "## Release Communication Impact",
-      "## Open Questions",
-    ].join("\n"),
-    "utf8",
-  );
-  await writeFile(
-    join(changePath, "design.md"),
-    [
-      "# Design: Interactive Shape",
-      "## Current Understanding",
-      "## Technical Approach",
-      "## Affected Epic Truth",
-      "## Alternatives / Deferred",
-      "## Open Questions",
-    ].join("\n"),
-    "utf8",
-  );
-  await writeFile(
-    join(changePath, "tasks.md"),
-    [
-      "---",
-      "status: in_progress",
-      "---",
-      "# Tasks: Interactive Shape",
-      "## Resume Here",
-      "## Interactive Log",
-      "## Checklist",
-      "## Implementation Ledger",
-      "## Verification Ledger",
-      "## Manual UI Confirmation",
-      "## Artifact Updates",
-      "## Open Questions",
-      "## Closeout",
-    ].join("\n"),
-    "utf8",
-  );
+  await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
+  await writeCanonicalEpic(root, "sample-web");
+  await declareFixtureEpic(root, changeId);
+  const changePath = join(root, ".sdd", "changes", changeId);
 
   const result = await validateArtifacts(root, {
     spaceId: "sample",
@@ -3063,6 +4938,8 @@ test("validate accepts the documented lightweight interactive Change shape", asy
 
   assert.equal(result.valid, true);
   assert.deepEqual(result.findings, []);
+  assert.equal(await pathExists(join(changePath, "slice-reviews")), false);
+  assert.equal(await pathExists(join(changePath, "slice-closures")), false);
 });
 
 test("validate warns instead of failing on historical closed-Change section drift", async (t) => {
@@ -3071,19 +4948,10 @@ test("validate warns instead of failing on historical closed-Change section drif
   await initWorkspace(root);
   const changeId = "2026-07-14-historical-shape";
   await writeCanonicalChange(root, "sample-web", changeId, "ready_to_close", { closed: true });
-  const proposalPath = join(
-    root,
-    "code",
-    "sample-web",
-    "docs",
-    "changes",
-    "closed",
-    changeId,
-    "proposal.md",
-  );
+  const changeFilePath = join(root, ".sdd", "changes", "closed", changeId, "change.md");
   await writeFile(
-    proposalPath,
-    (await readFile(proposalPath, "utf8")).replace("## Open Questions", "## Historical Questions"),
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace("## Open Questions", "## Historical Questions"),
     "utf8",
   );
 
@@ -3114,11 +4982,11 @@ test("validate reports malformed Change directory IDs", async (t) => {
   assert.ok(result.findings.some((finding) => finding.code === "INVALID_CHANGE_ID"));
 });
 
-test("validate discovers a private planned Change", async (t) => {
+test("validate discovers a current proposed Change without legacy artifacts", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
-  const created = await createPlannedChange(root, "sample", "planned-validation", {
+  const created = await createChange(root, "sample", "planned-validation", {
     date: "2026-07-14",
     repositories: ["sample-web"],
   });
@@ -3128,28 +4996,12 @@ test("validate discovers a private planned Change", async (t) => {
     changeId: created.changeId,
   });
 
+  assert.equal(result.summary.changes, 1);
   assert.equal(result.valid, true);
-  assert.equal(result.summary.plannedChanges, 1);
-  assert.equal(result.summary.changes, 0);
-  assert.ok(!result.findings.some((finding) => finding.code === "ARTIFACT_NOT_FOUND"));
-});
-
-test("validate ignores undated Change Brief files", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const plannedRoot = join(root, "ideas", "sample", "planned-changes");
-  await mkdir(plannedRoot, { recursive: true });
-  await writeFile(
-    join(plannedRoot, "future-outcome.md"),
-    "---\ntype: change-brief\ncreated: 2026-07-14\nmodified: 2026-07-14\n---\n# Change Brief: Future Outcome\n",
-    "utf8",
-  );
-
-  const result = await validateArtifacts(root, { spaceId: "sample" });
-
-  assert.equal(result.valid, true);
-  assert.equal(result.summary.plannedChanges, 0);
+  assert.ok(!result.findings.some((finding) =>
+    finding.code === "ARTIFACT_NOT_FOUND"
+      || finding.code === "UNSUPPORTED_CHANGE_SCHEMA"
+      || finding.code === "LEGACY_V2_ARTIFACT"));
 });
 
 test("validate reports an active and closed Change collision", async (t) => {
@@ -3169,6 +5021,53 @@ test("validate reports an active and closed Change collision", async (t) => {
   assert.equal(result.valid, false);
   assert.ok(result.findings.some((finding) =>
     finding.code === "CHANGE_LOCATION_COLLISION" && finding.artifactId === changeId));
+});
+
+test("Space-scoped validation reports global Change collisions across metadata Spaces", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await mkdir(join(root, "ideas", "other"), { recursive: true });
+  await mkdir(join(root, "code", "other-web"), { recursive: true });
+  await writeRepositoryConfig(join(root, "code", "other-web"), createRepositoryConfig("other-web"));
+  const config = await readWorkspaceConfig(root);
+  config.ideas.other = {
+    status: "active",
+    repositories: [{ root: "code", path: "other-web", status: "active" }],
+  };
+  await writeWorkspaceConfig(root, config);
+
+  const changeId = "2026-08-07-cross-space-location-collision";
+  await writeCanonicalChange(root, "sample-web", changeId, "in_review");
+  await writeCanonicalChange(root, "other-web", changeId, "in_review", { closed: true });
+  const closedChangeFilePath = join(root, ".sdd", "changes", "closed", changeId, "change.md");
+  await writeFile(
+    closedChangeFilePath,
+    (await readFile(closedChangeFilePath, "utf8")).replace("space: sample", "space: other"),
+    "utf8",
+  );
+
+  const result = await validateArtifacts(root, {
+    spaceId: "sample",
+    repositories: ["sample-web"],
+    changeId,
+  });
+  const collisions = result.findings.filter(
+    (finding) => finding.code === "CHANGE_LOCATION_COLLISION",
+  );
+
+  assert.equal(result.valid, false);
+  assert.equal(result.summary.changes, 1);
+  assert.deepEqual(
+    collisions.map((finding) => ({
+      artifactId: finding.artifactId,
+      path: finding.path,
+    })),
+    [{
+      artifactId: changeId,
+      path: `.sdd/changes/closed/${changeId}`,
+    }],
+  );
 });
 
 test("validate accepts a canonical Epic by ID", async (t) => {
@@ -4662,10 +6561,10 @@ test("validate reports unresolved scaffolding in an active Change", async (t) =>
   await initWorkspace(root);
   const changeId = "2026-07-14-unresolved-placeholder";
   await writeCanonicalChange(root, "sample-web", changeId, "in_progress");
-  const proposalPath = join(root, "code", "sample-web", "docs", "changes", changeId, "proposal.md");
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
   await writeFile(
-    proposalPath,
-    `${await readFile(proposalPath, "utf8")}\n## Deferred Detail\n\nCHANGE TITLE\n`,
+    changeFilePath,
+    `${await readFile(changeFilePath, "utf8")}\n## Deferred Detail\n\nCHANGE TITLE\n`,
     "utf8",
   );
 
@@ -4678,62 +6577,29 @@ test("validate reports unresolved scaffolding in an active Change", async (t) =>
   assert.equal(result.valid, false);
   assert.ok(result.findings.some((finding) =>
     finding.code === "UNRESOLVED_TEMPLATE_PLACEHOLDER"
-    && finding.path.endsWith("proposal.md")));
+    && finding.path.endsWith("change.md")));
 });
 
-test("validate reports a Change left in planning after promotion", async (t) => {
+
+test("validate accepts every active central Change status", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
-  const created = await createPlannedChange(root, "sample", "stale-planned-copy", {
-    date: "2026-07-14",
-    repositories: ["sample-web"],
-  });
-  await writeCanonicalChange(root, "sample-web", created.changeId, "proposed");
+  const changeId = "2026-07-14-active-statuses";
+  await writeCanonicalChange(root, "sample-web", changeId, "proposed");
+  await writeCanonicalEpic(root, "sample-web");
+  await declareFixtureEpic(root, changeId);
+  const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
 
-  const result = await validateArtifacts(root, {
-    spaceId: "sample",
-    repositories: ["sample-web"],
-    changeId: created.changeId,
-  });
-
-  assert.equal(result.valid, false);
-  assert.ok(result.findings.some((finding) =>
-    finding.code === "CHANGE_LOCATION_COLLISION"
-    && finding.message.includes("planning and repository")));
-});
-
-test("validate accepts pre-implementation planned statuses and rejects later states", async (t) => {
-  const root = await createMappedWorkspace();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  await initWorkspace(root);
-  const created = await createPlannedChange(root, "sample", "invalid-planned-status", {
-    date: "2026-07-14",
-    repositories: ["sample-web"],
-  });
-  const tasksPath = join(root, created.path, "tasks.md");
-  await setPlannedChangeStatus(root, created);
-
-  let result = await validateArtifacts(root, {
-    spaceId: "sample",
-    changeId: created.changeId,
-  });
-  assert.equal(result.valid, true);
-
-  await writeFile(
-    tasksPath,
-    (await readFile(tasksPath, "utf8")).replace("status: planned", "status: in_review"),
-    "utf8",
-  );
-
-  result = await validateArtifacts(root, {
-    spaceId: "sample",
-    changeId: created.changeId,
-  });
-
-  assert.equal(result.valid, false);
-  assert.ok(result.findings.some((finding) =>
-    finding.code === "CHANGE_STATUS_LOCATION_MISMATCH"));
+  for (const status of ["proposed", "planned", "in_progress", "in_review"]) {
+    const source = await readFile(changeFilePath, "utf8");
+    await writeFile(changeFilePath, source.replace(/^status: \S+$/m, `status: ${status}`), "utf8");
+    const result = await validateArtifacts(root, {
+      spaceId: "sample",
+      changeId,
+    });
+    assert.equal(result.valid, true, status);
+  }
 });
 
 test("validate reports broken Markdown links to SDD artifacts", async (t) => {
@@ -4743,7 +6609,7 @@ test("validate reports broken Markdown links to SDD artifacts", async (t) => {
   const epicPath = await writeCanonicalEpic(root, "sample-web");
   await writeFile(
     epicPath,
-    `${await readFile(epicPath, "utf8")}\n[Missing Change](../../changes/2026-07-14-missing/proposal.md)\n`,
+    `${await readFile(epicPath, "utf8")}\n[Missing Epic](../missing-epic/epic.md)\n`,
     "utf8",
   );
 
@@ -4756,7 +6622,7 @@ test("validate reports broken Markdown links to SDD artifacts", async (t) => {
   assert.equal(result.valid, false);
   assert.ok(result.findings.some((finding) =>
     finding.code === "BROKEN_ARTIFACT_LINK"
-    && finding.message.includes("docs/changes/2026-07-14-missing/proposal.md")));
+    && finding.message.includes("docs/epics/missing-epic/epic.md")));
 });
 
 test("CLI exposes scoped validation with JSON output", async (t) => {
@@ -4765,6 +6631,8 @@ test("CLI exposes scoped validation with JSON output", async (t) => {
   await initWorkspace(root);
   const changeId = "2026-07-14-cli-validation";
   await writeCanonicalChange(root, "sample-web", changeId, "in_review");
+  await writeCanonicalEpic(root, "sample-web");
+  await declareFixtureEpic(root, changeId);
 
   const { stdout } = await execFileAsync(process.execPath, [
     join(PACKAGE_ROOT, "bin", "sdd.js"),
@@ -4777,7 +6645,7 @@ test("CLI exposes scoped validation with JSON output", async (t) => {
     "--change",
     changeId,
     "--json",
-  ]);
+  ], { cwd: root });
   const result = JSON.parse(stdout);
 
   assert.equal(result.command, "validate");
@@ -4792,6 +6660,7 @@ test("CLI validation returns exit code one with structured findings", async (t) 
   await initWorkspace(root);
   const changeId = "2026-07-14-invalid-cli-validation";
   await writeChange(root, "sample-web", changeId, "in_review");
+  await rm(join(root, ".sdd", "changes", changeId, "tasks.md"));
 
   await assert.rejects(
     () => execFileAsync(process.execPath, [
@@ -4805,7 +6674,7 @@ test("CLI validation returns exit code one with structured findings", async (t) 
       "--change",
       changeId,
       "--json",
-    ]),
+    ], { cwd: root }),
     (error) => {
       const result = JSON.parse(error.stdout);
       return error.code === 1
@@ -4815,7 +6684,7 @@ test("CLI validation returns exit code one with structured findings", async (t) 
   );
 });
 
-test("workspace-local skill installation cannot escape the initialized root", async (t) => {
+test("workspace-local skill installation cannot escape the setup root", async (t) => {
   const root = await createWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
 
@@ -4829,9 +6698,9 @@ test("configured workspace paths cannot traverse outside the workspace", async (
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
-  const config = await readConfig(root);
+  const config = await readWorkspaceConfig(root);
   config.ideas.sample.repositories[0].path = "../outside";
-  await writeConfig(root, config);
+  await writeWorkspaceConfig(root, config);
 
   const diagnosis = await diagnoseWorkspace(root);
   assert.equal(diagnosis.healthy, false);
@@ -4846,10 +6715,10 @@ test("workspace lifecycle statuses use the canonical vocabulary", async (t) => {
   const root = await createMappedWorkspace();
   t.after(() => rm(root, { recursive: true, force: true }));
   await initWorkspace(root);
-  const config = await readConfig(root);
+  const config = await readWorkspaceConfig(root);
   config.ideas.sample.status = "building";
   config.ideas.sample.repositories[0].status = "retired";
-  await writeConfig(root, config);
+  await writeWorkspaceConfig(root, config);
 
   const diagnosis = await diagnoseWorkspace(root);
   assert.equal(diagnosis.healthy, false);
@@ -4858,4 +6727,1593 @@ test("workspace lifecycle statuses use the canonical vocabulary", async (t) => {
     () => getStatus(root),
     (error) => error instanceof SddError && error.code === "INVALID_CONFIG",
   );
+});
+
+test("CLI update keeps a positional target across explicit, environment, target, and cwd authority precedence", async (t) => {
+  const root = await createWorkspace("sdd-update-authority-routing-");
+  const environmentWorkspace = join(root, "environment-workspace");
+  const cwdWorkspace = join(root, "cwd-workspace");
+  const targetWorkspace = join(root, "target-workspace");
+  const externalRepository = join(root, "external-code", "sample-web");
+  const unmappedTarget = join(root, "unmapped-target");
+  await Promise.all([
+    populateMappedWorkspace(environmentWorkspace),
+    populateMappedWorkspace(cwdWorkspace),
+    populateMappedWorkspace(targetWorkspace),
+    mkdir(externalRepository, { recursive: true }),
+    mkdir(unmappedTarget, { recursive: true }),
+  ]);
+  await writeRepositoryConfig(externalRepository, createRepositoryConfig("sample-web"));
+  await Promise.all([
+    initWorkspace(environmentWorkspace),
+    initWorkspace(cwdWorkspace),
+    initWorkspace(targetWorkspace),
+  ]);
+  for (const workspaceRoot of [environmentWorkspace, cwdWorkspace, targetWorkspace]) {
+    const config = await readWorkspaceConfig(workspaceRoot);
+    config.ideas.sample.repositories = [{
+      path: externalRepository,
+      role: "web",
+      status: "active",
+    }];
+    await writeWorkspaceConfig(workspaceRoot, config);
+  }
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const command = [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "update",
+    externalRepository,
+    "--dry-run",
+    "--json",
+  ];
+  const cwdEnv = { ...process.env };
+  delete cwdEnv.SDD_WORKSPACE_ROOT;
+  const cwdResult = JSON.parse((await execFileAsync(
+    process.execPath,
+    command,
+    { cwd: cwdWorkspace, env: cwdEnv },
+  )).stdout);
+  const environmentResult = JSON.parse((await execFileAsync(
+    process.execPath,
+    command,
+    {
+      cwd: cwdWorkspace,
+      env: { ...cwdEnv, SDD_WORKSPACE_ROOT: environmentWorkspace },
+    },
+  )).stdout);
+  const targetResult = JSON.parse((await execFileAsync(
+    process.execPath,
+    [
+      join(PACKAGE_ROOT, "bin", "sdd.js"),
+      "update",
+      join(targetWorkspace, "ideas", "sample"),
+      "--dry-run",
+      "--json",
+    ],
+    { cwd: cwdWorkspace, env: cwdEnv },
+  )).stdout);
+  const explicitResult = JSON.parse((await execFileAsync(
+    process.execPath,
+    [...command, "--workspace", targetWorkspace],
+    {
+      cwd: cwdWorkspace,
+      env: { ...cwdEnv, SDD_WORKSPACE_ROOT: environmentWorkspace },
+    },
+  )).stdout);
+
+  for (const { args, env, cwd } of [
+    {
+      args: [
+        join(PACKAGE_ROOT, "bin", "sdd.js"),
+        "update",
+        ".",
+        "--dry-run",
+        "--json",
+      ],
+      env: { ...cwdEnv, SDD_WORKSPACE_ROOT: environmentWorkspace },
+      cwd: unmappedTarget,
+    },
+    {
+      args: [
+        join(PACKAGE_ROOT, "bin", "sdd.js"),
+        "update",
+        ".",
+        "--workspace",
+        targetWorkspace,
+        "--dry-run",
+        "--json",
+      ],
+      env: { ...cwdEnv, SDD_WORKSPACE_ROOT: environmentWorkspace },
+      cwd: unmappedTarget,
+    },
+  ]) {
+    await assert.rejects(
+      execFileAsync(process.execPath, args, { cwd, env }),
+      (error) => {
+        assert.equal(JSON.parse(error.stderr).error.code, "WORKSPACE_TARGET_UNMAPPED");
+        return true;
+      },
+    );
+  }
+
+  assert.equal(cwdResult.workspaceRoot, await realpath(cwdWorkspace));
+  assert.equal(environmentResult.workspaceRoot, environmentWorkspace);
+  assert.equal(targetResult.workspaceRoot, targetWorkspace);
+  assert.equal(explicitResult.workspaceRoot, targetWorkspace);
+  assert.equal(cwdResult.dryRun, true);
+  assert.equal(environmentResult.dryRun, true);
+});
+
+test("CLI configure keeps its positional scan target under environment and explicit workspace authority", async (t) => {
+  const root = await createWorkspace("sdd-configure-target-routing-");
+  const workspaceRoot = join(root, "workspace");
+  const scanRoot = join(root, "relocated-layout");
+  const planningRoot = join(scanRoot, "product-planning");
+  const repositoryRoot = join(scanRoot, "source-code");
+  const outside = join(root, "outside");
+  await populateMappedWorkspace(workspaceRoot);
+  await initWorkspace(workspaceRoot);
+  await Promise.all([
+    mkdir(join(planningRoot, "sample"), { recursive: true }),
+    mkdir(join(repositoryRoot, "sample-web"), { recursive: true }),
+    mkdir(join(repositoryRoot, "sample-mobile"), { recursive: true }),
+    mkdir(outside, { recursive: true }),
+  ]);
+  const config = await readWorkspaceConfig(workspaceRoot);
+  config.planning.root = "missing-planning";
+  config.repositories.roots = { code: "missing-code" };
+  delete config.ideas.sample.planning;
+  delete config.ideas.sample.planningPath;
+  config.ideas.sample.repositories = [
+    { root: "code", path: "sample-web", role: "web", status: "active" },
+    { root: "code", path: "sample-mobile", role: "mobile", status: "active" },
+  ];
+  await writeWorkspaceConfig(workspaceRoot, config);
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const { stdout: environmentStdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "configure",
+    scanRoot,
+    "--yes",
+    "--json",
+  ], {
+    cwd: outside,
+    env: { ...process.env, SDD_WORKSPACE_ROOT: workspaceRoot },
+  });
+  const environmentResult = JSON.parse(environmentStdout);
+  assert.equal(environmentResult.workspaceRoot, workspaceRoot);
+  assert.equal(environmentResult.planningRoot, planningRoot);
+  assert.equal(environmentResult.repositoryRoots.code, repositoryRoot);
+  const environmentStored = await readWorkspaceConfig(workspaceRoot);
+  assert.equal(environmentStored.planning.root, planningRoot);
+  assert.equal(environmentStored.repositories.roots.code, repositoryRoot);
+  await writeWorkspaceConfig(workspaceRoot, config);
+
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "configure",
+    scanRoot,
+    "--workspace",
+    workspaceRoot,
+    "--yes",
+    "--json",
+  ], {
+    cwd: outside,
+    env: { ...process.env, SDD_WORKSPACE_ROOT: outside },
+  });
+  const result = JSON.parse(stdout);
+
+  assert.equal(result.workspaceRoot, workspaceRoot);
+  assert.equal(result.planningRoot, planningRoot);
+  assert.equal(result.repositoryRoots.code, repositoryRoot);
+  assert.equal(result.planningRoot.startsWith("../"), false);
+  assert.equal(result.repositoryRoots.code.startsWith("../"), false);
+  const stored = await readWorkspaceConfig(workspaceRoot);
+  assert.equal(stored.planning.root, planningRoot);
+  assert.equal(stored.repositories.roots.code, repositoryRoot);
+});
+
+test("CLI configure scans the discovered workspace from a nested default cwd", async (t) => {
+  const workspaceRoot = await createMappedWorkspace();
+  const nestedCwd = join(workspaceRoot, "tools", "nested");
+  t.after(() => rm(workspaceRoot, { recursive: true, force: true }));
+  await initWorkspace(workspaceRoot);
+  await moveWorkspaceRoots(workspaceRoot);
+  await mkdir(nestedCwd, { recursive: true });
+
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "configure",
+    "--yes",
+    "--dry-run",
+    "--json",
+  ], { cwd: nestedCwd });
+  const result = JSON.parse(stdout);
+
+  assert.equal(result.workspaceRoot, await realpath(workspaceRoot));
+  assert.equal(result.planningRoot, "spaces/ideas");
+  assert.deepEqual(result.repositoryRoots, { code: "spaces/code" });
+});
+
+test("explicit workspace routes repository-only CLI operations without borrowing unrelated cwd", async (t) => {
+  const root = await createWorkspace("sdd-repository-only-routing-");
+  const workspaceRoot = join(root, "workspace");
+  const repositoryRoot = join(root, "standalone-repository");
+  const malformedCwd = join(root, "malformed-unrelated-checkout");
+  const differentRepositoryCwd = join(root, "different-repository");
+  const repositoryId = "standalone-repository";
+  const changeId = "2026-08-09-repository-only-routing";
+  await populateMappedWorkspace(workspaceRoot);
+  await initWorkspace(workspaceRoot);
+  await Promise.all([
+    mkdir(repositoryRoot, { recursive: true }),
+    mkdir(join(malformedCwd, ".sdd"), { recursive: true }),
+    mkdir(differentRepositoryCwd, { recursive: true }),
+  ]);
+  await writeRepositoryConfig(repositoryRoot, createRepositoryConfig(repositoryId));
+  await writeFile(getRepositoryConfigPath(malformedCwd), "schema: [\n", "utf8");
+  await writeRepositoryConfig(
+    differentRepositoryCwd,
+    createRepositoryConfig("different-repository"),
+  );
+  const authorityConfig = await readWorkspaceConfig(workspaceRoot);
+  authorityConfig.repositories.roots.standalone = repositoryRoot;
+  await writeWorkspaceConfig(workspaceRoot, authorityConfig);
+  await writeCanonicalChange(workspaceRoot, repositoryId, changeId, "in_review");
+  await writeCanonicalEpicAt(repositoryRoot);
+  await declareFixtureEpic(workspaceRoot, changeId);
+  const changeFilePath = join(workspaceRoot, ".sdd", "changes", changeId, "change.md");
+  await writeFile(
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace("space: sample", `space: ${repositoryId}`),
+    "utf8",
+  );
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const runJson = async (cwd, ...args) => {
+    const { stdout } = await execFileAsync(process.execPath, [
+      join(PACKAGE_ROOT, "bin", "sdd.js"),
+      ...args,
+      "--workspace",
+      workspaceRoot,
+      "--json",
+    ], { cwd });
+    return JSON.parse(stdout);
+  };
+  const targetlessMappedStatus = await runJson(repositoryRoot, "status");
+  const targetlessUnrelatedStatus = await runJson(differentRepositoryCwd, "status");
+  const status = await runJson(malformedCwd, "status", repositoryId);
+  const validation = await runJson(
+    differentRepositoryCwd,
+    "validate",
+    repositoryId,
+    "--repo",
+    repositoryId,
+  );
+  const epic = await runJson(
+    malformedCwd,
+    "epic",
+    "create",
+    repositoryId,
+    "STANDALONE-E001",
+    "repository-only-routing",
+    "--repo",
+    repositoryId,
+    "--date",
+    "2026-08-09",
+    "--dry-run",
+  );
+  const stableIdCreate = await runJson(
+    differentRepositoryCwd,
+    "change",
+    "create",
+    repositoryId,
+    "stable-id-routing",
+    "--repo",
+    repositoryId,
+    "--date",
+    "2026-08-09",
+    "--dry-run",
+  );
+  const inferredCreate = await runJson(
+    malformedCwd,
+    "change",
+    "create",
+    repositoryId,
+    "inferred-routing",
+    "--date",
+    "2026-08-09",
+    "--dry-run",
+  );
+  const transitioned = await runJson(
+    differentRepositoryCwd,
+    "change",
+    "transition",
+    repositoryId,
+    changeId,
+    "--from",
+    "in_review",
+    "--to",
+    "in_progress",
+    "--dry-run",
+  );
+  const closed = await runJson(
+    malformedCwd,
+    "change",
+    "close",
+    repositoryId,
+    changeId,
+    "--dry-run",
+  );
+
+  assert.equal(targetlessMappedStatus.mode, "summary");
+  assert.equal(targetlessMappedStatus.workspaceRoot, workspaceRoot);
+  assert.equal(targetlessUnrelatedStatus.mode, "summary");
+  assert.equal(targetlessUnrelatedStatus.workspaceRoot, workspaceRoot);
+  assert.equal(status.spaceId, repositoryId);
+  assert.deepEqual(validation.scope.repositories, [repositoryRoot]);
+  assert.equal(epic.repository.resolvedPath, repositoryRoot);
+  assert.equal(stableIdCreate.repositories[0].id, repositoryId);
+  assert.deepEqual(inferredCreate.repositories, []);
+  assert.equal(transitioned.repositories[0].id, repositoryId);
+  assert.equal(closed.repositories[0].id, repositoryId);
+});
+
+test("observational status falls back to workspace authority past an unrelated cyclic mapping", async (t) => {
+  const workspaceRoot = await createMappedWorkspace();
+  const outside = await createWorkspace("sdd-status-cyclic-mapping-cwd-");
+  t.after(() => rm(workspaceRoot, { recursive: true, force: true }));
+  t.after(() => rm(outside, { recursive: true, force: true }));
+  const repositoryId = "solo";
+  const changeId = "2026-08-09-solo-unresolved";
+  await initWorkspace(workspaceRoot);
+  const config = await readWorkspaceConfig(workspaceRoot);
+  const loopPath = join(workspaceRoot, "code", "looped-app");
+  config.ideas.sample.repositories[1].path = "looped-app";
+  await writeWorkspaceConfig(workspaceRoot, config);
+  await symlink("looped-app", loopPath);
+  await writeCanonicalChange(workspaceRoot, repositoryId, changeId, "in_review");
+  const changeFilePath = join(workspaceRoot, ".sdd", "changes", changeId, "change.md");
+  await writeFile(
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace("space: sample", `space: ${repositoryId}`),
+    "utf8",
+  );
+
+  const { stdout } = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "status",
+    repositoryId,
+    "--workspace",
+    workspaceRoot,
+    "--json",
+  ], { cwd: outside });
+  const result = JSON.parse(stdout);
+
+  assert.equal(result.mode, "space");
+  assert.equal(result.spaceId, repositoryId);
+  assert.deepEqual(result.unresolvedRepositoryIds, [repositoryId]);
+  assert.equal(result.change.changeId, changeId);
+});
+
+test("environment authority routes targetless and configured CLI operations without retargeting context", async (t) => {
+  const workspaceRoot = await createMappedWorkspace();
+  const outside = await createWorkspace("sdd-environment-authority-cwd-");
+  const changeId = "2026-08-09-environment-authority";
+  await initWorkspace(workspaceRoot);
+  await writeCanonicalChange(workspaceRoot, "sample-web", changeId, "in_review");
+  await writeCanonicalEpic(workspaceRoot, "sample-web");
+  await declareFixtureEpic(workspaceRoot, changeId);
+  t.after(() => rm(workspaceRoot, { recursive: true, force: true }));
+  t.after(() => rm(outside, { recursive: true, force: true }));
+  const env = {
+    ...process.env,
+    HOME: outside,
+    SDD_USER_HOME: outside,
+    SDD_WORKSPACE_ROOT: workspaceRoot,
+  };
+  const runJson = async (...args) => {
+    const { stdout } = await execFileAsync(process.execPath, [
+      join(PACKAGE_ROOT, "bin", "sdd.js"),
+      ...args,
+      "--json",
+    ], { cwd: outside, env });
+    return JSON.parse(stdout);
+  };
+
+  const diagnosis = await runJson("doctor");
+  const status = await runJson("status");
+  const fullValidation = await runJson("validate");
+  const selectedValidation = await runJson(
+    "validate",
+    "sample",
+    "--repo",
+    "sample-web",
+  );
+  const epic = await runJson(
+    "epic",
+    "create",
+    "sample",
+    "SAMPLE-E920",
+    "environment-authority",
+    "--repo",
+    "sample-web",
+    "--date",
+    "2026-08-09",
+    "--dry-run",
+  );
+  const created = await runJson(
+    "change",
+    "create",
+    "sample",
+    "environment-authority-create",
+    "--repo",
+    "sample-web",
+    "--date",
+    "2026-08-09",
+    "--dry-run",
+  );
+  const transitioned = await runJson(
+    "change",
+    "transition",
+    "sample",
+    changeId,
+    "--from",
+    "in_review",
+    "--to",
+    "in_progress",
+    "--dry-run",
+  );
+  const closed = await runJson(
+    "change",
+    "close",
+    "sample",
+    changeId,
+    "--dry-run",
+  );
+
+  assert.equal(diagnosis.workspaceRoot, workspaceRoot);
+  assert.equal(status.workspaceRoot, workspaceRoot);
+  assert.equal(fullValidation.workspaceRoot, workspaceRoot);
+  assert.deepEqual(selectedValidation.scope.repositories, ["code/sample-web"]);
+  assert.equal(epic.repository.resolvedPath, "code/sample-web");
+  assert.equal(created.repositories[0].id, "sample-web");
+  assert.equal(transitioned.repositories[0].id, "sample-web");
+  assert.equal(closed.repositories[0].id, "sample-web");
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      join(PACKAGE_ROOT, "bin", "sdd.js"),
+      "context",
+      "--json",
+    ], { cwd: outside, env }),
+    (error) => {
+      assert.equal(JSON.parse(error.stderr).error.code, "WORKSPACE_TARGET_UNMAPPED");
+      return true;
+    },
+  );
+});
+
+test("workspace-root inventory retains repository-only Change history without a mapped locator", async (t) => {
+  const root = await createWorkspace("sdd-repository-only-central-inventory-");
+  const workspaceRoot = join(root, "workspace");
+  const repositoryRoot = join(root, "external-repository");
+  const repositoryId = "external-repository";
+  const changeId = "2026-08-09-central-inventory";
+  await populateMappedWorkspace(workspaceRoot);
+  await initWorkspace(workspaceRoot);
+  await mkdir(repositoryRoot, { recursive: true });
+  await writeRepositoryConfig(repositoryRoot, createRepositoryConfig(repositoryId));
+  const configured = await readWorkspaceConfig(workspaceRoot);
+  configured.repositories.roots.external = repositoryRoot;
+  await writeWorkspaceConfig(workspaceRoot, configured);
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const runJson = async (cwd, ...args) => {
+    const { stdout } = await execFileAsync(process.execPath, [
+      join(PACKAGE_ROOT, "bin", "sdd.js"),
+      ...args,
+      "--workspace",
+      workspaceRoot,
+      "--json",
+    ], { cwd });
+    return JSON.parse(stdout);
+  };
+  const runJsonAllowingFindings = async (cwd, ...args) => {
+    try {
+      return await runJson(cwd, ...args);
+    } catch (error) {
+      if (error.code === 1 && typeof error.stdout === "string") {
+        return JSON.parse(error.stdout);
+      }
+      throw error;
+    }
+  };
+
+  const created = await runJson(
+    repositoryRoot,
+    "change",
+    "create",
+    repositoryId,
+    "central-inventory",
+    "--repo",
+    repositoryId,
+    "--date",
+    "2026-08-09",
+  );
+  assert.equal(created.path, `.sdd/changes/${changeId}`);
+  assert.equal(created.repositories[0].id, repositoryId);
+  assert.equal(
+    Object.hasOwn((await readWorkspaceConfig(workspaceRoot)).ideas, repositoryId),
+    false,
+  );
+  await writeCanonicalChange(workspaceRoot, repositoryId, changeId, "in_review");
+  await writeCanonicalEpicAt(repositoryRoot);
+  await declareFixtureEpic(workspaceRoot, changeId);
+  const changeFilePath = join(workspaceRoot, ".sdd", "changes", changeId, "change.md");
+  await writeFile(
+    changeFilePath,
+    (await readFile(changeFilePath, "utf8")).replace("space: sample", `space: ${repositoryId}`),
+    "utf8",
+  );
+
+  const checkoutOutput = await execFileAsync(process.execPath, [
+    join(PACKAGE_ROOT, "bin", "sdd.js"),
+    "status",
+    "--json",
+  ], {
+    cwd: repositoryRoot,
+    env: { ...process.env, SDD_WORKSPACE_ROOT: workspaceRoot },
+  });
+  const checkoutStatus = JSON.parse(checkoutOutput.stdout);
+  const checkoutSpace = checkoutStatus.spaces.find((space) => space.spaceId === repositoryId);
+  assert.ok(checkoutSpace);
+  assert.equal(checkoutSpace.repositories.length, 1);
+  assert.deepEqual(checkoutSpace.unresolvedRepositoryIds, []);
+  assert.deepEqual(
+    checkoutSpace.activeChanges.map((change) => change.changeId),
+    [changeId],
+  );
+
+  const activeStatus = await runJson(workspaceRoot, "status");
+  const activeSpace = activeStatus.spaces.find((space) => space.spaceId === repositoryId);
+  assert.ok(activeSpace);
+  assert.equal(activeSpace.planningPath, null);
+  assert.deepEqual(activeSpace.repositories, []);
+  assert.deepEqual(activeSpace.repositoryActivity, []);
+  assert.deepEqual(activeSpace.unresolvedRepositoryIds, [repositoryId]);
+  assert.deepEqual(
+    activeSpace.activeChanges.map((change) => change.changeId),
+    [changeId],
+  );
+
+  const activeDetail = await runJson(workspaceRoot, "status", repositoryId);
+  assert.equal(activeDetail.change.changeId, changeId);
+  assert.deepEqual(activeDetail.change.unresolvedRepositoryIds, []);
+
+  const diagnosis = await runJson(workspaceRoot, "doctor");
+  assert.equal(diagnosis.healthy, true);
+  assert.equal(diagnosis.findings.some((finding) =>
+    finding.code === "SPACE_NOT_FOUND"
+    || /unknown Space/.test(finding.message)), false);
+  assert.deepEqual(
+    diagnosis.findings
+      .filter((finding) => finding.code === "REPOSITORY_LOCATOR_UNAVAILABLE")
+      .map((finding) => ({ level: finding.level, spaceId: finding.spaceId })),
+    [{ level: "warning", spaceId: repositoryId }],
+  );
+
+  const validation = await runJsonAllowingFindings(
+    workspaceRoot,
+    "validate",
+    "--change",
+    changeId,
+  );
+  assert.equal(validation.valid, false);
+  assert.equal(validation.summary.changes, 1);
+  assert.equal(validation.summary.repositories, 0);
+  assert.deepEqual(validation.scope.repositories, []);
+  assert.deepEqual(
+    validation.findings.map((finding) => finding.code).sort(),
+    ["AFFECTED_EPIC_NOT_FOUND", "REPOSITORY_LOCATOR_UNAVAILABLE"],
+  );
+
+  const selectedValidation = await runJson(
+    workspaceRoot,
+    "validate",
+    repositoryId,
+    "--change",
+    changeId,
+    "--repo",
+    repositoryId,
+  );
+  assert.equal(selectedValidation.valid, true);
+  assert.deepEqual(selectedValidation.scope.repositories, [repositoryRoot]);
+
+  const closed = await runJson(
+    repositoryRoot,
+    "change",
+    "close",
+    repositoryId,
+    changeId,
+  );
+  assert.equal(closed.repositories[0].id, repositoryId);
+
+  const closedStatus = await runJson(workspaceRoot, "status");
+  const closedSpace = closedStatus.spaces.find((space) => space.spaceId === repositoryId);
+  assert.ok(closedSpace);
+  assert.equal(closedSpace.activeChangeCount, 0);
+  assert.deepEqual(
+    closedSpace.recentChanges.map((change) => ({
+      changeId: change.changeId,
+      status: change.status,
+      storedStatus: change.storedStatus,
+      unresolvedRepositoryIds: change.unresolvedRepositoryIds,
+    })),
+    [{
+      changeId,
+      status: "closed",
+      storedStatus: "in_review",
+      unresolvedRepositoryIds: [repositoryId],
+    }],
+  );
+
+  const closedValidation = await runJsonAllowingFindings(
+    workspaceRoot,
+    "validate",
+    "--change",
+    changeId,
+  );
+  assert.equal(closedValidation.valid, false);
+  assert.equal(closedValidation.summary.changes, 1);
+  assert.deepEqual(
+    closedValidation.findings.map((finding) => finding.code).sort(),
+    ["AFFECTED_EPIC_NOT_FOUND", "REPOSITORY_LOCATOR_UNAVAILABLE"],
+  );
+  assert.equal(
+    Object.hasOwn((await readWorkspaceConfig(workspaceRoot)).ideas, repositoryId),
+    false,
+  );
+});
+
+test("central inventory does not broaden repository-only Space synthesis", async (t) => {
+  const cases = [
+    { label: "zero", repositoryIds: [] },
+    { label: "different", repositoryIds: ["different-repository"] },
+    { label: "multiple", repositoryIds: ["unknown-multiple", "different-repository"] },
+  ];
+
+  for (const [index, scenario] of cases.entries()) {
+    const root = await createMappedWorkspace();
+    const spaceId = `unknown-${scenario.label}`;
+    const changeId = `2026-08-${String(index + 10).padStart(2, "0")}-${scenario.label}-ownership`;
+    t.after(() => rm(root, { recursive: true, force: true }));
+    await initWorkspace(root);
+    await writeCanonicalChange(root, "sample-web", changeId, "in_review");
+    const changeFilePath = join(root, ".sdd", "changes", changeId, "change.md");
+    const repositories = scenario.repositoryIds.length === 0
+      ? "repositories: []"
+      : ["repositories:", ...scenario.repositoryIds.map((id) => `  - ${id}`)].join("\n");
+    await writeFile(
+      changeFilePath,
+      (await readFile(changeFilePath, "utf8")).replace(
+        "space: sample\nrepositories:\n  - sample-web",
+        `space: ${spaceId}\n${repositories}`,
+      ),
+      "utf8",
+    );
+
+    await assert.rejects(
+      () => getStatus(root),
+      (error) => error instanceof SddError && error.code === "SPACE_NOT_FOUND",
+      scenario.label,
+    );
+
+    const diagnosis = await diagnoseWorkspace(root);
+    assert.equal(diagnosis.healthy, false, scenario.label);
+    assert.ok(diagnosis.findings.some((finding) =>
+      finding.level === "error"
+      && finding.code === "SPACE_NOT_FOUND"
+      && finding.message.includes(spaceId)), scenario.label);
+    assert.equal(diagnosis.findings.some((finding) =>
+      finding.code === "REPOSITORY_LOCATOR_UNAVAILABLE"), false, scenario.label);
+
+    const validation = await validateArtifacts(root, { changeId });
+    assert.equal(validation.valid, false, scenario.label);
+    assert.ok(validation.findings.some((finding) =>
+      finding.level === "error"
+      && finding.code === "SPACE_NOT_FOUND"
+      && finding.spaceId === spaceId), scenario.label);
+    assert.equal(validation.findings.some((finding) =>
+      finding.code === "REPOSITORY_LOCATOR_UNAVAILABLE"), false, scenario.label);
+
+    if (scenario.label === "multiple") {
+      const repositoryRoot = await createWorkspace("sdd-invalid-repository-only-context-");
+      t.after(() => rm(repositoryRoot, { recursive: true, force: true }));
+      await writeRepositoryConfig(repositoryRoot, createRepositoryConfig(spaceId));
+
+      await assert.rejects(
+        () => getStatus(repositoryRoot, null, { workspaceRoot: root }),
+        (error) => error instanceof SddError && error.code === "SPACE_NOT_FOUND",
+      );
+
+      const checkoutDiagnosis = await diagnoseWorkspace(repositoryRoot, {
+        workspaceRoot: root,
+      });
+      assert.equal(checkoutDiagnosis.healthy, false);
+      assert.ok(checkoutDiagnosis.findings.some((finding) =>
+        finding.level === "error"
+        && finding.code === "SPACE_NOT_FOUND"
+        && finding.message.includes(spaceId)));
+
+      const checkoutValidation = await validateArtifacts(repositoryRoot, {
+        changeId,
+        workspaceRoot: root,
+      });
+      assert.equal(checkoutValidation.valid, false);
+      assert.ok(checkoutValidation.findings.some((finding) =>
+        finding.level === "error"
+        && finding.code === "SPACE_NOT_FOUND"
+        && finding.spaceId === spaceId));
+    }
+  }
+});
+
+test("absolute --repo selectors drive contained and physical external CLI targets", async (t) => {
+  const workspaceRoot = await createMappedWorkspace();
+  const externalRoot = await createWorkspace("sdd-absolute-external-repository-");
+  const externalRepository = join(externalRoot, "sample-external");
+  const externalMapping = join(workspaceRoot, "code", "sample-external-link");
+  const containedRepository = join(workspaceRoot, "code", "sample-web");
+  await initWorkspace(workspaceRoot);
+  await mkdir(externalRepository, { recursive: true });
+  await writeRepositoryConfig(
+    externalRepository,
+    createRepositoryConfig("sample-external"),
+  );
+  await symlink(externalRepository, externalMapping);
+  const config = await readWorkspaceConfig(workspaceRoot);
+  config.ideas.sample.repositories.push({
+    path: "code/sample-external-link",
+    role: "external",
+    status: "active",
+  });
+  await writeWorkspaceConfig(workspaceRoot, config);
+  t.after(() => rm(workspaceRoot, { recursive: true, force: true }));
+  t.after(() => rm(externalRoot, { recursive: true, force: true }));
+
+  const runJson = async (...args) => {
+    const { stdout } = await execFileAsync(process.execPath, [
+      join(PACKAGE_ROOT, "bin", "sdd.js"),
+      ...args,
+      "--workspace",
+      workspaceRoot,
+      "--json",
+    ], { cwd: tmpdir() });
+    return JSON.parse(stdout);
+  };
+  const routes = [
+    {
+      label: "contained",
+      selector: containedRepository,
+      resolvedPath: "code/sample-web",
+      epicId: "SAMPLE-E910",
+    },
+    {
+      label: "external",
+      selector: externalRepository,
+      resolvedPath: "code/sample-external-link",
+      epicId: "SAMPLE-E911",
+    },
+  ];
+  for (const route of routes) {
+    const validation = await runJson(
+      "validate",
+      "sample",
+      "--repo",
+      route.selector,
+    );
+    const epic = await runJson(
+      "epic",
+      "create",
+      "sample",
+      route.epicId,
+      `${route.label}-absolute-selector`,
+      "--repo",
+      route.selector,
+      "--date",
+      "2026-08-09",
+      "--dry-run",
+    );
+    const change = await runJson(
+      "change",
+      "create",
+      "sample",
+      `${route.label}-absolute-selector`,
+      "--repo",
+      route.selector,
+      "--date",
+      "2026-08-09",
+      "--dry-run",
+    );
+
+    assert.equal(validation.valid, true);
+    assert.deepEqual(validation.scope.repositories, [route.resolvedPath]);
+    assert.equal(epic.repository.resolvedPath, route.resolvedPath);
+    assert.equal(change.repositories[0].resolvedPath, route.resolvedPath);
+  }
+});
+
+async function seedCreateCollisionEntry(kind, path, root) {
+  let markerPath = null;
+  if (kind === "empty directory") {
+    await mkdir(path);
+  } else if (kind === "file") {
+    markerPath = path;
+    await writeFile(path, "concurrent file\n", "utf8");
+  } else if (kind === "symlink") {
+    const linkTarget = join(root, "concurrent-link-target");
+    markerPath = join(linkTarget, "marker.txt");
+    await mkdir(linkTarget, { recursive: true });
+    await writeFile(markerPath, "concurrent symlink\n", "utf8");
+    await symlink(linkTarget, path);
+  } else {
+    markerPath = join(path, "marker.txt");
+    await mkdir(path);
+    await writeFile(markerPath, "concurrent directory\n", "utf8");
+  }
+  const state = await lstat(path, { bigint: true });
+  return {
+    identity: { dev: String(state.dev), ino: String(state.ino) },
+    markerPath,
+    markerSource: markerPath ? await readFile(markerPath, "utf8") : null,
+  };
+}
+
+async function assertCreateCollisionEntry(path, expected) {
+  const state = await lstat(path, { bigint: true });
+  assert.deepEqual(
+    { dev: String(state.dev), ino: String(state.ino) },
+    expected.identity,
+  );
+  if (expected.markerPath) {
+    assert.equal(await readFile(expected.markerPath, "utf8"), expected.markerSource);
+  } else {
+    assert.deepEqual(await readdir(path), []);
+  }
+}
+
+test("Epic creation preserves every destination type that appears before exclusive creation", async (t) => {
+  for (const kind of ["empty directory", "file", "symlink", "nonempty directory"]) {
+    await t.test(kind, async (subtest) => {
+      const root = await createMappedWorkspace();
+      subtest.after(() => rm(root, { recursive: true, force: true }));
+      await initWorkspace(root);
+      const destination = join(
+        root,
+        "code",
+        "sample-web",
+        "docs",
+        "epics",
+        "sample-e901-publication-race",
+      );
+      let concurrentEntry;
+
+      await assert.rejects(
+        () => createEpic(root, "sample", "SAMPLE-E901", "publication-race", {
+          date: "2026-08-09",
+          repositories: ["sample-web"],
+          beforePublish: async ({ targetPath }) => {
+            assert.equal(targetPath, destination);
+            concurrentEntry = await seedCreateCollisionEntry(kind, targetPath, root);
+          },
+        }),
+        (error) => error instanceof SddError
+          && ["CONCURRENT_CHANGE", "UNSAFE_ARTIFACT_PATH"].includes(error.code),
+      );
+      await assertCreateCollisionEntry(destination, concurrentEntry);
+
+      await rm(destination, { recursive: true, force: true });
+      const retried = await createEpic(root, "sample", "SAMPLE-E901", "publication-race", {
+        date: "2026-08-09",
+        repositories: ["sample-web"],
+      });
+      assert.equal(retried.command, "epic-create");
+    });
+  }
+});
+
+test("Epic validation failure retains complete inspectable state and reports manual recovery", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const epicDirectory = join(
+    root,
+    "code",
+    "sample-web",
+    "docs",
+    "epics",
+    "sample-e902-validation-residue",
+  );
+  let failure;
+
+  await assert.rejects(
+    () => createEpic(root, "sample", "SAMPLE-E902", "validation-residue", {
+      date: "2026-08-09",
+      repositories: ["sample-web"],
+      validate: async () => ({
+        valid: false,
+        findings: [{ code: "INJECTED_INVALID_EPIC", message: "Injected invalid Epic." }],
+      }),
+    }),
+    (error) => {
+      failure = error;
+      return error instanceof SddError
+        && error.code === "MUTATION_RECOVERY_FAILED"
+        && error.retainedPaths.includes(epicDirectory)
+        && error.details.some((detail) => detail.includes("Retained path requiring inspection"))
+        && error.details.some((detail) => detail.includes("retry"));
+    },
+  );
+
+  assert.equal(failure.retainedPaths[0], epicDirectory);
+  assert.match(await readFile(join(epicDirectory, "epic.md"), "utf8"), /^id: SAMPLE-E902$/m);
+  await assert.rejects(
+    () => createEpic(root, "sample", "SAMPLE-E902", "validation-residue", {
+      date: "2026-08-09",
+      repositories: ["sample-web"],
+    }),
+    (error) => error instanceof SddError && error.code === "EPIC_EXISTS",
+  );
+
+  await rm(epicDirectory, { recursive: true, force: true });
+  assert.equal((await createEpic(root, "sample", "SAMPLE-E902", "validation-residue", {
+    date: "2026-08-09",
+    repositories: ["sample-web"],
+  })).validation.valid, true);
+});
+
+test("Epic validation recovery preserves a replacement and the displaced scaffold", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const epicDirectory = join(
+    root,
+    "code",
+    "sample-web",
+    "docs",
+    "epics",
+    "sample-e903-validation-replacement",
+  );
+  const displacedScaffold = `${epicDirectory}.displaced`;
+  let replacement;
+
+  await assert.rejects(
+    () => createEpic(root, "sample", "SAMPLE-E903", "validation-replacement", {
+      date: "2026-08-09",
+      repositories: ["sample-web"],
+      validate: async () => ({
+        valid: false,
+        findings: [{ code: "INJECTED_INVALID_EPIC", message: "Injected invalid Epic." }],
+      }),
+      afterValidationFailure: async ({ path }) => {
+        assert.equal(path, epicDirectory);
+        await rename(path, displacedScaffold);
+        await mkdir(path);
+        await writeFile(join(path, "marker.txt"), "newer Epic replacement\n", "utf8");
+        const state = await lstat(path, { bigint: true });
+        replacement = { dev: String(state.dev), ino: String(state.ino) };
+      },
+    }),
+    (error) => error instanceof SddError
+      && error.code === "MUTATION_RECOVERY_FAILED"
+      && error.retainedPaths.includes(epicDirectory),
+  );
+
+  const current = await lstat(epicDirectory, { bigint: true });
+  assert.deepEqual({ dev: String(current.dev), ino: String(current.ino) }, replacement);
+  assert.equal(await readFile(join(epicDirectory, "marker.txt"), "utf8"), "newer Epic replacement\n");
+  assert.match(await readFile(join(displacedScaffold, "epic.md"), "utf8"), /^id: SAMPLE-E903$/m);
+});
+
+test("Epic creation rejects a target replacement after exclusive directory creation", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const epicDirectory = join(
+    root,
+    "code",
+    "sample-web",
+    "docs",
+    "epics",
+    "sample-e904-directory-replacement",
+  );
+  const displacedDirectory = `${epicDirectory}.displaced`;
+  let replacement;
+
+  await assert.rejects(
+    () => createEpic(root, "sample", "SAMPLE-E904", "directory-replacement", {
+      date: "2026-08-09",
+      repositories: ["sample-web"],
+      afterDirectoryCreate: async ({ targetPath }) => {
+        assert.equal(targetPath, epicDirectory);
+        await rename(targetPath, displacedDirectory);
+        await mkdir(targetPath);
+        const state = await lstat(targetPath, { bigint: true });
+        replacement = { dev: String(state.dev), ino: String(state.ino) };
+      },
+    }),
+    (error) => error instanceof SddError
+      && error.code === "MUTATION_RECOVERY_FAILED"
+      && error.retainedPaths.includes(epicDirectory),
+  );
+
+  const current = await lstat(epicDirectory, { bigint: true });
+  assert.deepEqual({ dev: String(current.dev), ino: String(current.ino) }, replacement);
+  assert.deepEqual(await readdir(epicDirectory), []);
+  assert.deepEqual(await readdir(displacedDirectory), []);
+});
+
+test("Epic creation rechecks authority before creating a missing artifact parent", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const repositoryRoot = join(root, "code", "sample-web");
+  const repositoryConfigPath = getRepositoryConfigPath(repositoryRoot);
+  const repositoryConfig = await readRepositoryConfig(repositoryRoot);
+  repositoryConfig.artifacts.epics = "custom/new/epics";
+  await writeRepositoryConfig(repositoryRoot, repositoryConfig);
+  const artifactRoot = join(repositoryRoot, "custom");
+  let replacement;
+
+  await assert.rejects(
+    () => createEpic(root, "sample", "SAMPLE-E905", "authority-before-parent", {
+      date: "2026-08-09",
+      repositories: ["sample-web"],
+      beforeParentCreate: async () => {
+        replacement = await replaceLifecycleAuthorityFile(
+          repositoryConfigPath,
+          await readFile(repositoryConfigPath, "utf8"),
+        );
+      },
+    }),
+    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
+  );
+
+  await assertLifecycleAuthorityFileCurrent(replacement);
+  assert.equal(await pathExists(artifactRoot), false);
+});
+
+test("Epic create honors external portable identity and custom artifacts from unrelated cwd", async (t) => {
+  const root = await createMappedWorkspace();
+  const externalRoot = await createWorkspace("sdd-epic-create-external-");
+  const repositoryRoot = join(externalRoot, "frontend");
+  await mkdir(repositoryRoot, { recursive: true });
+  const repositoryConfig = createRepositoryConfig("web-app");
+  repositoryConfig.artifacts.epics = "custom/epics";
+  await writeRepositoryConfig(repositoryRoot, repositoryConfig);
+  await initWorkspace(root);
+  await addRepositoryRootMapping(root, "external", externalRoot, "frontend");
+  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => rm(externalRoot, { recursive: true, force: true }));
+
+  const oldDirectory = join(repositoryRoot, "custom", "epics", "sample-e903-older");
+  await mkdir(oldDirectory, { recursive: true });
+  const template = await readFile(join(PACKAGE_ROOT, "docs", "templates", "epic.md"), "utf8");
+  await writeFile(
+    join(oldDirectory, "epic.md"),
+    template
+      .replaceAll("EPIC-ID", "SAMPLE-E903")
+      .replaceAll("Epic Name", "Older")
+      .replaceAll("yyyy-mm-dd", "2026-08-08"),
+    "utf8",
+  );
+
+  const runCreate = async (epicId, slug, selector) => {
+    const { stdout } = await execFileAsync(process.execPath, [
+      join(PACKAGE_ROOT, "bin", "sdd.js"),
+      "epic",
+      "create",
+      "sample",
+      epicId,
+      slug,
+      "--workspace",
+      root,
+      "--repo",
+      selector,
+      "--date",
+      "2026-08-09",
+      "--json",
+    ], { cwd: tmpdir() });
+    return JSON.parse(stdout);
+  };
+  const duplicateDirectory = join(
+    repositoryRoot,
+    "custom",
+    "epics",
+    "sample-e903-duplicate",
+  );
+  await assert.rejects(
+    () => runCreate("SAMPLE-E903", "duplicate", repositoryRoot),
+  );
+  assert.match(
+    await readFile(join(duplicateDirectory, "epic.md"), "utf8"),
+    /^id: SAMPLE-E903$/m,
+  );
+  await rm(duplicateDirectory, { recursive: true, force: true });
+
+  const absoluteSelected = await runCreate("SAMPLE-E904", "current", repositoryRoot);
+  assert.equal(absoluteSelected.repository.id, "web-app");
+  assert.equal(absoluteSelected.repository.resolvedPath, repositoryRoot);
+  assert.equal(absoluteSelected.validation.summary.epics, 1);
+  assert.equal(
+    await pathExists(join(repositoryRoot, "custom", "epics", "sample-e904-current", "epic.md")),
+    true,
+  );
+  assert.equal(
+    await pathExists(join(repositoryRoot, "docs", "epics", "sample-e904-current", "epic.md")),
+    false,
+  );
+
+  const idSelected = await runCreate("SAMPLE-E905", "stable-id", "web-app");
+  assert.equal(idSelected.repository.id, "web-app");
+  assert.equal(
+    await pathExists(join(repositoryRoot, "custom", "epics", "sample-e905-stable-id", "epic.md")),
+    true,
+  );
+});
+
+test("explicit create targets ignore unrelated broken configs but reject targeted and duplicate claims", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  await rename(join(root, "code", "sample-web"), join(root, "code", "web-app"));
+  const workspaceConfig = await readWorkspaceConfig(root);
+  workspaceConfig.ideas.sample.repositories.find(
+    (repository) => repository.path === "sample-web",
+  ).path = "web-app";
+  await writeWorkspaceConfig(root, workspaceConfig);
+  const brokenConfig = getRepositoryConfigPath(join(root, "code", "sample-mobile"));
+  await writeFile(brokenConfig, "kind: repository\nartifacts: [\n", "utf8");
+
+  const pathChange = await createChange(root, "sample", "healthy-path-target", {
+    date: "2026-08-09",
+    repositories: ["code/web-app"],
+  });
+  assert.deepEqual(pathChange.repositories.map((repository) => repository.id), ["sample-web"]);
+  const idChange = await createChange(root, "sample", "healthy-id-target", {
+    date: "2026-08-09",
+    repositories: ["sample-web"],
+  });
+  assert.deepEqual(idChange.repositories.map((repository) => repository.id), ["sample-web"]);
+  assert.equal((await createEpic(root, "sample", "SAMPLE-E905", "healthy-path", {
+    date: "2026-08-09",
+    repositories: ["code/web-app"],
+  })).validation.valid, true);
+  assert.equal((await createEpic(root, "sample", "SAMPLE-E906", "healthy-id", {
+    date: "2026-08-09",
+    repositories: ["sample-web"],
+  })).validation.valid, true);
+  await assert.rejects(
+    () => createChange(root, "sample", "unknown-target", {
+      date: "2026-08-09",
+      repositories: ["unknown-repository"],
+    }),
+    (error) =>
+      error instanceof SddError
+      && error.code === "REPOSITORY_NOT_FOUND"
+      && error.details.includes("Available repository: sample-web (code/web-app)")
+      && error.details.includes("code/sample-mobile: INVALID_YAML"),
+  );
+
+  await assert.rejects(
+    () => createChange(root, "sample", "broken-target", {
+      date: "2026-08-09",
+      repositories: ["sample-mobile"],
+    }),
+    (error) => error instanceof SddError && error.code === "INVALID_YAML",
+  );
+  await assert.rejects(
+    () => createEpic(root, "sample", "SAMPLE-E907", "broken-target", {
+      date: "2026-08-09",
+      repositories: ["sample-mobile"],
+    }),
+    (error) => error instanceof SddError && error.code === "INVALID_YAML",
+  );
+  await rm(brokenConfig);
+  await symlink(getRepositoryConfigPath(join(root, "code", "web-app")), brokenConfig);
+  await assert.rejects(
+    () => createEpic(root, "sample", "SAMPLE-E907", "symlink-config", {
+      date: "2026-08-09",
+      repositories: ["sample-mobile"],
+    }),
+    (error) => error instanceof SddError && error.code === "UNSAFE_CONFIG_PATH",
+  );
+  await rm(brokenConfig);
+
+  await writeRepositoryConfig(
+    join(root, "code", "sample-mobile"),
+    createRepositoryConfig("sample-web"),
+  );
+  await assert.rejects(
+    () => createChange(root, "sample", "duplicate-target", {
+      date: "2026-08-09",
+      repositories: ["code/web-app"],
+    }),
+    (error) => error instanceof SddError && error.code === "REPOSITORY_ID_COLLISION",
+  );
+  await assert.rejects(
+    () => createEpic(root, "sample", "SAMPLE-E908", "duplicate-target", {
+      date: "2026-08-09",
+      repositories: ["code/web-app"],
+    }),
+    (error) => error instanceof SddError && error.code === "REPOSITORY_ID_COLLISION",
+  );
+});
+
+test("Epic create allows a selected mapping without portable config and confines custom roots physically", async (t) => {
+  const root = await createMappedWorkspace();
+  const outside = await createWorkspace("sdd-epic-create-artifact-escape-");
+  t.after(() => rm(root, { recursive: true, force: true }));
+  t.after(() => rm(outside, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const repositoryRoot = join(root, "code", "sample-web");
+  await rm(getRepositoryConfigPath(repositoryRoot));
+
+  const missingConfig = await createEpic(root, "sample", "SAMPLE-E909", "missing-config", {
+    date: "2026-08-09",
+    repositories: ["sample-web"],
+  });
+  assert.equal(Object.hasOwn(missingConfig.repository, "id"), false);
+  assert.equal(missingConfig.validation.valid, true);
+
+  const unsafeConfig = createRepositoryConfig("sample-web");
+  unsafeConfig.artifacts.epics = "custom/epics";
+  await writeRepositoryConfig(repositoryRoot, unsafeConfig);
+  await symlink(outside, join(repositoryRoot, "custom"));
+  await assert.rejects(
+    () => createEpic(root, "sample", "SAMPLE-E910", "escaped-root", {
+      date: "2026-08-09",
+      repositories: ["sample-web"],
+    }),
+    (error) => error instanceof SddError && error.code === "UNSAFE_ARTIFACT_PATH",
+  );
+  assert.equal((await readdir(outside)).length, 0);
+});
+
+async function captureLifecycleAuthorityFile(path) {
+  const state = await lstat(path, { bigint: true });
+  return {
+    path,
+    identity: { dev: String(state.dev), ino: String(state.ino) },
+    source: await readFile(path, "utf8"),
+  };
+}
+
+async function assertLifecycleAuthorityFileCurrent(expected) {
+  const current = await captureLifecycleAuthorityFile(expected.path);
+  assert.deepEqual(current.identity, expected.identity);
+  assert.equal(current.source, expected.source);
+}
+
+async function replaceLifecycleAuthorityFile(path, source) {
+  const previous = await captureLifecycleAuthorityFile(path);
+  const replacementPath = `${path}.selection-authority-replacement`;
+  await writeFile(replacementPath, source, "utf8");
+  await rename(replacementPath, path);
+  const replacement = await captureLifecycleAuthorityFile(path);
+  assert.notDeepEqual(replacement.identity, previous.identity);
+  return replacement;
+}
+
+function lifecycleSelectionAuthorityMutations() {
+  return [
+    {
+      label: "workspace config with identical bytes and a new inode",
+      replace: async (root) => {
+        const path = getWorkspaceConfigPath(root);
+        return {
+          proof: await replaceLifecycleAuthorityFile(path, await readFile(path, "utf8")),
+        };
+      },
+    },
+    {
+      label: "workspace repository mapping with changed bytes",
+      replace: async (root) => {
+        const config = await readWorkspaceConfig(root);
+        config.ideas.sample.repositories[0].path = "sample-web-remapped";
+        await writeWorkspaceConfig(root, config);
+        return {
+          proof: await captureLifecycleAuthorityFile(getWorkspaceConfigPath(root)),
+          assertSemantic: async () => {
+            const current = await readWorkspaceConfig(root);
+            assert.equal(current.ideas.sample.repositories[0].path, "sample-web-remapped");
+          },
+        };
+      },
+    },
+    {
+      label: "selected repository config with identical bytes and a new inode",
+      replace: async (root) => {
+        const path = getRepositoryConfigPath(join(root, "code", "sample-web"));
+        return {
+          proof: await replaceLifecycleAuthorityFile(path, await readFile(path, "utf8")),
+        };
+      },
+    },
+    {
+      label: "selected repository config with changed identity and artifacts",
+      replace: async (root) => {
+        const repositoryRoot = join(root, "code", "sample-web");
+        const config = createRepositoryConfig("replacement-web");
+        config.artifacts.epics = "replacement/epics";
+        await writeRepositoryConfig(repositoryRoot, config);
+        return {
+          proof: await captureLifecycleAuthorityFile(getRepositoryConfigPath(repositoryRoot)),
+          assertSemantic: async () => {
+            const current = await readRepositoryConfig(repositoryRoot);
+            assert.equal(current.id, "replacement-web");
+            assert.equal(current.artifacts.epics, "replacement/epics");
+          },
+        };
+      },
+    },
+    {
+      label: "unselected repository config creates a duplicate selected ID",
+      replace: async (root) => {
+        const repositoryRoot = join(root, "code", "sample-mobile");
+        await writeRepositoryConfig(
+          repositoryRoot,
+          createRepositoryConfig("sample-web"),
+        );
+        return {
+          proof: await captureLifecycleAuthorityFile(getRepositoryConfigPath(repositoryRoot)),
+          assertSemantic: async () => {
+            assert.equal((await readRepositoryConfig(repositoryRoot)).id, "sample-web");
+          },
+        };
+      },
+    },
+  ];
+}
+
+function lifecycleSelectionAuthorityOperations() {
+  const transitionId = "2026-08-09-transition-selection-authority";
+  const closeId = "2026-08-09-close-selection-authority";
+  return [
+    {
+      label: "Change create",
+      prepare: async () => null,
+      run: (root, replaceAuthority) => createChange(
+        root,
+        "sample",
+        "selection-authority",
+        {
+          date: "2026-08-09",
+          repositories: ["sample-web"],
+          beforePublish: replaceAuthority,
+        },
+      ),
+      assertUncommitted: async (root) => {
+        assert.equal(
+          await pathExists(getActiveChangePath("2026-08-09-selection-authority", root)),
+          false,
+        );
+      },
+    },
+    {
+      label: "Change transition",
+      prepare: async (root) => {
+        await writeChange(root, "sample-web", transitionId, "in_progress");
+        return captureLifecycleAuthorityFile(join(
+          getActiveChangePath(transitionId, root),
+          "change.md",
+        ));
+      },
+      run: (root, replaceAuthority) => transitionChange(
+        root,
+        "sample",
+        transitionId,
+        {
+          from: "in_progress",
+          to: "in_review",
+          beforeCommit: replaceAuthority,
+        },
+      ),
+      assertUncommitted: async (root, changeProof) => {
+        await assertLifecycleAuthorityFileCurrent(changeProof);
+        assert.equal(await pathExists(getClosedChangePath(transitionId, root)), false);
+      },
+    },
+    {
+      label: "Change close",
+      prepare: async (root) => {
+        await writeChange(root, "sample-web", closeId, "in_review");
+        return captureLifecycleAuthorityFile(join(
+          getActiveChangePath(closeId, root),
+          "change.md",
+        ));
+      },
+      run: (root, replaceAuthority) => closeChange(
+        root,
+        "sample",
+        closeId,
+        { beforeCommit: replaceAuthority },
+      ),
+      assertUncommitted: async (root, changeProof) => {
+        await assertLifecycleAuthorityFileCurrent(changeProof);
+        assert.equal(await pathExists(getClosedChangePath(closeId, root)), false);
+      },
+    },
+  ];
+}
+
+test("lifecycle mutations reject replaced workspace and selected repository authority before commit", async (t) => {
+  for (const operation of lifecycleSelectionAuthorityOperations()) {
+    for (const mutation of lifecycleSelectionAuthorityMutations()) {
+      await t.test(`${operation.label}: ${mutation.label}`, async (subtest) => {
+        const root = await createMappedWorkspace();
+        subtest.after(() => rm(root, { recursive: true, force: true }));
+        await initWorkspace(root);
+        const uncommittedProof = await operation.prepare(root);
+        let replacement;
+
+        await assert.rejects(
+          () => operation.run(root, async () => {
+            replacement = await mutation.replace(root);
+          }),
+          (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
+        );
+
+        await assertLifecycleAuthorityFileCurrent(replacement.proof);
+        if (replacement.assertSemantic) await replacement.assertSemantic();
+        await operation.assertUncommitted(root, uncommittedProof);
+      });
+    }
+  }
+});
+
+test("Epic creation rechecks that a selected repository contract remains absent", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const repositoryRoot = join(root, "code", "sample-web");
+  const repositoryConfigPath = getRepositoryConfigPath(repositoryRoot);
+  await rm(repositoryConfigPath);
+  let replacement;
+
+  await assert.rejects(
+    () => createEpic(root, "sample", "SAMPLE-E912", "absent-authority", {
+      date: "2026-08-09",
+      repositories: ["sample-web"],
+      beforeParentCreate: async () => {
+        const config = createRepositoryConfig("late-web");
+        config.artifacts.epics = "late/epics";
+        await writeRepositoryConfig(repositoryRoot, config);
+        replacement = await captureLifecycleAuthorityFile(repositoryConfigPath);
+      },
+    }),
+    (error) => error instanceof SddError && error.code === "CONCURRENT_CHANGE",
+  );
+
+  await assertLifecycleAuthorityFileCurrent(replacement);
+  assert.equal((await readRepositoryConfig(repositoryRoot)).id, "late-web");
+  assert.equal(
+    await pathExists(join(
+      repositoryRoot,
+      "docs",
+      "epics",
+      "sample-e912-absent-authority",
+    )),
+    false,
+  );
+  assert.equal(
+    await pathExists(join(
+      repositoryRoot,
+      "late",
+      "epics",
+      "sample-e912-absent-authority",
+    )),
+    false,
+  );
+});
+
+test("Epic create never mutates a same-content external ancestor replacement", async (t) => {
+  const root = await createMappedWorkspace();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await initWorkspace(root);
+  const ancestor = join(root, "code", "sample-web", "docs", "epics");
+  const destination = join(ancestor, "sample-e915-ancestor-swap");
+  const outside = await createWorkspace("sdd-epic-ancestor-swap-");
+  t.after(() => rm(outside, { recursive: true, force: true }));
+  const displaced = `${ancestor}.owned-before-swap`;
+  let outsideHash;
+
+  await assert.rejects(
+    () => createEpic(root, "sample", "SAMPLE-E915", "ancestor-swap", {
+      date: "2026-08-09",
+      repositories: ["sample-web"],
+      beforePublish: async () => {
+        await rename(ancestor, displaced);
+        await rm(outside, { recursive: true });
+        await cp(displaced, outside, { recursive: true });
+        outsideHash = await hashDirectory(outside);
+        assert.equal(await hashDirectory(displaced), outsideHash);
+        await symlink(outside, ancestor);
+      },
+    }),
+    (error) => error instanceof SddError
+      && ["CONCURRENT_CHANGE", "MUTATION_RECOVERY_FAILED", "UNSAFE_ARTIFACT_PATH"].includes(error.code),
+  );
+
+  assert.equal(await hashDirectory(outside), outsideHash);
+  assert.equal(await pathExists(join(outside, basename(destination))), false);
+});
+
+test("lifecycle commit rechecks preserve unreadable and unsafe collision witnesses", async (t) => {
+  const operations = lifecycleSelectionAuthorityOperations();
+  const mutations = [
+    {
+      label: "unrelated config mode change",
+      apply: async (root) => {
+        const path = getRepositoryConfigPath(join(root, "code", "sample-mobile"));
+        await chmod(path, 0o000);
+        return async () => {
+          const state = await lstat(path);
+          assert.equal(Number(state.mode & 0o777), 0);
+        };
+      },
+    },
+    {
+      label: "unrelated config becomes malformed",
+      apply: async (root) => {
+        const path = getRepositoryConfigPath(join(root, "code", "sample-mobile"));
+        const source = "kind: repository\nid: [\n";
+        await writeFile(path, source, "utf8");
+        return async () => {
+          assert.equal(await readFile(path, "utf8"), source);
+        };
+      },
+    },
+    {
+      label: "unrelated config becomes a symlink to the selected identity",
+      apply: async (root) => {
+        const path = getRepositoryConfigPath(join(root, "code", "sample-mobile"));
+        const selectedPath = getRepositoryConfigPath(join(root, "code", "sample-web"));
+        const displacedPath = `${path}.collision-witness-original`;
+        const originalSource = await readFile(path, "utf8");
+        await rename(path, displacedPath);
+        await symlink(selectedPath, path);
+        return async () => {
+          assert.equal(await readlink(path), selectedPath);
+          assert.equal(await readFile(displacedPath, "utf8"), originalSource);
+        };
+      },
+    },
+  ];
+
+  for (const operation of operations) {
+    for (const mutation of mutations) {
+      await t.test(`${operation.label}: ${mutation.label}`, async (subtest) => {
+        const root = await createMappedWorkspace();
+        subtest.after(() => rm(root, { recursive: true, force: true }));
+        await initWorkspace(root);
+        const uncommittedProof = await operation.prepare(root);
+        let assertMutationPreserved;
+
+        await assert.rejects(
+          () => operation.run(root, async () => {
+            assertMutationPreserved = await mutation.apply(root);
+          }),
+          (error) => error instanceof SddError
+            && error.code === "CONCURRENT_CHANGE"
+            && error.details.some((detail) => detail.includes("code/sample-mobile")),
+        );
+
+        await assertMutationPreserved();
+        await operation.assertUncommitted(root, uncommittedProof);
+      });
+    }
+  }
 });

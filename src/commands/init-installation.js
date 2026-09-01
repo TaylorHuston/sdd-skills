@@ -1,26 +1,36 @@
-import { mkdir, readFile, rm } from "node:fs/promises";
-import { basename, resolve } from "node:path";
+import { lstat, mkdir } from "node:fs/promises";
+import { basename, join, resolve } from "node:path";
 
 import {
   assertValidConfig,
+  assertWorkspaceConfigSnapshotCurrent,
   assertValidRepositoryConfig,
+  createInitialConfig,
   createRepositoryConfig,
-  createUserConfig,
-  createUserConfigFromWorkspace,
-  getConfigDirectory,
-  getConfigPath,
-  getInstallLockPath,
-  getUserRoot,
-  readConfig,
-  readRepositoryConfig,
-  writeConfig,
+  createRepositoryRootMap,
+  getRepositoryConfigPath,
+  getWorkspaceConfigDirectory,
+  getWorkspaceConfigPath,
+  normalizeWorkspaceConfiguredPath,
+  readRepositoryConfigSnapshot,
+  readWorkspaceConfigSnapshot,
+  writeRepositoryConfig,
+  writeWorkspaceConfig,
 } from "../config.js";
+import { assertChangeStoreConfinement } from "../change-store.js";
+import {
+  CHANGES_DIRECTORY_NAME,
+  CLOSED_CHANGES_DIRECTORY_NAME,
+  WORKFLOW_RELATIVE_PATH,
+} from "../constants.js";
 import { SddError } from "../errors.js";
-import { pathExists, writeFileAtomically } from "../fs.js";
-import { planSkillSync } from "../skills.js";
-import { WORKFLOW_SOURCE_PATH } from "../constants.js";
-import { withWorkspaceMutationLock } from "../mutation.js";
+import { isPathPhysicallyInside } from "../fs.js";
 import { applyManagedInstallation } from "../installation.js";
+import { publishManagedFile } from "../managed-file-publication.js";
+import { withWorkspaceMutationLock } from "../mutation.js";
+import { planSkillSync, readInstallLockSnapshot } from "../skills.js";
+import { findOperationConfiguration } from "../workspace.js";
+import { planWorkflowSync } from "../workflow.js";
 
 function defaultRepositoryId(repositoryRoot) {
   return basename(repositoryRoot)
@@ -29,158 +39,344 @@ function defaultRepositoryId(repositoryRoot) {
     .replace(/^-|-$/g, "");
 }
 
-export async function setupInstallation(
-  options = {},
-) {
-  const userRoot = getUserRoot();
-  if (options.dryRun) return setupInstallationUnlocked(userRoot, options);
-  return withWorkspaceMutationLock(
-    userRoot,
-    () => setupInstallationUnlocked(userRoot, options),
-  );
-}
-
-async function setupInstallationUnlocked(
-  userRoot,
-  {
-    planningRoot,
-    repositoryRoots,
-    skillsDirectory,
-    fromWorkspace,
-    force = false,
-    dryRun = false,
-    writeLock = null,
-  },
-) {
-  const userConfigExists = await pathExists(getConfigPath(userRoot));
-  const requestedOverrides = [planningRoot, repositoryRoots, skillsDirectory, fromWorkspace].some(
-    (value) => value !== undefined,
-  );
-  if (userConfigExists && requestedOverrides) {
-    throw new SddError(
-      "User-level path overrides only apply when creating ~/.sdd/config.yaml. Edit the existing user configuration or run sdd configure.",
-      { code: "CONFIG_ALREADY_EXISTS" },
-    );
-  }
-
-  const userConfig = userConfigExists
-    ? await readConfig(userRoot)
-    : fromWorkspace
-      ? await createUserConfigFromWorkspace(userRoot, resolve(fromWorkspace), { skillsDirectory })
-      : await createUserConfig(userRoot, { planningRoot, repositoryRoots, skillsDirectory });
-  assertValidConfig(userConfig, "set up the user installation");
-
-  const skillPlan = await planSkillSync(userRoot, userConfig, { force });
-  const ignorePath = `${getConfigDirectory(userRoot)}/.gitignore`;
-  const ignoreExists = await pathExists(ignorePath);
-  let createdIgnore = false;
-  let skills;
-  try {
-    if (!dryRun && !userConfigExists) {
-      await writeConfig(userRoot, userConfig);
-      await mkdir(getConfigDirectory(userRoot), { recursive: true });
-      if (!ignoreExists) {
-        await writeFileAtomically(ignorePath, "cache/\n");
-        createdIgnore = true;
-      }
-    }
-    ({ skills } = await applyManagedInstallation(userRoot, {
-      skillPlan,
-      dryRun,
-      ...(writeLock ? { writeLock } : {}),
-    }));
-  } catch (error) {
-    if (!dryRun && !userConfigExists && !(await pathExists(getInstallLockPath(userRoot)))) {
-      const configPath = getConfigPath(userRoot);
-      const currentConfig = await readConfig(userRoot).catch(() => null);
-      if (JSON.stringify(currentConfig) === JSON.stringify(userConfig)) {
-        await rm(configPath, { force: true }).catch(() => {});
-      }
-      if (createdIgnore && await readFile(ignorePath, "utf8").catch(() => null) === "cache/\n") {
-        await rm(ignorePath, { force: true }).catch(() => {});
-      }
-    }
-    throw error;
-  }
-
+function installationResult(workspaceRoot, config, {
+  createdWorkspaceConfig,
+  dryRun,
+  workflow,
+  skills,
+}) {
   return {
     command: "setup",
-    mode: "user",
-    userRoot,
-    createdUserConfig: !userConfigExists,
-    migratedFromWorkspace: fromWorkspace ? resolve(fromWorkspace) : null,
+    mode: "workspace",
+    workspaceRoot,
+    createdWorkspaceConfig,
     dryRun,
-    userConfigPath: getConfigPath(userRoot),
-    config: userConfig,
-    workflowPath: WORKFLOW_SOURCE_PATH,
+    workspaceConfigPath: getWorkspaceConfigPath(workspaceRoot),
+    config,
+    workflowPath: resolve(workspaceRoot, WORKFLOW_RELATIVE_PATH),
+    workflow,
     skills,
   };
 }
 
+async function lstatIfPresent(path) {
+  try {
+    return await lstat(path, { bigint: true });
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+async function inspectFixedSetupFile(workspaceRoot, path, label) {
+  const state = await lstatIfPresent(path);
+  if (
+    !(await isPathPhysicallyInside(workspaceRoot, path))
+    || state?.isSymbolicLink()
+    || (state && !state.isFile())
+  ) {
+    throw new SddError(`${label} must be a confined regular file: ${path}`, {
+      code: "UNSAFE_CONFIG_PATH",
+    });
+  }
+  return state;
+}
+
+async function ensureSetupDirectory(
+  workspaceRoot,
+  path,
+  label,
+  assertOwnerCurrent = null,
+  beforeMutation = null,
+) {
+  if (!(await isPathPhysicallyInside(workspaceRoot, path))) {
+    throw new SddError(`${label} resolves outside its workspace: ${path}`, {
+      code: "UNSAFE_ARTIFACT_PATH",
+    });
+  }
+  try {
+    await beforeMutation?.({ path, label });
+    await assertOwnerCurrent?.();
+    await mkdir(path, { recursive: true, mode: 0o755 });
+    await assertOwnerCurrent?.();
+  } catch (error) {
+    if (error?.code !== "EEXIST") throw error;
+  }
+  const state = await lstatIfPresent(path);
+  if (
+    !state
+    || state.isSymbolicLink()
+    || !state.isDirectory()
+    || !(await isPathPhysicallyInside(workspaceRoot, path))
+  ) {
+    throw new SddError(`${label} must be a confined real directory: ${path}`, {
+      code: "UNSAFE_ARTIFACT_PATH",
+    });
+  }
+}
+
+function sameRepositoryRootMap(left, right) {
+  const keys = Object.keys(left).sort((a, b) => a.localeCompare(b));
+  const rightKeys = Object.keys(right).sort((a, b) => a.localeCompare(b));
+  return keys.length === rightKeys.length
+    && keys.every((key, index) => key === rightKeys[index] && left[key] === right[key]);
+}
+
+export async function setupInstallation(
+  workspacePath = process.cwd(),
+  options = {},
+) {
+  const workspaceRoot = resolve(workspacePath);
+  if (options.dryRun) return setupInstallationUnlocked(workspaceRoot, options);
+  return withWorkspaceMutationLock(
+    workspaceRoot,
+    ({ assertCurrent }) => setupInstallationUnlocked(workspaceRoot, {
+      ...options,
+      mutationAuthority: assertCurrent,
+    }),
+  );
+}
+
+async function setupInstallationUnlocked(
+  workspaceRoot,
+  {
+    planningRoot,
+    repositoryRoots,
+    skillsDirectory,
+    force = false,
+    dryRun = false,
+    writeLock = null,
+    beforeSetupMutation = null,
+    beforeSetupDirectoryMutation = null,
+    beforeManagedInstallationSuccess = null,
+    mutationAuthority = null,
+  } = {},
+) {
+  const normalizedPlanningRoot = planningRoot === undefined
+    ? undefined
+    : normalizeWorkspaceConfiguredPath(workspaceRoot, planningRoot);
+  const normalizedRepositoryRoots = repositoryRoots === undefined
+    ? undefined
+    : repositoryRoots.map((path) => normalizeWorkspaceConfiguredPath(workspaceRoot, path));
+  const normalizedSkillsDirectory = skillsDirectory === undefined
+    ? undefined
+    : normalizeWorkspaceConfiguredPath(workspaceRoot, skillsDirectory);
+  const configDirectory = getWorkspaceConfigDirectory(workspaceRoot);
+  const configPath = getWorkspaceConfigPath(workspaceRoot);
+  const ignorePath = join(configDirectory, ".gitignore");
+  const existing = (await inspectFixedSetupFile(
+    workspaceRoot,
+    configPath,
+    "Workspace configuration",
+  )) !== null;
+  const ignoreExists = (await inspectFixedSetupFile(
+    workspaceRoot,
+    ignorePath,
+    "Workspace SDD ignore file",
+  )) !== null;
+  const changesRoot = join(configDirectory, CHANGES_DIRECTORY_NAME);
+  const closedChangesRoot = join(changesRoot, CLOSED_CHANGES_DIRECTORY_NAME);
+  let workspaceConfigSnapshot = existing
+    ? await readWorkspaceConfigSnapshot(workspaceRoot)
+    : null;
+  const config = workspaceConfigSnapshot === null
+    ? await createInitialConfig(workspaceRoot, {
+        planningRoot: normalizedPlanningRoot,
+        repositoryRoots: normalizedRepositoryRoots,
+        skillsDirectory: normalizedSkillsDirectory,
+      })
+    : workspaceConfigSnapshot.config;
+
+  if (existing) {
+    const requestedRepositoryRoots = normalizedRepositoryRoots === undefined
+      ? null
+      : createRepositoryRootMap(normalizedRepositoryRoots);
+    const hasConflictingOverride = (
+      (normalizedPlanningRoot !== undefined && normalizedPlanningRoot !== config.planning.root)
+      || (normalizedSkillsDirectory !== undefined
+        && normalizedSkillsDirectory !== config.skills.directory)
+      || (requestedRepositoryRoots !== null
+        && !sameRepositoryRootMap(requestedRepositoryRoots, config.repositories.roots))
+    );
+    if (hasConflictingOverride) {
+      throw new SddError(
+        "Workspace layout overrides only apply when creating .sdd/config.yaml. Edit the existing configuration directly.",
+        { code: "CONFIG_ALREADY_EXISTS" },
+      );
+    }
+  }
+
+  assertValidConfig(config, "set up the workspace installation");
+  await assertChangeStoreConfinement(closedChangesRoot, workspaceRoot);
+  const installLockSnapshot = await readInstallLockSnapshot(workspaceRoot, {
+    includeMissingBinding: true,
+  });
+  const skillPlan = await planSkillSync(workspaceRoot, config, {
+    force,
+    installLockSnapshot,
+  });
+  const workflowPlan = await planWorkflowSync(workspaceRoot, {
+    force,
+    installLockSnapshot,
+  });
+  await assertWorkspaceConfigSnapshotCurrent(workspaceRoot, workspaceConfigSnapshot);
+
+  if (dryRun) {
+    return installationResult(workspaceRoot, config, {
+      createdWorkspaceConfig: !existing,
+      dryRun: true,
+      workflow: {
+        path: WORKFLOW_RELATIVE_PATH,
+        action: workflowPlan.action,
+        hash: workflowPlan.sourceHash,
+      },
+      skills: {
+        skillsDirectory: skillPlan.skillsDirectory,
+        actions: skillPlan.actions.map(({ skillName, action, sourceHash }) => ({
+          skillName,
+          action,
+          hash: sourceHash,
+        })),
+      },
+    });
+  }
+
+  await beforeSetupMutation?.({ workspaceRoot });
+  await mutationAuthority?.();
+  let createdWorkspaceConfig = false;
+  if (!existing) {
+    await mutationAuthority?.();
+    await writeWorkspaceConfig(workspaceRoot, config, { expected: null });
+    await mutationAuthority?.();
+    workspaceConfigSnapshot = await readWorkspaceConfigSnapshot(workspaceRoot);
+    createdWorkspaceConfig = true;
+  }
+  await mutationAuthority?.();
+  await ensureSetupDirectory(
+    workspaceRoot,
+    changesRoot,
+    "Workspace Change store",
+    mutationAuthority,
+    beforeSetupDirectoryMutation,
+  );
+  await mutationAuthority?.();
+  await ensureSetupDirectory(
+    workspaceRoot,
+    closedChangesRoot,
+    "Workspace closed Change store",
+    mutationAuthority,
+    beforeSetupDirectoryMutation,
+  );
+  if (!ignoreExists) {
+    await mutationAuthority?.();
+    await publishManagedFile(workspaceRoot, ignorePath, "cache/\n", {
+      expected: null,
+      label: "Workspace SDD ignore file",
+      assertOwnerCurrent: mutationAuthority,
+    });
+  }
+  await assertWorkspaceConfigSnapshotCurrent(workspaceRoot, workspaceConfigSnapshot);
+  await assertChangeStoreConfinement(closedChangesRoot, workspaceRoot);
+  const currentInstallLockSnapshot = await readInstallLockSnapshot(workspaceRoot, {
+    includeMissingBinding: true,
+  });
+  skillPlan.installLockSnapshot = currentInstallLockSnapshot;
+  workflowPlan.installLockSnapshot = currentInstallLockSnapshot;
+
+  let workflow;
+  let skills;
+  try {
+    await mutationAuthority?.();
+    ({ workflow, skills } = await applyManagedInstallation(workspaceRoot, {
+      skillPlan,
+      workflowPlan,
+      assertOwnerCurrent: mutationAuthority,
+      beforeSuccess: async (context) => {
+        await beforeManagedInstallationSuccess?.(context);
+        await mutationAuthority?.();
+        await assertWorkspaceConfigSnapshotCurrent(workspaceRoot, workspaceConfigSnapshot);
+        await assertChangeStoreConfinement(closedChangesRoot, workspaceRoot);
+      },
+      ...(writeLock ? { writeLock } : {}),
+    }));
+  } catch (error) {
+    if (createdWorkspaceConfig && error instanceof SddError) {
+      error.details = [
+        ...error.details,
+        `Preserved workspace configuration: ${configPath}`,
+        "Retry the same setup command after inspecting the preserved state.",
+      ];
+    }
+    throw error;
+  }
+
+  return installationResult(workspaceRoot, config, {
+    createdWorkspaceConfig: !existing,
+    dryRun: false,
+    workflow,
+    skills,
+  });
+}
+
 export async function initRepository(
   targetPath,
-  { repositoryId, dryRun = false } = {},
+  {
+    repositoryId,
+    dryRun = false,
+    workspaceRoot: explicitWorkspaceRoot,
+    beforeConfigPublish = null,
+  } = {},
 ) {
   const repositoryRoot = resolve(targetPath);
-  const userRoot = getUserRoot();
-  if (!(await pathExists(getConfigPath(userRoot)))) {
-    throw new SddError("No user-level SDD installation found. Run `sdd setup` first.", {
-      code: "USER_SETUP_REQUIRED",
-    });
-  }
-
-  const userConfig = await readConfig(userRoot);
-  assertValidConfig(userConfig, "initialize a repository");
-  if (userConfig.kind !== "user") {
-    throw new SddError("The user-level SDD configuration is not a user installation.", {
-      code: "INVALID_USER_CONFIG",
-    });
-  }
-
-  const options = { repositoryId, dryRun, userRoot, userConfig };
-  if (dryRun) return initRepositoryUnlocked(repositoryRoot, options);
-  return withWorkspaceMutationLock(
-    repositoryRoot,
-    () => initRepositoryUnlocked(repositoryRoot, options),
-  );
+  const operation = await findOperationConfiguration(repositoryRoot, {
+    ...(explicitWorkspaceRoot ? { workspaceRoot: explicitWorkspaceRoot } : {}),
+  });
+  assertValidConfig(operation.config, "initialize a repository");
+  return initRepositoryUnlocked(repositoryRoot, {
+    repositoryId,
+    dryRun,
+    workspaceRoot: operation.workspaceRoot,
+    workspaceConfig: operation.config,
+    beforeConfigPublish,
+  });
 }
 
 async function initRepositoryUnlocked(
   repositoryRoot,
-  { repositoryId, dryRun, userRoot, userConfig },
+  { repositoryId, dryRun, workspaceRoot, workspaceConfig, beforeConfigPublish },
 ) {
-
-  const targetConfigPath = getConfigPath(repositoryRoot);
-  const targetConfigExists = await pathExists(targetConfigPath);
-  const existingRepositoryConfig = await readRepositoryConfig(repositoryRoot);
-  if (targetConfigExists && !existingRepositoryConfig) {
+  const targetConfigPath = getRepositoryConfigPath(repositoryRoot);
+  const targetConfigSnapshot = await readRepositoryConfigSnapshot(repositoryRoot);
+  const existingRepositoryConfig = targetConfigSnapshot?.config?.kind === "repository"
+    ? targetConfigSnapshot.config
+    : null;
+  if (targetConfigSnapshot !== null && existingRepositoryConfig === null) {
     throw new SddError(
       `A non-repository SDD configuration already exists at ${targetConfigPath}.`,
-      {
-        code: "EXISTING_WORKSPACE_CONFIG",
-        details: ["Use `sdd init --legacy-workspace` only for the deprecated workspace model."],
-      },
+      { code: "EXISTING_WORKSPACE_CONFIG" },
     );
   }
-
   const repositoryConfig = existingRepositoryConfig ?? createRepositoryConfig(
     repositoryId ?? defaultRepositoryId(repositoryRoot),
   );
   assertValidRepositoryConfig(repositoryConfig);
   if (!dryRun && !existingRepositoryConfig) {
-    await writeConfig(repositoryRoot, repositoryConfig);
+    await writeRepositoryConfig(repositoryRoot, repositoryConfig, {
+      expected: null,
+      beforePublish: beforeConfigPublish,
+    });
   }
-
   return {
     command: "init",
     mode: "repository",
-    userRoot,
+    workspaceRoot,
     repositoryRoot,
     createdRepositoryConfig: !existingRepositoryConfig,
     dryRun,
-    userConfigPath: getConfigPath(userRoot),
+    workspaceConfigPath: getWorkspaceConfigPath(workspaceRoot),
     repositoryConfigPath: targetConfigPath,
+    workspaceConfig,
     repositoryConfig,
-    workflowPath: WORKFLOW_SOURCE_PATH,
+    workflowPath: resolve(workspaceRoot, WORKFLOW_RELATIVE_PATH),
   };
 }

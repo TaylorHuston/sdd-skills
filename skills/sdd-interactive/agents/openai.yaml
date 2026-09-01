@@ -1,4 +1,4 @@
 interface:
   display_name: "SDD Interactive"
-  short_description: "Track small changes with UI handoffs"
-  default_prompt: "Use $sdd-interactive to run a tracked interactive SDD change session with manual UI confirmation steps."
+  short_description: "Track and deliver one small v2 outcome"
+  default_prompt: "Use $sdd-interactive to capture a narrow change with the normal v2 change.md, tasks.md, and review.md templates, then compose exactly one $sdd-apply outcome. Do not create an Interactive-only ledger, log, receipt, or workflow."

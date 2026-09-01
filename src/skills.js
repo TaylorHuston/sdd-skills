@@ -1,22 +1,78 @@
-import { cp, mkdir, readFile, readdir, rm } from "node:fs/promises";
-import { join, relative, resolve } from "node:path";
+import { readFile, readdir } from "node:fs/promises";
+import { join, relative } from "node:path";
 
 import { BUNDLED_SKILLS_DIRECTORY, PACKAGE_JSON_PATH } from "./constants.js";
-import { getInstallLockPath, resolveWorkspacePath } from "./config.js";
+import {
+  getWorkspaceInstallLockPath,
+  resolveWorkspaceSkillsDirectory,
+} from "./config.js";
 import { SddError } from "./errors.js";
 import {
   hashDirectory,
-  isDirectory,
-  isPathInside,
-  isPathPhysicallyInside,
   pathExists,
-  readJson,
-  replaceDirectoryAtomically,
+  readBoundDirectory,
+  readBoundRegularFile,
 } from "./fs.js";
+import {
+  ensureManagedSkillRegistry,
+  publishManagedSkill,
+} from "./managed-skill-publication.js";
+
+const STRONG_DIRECTORY_HASH = /^sha256-directory-v2:[a-f0-9]{64}$/;
+const MUTATING_ACTIONS = new Set([
+  "install",
+  "update",
+  "update-forced",
+  "replace-forced",
+  "remove",
+  "remove-forced",
+]);
 
 async function readPackageVersion() {
   const packageJson = JSON.parse(await readFile(PACKAGE_JSON_PATH, "utf8"));
   return packageJson.version;
+}
+
+function invalidInstallLock(message) {
+  return new SddError(message, { code: "INVALID_INSTALL_LOCK" });
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+export function validateManagedInstallationLock(lock) {
+  if (!isRecord(lock) || !isRecord(lock.managedSkills)) {
+    throw invalidInstallLock("Installation lock must contain a managedSkills object.");
+  }
+  if (
+    (lock.version !== undefined && (!Number.isSafeInteger(lock.version) || lock.version < 1))
+    || (lock.packageVersion !== undefined
+      && (typeof lock.packageVersion !== "string" || !lock.packageVersion))
+    || (lock.schemaVersion !== undefined
+      && (typeof lock.schemaVersion !== "string" || !lock.schemaVersion))
+    || (lock.skillsDirectory !== undefined
+      && (typeof lock.skillsDirectory !== "string" || !lock.skillsDirectory))
+  ) {
+    throw invalidInstallLock("Installation lock metadata is malformed.");
+  }
+  for (const [skillName, hash] of Object.entries(lock.managedSkills)) {
+    if (!/^sdd-[a-z0-9-]+$/.test(skillName) || !STRONG_DIRECTORY_HASH.test(hash)) {
+      throw invalidInstallLock(`Installation lock has an invalid managed skill hash: ${skillName}`);
+    }
+  }
+  if (
+    lock.managedWorkflow !== undefined
+    && (
+      !isRecord(lock.managedWorkflow)
+      || typeof lock.managedWorkflow.path !== "string"
+      || !lock.managedWorkflow.path
+      || !/^sha256:[a-f0-9]{64}$/.test(lock.managedWorkflow.hash)
+    )
+  ) {
+    throw invalidInstallLock("Installation lock has invalid managed workflow ownership.");
+  }
+  return lock;
 }
 
 export async function listBundledSkills() {
@@ -27,13 +83,26 @@ export async function listBundledSkills() {
     .sort((left, right) => left.localeCompare(right));
 }
 
-export async function readInstallLock(workspaceRoot) {
-  const path = getInstallLockPath(workspaceRoot);
-  if (!(await pathExists(path))) {
-    return null;
+export async function readInstallLockSnapshot(
+  workspaceRoot,
+  { includeMissingBinding = false } = {},
+) {
+  const path = getWorkspaceInstallLockPath(workspaceRoot);
+  const file = await readBoundRegularFile(path, {
+    ownerRoot: workspaceRoot,
+    allowMissing: true,
+    returnMissingBinding: includeMissingBinding,
+    label: "Installation lock",
+    unsafeCode: "UNSAFE_CONFIG_PATH",
+  });
+  if (file === null || file.missing === true) return file;
+  if (!file.bytes.equals(Buffer.from(file.source, "utf8"))) {
+    throw new SddError(`Cannot parse SDD installation lock at ${path}: lock is not valid UTF-8.`, {
+      code: "INVALID_INSTALL_LOCK",
+    });
   }
   try {
-    return await readJson(path);
+    return { ...file, config: validateManagedInstallationLock(JSON.parse(file.source)) };
   } catch (error) {
     throw new SddError(`Cannot parse SDD installation lock at ${path}: ${error.message}`, {
       code: "INVALID_INSTALL_LOCK",
@@ -41,61 +110,71 @@ export async function readInstallLock(workspaceRoot) {
   }
 }
 
-async function assertSkillDirectoryInsideWorkspace(workspaceRoot, configuredDirectory) {
-  const target = resolveWorkspacePath(workspaceRoot, configuredDirectory);
-  if (!isPathInside(workspaceRoot, target) || !(await isPathPhysicallyInside(workspaceRoot, target))) {
-    throw new SddError(
-      `Skill directory ${configuredDirectory} resolves outside the configured user or legacy workspace root.`,
-      { code: "UNSAFE_SKILL_DIRECTORY" },
-    );
-  }
-  return target;
+export async function readInstallLock(workspaceRoot) {
+  return (await readInstallLockSnapshot(workspaceRoot))?.config ?? null;
 }
 
-export async function planSkillSync(workspaceRoot, config, { force = false } = {}) {
-  const skillsDirectory = await assertSkillDirectoryInsideWorkspace(
+export async function planSkillSync(
+  workspaceRoot,
+  config,
+  { force = false, installLockSnapshot: requestedInstallLockSnapshot } = {},
+) {
+  const skillsDirectory = await resolveWorkspaceSkillsDirectory(
     workspaceRoot,
     config.skills.directory,
   );
-  const previousLock = await readInstallLock(workspaceRoot);
+  const installLockSnapshot = requestedInstallLockSnapshot === undefined
+    ? await readInstallLockSnapshot(workspaceRoot, { includeMissingBinding: true })
+    : requestedInstallLockSnapshot;
+  const previousLock = installLockSnapshot?.config ?? null;
+  if (previousLock !== null) validateManagedInstallationLock(previousLock);
   const previousSkills = previousLock?.managedSkills ?? {};
-  const actions = [];
   const bundledSkills = await listBundledSkills();
-  const bundledSkillNames = new Set(bundledSkills);
+  const bundledNames = new Set(bundledSkills);
+  const actions = [];
 
   for (const skillName of bundledSkills) {
     const source = join(BUNDLED_SKILLS_DIRECTORY, skillName);
     const target = join(skillsDirectory, skillName);
     const sourceHash = await hashDirectory(source);
-    const targetExists = await isDirectory(target);
-    const targetHash = targetExists ? await hashDirectory(target) : null;
+    const targetSnapshot = await readBoundDirectory(target, {
+      ownerRoot: workspaceRoot,
+      allowMissing: true,
+      returnMissingBinding: true,
+      label: `Managed skill ${skillName}`,
+      unsafeCode: "UNSAFE_SKILL_DIRECTORY",
+    });
+    const targetHash = targetSnapshot.missing === true ? null : targetSnapshot.hash;
     const previousHash = previousSkills[skillName] ?? null;
-
     let action;
-    if (!targetExists) {
-      action = "install";
-    } else if (targetHash === sourceHash) {
-      action = previousHash ? "unchanged" : "adopt";
-    } else if (force) {
-      action = previousHash ? "update-forced" : "replace-forced";
-    } else if (previousHash && targetHash === previousHash) {
-      action = "update";
-    } else {
-      action = "conflict";
-    }
-
-    actions.push({ skillName, action, source, target, sourceHash, targetHash, previousHash });
-  }
-
-  for (const [skillName, previousHash] of Object.entries(previousSkills)) {
-    if (bundledSkillNames.has(skillName) || !/^sdd-[a-z0-9-]+$/.test(skillName)) continue;
-    const target = join(skillsDirectory, skillName);
-    if (!(await isDirectory(target))) continue;
-    const targetHash = await hashDirectory(target);
-    const action = targetHash === previousHash ? "remove" : force ? "remove-forced" : "conflict";
+    if (targetHash === null) action = "install";
+    else if (targetHash === sourceHash) action = previousHash ? "unchanged" : "adopt";
+    else if (force) action = previousHash ? "update-forced" : "replace-forced";
+    else if (previousHash !== null && targetHash === previousHash) action = "update";
+    else action = "conflict";
     actions.push({
       skillName,
       action,
+      source,
+      target,
+      sourceHash,
+      targetHash,
+      previousHash,
+    });
+  }
+
+  for (const [skillName, previousHash] of Object.entries(previousSkills)) {
+    if (bundledNames.has(skillName) || !/^sdd-[a-z0-9-]+$/.test(skillName)) continue;
+    const target = join(skillsDirectory, skillName);
+    if (!(await pathExists(target))) continue;
+    const targetHash = await hashDirectory(target);
+    actions.push({
+      skillName,
+      action: targetHash === previousHash
+        ? "remove"
+        : force
+          ? "remove-forced"
+          : "conflict",
       source: null,
       target,
       sourceHash: null,
@@ -104,18 +183,19 @@ export async function planSkillSync(workspaceRoot, config, { force = false } = {
     });
   }
 
-  const conflicts = actions.filter((entry) => entry.action === "conflict");
+  const conflicts = actions.filter(({ action }) => action === "conflict");
   if (conflicts.length > 0) {
     throw new SddError(
       "Managed skill installation would overwrite local changes. Resolve the conflicts or rerun with --force.",
       {
         code: "SKILL_CONFLICT",
-        details: conflicts.map((entry) => `${entry.skillName}: ${relative(workspaceRoot, entry.target)}`),
+        details: conflicts.map(({ skillName, target }) =>
+          `${skillName}: ${relative(workspaceRoot, target)}`),
       },
     );
   }
 
-  return {
+  const plan = {
     skillsDirectory,
     actions,
     lock: {
@@ -125,156 +205,191 @@ export async function planSkillSync(workspaceRoot, config, { force = false } = {
       skillsDirectory: config.skills.directory,
       managedSkills: Object.fromEntries(
         actions
-          .filter((entry) => entry.sourceHash)
-          .map((entry) => [entry.skillName, entry.sourceHash]),
+          .filter(({ sourceHash }) => sourceHash !== null)
+          .map(({ skillName, sourceHash }) => [skillName, sourceHash]),
       ),
     },
   };
+  Object.defineProperty(plan, "installLockSnapshot", {
+    value: installLockSnapshot,
+    enumerable: false,
+    writable: true,
+  });
+  return plan;
 }
 
-export async function applySkillSync(
-  workspaceRoot,
-  plan,
-  { dryRun = false, replaceDirectory = replaceDirectoryAtomically } = {},
-) {
-  const mutatingActions = new Set([
-    "install",
-    "update",
-    "update-forced",
-    "replace-forced",
-    "remove",
-    "remove-forced",
-  ]);
-  const candidates = plan.actions.filter((entry) => mutatingActions.has(entry.action));
-  const nonce = `${process.pid}-${Date.now()}`;
-  const backupRoot = join(plan.skillsDirectory, `.sdd-sync-backup-${nonce}`);
-  const snapshots = [];
-  const applied = [];
+function sameIdentity(left, right) {
+  return left?.dev === right?.dev && left?.ino === right?.ino;
+}
 
-  const rollback = async (originalError = null) => {
-    const failures = [];
-    for (const snapshot of [...applied].reverse()) {
-      try {
-        const currentExists = await isDirectory(snapshot.entry.target);
-        const expectedHash = snapshot.entry.sourceHash;
-        const currentHash = currentExists ? await hashDirectory(snapshot.entry.target) : null;
-        if (currentHash === snapshot.entry.targetHash) continue;
-        if (currentExists && expectedHash && currentHash !== expectedHash) {
-          failures.push(`${snapshot.entry.skillName}: newer target content preserved.`);
-          continue;
-        }
-        if (currentExists && !expectedHash) {
-          failures.push(`${snapshot.entry.skillName}: unexpected target content preserved.`);
-          continue;
-        }
-        if (snapshot.existed) {
-          await replaceDirectoryAtomically(snapshot.backupPath, snapshot.entry.target);
-        } else {
-          await rm(snapshot.entry.target, { recursive: true, force: true });
-        }
-      } catch (error) {
-        failures.push(`${snapshot.entry.skillName}: ${error.message}`);
+function sameSkillSnapshot(left, right) {
+  if (left?.missing === true || right?.missing === true) {
+    return left?.missing === true && right?.missing === true;
+  }
+  return left?.hash === right?.hash
+    && left.root?.mode === right.root?.mode
+    && sameIdentity(left.root?.identity, right.root?.identity)
+    && left.entries?.length === right.entries?.length
+    && left.entries.every((entry, index) => {
+      const other = right.entries[index];
+      if (
+        entry.type !== other?.type
+        || entry.relativePath !== other.relativePath
+        || entry.mode !== other.mode
+        || !sameIdentity(entry.identity, other.identity)
+      ) return false;
+      if (entry.type === "file") return entry.bytes.equals(other.bytes);
+      if (entry.type === "symlink") {
+        return Buffer.isBuffer(entry.linkTarget)
+          && Buffer.isBuffer(other.linkTarget)
+          && entry.linkTarget.equals(other.linkTarget);
       }
-    }
-    if (failures.length > 0) {
-      throw new SddError("Managed skill update failed and recovery was incomplete.", {
-        code: "MUTATION_RECOVERY_FAILED",
-        details: [
-          ...(originalError ? [`Original error: ${originalError.message}`] : []),
-          ...failures,
-          `Recovery snapshots: ${backupRoot}`,
-        ],
+      return true;
+    });
+}
+
+async function captureExpectedSkills(workspaceRoot, plan) {
+  const expected = [];
+  for (const entry of plan.actions) {
+    const snapshot = await readBoundDirectory(entry.target, {
+      ownerRoot: workspaceRoot,
+      allowMissing: true,
+      returnMissingBinding: true,
+      label: `Managed skill ${entry.skillName}`,
+      unsafeCode: "UNSAFE_SKILL_DIRECTORY",
+    });
+    const hash = snapshot.missing === true ? null : snapshot.hash;
+    if (hash !== entry.sourceHash) {
+      throw new SddError(`Managed skill changed before installation lock commit: ${entry.skillName}`, {
+        code: "SKILL_CONFLICT",
       });
     }
-    await rm(backupRoot, { recursive: true, force: true });
-  };
-
-  if (!dryRun) {
-    for (const entry of candidates) {
-      if (!(await isPathPhysicallyInside(workspaceRoot, entry.target))) {
-        throw new SddError(
-          `Managed skill target resolves outside the configured user or legacy workspace root: ${entry.target}`,
-          { code: "UNSAFE_SKILL_DIRECTORY" },
-        );
-      }
-      const currentExists = await isDirectory(entry.target);
-      const currentHash = currentExists ? await hashDirectory(entry.target) : null;
-      if (currentHash !== entry.targetHash) {
-        throw new SddError(
-          `Managed skill changed after update planning: ${entry.skillName}`,
-          { code: "SKILL_CONFLICT" },
-        );
-      }
-    }
-    if (candidates.length > 0) await mkdir(backupRoot, { recursive: true });
-    for (const entry of candidates) {
-      const existed = await isDirectory(entry.target);
-      const backupPath = join(backupRoot, entry.skillName);
-      if (existed) await cp(entry.target, backupPath, { recursive: true, verbatimSymlinks: true });
-      snapshots.push({ entry, existed, backupPath });
-    }
-    try {
-      for (const snapshot of snapshots) {
-        const { entry } = snapshot;
-        try {
-          const currentExists = await isDirectory(entry.target);
-          const currentHash = currentExists ? await hashDirectory(entry.target) : null;
-          if (currentHash !== entry.targetHash) {
-            throw new SddError(
-              `Managed skill changed immediately before update: ${entry.skillName}`,
-              { code: "SKILL_CONFLICT" },
-            );
-          }
-          applied.push(snapshot);
-          if (["install", "update", "update-forced", "replace-forced"].includes(entry.action)) {
-            await replaceDirectory(entry.source, entry.target, { expectedHash: entry.targetHash });
-          } else if (["remove", "remove-forced"].includes(entry.action)) {
-            await rm(entry.target, { recursive: true, force: true });
-          }
-        } catch (error) {
-          throw error;
-        }
-      }
-      await verifySkillSyncPlan(plan);
-    } catch (error) {
-      await rollback(error);
-      throw error;
-    }
+    expected.push({ entry, snapshot });
   }
-
-  const result = {
-    skillsDirectory: plan.skillsDirectory,
-    actions: plan.actions.map(({ skillName, action, sourceHash }) => ({
-      skillName,
-      action,
-      hash: sourceHash,
-    })),
-  };
-  Object.defineProperties(result, {
-    rollback: { value: rollback, enumerable: false },
-    finalize: {
-      value: () => rm(backupRoot, { recursive: true, force: true }),
-      enumerable: false,
-    },
-    verify: {
-      value: () => verifySkillSyncPlan(plan),
-      enumerable: false,
-    },
-  });
-  return result;
+  return expected;
 }
 
-async function verifySkillSyncPlan(plan) {
-  for (const entry of plan.actions) {
-    const currentExists = await isDirectory(entry.target);
-    const expectedHash = entry.sourceHash;
-    const currentHash = currentExists ? await hashDirectory(entry.target) : null;
-    if (currentHash !== expectedHash) {
+async function verifyExpectedSkills(workspaceRoot, expected) {
+  for (const { entry, snapshot } of expected) {
+    const current = await readBoundDirectory(entry.target, {
+      ownerRoot: workspaceRoot,
+      allowMissing: true,
+      returnMissingBinding: true,
+      label: `Managed skill ${entry.skillName}`,
+      unsafeCode: "UNSAFE_SKILL_DIRECTORY",
+    });
+    if (!sameSkillSnapshot(current, snapshot)) {
       throw new SddError(`Managed skill changed before installation lock commit: ${entry.skillName}`, {
         code: "SKILL_CONFLICT",
       });
     }
   }
+}
+
+function partialSkillFailure(error, state) {
+  const details = [
+    `Original error: ${error.message}`,
+    ...(error?.details ?? []).map((detail) => `Original detail: ${detail}`),
+    ...state.completed.map(({ skillName, action }) =>
+      `Completed managed skill: ${skillName} (${action}).`),
+    ...state.unchanged.map(({ skillName, action }) =>
+      `Unchanged managed skill: ${skillName} (${action}).`),
+    ...(state.failed
+      ? [`Failed managed skill: ${state.failed.skillName} (${state.failed.action}).`]
+      : []),
+    ...state.pending.map(({ skillName, action }) =>
+      `Residual managed skill action: ${skillName} (${action}).`),
+    ...state.retainedPaths.map((path) => `Retained path requiring inspection: ${path}`),
+    ...state.recordedSkillPaths.map((path) =>
+      `Managed skill path recorded before registry-owner drift (do not follow its current pathname): ${path}`),
+    ...(state.recordedSkillPaths.length === 0 ? [] : [
+      "Inspect the displaced original managed skills directory for the recorded basenames; do not follow the current registry pathname.",
+    ]),
+    "Installation evidence was not advanced. Inspect verified retained state or the displaced original registry for recorded names, retry the same setup or update command when it is intended, and use --force only to replace deliberate local content.",
+  ];
+  const failure = new SddError("Managed skill refresh stopped with preserved partial state.", {
+    code: "MUTATION_RECOVERY_FAILED",
+    details,
+  });
+  failure.cause = error;
+  failure.skillState = state;
+  failure.retainedPaths = state.retainedPaths;
+  failure.recordedSkillPaths = state.recordedSkillPaths;
+  return failure;
+}
+
+export async function applySkillSync(
+  workspaceRoot,
+  plan,
+  {
+    dryRun = false,
+    assertOwnerCurrent = null,
+    beforeSkillPublication = null,
+  } = {},
+) {
+  const resultActions = plan.actions.map(({ skillName, action, sourceHash }) => ({
+    skillName,
+    action,
+    hash: sourceHash,
+  }));
+  if (dryRun) return { skillsDirectory: plan.skillsDirectory, actions: resultActions };
+
+  const candidates = plan.actions.filter(({ action }) => MUTATING_ACTIONS.has(action));
+  const state = {
+    completed: [],
+    unchanged: plan.actions
+      .filter(({ action }) => !MUTATING_ACTIONS.has(action))
+      .map(({ skillName, action }) => ({ skillName, action })),
+    failed: null,
+    pending: candidates.map(({ skillName, action }) => ({ skillName, action })),
+    retainedPaths: [],
+    recordedSkillPaths: [],
+  };
+  let assertRegistry = null;
+  if (candidates.length > 0) {
+    try {
+      assertRegistry = await ensureManagedSkillRegistry(workspaceRoot, plan.skillsDirectory, {
+        assertOwnerCurrent,
+        beforeMutation: beforeSkillPublication,
+      });
+    } catch (error) {
+      throw partialSkillFailure(error, state);
+    }
+  }
+
+  for (const entry of candidates) {
+    state.pending.shift();
+    try {
+      const completed = await publishManagedSkill(workspaceRoot, entry, {
+        assertRegistry,
+        assertOwnerCurrent,
+        beforeMutation: beforeSkillPublication,
+      });
+      state.completed.push({ skillName: completed.skillName, action: completed.action });
+    } catch (error) {
+      if (error?.completed) {
+        state.completed.push({ skillName: entry.skillName, action: entry.action });
+      } else {
+        state.failed = { skillName: entry.skillName, action: entry.action };
+      }
+      state.retainedPaths.push(...(error?.retainedPaths ?? []));
+      state.recordedSkillPaths.push(...(error?.recordedSkillPaths ?? []));
+      throw partialSkillFailure(error, state);
+    }
+  }
+
+  let expected;
+  try {
+    expected = await captureExpectedSkills(workspaceRoot, plan);
+  } catch (error) {
+    throw partialSkillFailure(error, state);
+  }
+  const result = { skillsDirectory: plan.skillsDirectory, actions: resultActions };
+  Object.defineProperty(result, "verify", {
+    value: () => verifyExpectedSkills(workspaceRoot, expected),
+    enumerable: false,
+  });
+  return result;
 }
 
 export async function inspectSkillInstallation(workspaceRoot, config) {
@@ -291,17 +406,14 @@ export async function inspectSkillInstallation(workspaceRoot, config) {
     }
     throw error;
   }
-
   const lock = await readInstallLock(workspaceRoot);
-  if (!lock) {
-    findings.push({ level: "error", message: "Missing .sdd/install-lock.json." });
-  } else if (lock.skillsDirectory !== config.skills.directory) {
+  if (!lock) findings.push({ level: "error", message: "Missing .sdd/install-lock.json." });
+  else if (lock.skillsDirectory !== config.skills.directory) {
     findings.push({
       level: "error",
       message: "The installation lock skill directory does not match config.yaml.",
     });
   }
-
   for (const entry of plan.actions) {
     if (entry.action === "install") {
       findings.push({ level: "error", message: `Missing managed skill: ${entry.skillName}.` });

@@ -15,6 +15,31 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 const packageRoot = new URL("../", import.meta.url);
 
+test("package dry run includes the current workflow without legacy closure templates", async () => {
+  const { stdout } = await execFileAsync("npm", ["pack", "--dry-run", "--json"], {
+    cwd: new URL("../", import.meta.url),
+  });
+  const [packed] = JSON.parse(stdout);
+  const paths = packed.files.map((file) => file.path);
+  assert.ok(paths.includes("skills/sdd-epic-update/SKILL.md"));
+  assert.ok(paths.includes("skills/sdd-epic-update/agents/openai.yaml"));
+  assert.ok(paths.includes("skills/sdd-changelog/SKILL.md"));
+  assert.ok(paths.includes("skills/sdd-changelog/agents/openai.yaml"));
+  assert.ok(paths.includes("src/commands/candidate-resolve.js"));
+  assert.ok(paths.includes("src/commands/epic-update-input.js"));
+  assert.ok(paths.includes("skills/sdd-change/assets/tasks-template.md"));
+  assert.ok(paths.includes("skills/sdd-review/assets/review-template.md"));
+  assert.ok(!paths.includes("skills/sdd-review/assets/slice-review-template.md"));
+  assert.ok(!paths.includes("skills/sdd-review/assets/subagent-pr-review-prompt.md"));
+  assert.ok(!paths.includes("skills/sdd-apply/assets/slice-closure-template.yaml"));
+  assert.ok(!paths.includes("docs/templates/slice-review.md"));
+  assert.ok(!paths.includes("docs/templates/slice-closure.yaml"));
+  assert.ok(!paths.includes("src/change-tasks.js"));
+  assert.ok(!paths.includes("src/slice-review.js"));
+  assert.ok(!paths.includes("src/slice-closure.js"));
+  assert.ok(!paths.includes("test/slice-closure.test.js"));
+});
+
 test("package manifest excludes generated Python bytecode", async (t) => {
   const fixture = await mkdtemp(join(tmpdir(), "sdd-package-"));
   t.after(() => rm(fixture, { recursive: true, force: true }));

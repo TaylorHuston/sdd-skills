@@ -1,43 +1,50 @@
+import { resolve } from "node:path";
+
 import {
   assertValidConfig,
-  findWorkspaceRoot,
-  readConfig,
+  getWorkspaceConfigPath,
 } from "../config.js";
-import { planSkillSync } from "../skills.js";
-import { planWorkflowSync } from "../workflow.js";
-import { WORKFLOW_SOURCE_PATH } from "../constants.js";
-import { withWorkspaceMutationLock } from "../mutation.js";
-import { applyManagedInstallation } from "../installation.js";
+import { setupInstallation } from "./init-installation.js";
+import { resolveOperationConfiguration } from "../workspace.js";
 
-export async function updateWorkspace(startPath, { force = false, dryRun = false } = {}) {
-  const workspaceRoot = await findWorkspaceRoot(startPath);
-  if (dryRun) return updateWorkspaceUnlocked(workspaceRoot, { force, dryRun });
-  return withWorkspaceMutationLock(
-    workspaceRoot,
-    () => updateWorkspaceUnlocked(workspaceRoot, { force, dryRun }),
-  );
-}
-
-async function updateWorkspaceUnlocked(workspaceRoot, { force, dryRun }) {
-  const config = await readConfig(workspaceRoot);
-  assertValidConfig(config, "update managed skills");
-  const plan = await planSkillSync(workspaceRoot, config, { force });
-  const workflowPlan = config.kind === "user"
-    ? null
-    : await planWorkflowSync(workspaceRoot, { force });
-  const applied = await applyManagedInstallation(workspaceRoot, {
-    skillPlan: plan,
-    workflowPlan,
-    dryRun,
+export async function updateWorkspace(
+  startPath = process.cwd(),
+  {
+    workspaceRoot: explicitWorkspaceRoot,
+    force = false,
+    dryRun = false,
+    installationOptions = {},
+    targetSpecified = false,
+  } = {},
+) {
+  const invocationCwd = process.cwd();
+  const requestedWorkspaceRoot = explicitWorkspaceRoot
+    ? resolve(invocationCwd, explicitWorkspaceRoot)
+    : typeof process.env.SDD_WORKSPACE_ROOT === "string" && process.env.SDD_WORKSPACE_ROOT.length > 0
+      ? resolve(invocationCwd, process.env.SDD_WORKSPACE_ROOT)
+      : null;
+  const targetPath = !targetSpecified && requestedWorkspaceRoot
+    ? requestedWorkspaceRoot
+    : resolve(invocationCwd, startPath);
+  const operation = await resolveOperationConfiguration(targetPath, {
+    ...(requestedWorkspaceRoot
+      ? { workspaceRoot: requestedWorkspaceRoot }
+      : {}),
   });
-  const workflow = applied.workflow ?? { path: WORKFLOW_SOURCE_PATH, action: "bundled" };
-  const { skills } = applied;
+  assertValidConfig(operation.config, "update the SDD installation");
+
+  const installation = await setupInstallation(operation.workspaceRoot, {
+    force,
+    dryRun,
+    ...installationOptions,
+  });
   return {
     command: "update",
-    mode: config.kind === "user" ? "user" : "legacy-workspace",
-    workspaceRoot,
+    mode: "workspace",
+    workspaceRoot: operation.workspaceRoot,
+    workspaceConfigPath: getWorkspaceConfigPath(operation.workspaceRoot),
     dryRun,
-    workflow,
-    skills,
+    workflow: installation.workflow,
+    skills: installation.skills,
   };
 }

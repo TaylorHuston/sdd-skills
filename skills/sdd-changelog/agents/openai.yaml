@@ -1,0 +1,4 @@
+interface:
+  display_name: "SDD Changelog"
+  short_description: "Write one reviewed candidate's release entry"
+  default_prompt: "Use $sdd-changelog to decide whether the exact reviewed candidate needs user-facing or operator-relevant release communication, create or update one entry in the repository's native format when warranted, prove candidate preservation and same-candidate idempotence, and stop before versioning, staging, commits, PRs, release, or deployment."

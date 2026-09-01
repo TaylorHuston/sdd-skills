@@ -1,4 +1,4 @@
 interface:
   display_name: "SDD Change"
-  short_description: "Brief, plan, or replan SDD changes"
-  default_prompt: "Use $sdd-change to capture this outcome as a brief, plan it against current project context, or replan an active Change."
+  short_description: "Capture or plan one v2 SDD Change"
+  default_prompt: "Use $sdd-change to create or resume one workspace-central v2 Change. Capture intent proportionally, plan coherent observable outcomes in compact tasks.md, initialize one central review.md, declare only material expected risk triggers, and describe what must become true without prescribing implementation method or compatibility work."

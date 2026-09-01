@@ -1,5 +1,5 @@
 ---
-modified: 2026-07-23
+modified: 2026-08-16
 ---
 # Changelog
 
@@ -8,6 +8,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.13.0] - 2026-08-29
+
+### Added
+
+- Added one workspace-scoped SDD installation: private topology, central Changes, managed doctrine, installation evidence, and managed skills belong to an explicit workspace, while repositories retain portable identity and Epic, ADR, and audit paths.
+- Added read-only `sdd candidate resolve` and `sdd epic update-input` commands for immutable committed or content-sensitive working-tree envelopes used by candidate-bound Review, Epic Update, and Changelog workflows.
+- Added `/sdd-gather-context`, `/sdd-epic-update`, and `/sdd-changelog` as independently callable capabilities with explicit ownership and mutation boundaries.
+- Added a framework-free public guide for the portable methodology and this package's local-first reference implementation.
+
+### Changed
+
+- **Breaking:** New work uses one current `schema: sdd-change-v2` contract. `change.md` owns intent and lifecycle, compact `tasks.md` owns outcomes and one replaceable Resume checkpoint, and central `review.md` owns exact candidates, five universal gates, concrete planned or discovered triggers, findings, gaps, manual acceptance, and final commit/tree facts.
+- **Breaking:** `/sdd-apply` delivers exactly one coherent outcome per invocation, follows repository guidance for implementation method, runs focused behavior-derived and repository-required checks, obtains independent Spec Adherence and Implementation Quality review, permits one bounded remediation batch, selectively creates one content-identical local commit, and stops before remote delivery or closeout.
+- **Breaking:** Schema-less Changes and receipt-based records are unsupported pre-1.0 history. Current validation and lifecycle commands do not migrate them or invoke their task, Review, ledger, or receipt contracts.
+- Change planning now creates or resumes one progressive workspace-central record and chooses vertical outcomes by fresh-session implementability and reviewability; one Requirement is a default rather than a universal limit.
+- Epic reconciliation now runs immediately only when accepted behavior, Story completion, or a consumed contract or gap changes; otherwise it waits for final Change completion.
+- Workspace setup, configuration, Change lifecycle, Epic scaffolding, managed workflow/evidence refresh, and managed-skill synchronization now use bounded current-consumer mutation primitives with physical confinement, no silent overwrite, complete individual durable files, and actionable preserved-state reporting instead of migration-grade replay or cross-artifact rollback.
+- `sdd update` now reconciles only the selected workspace's checksum-managed doctrine and skills. Repository-required tests and fixtures describe the current v2 contract or explicit unsupported-history rejection.
+- README, doctrine, templates, skills, and the public guide now describe one risk-triggered default with proportional verification, explicit technical gaps, separate product acceptance, selective local commit authority, and no second assurance profile.
+
+### Fixed
+
+- Fixed configuration validation so malformed NUL-containing path values return typed findings before filesystem path resolution.
+- Fixed restrictive Change close so temporary permission restoration remains bound to the verified moved directory inode and never follows a replaced source or destination symlink.
+- Fixed configuration, workflow, and installation-evidence recovery reporting so post-displacement failures identify verified retained paths or honest recorded names plus safe retry/manual guidance within the documented owner-operated filesystem limits.
+
+### Removed
+
+- Removed generated Implementation and Gate ledgers, fixed 14-gate manifests, per-slice Reviews, Review digests, closure receipts, repository verification descriptors, and closure-only reseal commits from the current workflow.
+- Removed automatic migration of pre-1.0 home installations and Change stores, `sdd setup --from-user`, `sdd change promote`, repository-local Change roots, transaction journals, generalized replay, and aggregate rollback machinery that had no current consumer.
+- Removed unsupported legacy hash/configuration handling and retired closure templates, parsers, and tests from the published package.
 
 ## [0.12.0] - 2026-07-23
 

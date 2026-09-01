@@ -1,16 +1,20 @@
 import { readdir } from "node:fs/promises";
-import { basename, join, relative, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 
 import {
   assertValidConfig,
-  findWorkspaceRoot,
-  getConfigPath,
-  readConfig,
+  getWorkspaceConfigPath,
+  normalizeWorkspaceConfiguredPath,
   resolveWorkspacePath,
-  writeConfig,
+  writeWorkspaceConfig,
 } from "../config.js";
 import { SddError } from "../errors.js";
-import { isDirectory } from "../fs.js";
+import { isDirectory, resolvePhysicalPath } from "../fs.js";
+import {
+  assertDistinctRepositoryOwnership,
+  assertValidRepositoryArtifactTopology,
+  findOperationConfiguration,
+} from "../workspace.js";
 
 const IGNORED_DIRECTORIES = new Set([
   ".agents",
@@ -26,7 +30,7 @@ function normalizePath(value) {
   return value.split("\\").join("/") || ".";
 }
 
-async function collectDirectories(workspaceRoot, maxDepth = 3) {
+async function collectDirectories(searchRoot, configurationRoot = searchRoot, maxDepth = 3) {
   const directories = [];
   async function visit(directory, depth) {
     if (depth >= maxDepth) return;
@@ -35,12 +39,12 @@ async function collectDirectories(workspaceRoot, maxDepth = 3) {
     for (const entry of entries) {
       if (!entry.isDirectory() || IGNORED_DIRECTORIES.has(entry.name)) continue;
       const absolutePath = join(directory, entry.name);
-      const configuredPath = normalizePath(relative(workspaceRoot, absolutePath));
+      const configuredPath = normalizeWorkspaceConfiguredPath(configurationRoot, absolutePath);
       directories.push({ absolutePath, configuredPath });
       await visit(absolutePath, depth + 1);
     }
   }
-  await visit(workspaceRoot, 0);
+  await visit(searchRoot, 0);
   return directories;
 }
 
@@ -82,11 +86,17 @@ async function suggestPath(candidates, configuredPath, expectedChildren) {
     )[0]?.configuredPath ?? null;
 }
 
-export async function inspectWorkspaceConfiguration(startPath) {
-  const workspaceRoot = await findWorkspaceRoot(startPath);
-  const config = await readConfig(workspaceRoot);
+export async function inspectWorkspaceConfiguration(
+  startPath,
+  { workspaceRoot: requestedWorkspaceRoot = null } = {},
+) {
+  const { workspaceRoot, workspaceConfigSnapshot, config } = await findOperationConfiguration(
+    startPath,
+    requestedWorkspaceRoot ? { workspaceRoot: requestedWorkspaceRoot } : {},
+  );
   assertValidConfig(config, "configure workspace paths");
-  const candidates = config.kind === "user" ? [] : await collectDirectories(workspaceRoot);
+  const searchRoot = resolve(startPath);
+  const candidates = await collectDirectories(searchRoot, workspaceRoot);
 
   const planningMissing = !(await isDirectory(
     resolveWorkspacePath(workspaceRoot, config.planning.root),
@@ -121,7 +131,7 @@ export async function inspectWorkspaceConfiguration(startPath) {
     });
   }
 
-  return { workspaceRoot, config, planning, repositoryRoots };
+  return { workspaceRoot, workspaceConfigSnapshot, config, planning, repositoryRoots };
 }
 
 export async function configureWorkspace(
@@ -131,10 +141,14 @@ export async function configureWorkspace(
     repositoryRoots = {},
     acceptSuggestions = false,
     dryRun = false,
+    workspaceRoot: requestedWorkspaceRoot = null,
+    beforeConfigPublish = null,
   } = {},
 ) {
-  const inspection = await inspectWorkspaceConfiguration(startPath);
-  const { workspaceRoot, config, planning } = inspection;
+  const inspection = await inspectWorkspaceConfiguration(startPath, {
+    workspaceRoot: requestedWorkspaceRoot,
+  });
+  const { workspaceRoot, workspaceConfigSnapshot, config, planning } = inspection;
   const unknownRootIds = Object.keys(repositoryRoots).filter(
     (rootId) => !Object.hasOwn(config.repositories.roots, rootId),
   );
@@ -146,8 +160,11 @@ export async function configureWorkspace(
   }
 
   const pending = [];
-  const selectedPlanningRoot =
+  const requestedPlanningRoot =
     planningRoot ?? (planning.missing && acceptSuggestions ? planning.suggestion : null);
+  const selectedPlanningRoot = requestedPlanningRoot
+    ? normalizeWorkspaceConfiguredPath(workspaceRoot, requestedPlanningRoot)
+    : null;
   if (planning.missing && !selectedPlanningRoot) {
     pending.push(
       `Planning root ${planning.from} is missing.${planning.suggestion ? ` Suggested: ${planning.suggestion}.` : ""}`,
@@ -163,7 +180,12 @@ export async function configureWorkspace(
         `Repository root ${root.rootId} (${root.from}) is missing.${root.suggestion ? ` Suggested: ${root.suggestion}.` : ""}`,
       );
     }
-    if (selected) selectedRepositoryRoots[root.rootId] = selected;
+    if (selected) {
+      selectedRepositoryRoots[root.rootId] = normalizeWorkspaceConfiguredPath(
+        workspaceRoot,
+        selected,
+      );
+    }
   }
   if (pending.length > 0) {
     throw new SddError("Workspace paths require configuration.", {
@@ -183,7 +205,8 @@ export async function configureWorkspace(
     })),
   ];
   for (const selected of selectedPaths) {
-    if (!(await isDirectory(resolveWorkspacePath(workspaceRoot, selected.path)))) {
+    const absolutePath = resolveWorkspacePath(workspaceRoot, selected.path);
+    if (!(await isDirectory(await resolvePhysicalPath(absolutePath)))) {
       throw new SddError(`${selected.label} does not exist: ${selected.path}`, {
         code: "CONFIG_PATH_NOT_FOUND",
       });
@@ -196,6 +219,8 @@ export async function configureWorkspace(
     nextConfig.repositories.roots[rootId] = configuredPath;
   }
   assertValidConfig(nextConfig, "configure workspace paths");
+  await assertDistinctRepositoryOwnership(workspaceRoot, nextConfig);
+  await assertValidRepositoryArtifactTopology(workspaceRoot, nextConfig);
 
   const changes = [];
   if (nextConfig.planning.root !== config.planning.root) {
@@ -211,11 +236,16 @@ export async function configureWorkspace(
       });
     }
   }
-  if (!dryRun && changes.length > 0) await writeConfig(workspaceRoot, nextConfig);
+  if (!dryRun && changes.length > 0) {
+    await writeWorkspaceConfig(workspaceRoot, nextConfig, {
+      expected: workspaceConfigSnapshot,
+      beforePublish: beforeConfigPublish,
+    });
+  }
   return {
     command: "configure",
     workspaceRoot,
-    configPath: getConfigPath(workspaceRoot),
+    workspaceConfigPath: getWorkspaceConfigPath(workspaceRoot),
     dryRun,
     changed: changes.length > 0,
     changes,

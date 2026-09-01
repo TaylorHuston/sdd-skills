@@ -1,4 +1,4 @@
 interface:
   display_name: "SDD Design"
-  short_description: "Resolve UI and interaction design readiness"
-  default_prompt: "Use $sdd-design to plan or revise this UI-bearing Change into an approved, implementation-ready experience direction without changing accepted behavior."
+  short_description: "Converge or revise UI experience direction"
+  default_prompt: "Use $sdd-design to converge this planned UI-bearing Change or revise one exact implementation candidate into an approved experience direction, then return a composable handoff without changing accepted behavior."

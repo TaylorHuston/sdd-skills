@@ -1,4 +1,4 @@
 interface:
   display_name: "SDD Review"
-  short_description: "Review SDD changes for integration"
-  default_prompt: "Use $sdd-review to run a deep local PR-style review of the active SDD change against its target branch, including SDD truth, security, manual UI confirmation, and integration readiness."
+  short_description: "Independently review one exact SDD candidate"
+  default_prompt: "Use $sdd-review to independently judge the exact candidate. Record the five universal gates, every planned and material discovered trigger with a concrete check, exact Scenario coverage, separate Spec Adherence and Implementation Quality results, findings, gaps, acceptance, and commit/tree identity in the one central review.md. Use focused risk-proportional verification, treat prior conclusions as untrusted, and do not create slice Reviews, receipts, digests, duplicate ledgers, or fixed not-applicable manifests."

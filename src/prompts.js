@@ -1,7 +1,15 @@
 import { createInterface } from "node:readline/promises";
 import { inspectWorkspaceConfiguration } from "./commands/configure.js";
-import { createInitialConfig, getConfigPath, getUserRoot } from "./config.js";
-import { pathExists } from "./fs.js";
+import { createInitialConfig, readWorkspaceConfigSnapshot } from "./config.js";
+async function hasWorkspaceConfiguration(workspaceRoot) {
+  try {
+    await readWorkspaceConfigSnapshot(workspaceRoot);
+    return true;
+  } catch (error) {
+    if (error?.code === "WORKSPACE_NOT_INITIALIZED") return false;
+    throw error;
+  }
+}
 
 function parseRepositoryRoots(value) {
   return value
@@ -11,42 +19,6 @@ function parseRepositoryRoots(value) {
 }
 
 export async function collectSetupOptions(
-  options,
-  {
-    interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY),
-    ask,
-  } = {},
-) {
-  const userRoot = getUserRoot();
-  if (options.fromWorkspace) return options;
-  if (!interactive || (await pathExists(getConfigPath(userRoot)))) return options;
-
-  let prompt = ask;
-  let interfaceInstance;
-  if (!prompt) {
-    interfaceInstance = createInterface({ input: process.stdin, output: process.stdout });
-    prompt = (question) => interfaceInstance.question(question);
-  }
-  try {
-    const defaultPlanning = options.planningRoot ?? "planning";
-    const planningRoot = options.planningRoot ?? (
-      (await prompt(`Private planning root (absolute, ~/..., or relative to home) [${defaultPlanning}]: `)).trim()
-      || defaultPlanning
-    );
-    let repositoryRoots = options.repositoryRoots;
-    if (!repositoryRoots?.length) {
-      const response = (
-        await prompt("Repository roots (comma-separated, absolute, ~/..., or relative to home) [none]: ")
-      ).trim();
-      repositoryRoots = response ? parseRepositoryRoots(response) : [];
-    }
-    return { ...options, planningRoot, repositoryRoots };
-  } finally {
-    interfaceInstance?.close();
-  }
-}
-
-export async function collectInitOptions(
   workspaceRoot,
   options,
   {
@@ -54,7 +26,7 @@ export async function collectInitOptions(
     ask,
   } = {},
 ) {
-  if (!interactive || (await pathExists(getConfigPath(workspaceRoot)))) {
+  if (!interactive || (await hasWorkspaceConfiguration(workspaceRoot))) {
     return options;
   }
 
@@ -65,18 +37,17 @@ export async function collectInitOptions(
     interfaceInstance = createInterface({ input: process.stdin, output: process.stdout });
     prompt = (question) => interfaceInstance.question(question);
   }
-
   try {
-    const planningRoot =
-      options.planningRoot ??
-      ((await prompt(
+    const planningRoot = options.planningRoot ?? (
+      (await prompt(
         `Planning documents path (relative to workspace root) [${detected.planning.root}]: `,
-      )).trim() || detected.planning.root);
-
+      )).trim()
+      || detected.planning.root
+    );
     let repositoryRoots = options.repositoryRoots;
     if (!repositoryRoots?.length) {
       const detectedRepositoryPaths = Object.values(detected.repositories.roots);
-      const detectedRoots = detectedRepositoryPaths.join(", ");
+      const detectedRoots = detectedRepositoryPaths.join(", ") || "none";
       const response = (
         await prompt(
           `Code/repository roots (comma-separated, relative to workspace root) [${detectedRoots}]: `,
@@ -84,15 +55,15 @@ export async function collectInitOptions(
       ).trim();
       repositoryRoots = response ? parseRepositoryRoots(response) : detectedRepositoryPaths;
     }
-
     return { ...options, planningRoot, repositoryRoots };
   } finally {
     interfaceInstance?.close();
   }
 }
 
+
 export async function collectConfigureOptions(
-  workspaceRoot,
+  startPath,
   options,
   {
     interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY),
@@ -101,7 +72,9 @@ export async function collectConfigureOptions(
 ) {
   if (!interactive) return options;
 
-  const inspection = await inspectWorkspaceConfiguration(workspaceRoot);
+  const inspection = await inspectWorkspaceConfiguration(startPath, {
+    ...(options.workspaceRoot ? { workspaceRoot: options.workspaceRoot } : {}),
+  });
   let prompt = ask;
   let interfaceInstance;
   if (!prompt) {

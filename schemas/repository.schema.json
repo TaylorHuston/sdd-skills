@@ -2,22 +2,37 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/TaylorHuston/sdd-skills/schemas/repository.schema.json",
   "title": "SDD Repository Configuration",
+  "description": "Artifact paths are constrained lexically here. Runtime validation additionally rejects normalized ownership of the repository root, overlapping artifact owners, and filesystem paths that escape their physical owner because JSON Schema cannot compare normalized paths or inspect the filesystem.",
+  "$defs": {
+    "nonEmptyNulFreeString": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\u0000]+$"
+    },
+    "relativePath": {
+      "description": "A non-empty repository-relative path without NUL bytes, home-directory shorthand, or a parent-directory segment. POSIX roots, Windows roots, UNC roots, and all drive prefixes are rejected.",
+      "allOf": [
+        { "$ref": "#/$defs/nonEmptyNulFreeString" },
+        { "not": { "pattern": "^~(?:$|[\\\\/])" } },
+        { "not": { "pattern": "(?:^|[\\\\/])\\.\\.(?:$|[\\\\/])" } },
+        { "not": { "pattern": "^(?:[\\\\/]|[A-Za-z]:)" } }
+      ]
+    }
+  },
   "type": "object",
   "required": ["kind", "version", "schema", "id", "artifacts"],
   "properties": {
     "kind": { "const": "repository" },
-    "version": { "const": 1 },
-    "schema": { "const": "sdd-repository-v1" },
+    "version": { "const": 2 },
+    "schema": { "const": "sdd-repository-v2" },
     "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
     "artifacts": {
       "type": "object",
-      "required": ["activeChanges", "closedChanges", "epics", "adrs", "audits"],
+      "required": ["epics", "adrs", "audits"],
       "properties": {
-        "activeChanges": { "type": "string", "minLength": 1 },
-        "closedChanges": { "type": "string", "minLength": 1 },
-        "epics": { "type": "string", "minLength": 1 },
-        "adrs": { "type": "string", "minLength": 1 },
-        "audits": { "type": "string", "minLength": 1 }
+        "epics": { "$ref": "#/$defs/relativePath" },
+        "adrs": { "$ref": "#/$defs/relativePath" },
+        "audits": { "$ref": "#/$defs/relativePath" }
       },
       "additionalProperties": false
     }

@@ -1,0 +1,4 @@
+interface:
+  display_name: "SDD Gather Context"
+  short_description: "Read the minimum context for SDD work"
+  default_prompt: "Use $sdd-gather-context with the appropriate action and focused question, then return the evidence-linked context result to the calling workflow."
